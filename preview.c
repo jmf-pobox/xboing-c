@@ -102,7 +102,7 @@ void DoPreviewWait();
 
 enum PreviewStates PreviewState;
 static int waitingFrame;
-enum PreviewStates waitMode;
+static enum PreviewStates waitMode;
 
 #if NeedFunctionPrototypes
 void SetUpPreviewLevel(Display *display, Window window, Colormap colormap)

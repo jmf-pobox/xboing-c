@@ -112,27 +112,10 @@ void sleepSync(display, ms)
     unsigned long ms;
 #endif
 {
-    struct timeval st, et;
-    long SyncTime;
-    static unsigned long accu;
-
-    gettimeofday(&st, NULL);
+    /* Delay tuned for modern hardware - binary search: 35 too fast, 3000 too slow */
     XSync(display, False);
-    gettimeofday(&et, NULL);
-
-    SyncTime = (((et.tv_sec - st.tv_sec) * 1000) +
-               ((et.tv_usec - st.tv_usec) / 1000) );
-
-/*    if ((ms) > ((1000 / 60) + SyncTime))
-        usleep(ms - SyncTime);
-*/
-    if ((ms + accu) > ((1000 / 30) + SyncTime)) 
-    {
-        usleep(ms +accu - SyncTime);
-        accu = 0;
-    }
-    else if (ms > SyncTime)
-       accu += (ms - SyncTime);
+    if (ms > 0)
+        usleep(ms * 400);
 }
 
 #if NeedFunctionPrototypes

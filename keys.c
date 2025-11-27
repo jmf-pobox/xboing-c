@@ -105,7 +105,7 @@ static int endFrame = 0;
 static int startFrame = 0;
 enum KeysStates KeysState;
 static int waitingFrame;
-enum KeysStates waitMode;
+static enum KeysStates waitMode;
 Pixmap mouse, leftarrow, rightarrow;
 Pixmap mouseM, leftarrowM, rightarrowM;
 

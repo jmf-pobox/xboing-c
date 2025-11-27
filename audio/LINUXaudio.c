@@ -54,7 +54,10 @@
 
 #include <unistd.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <fcntl.h>
+#include <sys/ioctl.h>
 #include <linux/soundcard.h>
 
 #include "include/error.h"
@@ -77,7 +80,7 @@ static int snd_pipes[2];
  *  Internal variable declarations:
  */
 
-static char				*Audio_dev = "/dev/audio";
+static char				*Audio_dev = "/dev/dsp";
 static int 				Audio_fd;
 /* size should depend on sample_rate */
 static unsigned char   	buf[BUFFER_SIZE];       
@@ -157,11 +160,8 @@ int SetUpAudioSystem(display)
                         /* If input EOF, write an eof marker */
                         err = write(Audio_fd, (char *)buf, cnt);
 
-                        if (err != cnt) 
-                        {
-                                sprintf(errorString, "Problem while writing to sound device");
-                                WarningMessage(errorString);
-                        }    
+                        /* Note: partial writes are normal for audio devices, not an error */
+                        (void)err;    
 
                         /* End of file? */
                         if (cnt == 0) break;

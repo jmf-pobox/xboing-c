@@ -100,7 +100,7 @@ static int endFrame = 0;
 static int startFrame = 0;
 enum KeysEditStates KeysEditState;
 static int waitingFrame;
-enum KeysEditStates waitMode;
+static enum KeysEditStates waitMode;
 
 #if NeedFunctionPrototypes
 void SetUpKeysEdit(Display *display, Window window, Colormap colormap)

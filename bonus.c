@@ -120,7 +120,7 @@ enum BonusStates 	BonusState;
 static Pixmap 	titlePixmap, titlePixmapM;
 static int 		ypos;
 static int 		waitingFrame;
-enum BonusStates		waitMode;
+static enum BonusStates		waitMode;
 static char 	string[80];
 static u_long 	bonusScore;
 static int 		firstTime = True;

@@ -52,6 +52,7 @@
 
 #include <stdio.h>
 #include <time.h>
+#include <X11/Xlib.h>
 
 /*
  *  Constants and macros:

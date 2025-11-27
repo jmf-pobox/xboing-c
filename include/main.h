@@ -77,9 +77,10 @@
 #define MODE_EDIT			14
 #define MODE_KEYSEDIT		15
 
-#define FAST_SPEED         	1
-#define MEDIUM_SPEED        5
-#define SLOW_SPEED          9
+/* Speed delay values in milliseconds (original was 1, 5, 9) */
+#define FAST_SPEED         	5
+#define MEDIUM_SPEED        15
+#define SLOW_SPEED          30
 
 #define MAX_TILTS			3
 

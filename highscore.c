@@ -137,7 +137,7 @@ static int endFrame = 0;
 enum HighScoreStates HighScoreState;
 static Pixmap titlePixmap, titlePixmapM;
 static int waitingFrame;
-enum HighScoreStates waitMode;
+static enum HighScoreStates waitMode;
 static int sparkley = 0;
 static int sindex = 0;
 static int si = 0;

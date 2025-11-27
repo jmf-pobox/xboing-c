@@ -107,7 +107,7 @@ static int endFrame = 0;
 static int startFrame = 0;
 enum DemoStates DemoState;
 static int waitingFrame;
-enum DemoStates waitMode;
+static enum DemoStates waitMode;
 
 #if NeedFunctionPrototypes
 void SetUpDemonstration(Display *display, Window window, Colormap colormap)

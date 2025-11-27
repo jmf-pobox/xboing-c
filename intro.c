@@ -120,7 +120,7 @@ enum IntroStates IntroState;
 Pixmap bigtitlePixmap, bigtitlePixmapM;
 Pixmap stars[12], starsM[12];
 static int waitingFrame;
-enum IntroStates waitMode;
+static enum IntroStates waitMode;
 
 #if NeedFunctionPrototypes
 void SetUpIntroduction(Display *display, Window window, Colormap colormap)

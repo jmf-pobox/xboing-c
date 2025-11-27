@@ -121,7 +121,7 @@ void DoEditWait();
 enum EditStates EditState;
 enum EditStates oldEditState;
 static int waitingFrame;
-enum EditStates waitMode;
+static enum EditStates waitMode;
 static int oldWidth, oldHeight;
 static int curBlockType;
 static int drawAction = ED_NOP;

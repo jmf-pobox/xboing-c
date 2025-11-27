@@ -1,0 +1,7 @@
+*.o
+xboing
+.xboing.scr
+version.c
+audio.c
+sounds/originals/
+sounds/*.raw

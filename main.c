@@ -229,7 +229,7 @@ void handlePaddleMoving(display)
 	Display *display;
 #endif
 {
-	static oldx = 0;
+	static int oldx = 0;
 	int x, y;
 
 	if (paddleControl == CONTROL_KEYS)
