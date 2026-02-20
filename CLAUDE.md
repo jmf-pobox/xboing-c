@@ -292,6 +292,23 @@ Match the workflow to the scope. The deciding factor is **design ambiguity**, no
 - Adding CMocka tests to the save/load subsystem (multi-file, needs code exploration) → **T2: Feature Dev**
 - Fixing a buffer overflow found by ASan (single root cause, obvious fix) → **T3: Direct**
 
+### Expert Agents
+
+Four project-specific agents in `.claude/agents/` provide domain expertise. Consult them via the Task tool or as hive-mind participants in `/feature-forge`.
+
+| Agent | Expertise | Consult when... |
+|-------|-----------|-----------------|
+| `xboing-author` | Original author persona (Justin C. Kibell). Game vision, feel, design intent. | Any change touches gameplay mechanics, physics, scoring, level design, constants, or player experience. **Must approve** gameplay-affecting changes. |
+| `c-modernization-expert` | Modern C (C11/C17/C23), sanitizers, static analysis, safe refactoring. | Modernizing legacy code, fixing compiler warnings, resolving sanitizer findings, reviewing unsafe patterns. |
+| `av-platform-expert` | SDL2, legacy X11/Xlib, ALSA/PulseAudio, asset pipeline (XPM→PNG, .au→WAV). | Porting rendering or audio subsystems, designing the SDL2 abstraction layer, converting assets. |
+| `test-expert` | CMocka, characterization testing, fuzz testing, creating testability seams. | Writing tests for legacy code, designing test harness, extracting pure functions from coupled modules. |
+
+**Workflow integration:**
+
+- **T1: Forge** — all four agents participate as hive-mind experts. `xboing-author` has veto power on gameplay changes.
+- **T2: Feature Dev** — delegate to the relevant expert(s) as subagents for exploration and review.
+- **T3: Direct** — consult `xboing-author` if the change could affect game feel; consult `c-modernization-expert` for any C code changes.
+
 ### Branch Discipline
 
 Feature work goes on feature branches. Never commit directly to main.
