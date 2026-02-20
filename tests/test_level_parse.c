@@ -22,6 +22,7 @@
 
 #include "blocks.h"
 #include "level.h"
+#include "main.h"
 #include "stage.h"
 
 /* ReadNextLevel prototype — from file.c */
@@ -52,8 +53,8 @@ static void level_path(char *buf, size_t bufsiz, int num)
 static int setup(void **state)
 {
     (void)state;
-    extern int frame;
     frame = 0;
+    levelTitle[0] = '\0';
     memset(blocks, 0, sizeof(blocks));
     return 0;
 }
@@ -231,8 +232,11 @@ static void test_grid_row_count(void **state)
     for (int c = 0; c < MAX_COL; c++)
     {
         assert_int_equal(blocks[15][c].occupied, 0);
+        assert_int_equal(blocks[15][c].blockType, NONE_BLK);
         assert_int_equal(blocks[16][c].occupied, 0);
+        assert_int_equal(blocks[16][c].blockType, NONE_BLK);
         assert_int_equal(blocks[17][c].occupied, 0);
+        assert_int_equal(blocks[17][c].blockType, NONE_BLK);
     }
 }
 

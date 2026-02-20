@@ -11,6 +11,7 @@
 
 #include <stdarg.h>
 #include <stddef.h>
+#include <stdlib.h>
 #include <setjmp.h>
 #include <cmocka.h>
 #include <math.h>
@@ -152,11 +153,16 @@ static void test_collide_bug_ballx_for_bally(void **state)
 
     ball_math_collide(&b1, &b2);
 
-    /* With the bug, the normalized direction vector is dominated by
-     * the y component (p.y=150 vs p.x=-10). The y velocities change
-     * by ±1 due to the momentum exchange in the wrong direction.
+    /* With the bug, p.y=150 dominates p.x=-10 in the direction vector.
+     * The momentum exchange produces spurious dy changes while dx is
+     * unchanged (the small px component truncates to 0 after int cast):
+     *   b1: dx=14 (unchanged), dy=+1 (spurious — from bug)
+     *   b2: dx=-14 (unchanged), dy=-1 (spurious — from bug)
      * Without the bug (p.y=0), dy would remain 0 for both balls. */
-    assert_true(b1.dy != 0 || b2.dy != 0);
+    assert_int_equal(b1.dx, 14);
+    assert_int_equal(b1.dy, 1);
+    assert_int_equal(b2.dx, -14);
+    assert_int_equal(b2.dy, -1);
 }
 
 /* TC-08: Mass ratio affects momentum transfer.
@@ -264,9 +270,12 @@ static void test_normalize_speed_zero_velocity(void **state)
 
     ball_math_normalize_speed(&dx, &dy, 5);
 
-    /* Both should be at least MIN_DX_BALL/MIN_DY_BALL */
-    assert_true(abs(dx) >= MIN_DX_BALL);
-    assert_true(abs(dy) >= MIN_DY_BALL);
+    /* Zero input → Vx=Vy=0 → stays 0 through scaling → minimum clamps:
+     * dy = MIN_DY_BALL = +2, dx = MIN_DX_BALL = +2.
+     * Note: sign is positive (not negative). For a paddle bounce,
+     * +dy means downward, which is a bug — but this characterizes it. */
+    assert_int_equal(dx, MIN_DX_BALL);
+    assert_int_equal(dy, MIN_DY_BALL);
 }
 
 /* -------------------------------------------------------------------------

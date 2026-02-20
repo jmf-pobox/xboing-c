@@ -8,7 +8,6 @@ function(xboing_add_test NAME)
     add_executable(${NAME} ${NAME}.c)
     target_include_directories(${NAME} PRIVATE
         ${CMAKE_SOURCE_DIR}/include
-        /usr/include/X11
         ${X11_INCLUDE_DIRS}
         ${XPM_INCLUDE_DIRS}
     )
