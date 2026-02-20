@@ -5,3 +5,4 @@ version.c
 audio.c
 sounds/originals/
 sounds/*.raw
+build/
