@@ -22,3 +22,15 @@ endfunction()
 # --- Test targets -----------------------------------------------------------
 
 xboing_add_test(test_skeleton)
+
+# Ball physics characterization tests (bead n9e.1)
+# Links ball_math.c directly — no X11, no game binary.
+add_executable(test_ball_math test_ball_math.c ${CMAKE_SOURCE_DIR}/ball_math.c)
+target_include_directories(test_ball_math PRIVATE
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_compile_definitions(test_ball_math PRIVATE
+    NeedFunctionPrototypes=1
+)
+target_link_libraries(test_ball_math PRIVATE ${CMOCKA_LIBRARIES} m)
+add_test(NAME test_ball_math COMMAND test_ball_math)
