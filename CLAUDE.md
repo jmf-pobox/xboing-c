@@ -268,6 +268,30 @@ Runs markdownlint on all `.md` files.
 
 ## Development Workflow
 
+### Workflow Tiers
+
+Match the workflow to the scope. The deciding factor is **design ambiguity**, not size.
+
+| Tier | Tool | When | Tracking |
+|------|------|------|----------|
+| **T1: Forge** | `/feature-forge` | Epics, cross-cutting work, competing design approaches | Beads with dependencies |
+| **T2: Feature Dev** | `/feature-dev` | Features, multi-file, clear goal but needs exploration | Beads + TodoWrite (internal) |
+| **T3: Direct** | Plan mode or manual | Tasks, bugs, obvious implementation path | Beads |
+
+**Decision flow:**
+
+1. Is there design ambiguity needing multi-perspective input? → **T1: Forge**
+2. Does it touch multiple files and benefit from codebase exploration? → **T2: Feature Dev**
+3. Otherwise → **T3: Direct** (plan mode if >3 files, manual if fewer)
+
+**Escalation only goes up.** If T3 reveals unexpected scope, escalate to T2. If T2 reveals competing design approaches, escalate to T1. Never demote mid-flight.
+
+**Game modernization examples:**
+
+- Replacing the renderer with SDL2 (architectural choice, multiple valid approaches) → **T1: Forge**
+- Adding CMocka tests to the save/load subsystem (multi-file, needs code exploration) → **T2: Feature Dev**
+- Fixing a buffer overflow found by ASan (single root cause, obvious fix) → **T3: Direct**
+
 ### Branch Discipline
 
 Feature work goes on feature branches. Never commit directly to main.
