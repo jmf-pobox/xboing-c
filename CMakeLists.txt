@@ -101,3 +101,12 @@ target_link_libraries(xboing PRIVATE
     ${X11_LIBRARIES}
     m
 )
+
+# --- Tests ------------------------------------------------------------------
+
+option(BUILD_TESTING "Build unit tests" ON)
+if(BUILD_TESTING)
+    pkg_check_modules(CMOCKA REQUIRED cmocka)
+    enable_testing()
+    add_subdirectory(tests)
+endif()
