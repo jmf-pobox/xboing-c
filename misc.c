@@ -134,19 +134,14 @@ void DrawLine(display, window, x, y, x2, y2, colour, width)
 #endif
 {
 	/* Change the width of the line */
-	XSetLineAttributes(display, gcxor, width, LineSolid, CapProjecting, 
-		JoinMiter);
-	XSetLineAttributes(display, gcand, width, LineSolid, CapProjecting, 
+	XSetLineAttributes(display, gccopy, width, LineSolid, CapProjecting,
 		JoinMiter);
 
-	/* Set to the desired colours */
-	XSetBackground(display, gcxor, colour);
-	XSetForeground(display, gcxor, colour);
+	/* Set the foreground color */
+	XSetForeground(display, gccopy, colour);
 
-	/* Now draw the line */
-	XDrawLine(display, window, gcxor, x, y, x2, y2);
-	XDrawLine(display, window, gcand, x, y, x2, y2);
-	XDrawLine(display, window, gcxor, x, y, x2, y2);
+	/* Draw the line using simple copy mode (works on TrueColor displays) */
+	XDrawLine(display, window, gccopy, x, y, x2, y2);
 }
 
 #if NeedFunctionPrototypes
@@ -193,11 +188,6 @@ void DrawShadowText(display, window, font, string, x, y, colour)
 	int colour;
 #endif
 {
-    int len;
-
-	/* String length */
-    len = strlen(string);
-
 	/* Draw the text with a shadow */
     DrawText(display, window, x+2, y + 2, font, black, string, -1);
     DrawText(display, window, x, y, font, colour, string, -1);
@@ -256,17 +246,13 @@ void DrawText(display, window, x, y, font, colour, text, numChar)
 		len = numChar;
 
 	/* Change to the new font */
-	XSetFont(display, gcxor, font->fid);
-	XSetFont(display, gcand, font->fid);
+	XSetFont(display, gccopy, font->fid);
 
-	/* Change the drawing function */
-	XSetBackground(display, gcxor, colour);
-	XSetForeground(display, gcxor, colour);
+	/* Set the foreground color */
+	XSetForeground(display, gccopy, colour);
 
-	/* Draw the string into the drawable */
-	XDrawString(display, window, gcxor, x, y + font->ascent, text, len);
-	XDrawString(display, window, gcand, x, y + font->ascent, text, len);
-	XDrawString(display, window, gcxor, x, y + font->ascent, text, len);
+	/* Draw the string using simple copy mode (works on TrueColor displays) */
+	XDrawString(display, window, gccopy, x, y + font->ascent, text, len);
 }
 
 #if NeedFunctionPrototypes

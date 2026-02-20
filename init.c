@@ -220,10 +220,11 @@ static void InitialiseColourNames(display, colormap)
 	tann    = ColourNameToPixel(display, colormap, "tan");
 	yellow  = ColourNameToPixel(display, colormap, "yellow");
 	green   = ColourNameToPixel(display, colormap, "green");
-	white   = ColourNameToPixel(display, colormap, "white");
-	black   = ColourNameToPixel(display, colormap, "black");
+	white   = WhitePixel(display, DefaultScreen(display));
+	black   = BlackPixel(display, DefaultScreen(display));
 	purple  = ColourNameToPixel(display, colormap, "purple");
 	blue    = ColourNameToPixel(display, colormap, "blue");
+
 }
 
 #if NeedFunctionPrototypes
