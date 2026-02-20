@@ -46,3 +46,39 @@ target_compile_definitions(test_score PRIVATE
 )
 target_link_libraries(test_score PRIVATE ${CMOCKA_LIBRARIES})
 add_test(NAME test_score COMMAND test_score)
+
+# Level parsing characterization tests (bead n9e.3)
+# Compiles production files (file.c, blocks.c, level.c, error.c) with
+# X11 function stubs. Tests call ReadNextLevel(NULL, 0, path, False).
+add_executable(test_level_parse
+    test_level_parse.c
+    stubs_x11_xboing.c
+    ${CMAKE_SOURCE_DIR}/file.c
+    ${CMAKE_SOURCE_DIR}/blocks.c
+    ${CMAKE_SOURCE_DIR}/level.c
+    ${CMAKE_SOURCE_DIR}/error.c
+)
+target_include_directories(test_level_parse PRIVATE
+    ${CMAKE_SOURCE_DIR}/include
+    ${CMAKE_SOURCE_DIR}
+    /usr/include/X11
+    ${X11_INCLUDE_DIRS}
+    ${XPM_INCLUDE_DIRS}
+)
+target_compile_definitions(test_level_parse PRIVATE
+    NeedFunctionPrototypes=1
+    LEVELS_DIR="${CMAKE_SOURCE_DIR}/levels"
+    READMEP_FILE="./docs/problems.doc"
+    "HIGH_SCORE_FILE=\"./.xboing.scr\""
+    "LEVEL_INSTALL_DIR=\"./levels\""
+    "SOUNDS_DIR=\"./sounds\""
+    "AUDIO_AVAILABLE=\"True\""
+    "AUDIO_FILE=\"audio/LINUXaudio.c\""
+)
+target_compile_options(test_level_parse PRIVATE
+    -Wno-unused-result
+    -Wno-format-overflow
+    -Wno-format-truncation
+)
+target_link_libraries(test_level_parse PRIVATE ${CMOCKA_LIBRARIES} m)
+add_test(NAME test_level_parse COMMAND test_level_parse)
