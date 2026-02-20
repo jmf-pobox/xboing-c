@@ -5,4 +5,4 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-exec ./xboing -usedefcmap -sound "$@"
+exec ./xboing -usedefcmap -sound "$@" -speed 9
