@@ -94,13 +94,21 @@ target_include_directories(xboing PRIVATE
 # the bead that will remove it.  -Werror gets added to xboing when the last
 # suppression is removed (xboing-cro).
 
+include(CheckCCompilerFlag)
+
 set(XBOING_STRICT_WARNINGS
     -Wall -Wextra -Wpedantic
     -Wconversion -Wshadow -Wdouble-promotion
-    -Wformat=2 -Wformat-overflow=2
+    -Wformat=2
     -Wnull-dereference -Wuninitialized
     -Wstrict-prototypes -Wold-style-definition
 )
+
+# -Wformat-overflow=2 is GCC-only (Clang lacks the =N level syntax).
+check_c_compiler_flag(-Wformat-overflow=2 HAVE_WFORMAT_OVERFLOW_2)
+if(HAVE_WFORMAT_OVERFLOW_2)
+    list(APPEND XBOING_STRICT_WARNINGS -Wformat-overflow=2)
+endif()
 
 set(XBOING_LEGACY_SUPPRESSIONS
     # Count | Removal bead   | Category
