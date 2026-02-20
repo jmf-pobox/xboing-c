@@ -9,7 +9,7 @@
  * values. No global state is read or written.
  */
 
-#include <sys/types.h>   /* u_long */
+#include <sys/types.h> /* u_long */
 
 /*
  * Apply x2/x4 multiplier to a raw point increment.
@@ -45,8 +45,8 @@ int score_extra_life_threshold(long score_value);
  *   num_bullets   <- GetNumberBullets()
  *   level_adj     <- (int)level - GetStartingLevel() + 1
  */
-u_long score_compute_bonus(int time_bonus, int num_bonus, int max_bonus,
-                           int num_bullets, int level_adj);
+u_long score_compute_bonus(int time_bonus, int num_bonus, int max_bonus, int num_bullets,
+                           int level_adj);
 
 /*
  * Return the hit point value for a block type.

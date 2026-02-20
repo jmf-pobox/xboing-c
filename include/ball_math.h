@@ -27,8 +27,7 @@ float ball_math_init(void);
  *
  * machine_eps: the value returned by ball_math_init().
  */
-int ball_math_will_collide(const BALL *ball1, const BALL *ball2,
-                           float *time, float machine_eps);
+int ball_math_will_collide(const BALL *ball1, const BALL *ball2, float *time, float machine_eps);
 
 /*
  * Compute new velocities after ball-ball elastic collision.
@@ -54,8 +53,8 @@ void ball_math_collide(BALL *ball1, BALL *ball2);
  *
  * Ensures dy <= -MIN_DY_BALL (ball always moves upward after paddle hit).
  */
-void ball_math_paddle_bounce(int vx, int vy, int hit_pos, int pad_size,
-                             int paddle_dx, int *new_dx, int *new_dy);
+void ball_math_paddle_bounce(int vx, int vy, int hit_pos, int pad_size, int paddle_dx, int *new_dx,
+                             int *new_dy);
 
 /*
  * Normalize ball speed to match the given speed level.
