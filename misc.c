@@ -112,10 +112,10 @@ void sleepSync(display, ms)
     unsigned long ms;
 #endif
 {
-    /* Delay tuned for modern hardware - binary search: 35 too fast, 3000 too slow */
+    /* Delay tuned for modern hardware */
     XSync(display, False);
     if (ms > 0)
-        usleep(ms * 400);
+        usleep(ms * 300);
 }
 
 #if NeedFunctionPrototypes

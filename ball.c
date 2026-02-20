@@ -1512,10 +1512,10 @@ static int CheckRegions(display, window, row, col, x, y, i)
     if (col < 0 || col >= MAX_COL) return REGION_NONE;
 
     blockP = &blocks[row][col];
-    blockPleft = &blocks[row][col-1];
-    blockPright = &blocks[row][col+1];
-    blockPtop = &blocks[row-1][col];
-    blockPbottom = &blocks[row+1][col];
+    blockPleft = (col > 0)            ? &blocks[row][col-1] : NULL;
+    blockPright = (col < MAX_COL - 1) ? &blocks[row][col+1] : NULL;
+    blockPtop = (row > 0)             ? &blocks[row-1][col] : NULL;
+    blockPbottom = (row < MAX_ROW - 1) ? &blocks[row+1][col] : NULL;
 
     /* If blocks is occupied then check for collision */
     if (blockP->occupied == 1 && blockP->exploding == False)
@@ -1529,7 +1529,7 @@ static int CheckRegions(display, window, row, col, x, y, i)
             if (XRectInRegion(blockP->regionLeft, x - BALL_WC, y - BALL_HC,
                 BALL_WIDTH, BALL_HEIGHT) != RectangleOut)
 			{
-            	if (blockPleft->occupied == False)
+            	if (blockPleft == NULL || blockPleft->occupied == False)
                 	region |= REGION_LEFT;
 			}
 
@@ -1537,7 +1537,7 @@ static int CheckRegions(display, window, row, col, x, y, i)
             if (XRectInRegion(blockP->regionRight, x - BALL_WC, y - BALL_HC,
                 BALL_WIDTH, BALL_HEIGHT) != RectangleOut)
 			{
-            	if (blockPright->occupied == False)
+            	if (blockPright == NULL || blockPright->occupied == False)
                 	region |= REGION_RIGHT;
 			}
 
@@ -1545,7 +1545,7 @@ static int CheckRegions(display, window, row, col, x, y, i)
             if (XRectInRegion(blockP->regionBottom, x - BALL_WC, y - BALL_HC,
                 BALL_WIDTH, BALL_HEIGHT) != RectangleOut)
 			{
-            	if (blockPbottom->occupied == False)
+            	if (blockPbottom == NULL || blockPbottom->occupied == False)
                 	region |= REGION_BOTTOM;
 			}
 
@@ -1553,7 +1553,7 @@ static int CheckRegions(display, window, row, col, x, y, i)
             if (XRectInRegion(blockP->regionTop, x - BALL_WC, y - BALL_HC,
                 BALL_WIDTH, BALL_HEIGHT) != RectangleOut)
 			{
-            	if (blockPtop->occupied == False)
+            	if (blockPtop == NULL || blockPtop->occupied == False)
                 	region |= REGION_TOP;
 			}
         }
@@ -1565,7 +1565,7 @@ static int CheckRegions(display, window, row, col, x, y, i)
             if (XRectInRegion(blockP->regionBottom, x - BALL_WC, y - BALL_HC,
                 BALL_WIDTH, BALL_HEIGHT) != RectangleOut)
 			{
-            	if (blockPbottom->occupied == False)
+            	if (blockPbottom == NULL || blockPbottom->occupied == False)
                 	region |= REGION_BOTTOM;
 			}
 
@@ -1573,7 +1573,7 @@ static int CheckRegions(display, window, row, col, x, y, i)
             if (XRectInRegion(blockP->regionTop, x - BALL_WC, y - BALL_HC,
                 BALL_WIDTH, BALL_HEIGHT) != RectangleOut)
 			{
-            	if (blockPtop->occupied == False)
+            	if (blockPtop == NULL || blockPtop->occupied == False)
                 	region |= REGION_TOP;
 			}
 
@@ -1581,7 +1581,7 @@ static int CheckRegions(display, window, row, col, x, y, i)
             if (XRectInRegion(blockP->regionLeft, x - BALL_WC, y - BALL_HC,
                 BALL_WIDTH, BALL_HEIGHT) != RectangleOut)
 			{
-            	if (blockPleft->occupied == False)
+            	if (blockPleft == NULL || blockPleft->occupied == False)
                 	region |= REGION_LEFT;
 			}
 
@@ -1589,7 +1589,7 @@ static int CheckRegions(display, window, row, col, x, y, i)
             if (XRectInRegion(blockP->regionRight, x - BALL_WC, y - BALL_HC,
                 BALL_WIDTH, BALL_HEIGHT) != RectangleOut)
 			{
-            	if (blockPright->occupied == False)
+            	if (blockPright == NULL || blockPright->occupied == False)
                 	region |= REGION_RIGHT;
 			}
         }
