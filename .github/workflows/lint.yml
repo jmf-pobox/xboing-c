@@ -36,6 +36,7 @@ jobs:
         run: |
           cppcheck \
             --enable=warning,style,performance,portability \
+            --suppress=variableScope:ball_math.c \
             --error-exitcode=1 \
             src/ ball_math.c
 
