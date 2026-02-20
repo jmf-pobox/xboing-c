@@ -1480,12 +1480,10 @@ static void handleEventLoop(display)
 		/* Sleep a bit if not iconified */
 		if (iconified == False)
 		{
-			/* Only delay during gameplay - animations run at full speed */
 			if (mode == MODE_GAME || mode == MODE_BALL_WAIT)
 				sleepSync(display, speed);
-			/* Other modes just sync without delay */
 			else
-				XSync(display, False);
+				sleepSync(display, 3);
 		}
 
 		/* handle all game states and animations */
