@@ -14,6 +14,7 @@ function(xboing_add_test NAME)
     target_compile_definitions(${NAME} PRIVATE
         NeedFunctionPrototypes=1
     )
+    target_compile_options(${NAME} PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
     target_link_libraries(${NAME} PRIVATE ${CMOCKA_LIBRARIES})
     add_test(NAME ${NAME} COMMAND ${NAME})
 endfunction()
@@ -31,6 +32,7 @@ target_include_directories(test_ball_math PRIVATE
 target_compile_definitions(test_ball_math PRIVATE
     NeedFunctionPrototypes=1
 )
+target_compile_options(test_ball_math PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
 target_link_libraries(test_ball_math PRIVATE ${CMOCKA_LIBRARIES} m)
 add_test(NAME test_ball_math COMMAND test_ball_math)
 
@@ -43,6 +45,7 @@ target_include_directories(test_score PRIVATE
 target_compile_definitions(test_score PRIVATE
     NeedFunctionPrototypes=1
 )
+target_compile_options(test_score PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
 target_link_libraries(test_score PRIVATE ${CMOCKA_LIBRARIES})
 add_test(NAME test_score COMMAND test_score)
 
@@ -74,10 +77,17 @@ target_compile_definitions(test_level_parse PRIVATE
     "AUDIO_AVAILABLE=\"True\""
     "AUDIO_FILE=\"audio/LINUXaudio.c\""
 )
-target_compile_options(test_level_parse PRIVATE
-    -Wno-unused-result
-    -Wno-format-overflow
-    -Wno-format-truncation
+target_compile_options(test_level_parse PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+
+# Legacy production sources compiled into this test get the full suppression
+# list and -Wno-error so they don't block the build.
+set_source_files_properties(
+    ${CMAKE_SOURCE_DIR}/file.c
+    ${CMAKE_SOURCE_DIR}/blocks.c
+    ${CMAKE_SOURCE_DIR}/level.c
+    ${CMAKE_SOURCE_DIR}/error.c
+    PROPERTIES COMPILE_OPTIONS "${XBOING_LEGACY_SUPPRESSIONS};-Wno-error"
 )
+
 target_link_libraries(test_level_parse PRIVATE ${CMOCKA_LIBRARIES} m)
 add_test(NAME test_level_parse COMMAND test_level_parse)
