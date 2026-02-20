@@ -84,14 +84,48 @@ target_include_directories(xboing PRIVATE
     ${XPM_INCLUDE_DIRS}
 )
 
-# --- Compile options (match Makefile) ---------------------------------------
-# Strict warnings deferred to xboing-91a.6 — this matches the Makefile flags.
+# --- Compiler warning policy ------------------------------------------------
+#
+# Two-tier policy (xboing-91a.6):
+#   Tier 1 — strict + -Werror: test targets (modernized code, zero warnings).
+#   Tier 2 — strict + suppressions, no -Werror: xboing target (legacy code).
+#
+# Each suppression documents its warning count (from diagnostic build) and
+# the bead that will remove it.  -Werror gets added to xboing when the last
+# suppression is removed (xboing-cro).
+
+set(XBOING_STRICT_WARNINGS
+    -Wall -Wextra -Wpedantic
+    -Wconversion -Wshadow -Wdouble-promotion
+    -Wformat=2 -Wformat-overflow=2
+    -Wnull-dereference -Wuninitialized
+    -Wstrict-prototypes -Wold-style-definition
+)
+
+set(XBOING_LEGACY_SUPPRESSIONS
+    # Count | Removal bead   | Category
+    -Wno-conversion              # 114 | xboing-cro.2 | implicit narrowing
+    -Wno-sign-conversion         # 104 | xboing-cro.2 | signed/unsigned mismatch
+    -Wno-unused-parameter        # 106 | xboing-cro.2 | unused function params
+    -Wno-shadow                  #  51 | xboing-cro.2 | variable shadowing
+    -Wno-double-promotion        #  27 | xboing-cro.2 | float→double promotion
+    -Wno-float-conversion        #  18 | xboing-cro.2 | float truncation
+    -Wno-misleading-indentation  #  15 | xboing-cro.3 | indentation vs braces
+    -Wno-sign-compare            #   4 | xboing-cro.2 | signed/unsigned compare
+    -Wno-unused-but-set-variable #   4 | xboing-cro.2 | set but never read
+    -Wno-unused-variable         #   3 | xboing-cro.2 | declared but unused
+    -Wno-implicit-function-declaration #  3 | xboing-cro.1 | missing #include
+    -Wno-format-y2k              #   3 | xboing-cro.2 | %y in strftime
+    -Wno-return-type             #   2 | xboing-cro.1 | missing return
+    -Wno-pointer-compare         #   2 | xboing-cro.2 | suspicious comparison
+    -Wno-overflow                #   1 | xboing-cro.2 | integer overflow
+    -Wno-stringop-overread       #   1 | xboing-cro.2 | out-of-bounds read
+    -Wno-unused-function         #   1 | xboing-cro.2 | unreferenced static
+)
 
 target_compile_options(xboing PRIVATE
-    -Wall
-    -Wno-unused-result
-    -Wno-format-overflow
-    -Wno-format-truncation
+    ${XBOING_STRICT_WARNINGS}
+    ${XBOING_LEGACY_SUPPRESSIONS}
 )
 
 # --- Link libraries ---------------------------------------------------------
