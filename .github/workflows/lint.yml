@@ -1,0 +1,50 @@
+name: Lint
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  clang-format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install clang-format
+        run: sudo apt-get update && sudo apt-get install -y clang-format
+
+      - name: Check formatting (modernized files only)
+        run: |
+          clang-format --dry-run --Werror \
+            src/*.c \
+            ball_math.c \
+            include/block_types.h \
+            include/ball_types.h \
+            include/ball_math.h \
+            include/score_logic.h
+
+  cppcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install cppcheck
+        run: sudo apt-get update && sudo apt-get install -y cppcheck
+
+      - name: cppcheck (modernized files - strict)
+        run: |
+          cppcheck \
+            --enable=warning,style,performance,portability \
+            --suppress=variableScope:ball_math.c \
+            --error-exitcode=1 \
+            src/ ball_math.c
+
+      - name: cppcheck (legacy files - informational)
+        run: |
+          cppcheck \
+            --enable=warning,style,performance,portability \
+            --suppress=missingIncludeSystem \
+            -I include/ \
+            $(ls *.c | grep -v '^ball_math\.c$') \
+            || true

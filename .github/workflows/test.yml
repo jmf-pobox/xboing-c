@@ -1,0 +1,35 @@
+name: Build & Test
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - preset: debug
+            build_dir: build
+          - preset: asan
+            build_dir: build-asan
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake pkg-config libx11-dev libxpm-dev libcmocka-dev
+
+      - name: Configure (${{ matrix.preset }})
+        run: cmake --preset ${{ matrix.preset }}
+
+      - name: Build
+        run: cmake --build ${{ matrix.build_dir }}
+
+      - name: Test
+        run: ctest --test-dir ${{ matrix.build_dir }} --output-on-failure

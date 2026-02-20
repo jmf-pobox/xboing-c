@@ -9,19 +9,19 @@
  * of the original modules, including any quirks. Do not fix bugs here.
  */
 
-#include <sys/types.h>
 #include "score_logic.h"
 #include "block_types.h"
+#include <sys/types.h>
 
 /* From level.c:90 */
-#define NEW_LIVE_SCORE_INC  100000L
+#define NEW_LIVE_SCORE_INC 100000L
 
 /* From bonus.c:91-95 */
-#define BONUS_COIN_SCORE    3000
-#define SUPER_BONUS_SCORE   50000
-#define BULLET_SCORE        500
-#define LEVEL_SCORE         100
-#define TIME_BONUS_POINTS   100
+#define BONUS_COIN_SCORE 3000
+#define SUPER_BONUS_SCORE 50000
+#define BULLET_SCORE 500
+#define LEVEL_SCORE 100
+#define TIME_BONUS_POINTS 100
 
 u_long score_apply_multiplier(u_long inc, int x2_active, int x4_active)
 {
@@ -42,8 +42,8 @@ int score_extra_life_threshold(long score_value)
     return (int)(score_value / NEW_LIVE_SCORE_INC);
 }
 
-u_long score_compute_bonus(int time_bonus, int num_bonus, int max_bonus,
-                           int num_bullets, int level_adj)
+u_long score_compute_bonus(int time_bonus, int num_bonus, int max_bonus, int num_bullets,
+                           int level_adj)
 {
     /* Replicates ComputeAndAddBonusScore() (bonus.c:838-888). */
     u_long total = 0;

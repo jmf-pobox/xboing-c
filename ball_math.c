@@ -9,16 +9,16 @@
  * and file separate beads.
  */
 
-#include <math.h>
 #include "ball_math.h"
+#include <math.h>
 
 /* SQR returns the square of x */
 #ifndef SQR
-#define SQR(x) ((x)*(x))
+#define SQR(x) ((x) * (x))
 #endif
 
 #ifndef MIN
-#define MIN(a,b) ((a)<(b) ? (a):(b))
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
 #endif
 
 /*
@@ -35,8 +35,7 @@ float ball_math_init(void)
     return (float)sqrt((double)MINFLOAT);
 }
 
-int ball_math_will_collide(const BALL *ball1, const BALL *ball2,
-                           float *time, float machine_eps)
+int ball_math_will_collide(const BALL *ball1, const BALL *ball2, float *time, float machine_eps)
 {
     /*
      * Calculate when 2 balls will collide.
@@ -91,7 +90,7 @@ void ball_math_collide(BALL *ball1, BALL *ball2)
     float k, plen, massrate;
 
     px = (float)(ball1->ballx - ball2->ballx);
-    py = (float)(ball1->ballx - ball2->bally);  /* BUG: ballx not bally */
+    py = (float)(ball1->ballx - ball2->bally); /* BUG: ballx not bally */
     vx = (float)(ball1->dx - ball2->dx);
     vy = (float)(ball1->dy - ball2->dy);
 
@@ -110,8 +109,8 @@ void ball_math_collide(BALL *ball1, BALL *ball2)
     ball2->dy += (int)(k * py);
 }
 
-void ball_math_paddle_bounce(int vx, int vy, int hit_pos, int pad_size,
-                             int paddle_dx, int *new_dx, int *new_dy)
+void ball_math_paddle_bounce(int vx, int vy, int hit_pos, int pad_size, int paddle_dx, int *new_dx,
+                             int *new_dy)
 {
     /*
      * Compute paddle bounce reflection.
@@ -167,12 +166,13 @@ void ball_math_normalize_speed(int *dx, int *dy, int speed_level)
     Vy = (float)*dy;
     Vs = (float)sqrt((double)(Vx * Vx + Vy * Vy));
 
-    alpha = (float)sqrt((double)((float)MAX_X_VEL * (float)MAX_X_VEL +
-                                  (float)MAX_Y_VEL * (float)MAX_Y_VEL));
+    alpha = (float)sqrt(
+        (double)((float)MAX_X_VEL * (float)MAX_X_VEL + (float)MAX_Y_VEL * (float)MAX_Y_VEL));
     alpha /= 9.0f; /* number of speed levels */
     alpha *= (float)speed_level;
 
-    if (Vs == 0.0f) Vs = 1.0f;
+    if (Vs == 0.0f)
+        Vs = 1.0f;
     beta = alpha / Vs;
 
     Vx *= beta;
