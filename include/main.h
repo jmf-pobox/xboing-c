@@ -92,7 +92,6 @@
  *  Function prototypes:
  */
 
-#if NeedFunctionPrototypes
 void SetGameSpeed(int delay);
 int GetWarpSpeed(void);
 int paddleIsMoving(void);
@@ -102,17 +101,6 @@ int GetPaddleControlMode(void);
 void SelectiveRedraw(Display *display);
 void handlePaddleMoving(Display *display);
 void SetTiltsZero(void);
-#else
-void SetTiltsZero();
-int GetWarpSpeed();
-void handlePaddleMoving();
-void SelectiveRedraw();
-int GetPaddleControlMode();
-void SetControlMode();
-void SetGameSpeed();
-int paddleIsMoving();
-void SetUserSpeed();
-#endif
 
 extern int frame, mode, oldMode, modeSfx, gameActive;
 extern time_t pausedTime;

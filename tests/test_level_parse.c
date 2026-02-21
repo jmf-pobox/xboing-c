@@ -26,12 +26,8 @@
 #include "stage.h"
 
 /* ReadNextLevel prototype — from file.c */
-#if NeedFunctionPrototypes
 extern int ReadNextLevel(Display *display, Window window, char *levelName,
                          int draw);
-#else
-extern int ReadNextLevel();
-#endif
 
 /*
  * Path to the levels/ directory. CMake passes this as a compile definition.

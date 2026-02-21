@@ -14,12 +14,7 @@
 
 static int audioEnabled = 0;
 
-#if NeedFunctionPrototypes
 int SetUpAudioSystem(Display *display)
-#else
-int SetUpAudioSystem(display)
-    Display *display;
-#endif
 {
     /* Check if sox play is available */
     if (system("which play > /dev/null 2>&1") == 0) {
@@ -30,22 +25,12 @@ int SetUpAudioSystem(display)
     return False;
 }
 
-#if NeedFunctionPrototypes
 void FreeAudioSystem(void)
-#else
-void FreeAudioSystem()
-#endif
 {
     audioEnabled = 0;
 }
 
-#if NeedFunctionPrototypes
 void playSoundFile(char *filename, int volume)
-#else
-void playSoundFile(filename, volume)
-    char *filename;
-    int volume;
-#endif
 {
     char command[512];
     char *soundDir;
@@ -74,31 +59,18 @@ void playSoundFile(filename, volume)
     waitpid(-1, NULL, WNOHANG);
 }
 
-#if NeedFunctionPrototypes
 void audioDeviceEvents(void)
-#else
-void audioDeviceEvents()
-#endif
 {
     /* Reap zombie processes */
     waitpid(-1, NULL, WNOHANG);
 }
 
-#if NeedFunctionPrototypes
 void SetMaximumVolume(int Volume)
-#else
-void SetMaximumVolume(Volume)
-    int Volume;
-#endif
 {
     /* Volume control not implemented */
 }
 
-#if NeedFunctionPrototypes
 int GetMaximumVolume(void)
-#else
-int GetMaximumVolume()
-#endif
 {
     return 100;
 }
