@@ -91,3 +91,8 @@ set_source_files_properties(
 
 target_link_libraries(test_level_parse PRIVATE ${CMOCKA_LIBRARIES} m)
 add_test(NAME test_level_parse COMMAND test_level_parse)
+
+# Save/load round-trip characterization tests (bead n9e.4)
+# Pure format tests — no production .c files linked. Tests the binary
+# file format at the byte level using struct definitions from headers.
+xboing_add_test(test_save_load)
