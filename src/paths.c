@@ -89,7 +89,7 @@ static void parse_data_dirs(paths_config_t *cfg, const char *dirs)
     tmp[len] = '\0';
 
     char *saveptr = NULL;
-    char *tok = strtok_r(tmp, ":", &saveptr);
+    const char *tok = strtok_r(tmp, ":", &saveptr);
     while (tok != NULL && cfg->xdg_data_dirs_count < PATHS_MAX_DATA_DIRS)
     {
         if (tok[0] != '\0')
