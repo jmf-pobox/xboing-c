@@ -362,8 +362,9 @@ void ShutDown(display, exit_code, message)
 {
 	/* This is the last function called when exiting */
 
-	/* Remove the colour map */
-	if (colormap) XUninstallColormap(display, colormap);
+	/* Remove the colour map (skip if using the default — we didn't install it) */
+	if (colormap && colormap != XDefaultColormap(display, XDefaultScreen(display)))
+		XUninstallColormap(display, colormap);
 
 	/* Close the audio device if available and wanted */
 	if (noSound == False)
@@ -993,11 +994,17 @@ Display *InitialiseGame(argv, argc)
 
 	DEBUG("Display system checked.")
 
-	/* Create our own colour map or use the default one */
-	if (useDefaultColourmap == True)
+	/* Create our own colour map or use the default one.
+	 * TrueColor visuals use direct RGB encoding, so a private colormap
+	 * provides no benefit. Worse, XCreateColormap may return a colormap
+	 * bound to a TrueColor visual that differs from DefaultVisual, causing
+	 * a BadMatch in XCreateSimpleWindow (which inherits DefaultVisual).
+	 * Auto-detect TrueColor and use the default colormap to avoid this.
+	 */
+	if (useDefaultColourmap == True || visual_info.class == TrueColor)
 		colormap = XDefaultColormap(display, screen_num);
 	else
-		colormap = XCreateColormap(display, RootWindow(display, screen_num), 
+		colormap = XCreateColormap(display, RootWindow(display, screen_num),
 			visual_info.visual, AllocNone);
 
 	DEBUG("Colourmap created.")
@@ -1095,8 +1102,12 @@ Display *InitialiseGame(argv, argc)
     /* Actually map the main window */
     XMapWindow(display, mainWindow);
 
-	/* Install our new colormap into the server list */
-	XInstallColormap(display, colormap);
+	/* Install our new colormap into the server list.
+	 * Skip if using the default colormap — installing it is a no-op that
+	 * can confuse some window managers.
+	 */
+	if (colormap != XDefaultColormap(display, XDefaultScreen(display)))
+		XInstallColormap(display, colormap);
 
 	DEBUG("Entering main loop.")
 
