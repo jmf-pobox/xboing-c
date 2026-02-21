@@ -10,8 +10,7 @@ CFLAGS = -O2 -Wall -Wno-unused-result -Wno-format-overflow -Wno-format-truncatio
          -DSOUNDS_DIR=\"./sounds\" \
          -DREADMEP_FILE=\"./docs/problems.doc\" \
          -DAUDIO_AVAILABLE=\"True\" \
-         -DAUDIO_FILE=\"audio/LINUXaudio.c\" \
-         -DNeedFunctionPrototypes=1
+         -DAUDIO_FILE=\"audio/LINUXaudio.c\"
 
 LDFLAGS =
 LIBS = -lXpm -lX11 -lm

@@ -72,7 +72,6 @@ target_compile_definitions(xboing PRIVATE
     "READMEP_FILE=\"./docs/problems.doc\""
     "AUDIO_AVAILABLE=\"True\""
     "AUDIO_FILE=\"audio/LINUXaudio.c\""
-    NeedFunctionPrototypes=1
 )
 
 # --- Include directories ----------------------------------------------------

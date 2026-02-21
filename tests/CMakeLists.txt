@@ -11,9 +11,6 @@ function(xboing_add_test NAME)
         ${X11_INCLUDE_DIRS}
         ${XPM_INCLUDE_DIRS}
     )
-    target_compile_definitions(${NAME} PRIVATE
-        NeedFunctionPrototypes=1
-    )
     target_compile_options(${NAME} PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
     target_link_libraries(${NAME} PRIVATE ${CMOCKA_LIBRARIES})
     add_test(NAME ${NAME} COMMAND ${NAME})
@@ -29,9 +26,6 @@ add_executable(test_ball_math test_ball_math.c ${CMAKE_SOURCE_DIR}/ball_math.c)
 target_include_directories(test_ball_math PRIVATE
     ${CMAKE_SOURCE_DIR}/include
 )
-target_compile_definitions(test_ball_math PRIVATE
-    NeedFunctionPrototypes=1
-)
 target_compile_options(test_ball_math PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
 target_link_libraries(test_ball_math PRIVATE ${CMOCKA_LIBRARIES} m)
 add_test(NAME test_ball_math COMMAND test_ball_math)
@@ -41,9 +35,6 @@ add_test(NAME test_ball_math COMMAND test_ball_math)
 add_executable(test_score test_score.c ${CMAKE_SOURCE_DIR}/src/score_logic.c)
 target_include_directories(test_score PRIVATE
     ${CMAKE_SOURCE_DIR}/include
-)
-target_compile_definitions(test_score PRIVATE
-    NeedFunctionPrototypes=1
 )
 target_compile_options(test_score PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
 target_link_libraries(test_score PRIVATE ${CMOCKA_LIBRARIES})
@@ -68,7 +59,6 @@ target_include_directories(test_level_parse PRIVATE
     ${XPM_INCLUDE_DIRS}
 )
 target_compile_definitions(test_level_parse PRIVATE
-    NeedFunctionPrototypes=1
     LEVELS_DIR="${CMAKE_SOURCE_DIR}/levels"
     READMEP_FILE="./docs/problems.doc"
     "HIGH_SCORE_FILE=\"./.xboing.scr\""
@@ -108,7 +98,6 @@ target_include_directories(test_blocks PRIVATE
     ${XPM_INCLUDE_DIRS}
 )
 target_compile_definitions(test_blocks PRIVATE
-    NeedFunctionPrototypes=1
     LEVELS_DIR="${CMAKE_SOURCE_DIR}/levels"
     READMEP_FILE="./docs/problems.doc"
     "HIGH_SCORE_FILE=\"./.xboing.scr\""
