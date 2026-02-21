@@ -122,6 +122,18 @@ set_source_files_properties(
 target_link_libraries(test_blocks PRIVATE ${CMOCKA_LIBRARIES} m)
 add_test(NAME test_blocks COMMAND test_blocks)
 
+# XDG path resolution tests (bead xboing-ifb.2)
+# Links paths.c directly — no X11, no game binary.
+# Tests run from the source root so CWD fallback can find ./levels/ and ./sounds/.
+add_executable(test_paths test_paths.c ${CMAKE_SOURCE_DIR}/src/paths.c)
+target_include_directories(test_paths PRIVATE
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_compile_options(test_paths PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+target_link_libraries(test_paths PRIVATE ${CMOCKA_LIBRARIES})
+add_test(NAME test_paths COMMAND test_paths)
+set_tests_properties(test_paths PROPERTIES WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
 # Save/load round-trip characterization tests (bead n9e.4)
 # Pure format tests — no production .c files linked. Tests the binary
 # file format at the byte level using struct definitions from headers.
