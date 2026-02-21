@@ -10,6 +10,12 @@ find_package(PkgConfig REQUIRED)
 pkg_check_modules(X11 REQUIRED x11)
 pkg_check_modules(XPM REQUIRED xpm)
 
+# SDL2 libraries — optional until SDL2 rendering/audio code lands.
+pkg_check_modules(SDL2       sdl2)
+pkg_check_modules(SDL2_IMAGE SDL2_image)
+pkg_check_modules(SDL2_MIXER SDL2_mixer)
+pkg_check_modules(SDL2_TTF   SDL2_ttf)
+
 # --- Generated sources ------------------------------------------------------
 
 # audio.c — symlink to the Linux audio driver (matches Makefile)
@@ -151,3 +157,16 @@ if(BUILD_TESTING)
     enable_testing()
     add_subdirectory(tests)
 endif()
+
+# --- Configuration summary ---------------------------------------------------
+
+message(STATUS "")
+message(STATUS "XBoing configuration summary:")
+message(STATUS "  X11:        ${X11_VERSION}")
+message(STATUS "  XPM:        ${XPM_VERSION}")
+message(STATUS "  SDL2:       ${SDL2_VERSION}")
+message(STATUS "  SDL2_image: ${SDL2_IMAGE_VERSION}")
+message(STATUS "  SDL2_mixer: ${SDL2_MIXER_VERSION}")
+message(STATUS "  SDL2_ttf:   ${SDL2_TTF_VERSION}")
+message(STATUS "  CMocka:     ${CMOCKA_VERSION}")
+message(STATUS "")
