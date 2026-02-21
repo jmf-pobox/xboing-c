@@ -4,5 +4,8 @@
       "Read(./.env)",
       "Read(./.env.*)"
     ]
+  },
+  "enabledPlugins": {
+    "feature-dev@claude-plugins-official": true
   }
 }
