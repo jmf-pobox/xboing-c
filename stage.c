@@ -377,6 +377,10 @@ void CreateAllWindows(display, colormap, argv, argc)
 	XSetWMProperties(display, mainWindow, &windowName, &iconName,
 		argv, argc, &sizehints, &wmhints, &classhints);
 
+	/* Free the text property values allocated by XStringListToTextProperty */
+	if (windowName.value) XFree(windowName.value);
+	if (iconName.value) XFree(iconName.value);
+
 	DEBUG("Setting WM properties.");
 
 	if (noicon == False)
