@@ -313,79 +313,74 @@ static void test_score_global_legacy_override(void **state)
     assert_string_equal(buf, "/custom/scores.dat");
 }
 
-/* TC-22: Global score — falls back to legacy $HOME/.xboing.scr
- * (no XDG file exists on disk). */
-static void test_score_global_legacy_fallback(void **state)
+/* TC-22: Global score — defaults to XDG on fresh install (no legacy file). */
+static void test_score_global_xdg_default(void **state)
 {
     (void)state;
     paths_config_t cfg;
-    paths_init_explicit(&cfg, "/home/test", NULL, NULL, NULL, NULL, NULL, NULL);
+    paths_init_explicit(&cfg, "/nonexistent/home", NULL, NULL, NULL, NULL, NULL, NULL);
 
     char buf[PATHS_MAX_PATH];
     paths_status_t st = paths_score_file_global(&cfg, buf, sizeof(buf));
     assert_int_equal(st, PATHS_OK);
-    /* XDG file won't exist, so falls back to legacy. */
-    assert_string_equal(buf, "/home/test/.xboing.scr");
+    /* No legacy file on disk → XDG path. */
+    assert_string_equal(buf, "/nonexistent/home/.local/share/xboing/scores.dat");
 }
 
-/* TC-23: Personal score — falls back to legacy $HOME/.xboing-scores
- * (no XDG file exists on disk). */
-static void test_score_personal_legacy_fallback(void **state)
+/* TC-23: Personal score — defaults to XDG on fresh install (no legacy file). */
+static void test_score_personal_xdg_default(void **state)
 {
     (void)state;
     paths_config_t cfg;
-    paths_init_explicit(&cfg, "/home/test", NULL, NULL, NULL, NULL, NULL, NULL);
+    paths_init_explicit(&cfg, "/nonexistent/home", NULL, NULL, NULL, NULL, NULL, NULL);
 
     char buf[PATHS_MAX_PATH];
     paths_status_t st = paths_score_file_personal(&cfg, buf, sizeof(buf));
     assert_int_equal(st, PATHS_OK);
-    assert_string_equal(buf, "/home/test/.xboing-scores");
+    assert_string_equal(buf, "/nonexistent/home/.local/share/xboing/personal-scores.dat");
 }
 
-/* TC-24: Personal score — XDG default path construction. */
-static void test_score_personal_xdg_path(void **state)
+/* TC-24: Personal score — custom XDG_DATA_HOME reflected in path. */
+static void test_score_personal_custom_xdg(void **state)
 {
     (void)state;
     paths_config_t cfg;
-    paths_init_explicit(&cfg, "/home/test", "/xdg/data", NULL, NULL, NULL, NULL, NULL);
+    paths_init_explicit(&cfg, "/nonexistent/home", "/xdg/data", NULL, NULL, NULL, NULL, NULL);
 
     char buf[PATHS_MAX_PATH];
-    /* The XDG file won't exist, so this still falls to legacy.
-     * Verify the XDG path would be correct by checking with custom data home. */
     paths_status_t st = paths_score_file_personal(&cfg, buf, sizeof(buf));
     assert_int_equal(st, PATHS_OK);
-    /* No XDG file on disk → legacy fallback. */
-    assert_string_equal(buf, "/home/test/.xboing-scores");
+    assert_string_equal(buf, "/xdg/data/xboing/personal-scores.dat");
 }
 
 /* =========================================================================
  * Group 5: Save file resolution
  * ========================================================================= */
 
-/* TC-25: Save info — legacy fallback (no XDG file on disk). */
-static void test_save_info_legacy_fallback(void **state)
+/* TC-25: Save info — defaults to XDG on fresh install (no legacy file). */
+static void test_save_info_xdg_default(void **state)
 {
     (void)state;
     paths_config_t cfg;
-    paths_init_explicit(&cfg, "/home/test", NULL, NULL, NULL, NULL, NULL, NULL);
+    paths_init_explicit(&cfg, "/nonexistent/home", NULL, NULL, NULL, NULL, NULL, NULL);
 
     char buf[PATHS_MAX_PATH];
     paths_status_t st = paths_save_info(&cfg, buf, sizeof(buf));
     assert_int_equal(st, PATHS_OK);
-    assert_string_equal(buf, "/home/test/.xboing-savinf");
+    assert_string_equal(buf, "/nonexistent/home/.local/share/xboing/save-info.dat");
 }
 
-/* TC-26: Save level — legacy fallback (no XDG file on disk). */
-static void test_save_level_legacy_fallback(void **state)
+/* TC-26: Save level — defaults to XDG on fresh install (no legacy file). */
+static void test_save_level_xdg_default(void **state)
 {
     (void)state;
     paths_config_t cfg;
-    paths_init_explicit(&cfg, "/home/test", NULL, NULL, NULL, NULL, NULL, NULL);
+    paths_init_explicit(&cfg, "/nonexistent/home", NULL, NULL, NULL, NULL, NULL, NULL);
 
     char buf[PATHS_MAX_PATH];
     paths_status_t st = paths_save_level(&cfg, buf, sizeof(buf));
     assert_int_equal(st, PATHS_OK);
-    assert_string_equal(buf, "/home/test/.xboing-savlev");
+    assert_string_equal(buf, "/nonexistent/home/.local/share/xboing/save-level.dat");
 }
 
 /* =========================================================================
@@ -489,12 +484,12 @@ int main(void)
         cmocka_unit_test(test_sound_null_name),
         /* Group 4: Score files */
         cmocka_unit_test(test_score_global_legacy_override),
-        cmocka_unit_test(test_score_global_legacy_fallback),
-        cmocka_unit_test(test_score_personal_legacy_fallback),
-        cmocka_unit_test(test_score_personal_xdg_path),
+        cmocka_unit_test(test_score_global_xdg_default),
+        cmocka_unit_test(test_score_personal_xdg_default),
+        cmocka_unit_test(test_score_personal_custom_xdg),
         /* Group 5: Save files */
-        cmocka_unit_test(test_save_info_legacy_fallback),
-        cmocka_unit_test(test_save_level_legacy_fallback),
+        cmocka_unit_test(test_save_info_xdg_default),
+        cmocka_unit_test(test_save_level_xdg_default),
         /* Group 6: Directory accessors */
         cmocka_unit_test(test_levels_dir_legacy),
         cmocka_unit_test(test_levels_dir_default),

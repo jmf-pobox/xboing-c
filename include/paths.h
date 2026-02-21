@@ -83,9 +83,16 @@ paths_status_t paths_level_file(const paths_config_t *cfg, const char *filename,
 paths_status_t paths_sound_file(const paths_config_t *cfg, const char *name, char *buf,
                                 size_t bufsize);
 
-/* --- Writable user state (constructs path, does NOT check existence) ------ */
+/* --- Writable user state -------------------------------------------------- */
+/*
+ * These helpers resolve paths for writable user state (scores, saves).
+ * They may check file existence (via stat) to choose between XDG and
+ * legacy locations, but the caller is responsible for creating or
+ * writing the files.  On fresh installs (no legacy files), XDG paths
+ * are returned by default.
+ */
 
-/* Global high-score file (shared across users on multi-user installs). */
+/* Per-user high-score file (XDG_DATA_HOME/xboing/scores.dat by default). */
 paths_status_t paths_score_file_global(const paths_config_t *cfg, char *buf, size_t bufsize);
 
 /* Per-user personal score file. */

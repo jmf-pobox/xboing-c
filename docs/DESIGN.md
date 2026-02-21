@@ -61,8 +61,8 @@ Resolution priority for read-only assets (levels, sounds):
 Resolution priority for writable state (scores, saves):
 
 1. Legacy env var (`XBOING_SCORE_FILE` — global scores only)
-2. `XDG_DATA_HOME` — `$HOME/.local/share/xboing/scores.dat` etc.
-3. Legacy fallback — `$HOME/.xboing-scores` etc.
+2. Existing legacy file on disk — `$HOME/.xboing-scores` etc. (migration compat)
+3. XDG default — `$XDG_DATA_HOME/xboing/scores.dat` etc. (fresh installs)
 
 Design constraints:
 

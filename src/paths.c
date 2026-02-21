@@ -20,6 +20,8 @@
  */
 static int safe_copy(char *dst, size_t dstsize, const char *src)
 {
+    if (dstsize == 0)
+        return -1;
     if (src == NULL)
     {
         dst[0] = '\0';
@@ -38,8 +40,8 @@ static int safe_copy(char *dst, size_t dstsize, const char *src)
 
 /*
  * Build a path from up to 4 segments: base/a/b/c.
- * Any segment may be NULL (skipped).  Returns PATHS_OK or
- * PATHS_TRUNCATED.
+ * base must be non-NULL.  Segments a, b, and c may be NULL (skipped).
+ * Returns PATHS_OK or PATHS_TRUNCATED.
  */
 static paths_status_t build_path(char *buf, size_t bufsize, const char *base, const char *a,
                                  const char *b, const char *c)
@@ -120,13 +122,15 @@ paths_status_t paths_init_explicit(paths_config_t *cfg, const char *home,
     if (home == NULL || home[0] == '\0')
         return PATHS_NO_HOME;
 
-    safe_copy(cfg->home, PATHS_MAX_PATH, home);
+    if (safe_copy(cfg->home, PATHS_MAX_PATH, home) != 0)
+        return PATHS_TRUNCATED;
     strip_trailing_slash(cfg->home);
 
     /* XDG_DATA_HOME: default $HOME/.local/share */
     if (xdg_data_home != NULL && xdg_data_home[0] != '\0')
     {
-        safe_copy(cfg->xdg_data_home, PATHS_MAX_PATH, xdg_data_home);
+        if (safe_copy(cfg->xdg_data_home, PATHS_MAX_PATH, xdg_data_home) != 0)
+            return PATHS_TRUNCATED;
     }
     else
     {
@@ -139,7 +143,8 @@ paths_status_t paths_init_explicit(paths_config_t *cfg, const char *home,
     /* XDG_CONFIG_HOME: default $HOME/.config */
     if (xdg_config_home != NULL && xdg_config_home[0] != '\0')
     {
-        safe_copy(cfg->xdg_config_home, PATHS_MAX_PATH, xdg_config_home);
+        if (safe_copy(cfg->xdg_config_home, PATHS_MAX_PATH, xdg_config_home) != 0)
+            return PATHS_TRUNCATED;
     }
     else
     {
@@ -162,17 +167,20 @@ paths_status_t paths_init_explicit(paths_config_t *cfg, const char *home,
     /* Legacy env var overrides. */
     if (xboing_levels != NULL && xboing_levels[0] != '\0')
     {
-        safe_copy(cfg->xboing_levels_dir, PATHS_MAX_PATH, xboing_levels);
+        if (safe_copy(cfg->xboing_levels_dir, PATHS_MAX_PATH, xboing_levels) != 0)
+            return PATHS_TRUNCATED;
         strip_trailing_slash(cfg->xboing_levels_dir);
     }
     if (xboing_sounds != NULL && xboing_sounds[0] != '\0')
     {
-        safe_copy(cfg->xboing_sound_dir, PATHS_MAX_PATH, xboing_sounds);
+        if (safe_copy(cfg->xboing_sound_dir, PATHS_MAX_PATH, xboing_sounds) != 0)
+            return PATHS_TRUNCATED;
         strip_trailing_slash(cfg->xboing_sound_dir);
     }
     if (xboing_scores != NULL && xboing_scores[0] != '\0')
     {
-        safe_copy(cfg->xboing_score_file, PATHS_MAX_PATH, xboing_scores);
+        if (safe_copy(cfg->xboing_score_file, PATHS_MAX_PATH, xboing_scores) != 0)
+            return PATHS_TRUNCATED;
     }
 
     return PATHS_OK;
@@ -274,63 +282,54 @@ paths_status_t paths_score_file_global(const paths_config_t *cfg, char *buf, siz
         return PATHS_OK;
     }
 
-    /* 2. XDG_DATA_HOME/xboing/scores.dat */
-    paths_status_t st = xdg_user_path(cfg, "scores.dat", buf, bufsize);
-    if (st != PATHS_OK)
-        return st;
-
-    /* Check if the XDG path exists; if not, fall back to legacy. */
+    /* 2. If a legacy file exists on disk, use it (migration compat). */
+    paths_status_t st = build_path(buf, bufsize, cfg->home, ".xboing.scr", NULL, NULL);
+    if (st == PATHS_TRUNCATED)
+        return PATHS_TRUNCATED;
     if (file_exists(buf))
         return PATHS_OK;
 
-    /* 3. Legacy fallback: $HOME/.xboing.scr */
-    st = build_path(buf, bufsize, cfg->home, ".xboing.scr", NULL, NULL);
-    return st;
+    /* 3. Default to XDG for new installs: XDG_DATA_HOME/xboing/scores.dat */
+    return xdg_user_path(cfg, "scores.dat", buf, bufsize);
 }
 
 paths_status_t paths_score_file_personal(const paths_config_t *cfg, char *buf, size_t bufsize)
 {
-    /* 1. XDG_DATA_HOME/xboing/personal-scores.dat */
-    paths_status_t st = xdg_user_path(cfg, "personal-scores.dat", buf, bufsize);
-    if (st != PATHS_OK)
-        return st;
-
+    /* 1. If a legacy file exists on disk, use it (migration compat). */
+    paths_status_t st = build_path(buf, bufsize, cfg->home, ".xboing-scores", NULL, NULL);
+    if (st == PATHS_TRUNCATED)
+        return PATHS_TRUNCATED;
     if (file_exists(buf))
         return PATHS_OK;
 
-    /* 2. Legacy fallback: $HOME/.xboing-scores */
-    st = build_path(buf, bufsize, cfg->home, ".xboing-scores", NULL, NULL);
-    return st;
+    /* 2. Default to XDG for new installs: XDG_DATA_HOME/xboing/personal-scores.dat */
+    return xdg_user_path(cfg, "personal-scores.dat", buf, bufsize);
 }
 
 paths_status_t paths_save_info(const paths_config_t *cfg, char *buf, size_t bufsize)
 {
-    /* 1. XDG_DATA_HOME/xboing/save-info.dat */
-    paths_status_t st = xdg_user_path(cfg, "save-info.dat", buf, bufsize);
-    if (st != PATHS_OK)
-        return st;
-
+    /* 1. If a legacy file exists on disk, use it (migration compat). */
+    paths_status_t st = build_path(buf, bufsize, cfg->home, ".xboing-savinf", NULL, NULL);
+    if (st == PATHS_TRUNCATED)
+        return PATHS_TRUNCATED;
     if (file_exists(buf))
         return PATHS_OK;
 
-    /* 2. Legacy fallback: $HOME/.xboing-savinf */
-    st = build_path(buf, bufsize, cfg->home, ".xboing-savinf", NULL, NULL);
-    return st;
+    /* 2. Default to XDG for new installs: XDG_DATA_HOME/xboing/save-info.dat */
+    return xdg_user_path(cfg, "save-info.dat", buf, bufsize);
 }
 
 paths_status_t paths_save_level(const paths_config_t *cfg, char *buf, size_t bufsize)
 {
-    /* 1. XDG_DATA_HOME/xboing/save-level.dat */
-    paths_status_t st = xdg_user_path(cfg, "save-level.dat", buf, bufsize);
-    if (st != PATHS_OK)
-        return st;
-
+    /* 1. If a legacy file exists on disk, use it (migration compat). */
+    paths_status_t st = build_path(buf, bufsize, cfg->home, ".xboing-savlev", NULL, NULL);
+    if (st == PATHS_TRUNCATED)
+        return PATHS_TRUNCATED;
     if (file_exists(buf))
         return PATHS_OK;
 
-    /* 2. Legacy fallback: $HOME/.xboing-savlev */
-    st = build_path(buf, bufsize, cfg->home, ".xboing-savlev", NULL, NULL);
-    return st;
+    /* 2. Default to XDG for new installs: XDG_DATA_HOME/xboing/save-level.dat */
+    return xdg_user_path(cfg, "save-level.dat", buf, bufsize);
 }
 
 /* --- Directory accessors -------------------------------------------------- */
