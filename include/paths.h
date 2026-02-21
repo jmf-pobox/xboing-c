@@ -23,10 +23,10 @@
 
 typedef enum
 {
-    PATHS_OK = 0,       /* Success. */
-    PATHS_NOT_FOUND,    /* File does not exist at any candidate location. */
-    PATHS_TRUNCATED,    /* Result was truncated — buffer too small. */
-    PATHS_NO_HOME       /* $HOME is unset or empty — cannot resolve paths. */
+    PATHS_OK = 0,    /* Success. */
+    PATHS_NOT_FOUND, /* File does not exist at any candidate location. */
+    PATHS_TRUNCATED, /* Result was truncated — buffer too small. */
+    PATHS_NO_HOME    /* $HOME is unset or empty — cannot resolve paths. */
 } paths_status_t;
 
 /*
@@ -59,10 +59,10 @@ paths_status_t paths_init(paths_config_t *cfg);
  *
  * xdg_data_dirs is colon-separated, matching the env var format.
  */
-paths_status_t paths_init_explicit(paths_config_t *cfg, const char *home,
-                                   const char *xdg_data_home, const char *xdg_config_home,
-                                   const char *xdg_data_dirs, const char *xboing_levels,
-                                   const char *xboing_sounds, const char *xboing_scores);
+paths_status_t paths_init_explicit(paths_config_t *cfg, const char *home, const char *xdg_data_home,
+                                   const char *xdg_config_home, const char *xdg_data_dirs,
+                                   const char *xboing_levels, const char *xboing_sounds,
+                                   const char *xboing_scores);
 
 /* --- Read-only asset resolution (checks file existence) ------------------- */
 

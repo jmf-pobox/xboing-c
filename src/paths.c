@@ -112,10 +112,10 @@ paths_status_t paths_init(paths_config_t *cfg)
                                getenv("XBOING_SCORE_FILE"));
 }
 
-paths_status_t paths_init_explicit(paths_config_t *cfg, const char *home,
-                                   const char *xdg_data_home, const char *xdg_config_home,
-                                   const char *xdg_data_dirs, const char *xboing_levels,
-                                   const char *xboing_sounds, const char *xboing_scores)
+paths_status_t paths_init_explicit(paths_config_t *cfg, const char *home, const char *xdg_data_home,
+                                   const char *xdg_config_home, const char *xdg_data_dirs,
+                                   const char *xboing_levels, const char *xboing_sounds,
+                                   const char *xboing_scores)
 {
     memset(cfg, 0, sizeof(*cfg));
 
