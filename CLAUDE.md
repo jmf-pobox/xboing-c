@@ -11,6 +11,7 @@ I am a principal engineer. Every change I make leaves the codebase in a better s
 XBoing is a classic X11 breakout/blockout game (1993-1996, Justin C. Kibell) modernized for current Linux systems. It uses pure Xlib (no Motif/Xt) with the XPM library for pixmap graphics.
 
 **Reference documents:**
+
 - `docs/SPECIFICATION.md` — comprehensive technical spec of all 16 subsystems
 - `docs/MODERNIZATION.md` — from-to architectural changes for SDL2-based modernization
 
@@ -70,6 +71,7 @@ ctest --test-dir build --output-on-failure
 | **CMocka** | Unit test framework (v2.0+, supports TAP 14) | `apt install libcmocka-dev` |
 | **Valgrind** | Memory debugging | `apt install valgrind` |
 | **shellcheck** | Shell script linting | `apt install shellcheck` |
+| **bd** | Issue tracking with dependency chains | [github.com/steveyegge/beads](https://github.com/steveyegge/beads) |
 
 ## Quality Gates
 
@@ -96,13 +98,18 @@ ctest --test-dir build-asan --output-on-failure
 
 # Shell scripts
 shellcheck scripts/*.sh
+
+# Markdown lint (if any .md files changed)
+npx markdownlint-cli2 "*.{md,markdown}"
 ```
+
+**Run quality gates locally before creating a PR.** Never let CI catch something you could have caught on your own machine.
 
 ### Compiler Warnings Policy
 
 The base warning set for all translation units:
 
-```
+```text
 -Wall -Wextra -Wpedantic -Werror
 -Wconversion -Wshadow -Wdouble-promotion
 -Wformat=2 -Wformat-overflow=2
@@ -131,6 +138,7 @@ Testing a game is harder than testing a library. Most game code has tight coupli
 Pure logic with no side effects. Highest-value, lowest-cost testing.
 
 **What to test:**
+
 - Math utilities (collision geometry, trig paddle bounce, velocity clamping)
 - State machines (game modes, ball states, block states, bonus sequence)
 - Serialization (save/load round-trips, level file parsing, config parsing)
@@ -138,6 +146,7 @@ Pure logic with no side effects. Highest-value, lowest-cost testing.
 - String handling and text processing
 
 **How to make legacy code testable:**
+
 - Extract pure functions from modules that mix logic with I/O
 - Introduce seams: pass function pointers instead of calling globals directly
 - Replace `#include`-coupled singletons with struct pointers passed as parameters
@@ -148,12 +157,14 @@ Pure logic with no side effects. Highest-value, lowest-cost testing.
 Multiple subsystems working together, but still deterministic.
 
 **What to test:**
+
 - Game loop ticking with fixed timestep (no real clock)
 - Ball-block-paddle interaction lifecycle
 - Level loading -> block spawning -> state verification
 - Save -> load -> verify round-trip
 
 **How to set up:**
+
 - Create a headless build configuration that stubs rendering and audio
 - Replace platform I/O with in-memory equivalents
 - Fixed random seed for reproducibility
@@ -163,11 +174,13 @@ Multiple subsystems working together, but still deterministic.
 Record inputs, replay deterministically, compare results.
 
 **What to test:**
+
 - Full game sequences (menu -> gameplay -> victory/defeat)
 - Known bug reproduction
 - Performance regression (frame time during replay)
 
 **How to set up:**
+
 - Implement an input recording/playback system early in modernization
 - Ensure deterministic updates (fixed timestep, seeded RNG)
 - Store golden files in `tests/golden/`
@@ -178,6 +191,7 @@ Record inputs, replay deterministically, compare results.
 Feed malformed data to parsers and deserializers.
 
 **What to fuzz:**
+
 - Level file parsers
 - Save file deserializers
 - Config file parsers
@@ -243,11 +257,13 @@ SortIncludes: true
 Reformat files only when you are already modifying them for another reason — never commit a format-only change to a file you are not otherwise touching (except in dedicated formatting passes).
 
 **Naming for new code:**
+
 - `snake_case` for functions and variables
 - `UPPER_SNAKE_CASE` for macros and constants
 - Prefix public API functions with the module name: `ball_update()`, `audio_play()`
 
 **Headers:**
+
 - Every `.c` file has a corresponding `.h` file
 - Include guards: `#ifndef MODULE_NAME_H` / `#define MODULE_NAME_H`
 - System includes before project includes, alphabetized within each group
@@ -334,6 +350,71 @@ Feature work goes on feature branches. Never commit directly to main.
 | `port:` | Platform-specific changes |
 | `build:` | CMake, CI, dependency changes |
 | `docs:` | Documentation |
+
+### Issue Tracking (bd)
+
+This project uses **bd** (beads) for issue tracking. The database lives in `.beads/` and auto-syncs with git.
+
+**NEVER hand-edit `.beads/issues.jsonl`.** Always use `bd` commands.
+
+#### Finding work
+
+```bash
+bd ready                          # Show unblocked work (no dependencies pending)
+bd list --status=open             # All open issues
+bd list --status=in_progress      # Your active work
+bd show <id>                      # Full details with dependencies
+bd blocked                        # Issues waiting on other work
+bd search "colormap"              # Search by text across title/description/ID
+bd graph --all                    # Visualize all dependency chains
+bd status                         # Project health overview (open/closed/blocked counts)
+```
+
+#### Creating issues
+
+```bash
+bd create "Fix the frobnicator" --type=bug --priority=1
+bd create "Add widget support" --type=task --priority=2 --parent=xboing-abc
+bd create "Rewrite renderer" --type=epic --priority=0
+```
+
+Issue types: `bug`, `feature`, `task`, `epic`, `chore`. Priority: 0-4 (0=critical, 2=default, 4=backlog).
+
+Use `--parent=<id>` to create children under an epic. Use `--deps=<id>` to declare blocking dependencies at creation time.
+
+#### Working on issues
+
+```bash
+bd update <id> --status=in_progress   # Claim it
+bd update <id> --claim                # Atomic claim (fails if already taken)
+bd comments add <id> "Found the root cause in ball.c:1744"
+```
+
+#### Completing work
+
+```bash
+bd close <id> -r "Merged PR #5"       # Close with reason
+bd close <id1> <id2> -r "Fixed in PR #6"  # Close multiple at once
+bd epic close-eligible                 # Auto-close epics with all children done
+```
+
+#### Dependencies
+
+```bash
+bd dep add <blocked> <blocker>    # <blocked> depends on <blocker>
+bd dep <blocker> --blocks <blocked>   # Same thing, reversed syntax
+bd dep tree <id>                  # Visualize dependency tree
+bd dep cycles                     # Detect circular dependencies
+```
+
+#### Sync and session end
+
+```bash
+bd sync                           # Pull, merge, export, commit, push beads data
+bd preflight                      # Pre-PR checklist
+```
+
+Always run `bd sync` before ending a session. See AGENTS.md for the full landing-the-plane workflow.
 
 ### Session Close Protocol
 

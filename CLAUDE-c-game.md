@@ -57,7 +57,7 @@ Adapt glob patterns to match the actual project structure. The key principle: **
 
 The base warning set for all translation units:
 
-```
+```text
 -Wall -Wextra -Wpedantic -Werror
 -Wconversion -Wshadow -Wdouble-promotion
 -Wformat=2 -Wformat-overflow=2
@@ -90,6 +90,7 @@ Testing a game is harder than testing a library. Most game code has tight coupli
 Pure logic with no side effects. This is the highest-value, lowest-cost testing.
 
 **What to test:**
+
 - Math utilities (vectors, matrices, fixed-point, random number generators)
 - Data structures (linked lists, hash tables, spatial indexes, pools)
 - State machines (AI behavior trees, menu state, game phase transitions)
@@ -98,6 +99,7 @@ Pure logic with no side effects. This is the highest-value, lowest-cost testing.
 - String handling and text processing
 
 **How to make legacy code testable:**
+
 - Extract pure functions from modules that mix logic with I/O
 - Introduce seams: pass function pointers instead of calling globals directly
 - Replace `#include`-coupled singletons with struct pointers passed as parameters
@@ -108,6 +110,7 @@ Pure logic with no side effects. This is the highest-value, lowest-cost testing.
 Multiple subsystems working together, but still deterministic.
 
 **What to test:**
+
 - Game loop ticking with fixed timestep (no real clock)
 - Entity creation, update, and destruction lifecycle
 - Event/message dispatch between systems
@@ -115,6 +118,7 @@ Multiple subsystems working together, but still deterministic.
 - Level loading → entity spawning → state verification
 
 **How to set up:**
+
 - Create a headless build configuration that stubs rendering and audio
 - Replace platform I/O with in-memory equivalents (virtual filesystem)
 - Fixed random seed for reproducibility
@@ -124,11 +128,13 @@ Multiple subsystems working together, but still deterministic.
 The classic game testing technique. Record inputs, replay deterministically, compare results.
 
 **What to test:**
+
 - Full game sequences (menu → gameplay → victory/defeat)
 - Known bug reproduction (record the sequence that triggers a bug, test the fix)
 - Performance regression (measure frame time during replay, alert on regressions)
 
 **How to set up:**
+
 - Implement an input recording/playback system early in modernization
 - Ensure deterministic updates (fixed timestep, seeded RNG, sorted entity lists)
 - Store golden files in `tests/golden/` — version-controlled expected outputs
@@ -139,6 +145,7 @@ The classic game testing technique. Record inputs, replay deterministically, com
 Feed malformed data to parsers and deserializers.
 
 **What to fuzz:**
+
 - Level/map file parsers
 - Save file deserializers
 - Network packet handlers (if multiplayer)
