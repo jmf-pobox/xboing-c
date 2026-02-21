@@ -306,7 +306,13 @@ int ColourNameToPixel(display, colormap, colourName)
 {
     XColor colour;
 
-    /* Obtain the exact colour from the colour name */
+    /* Parse against DefaultColormap, allocate into the game's colormap.
+     * On TrueColor displays (where the game now auto-selects the default
+     * colormap) these are the same, so the mixed usage is correct.
+     * On PseudoColor displays with a private colormap, XParseColor only
+     * needs a colormap for its color-name database lookup — any valid
+     * colormap works — while XAllocColor correctly targets our private map.
+     */
     if (XParseColor(display, DefaultColormap(display,
         XDefaultScreen(display)), colourName, &colour) != 0)
     {

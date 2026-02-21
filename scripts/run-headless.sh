@@ -11,9 +11,9 @@
 #
 # Requirements: xvfb (apt install xvfb)
 #
-# The game needs -usedefcmap because XCreateSimpleWindow inherits the
-# root window's visual, which conflicts with a custom colormap under
-# Xvfb's TrueColor-only framebuffer.
+# TrueColor displays are now auto-detected and use the default colormap,
+# so -usedefcmap is redundant. Retained here for belt-and-suspenders
+# compatibility with older builds.
 
 set -e
 
