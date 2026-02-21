@@ -120,6 +120,11 @@ target_compile_definitions(test_blocks PRIVATE
 target_compile_options(test_blocks PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
 
 # Legacy production source gets full suppression list and -Wno-error.
+# NOTE: set_source_files_properties is directory-scoped, so this applies to
+# blocks.c in ALL targets in this directory (including test_level_parse).
+# This is acceptable here because all consumers are test targets. The main
+# xboing executable is built from the parent CMakeLists.txt in a different
+# directory scope and is unaffected.
 set_source_files_properties(
     ${CMAKE_SOURCE_DIR}/blocks.c
     PROPERTIES COMPILE_OPTIONS "${XBOING_LEGACY_SUPPRESSIONS};-Wno-error"

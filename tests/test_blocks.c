@@ -170,16 +170,38 @@ static void test_blockinfo_special_dimensions(void **state)
 }
 
 /* TC-07: SetupBlockInfo slide field bug -- indices 1-8 write to [0].slide.
- * This is a copy-paste bug in the original code. Characterize it. */
+ * This is a copy-paste bug in the original code. Characterize it so the
+ * test would fail if the bug were ever fixed. */
 static void test_blockinfo_slide_bug(void **state)
 {
     (void)state;
     /* Only index 0 and indices >= 9 have their own .slide set.
      * Indices 1-8 mistakenly write to BlockInfo[0].slide instead
      * of BlockInfo[i].slide. The value written is always 0, so
-     * the bug is harmless — but BlockInfo[1..8].slide is uninitialized
-     * (or zero from static storage). Characterize that all slides are 0. */
+     * the bug is harmless — but BlockInfo[1..8].slide is left at
+     * whatever prior value it had.
+     *
+     * To lock in this behavior, fill the array with a non-zero sentinel,
+     * then call SetupBlockInfo() and verify:
+     *   - BlockInfo[0].slide is set to 0,
+     *   - BlockInfo[1..8].slide retain the sentinel (never written),
+     *   - BlockInfo[9..MAX_BLOCKS-1].slide are set to 0. */
+    const int sentinel = 123;
+
     for (int i = 0; i < MAX_BLOCKS; i++)
+        BlockInfo[i].slide = sentinel;
+
+    SetupBlockInfo();
+
+    /* Index 0 receives the writes meant for 0-8, all value 0. */
+    assert_int_equal(BlockInfo[0].slide, 0);
+
+    /* Indices 1-8 never have their own .slide written. */
+    for (int i = 1; i <= 8; i++)
+        assert_int_equal(BlockInfo[i].slide, sentinel);
+
+    /* Indices >= 9 correctly write their own .slide to 0. */
+    for (int i = 9; i < MAX_BLOCKS; i++)
         assert_int_equal(BlockInfo[i].slide, 0);
 }
 
@@ -354,11 +376,17 @@ static void test_clear_block_array(void **state)
         }
 }
 
-/* TC-21: AddNewBlock boundary check -- out-of-range row/col are ignored. */
+/* TC-21: AddNewBlock boundary check -- negative and far-out-of-range values
+ * are silently ignored.
+ *
+ * NOTE: Production code checks (row > MAX_ROW || row < 0 || col > MAX_COL
+ * || col < 0), using > instead of >=. This means row==MAX_ROW and
+ * col==MAX_COL are NOT rejected -- an off-by-one bug that would write
+ * out of bounds. We do NOT exercise those values here (would be UB).
+ * We only test values that ARE rejected by the current bounds check. */
 static void test_addnewblock_boundary(void **state)
 {
     (void)state;
-    /* These should not crash (silently ignored per bounds check) */
     AddNewBlock(NULL, (Window)0, -1, 0, RED_BLK, 0, 0);
     AddNewBlock(NULL, (Window)0, 0, -1, RED_BLK, 0, 0);
     AddNewBlock(NULL, (Window)0, MAX_ROW + 1, 0, RED_BLK, 0, 0);
