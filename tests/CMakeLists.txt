@@ -92,6 +92,47 @@ set_source_files_properties(
 target_link_libraries(test_level_parse PRIVATE ${CMOCKA_LIBRARIES} m)
 add_test(NAME test_level_parse COMMAND test_level_parse)
 
+# Block grid and type catalog characterization tests (bead n9e.5)
+# Links blocks.c with X11 stubs — tests SetupBlockInfo(), AddNewBlock(draw=False),
+# ClearBlock(), ClearBlockArray(), StillActiveBlocks() directly.
+add_executable(test_blocks
+    test_blocks.c
+    stubs_x11_xboing.c
+    ${CMAKE_SOURCE_DIR}/blocks.c
+)
+target_include_directories(test_blocks PRIVATE
+    ${CMAKE_SOURCE_DIR}/include
+    ${CMAKE_SOURCE_DIR}
+    /usr/include/X11
+    ${X11_INCLUDE_DIRS}
+    ${XPM_INCLUDE_DIRS}
+)
+target_compile_definitions(test_blocks PRIVATE
+    NeedFunctionPrototypes=1
+    LEVELS_DIR="${CMAKE_SOURCE_DIR}/levels"
+    READMEP_FILE="./docs/problems.doc"
+    "HIGH_SCORE_FILE=\"./.xboing.scr\""
+    "LEVEL_INSTALL_DIR=\"./levels\""
+    "SOUNDS_DIR=\"./sounds\""
+    "AUDIO_AVAILABLE=\"True\""
+    "AUDIO_FILE=\"audio/LINUXaudio.c\""
+)
+target_compile_options(test_blocks PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+
+# Legacy production source gets full suppression list and -Wno-error.
+# NOTE: set_source_files_properties is directory-scoped, so this applies to
+# blocks.c in ALL targets in this directory (including test_level_parse).
+# This is acceptable here because all consumers are test targets. The main
+# xboing executable is built from the parent CMakeLists.txt in a different
+# directory scope and is unaffected.
+set_source_files_properties(
+    ${CMAKE_SOURCE_DIR}/blocks.c
+    PROPERTIES COMPILE_OPTIONS "${XBOING_LEGACY_SUPPRESSIONS};-Wno-error"
+)
+
+target_link_libraries(test_blocks PRIVATE ${CMOCKA_LIBRARIES} m)
+add_test(NAME test_blocks COMMAND test_blocks)
+
 # Save/load round-trip characterization tests (bead n9e.4)
 # Pure format tests — no production .c files linked. Tests the binary
 # file format at the byte level using struct definitions from headers.
