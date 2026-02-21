@@ -137,3 +137,8 @@ add_test(NAME test_blocks COMMAND test_blocks)
 # Pure format tests — no production .c files linked. Tests the binary
 # file format at the byte level using struct definitions from headers.
 xboing_add_test(test_save_load)
+
+# State machine transition characterization tests (bead n9e.6)
+# Pure data-driven tests — no production .c files linked. Characterizes
+# mode constants, auto-cycle sequence, transition graph, and dispatch tables.
+xboing_add_test(test_state_machine)
