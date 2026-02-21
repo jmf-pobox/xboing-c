@@ -22,6 +22,7 @@ jobs:
             include/block_types.h \
             include/ball_types.h \
             include/ball_math.h \
+            include/paths.h \
             include/score_logic.h
 
   cppcheck:
