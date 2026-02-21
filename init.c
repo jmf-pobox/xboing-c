@@ -976,8 +976,16 @@ Display *InitialiseGame(argv, argc)
 	/* Obtain the screen number for this display */
 	screen_num = XDefaultScreen(display);
 
-	/* Make sure that we are using a colour visual */
-	if (!XMatchVisualInfo(display, screen_num, 
+	/* Visual selection: prefer PseudoColor (original 1993 target), fall back
+	 * through DirectColor to TrueColor.  Modern displays are universally
+	 * TrueColor.  Visual fidelity analysis (xboing-rte) confirmed that
+	 * remaining differences from original PseudoColor screenshots are
+	 * inherent to the visual class transition (e.g. dithering artifacts,
+	 * colormap animation effects) and are not rendering bugs.  The major
+	 * rendering issue (XOR/AND/XOR triple-draw in sprite compositing) was
+	 * fixed in commit cb40810.
+	 */
+	if (!XMatchVisualInfo(display, screen_num,
 		DefaultDepth(display, screen_num), PseudoColor, &visual_info))
 	{
 		if (!XMatchVisualInfo(display, screen_num, 
