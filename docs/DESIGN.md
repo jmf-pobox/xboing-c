@@ -137,3 +137,72 @@ What is explicitly out of scope:
 - `FILES_MATCHING PATTERN` in install rules excludes stale `CVS/` directories.
 - The `install` preset disables tests (`BUILD_TESTING=OFF`) since installed
   builds do not need the test harness.
+
+## ADR-004: SDL2 window and renderer architecture
+
+**Status:** Accepted
+
+**Context:**
+The original XBoing creates 10 X11 sub-windows via `CreateAllWindows()` in
+`stage.c` (main, play, score, level, message, special, time, input, block,
+type). The main window is 575x720 pixels (`PLAY_WIDTH + MAIN_WIDTH + 10` by
+`PLAY_HEIGHT + MAIN_HEIGHT + 10`, per `stage.c:240-242`). All rendering goes
+through Xlib calls (`XCopyArea`, `XFillRectangle`) targeting these sub-windows.
+
+SDL2 uses a fundamentally different model: one window, one GPU-accelerated
+renderer, with all drawing expressed as texture copies and draw primitives.
+There is no concept of sub-windows. The multi-window Xlib layout must be
+replaced with logical regions drawn into a single render target.
+
+MODERNIZATION.md calls for SDL2 rendering with integer scaling and
+fullscreen support. The game targets pixel-art aesthetics (XPM bitmaps),
+so nearest-neighbor scaling is essential.
+
+**Decision:**
+Create an `sdl2_renderer` module (`src/sdl2_renderer.c`, `include/sdl2_renderer.h`)
+that manages a single SDL2 window and renderer. Key design points:
+
+1. **Fixed logical resolution (575x720).** The game always renders at the
+   original XBoing resolution. `SDL_RenderSetLogicalSize()` handles
+   letterboxing and scaling to the physical window.
+
+2. **2x default scale, resizable window.** The physical window opens at
+   1150x1440 (2x logical) with `SDL_WINDOW_RESIZABLE`. Users can resize
+   freely; SDL2 letterboxes automatically.
+
+3. **Fullscreen-desktop mode.** `SDL_WINDOW_FULLSCREEN_DESKTOP` (no mode
+   switch) for instant toggle. The logical size is preserved.
+
+4. **Opaque context struct.** `sdl2_renderer_t` is heap-allocated and
+   opaque. No global state. All functions take a context pointer. This
+   makes the module testable and supports future multi-window scenarios
+   (e.g., detached level editor).
+
+5. **Static library boundary.** Built as `libsdl2_renderer.a`, conditional
+   on `SDL2_FOUND`. The legacy `xboing` target is completely untouched —
+   SDL2 stays optional. Test targets link against the static library.
+
+6. **Nearest-neighbor scaling.** `SDL_HINT_RENDER_SCALE_QUALITY` set to
+   `"nearest"` to preserve pixel-art sharpness at all scale factors.
+
+7. **Software renderer fallback.** If `SDL_RENDERER_ACCELERATED` fails
+   (e.g., CI dummy driver), falls back to `SDL_RENDERER_SOFTWARE`.
+
+What this module does NOT do (deferred to later beads):
+
+- Logical region definitions (xboing-oaa.6 — layout module)
+- Texture loading (xboing-oaa.2 — asset pipeline)
+- Font rendering (xboing-oaa.3 — SDL2_ttf integration)
+- Color system (xboing-oaa.4 — colormap replacement)
+- Event loop (the module creates the window, not the event pump)
+
+**Consequences:**
+
+- All SDL2 window/renderer setup lives in one module with a clean API.
+- The 575x720 logical resolution preserves exact layout compatibility with
+  the original X11 sub-window geometry.
+- Tests run under `SDL_VIDEODRIVER=dummy` — no display required in CI.
+- The opaque context pattern avoids the global state that made the original
+  X11 code hard to test.
+- Future layout work can define logical regions that map 1:1 to the original
+  sub-window positions, rendering into the single SDL2 target.

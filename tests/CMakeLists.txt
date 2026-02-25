@@ -143,3 +143,14 @@ xboing_add_test(test_save_load)
 # Pure data-driven tests — no production .c files linked. Characterizes
 # mode constants, auto-cycle sequence, transition graph, and dispatch tables.
 xboing_add_test(test_state_machine)
+
+# SDL2 renderer lifecycle tests (bead xboing-oaa.1)
+# Links against the sdl2_renderer static library.
+# Uses SDL_VIDEODRIVER=dummy for headless CI testing.
+if(SDL2_FOUND)
+    add_executable(test_sdl2_renderer test_sdl2_renderer.c)
+    target_compile_options(test_sdl2_renderer PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+    target_link_libraries(test_sdl2_renderer PRIVATE sdl2_renderer ${CMOCKA_LIBRARIES})
+    add_test(NAME test_sdl2_renderer COMMAND test_sdl2_renderer)
+    set_tests_properties(test_sdl2_renderer PROPERTIES ENVIRONMENT "SDL_VIDEODRIVER=dummy")
+endif()

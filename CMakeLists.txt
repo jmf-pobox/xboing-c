@@ -195,6 +195,18 @@ install(FILES xboing.man
     DESTINATION "${CMAKE_INSTALL_MANDIR}/man6"
     RENAME xboing.6)
 
+# --- SDL2 renderer library (optional) ---------------------------------------
+
+if(SDL2_FOUND)
+    add_library(sdl2_renderer STATIC src/sdl2_renderer.c)
+    target_include_directories(sdl2_renderer PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${SDL2_INCLUDE_DIRS}
+    )
+    target_compile_options(sdl2_renderer PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+    target_link_libraries(sdl2_renderer PUBLIC ${SDL2_LIBRARIES})
+endif()
+
 # --- Tests ------------------------------------------------------------------
 
 option(BUILD_TESTING "Build unit tests" ON)
