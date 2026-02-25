@@ -684,3 +684,60 @@ required modifier mask.
 - 40 characterization tests verify default bindings, key press/release state
   tracking, dual-binding behavior, edge triggers, mouse input, modifier
   queries, rebinding, and error handling.
+
+## ADR-012: Game state machine with function pointer dispatch
+
+**Status:** Accepted
+**Date:** 2026-02-25
+**Bead:** xboing-cks.2
+
+**Context:**
+
+The legacy game loop dispatches to mode handlers via a `switch(mode)` in
+`main.c:handleGameStates()` (16 cases). Mode transitions are scattered across
+key handlers and subsystem callbacks, with `Reset*()` initialization functions
+called manually before each transition. There are no exit hooks — cleanup is
+implicit. The `oldMode` global exists only for dialogue save/restore.
+
+**Decision:**
+
+Replace the switch dispatch with a function pointer table:
+
+- **Opaque context pattern** — `sdl2_state_t` allocated by `create()`, freed
+  by `destroy()`. No globals, fully testable.
+- **Mode enum** — 16 values matching legacy `MODE_*` defines (include/main.h).
+  `SDL2ST_BALL_WAIT` and `SDL2ST_WAIT` preserved for compatibility even though
+  the legacy code never assigns them.
+- **Handler registration** — `register()` takes a `sdl2_state_mode_def_t`
+  struct with three optional callbacks: `on_enter`, `on_update`, `on_exit`.
+  This replaces the scattered `Reset*()` pattern with centralized hooks.
+- **Centralized transition** — `transition()` calls `on_exit` for the old mode,
+  then `on_enter` for the new mode. Same-mode transitions are no-ops.
+- **Dialogue push/pop** — `push_dialogue()` saves the current mode and enters
+  `SDL2ST_DIALOGUE`; `pop_dialogue()` restores it. Replaces the legacy
+  `oldMode` save/restore in dialogue.c.
+- **Frame counter** — incremented by `update()` except in `SDL2ST_PAUSE` and
+  `SDL2ST_DIALOGUE`, matching legacy behavior (main.c:1283).
+- **Gameplay query** — `is_gameplay()` returns true for `GAME`, `PAUSE`,
+  `BALL_WAIT`, `WAIT` — matching legacy key dispatch routing to
+  `handleGameKeys()` vs `handleIntroKeys()`.
+- **Pure C** — no SDL2 dependency. The state machine is game logic, not
+  platform code.
+
+**What we are NOT doing:**
+
+- Wiring into legacy event loop (separate migration task)
+- Implementing the actual mode handlers (each mode's update/enter/exit logic
+  stays in its original module until migrated)
+- Changing mode numbering or semantics
+
+**Consequences:**
+
+- The ~300-line module replaces the 16-case switch dispatch with O(1) function
+  pointer lookup.
+- Enter/exit hooks eliminate the error-prone pattern of manually calling
+  `Reset*()` before every mode transition.
+- Dialogue push/pop is type-safe with clear error states, replacing the
+  fragile global `oldMode` variable.
+- 37 tests across 10 groups verify transitions, callback ordering, dialogue
+  save/restore, frame counter behavior, and all query functions.

@@ -234,3 +234,10 @@ if(SDL2_FOUND)
     target_link_libraries(test_sdl2_input PRIVATE sdl2_input ${CMOCKA_LIBRARIES})
     add_test(NAME test_sdl2_input COMMAND test_sdl2_input)
 endif()
+
+# Game state machine tests (bead xboing-cks.2)
+# Pure logic tests — no SDL2, video, or audio driver needed.
+add_executable(test_sdl2_state test_sdl2_state.c)
+target_compile_options(test_sdl2_state PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+target_link_libraries(test_sdl2_state PRIVATE sdl2_state ${CMOCKA_LIBRARIES})
+add_test(NAME test_sdl2_state COMMAND test_sdl2_state)
