@@ -207,6 +207,19 @@ if(SDL2_FOUND)
     target_link_libraries(sdl2_renderer PUBLIC ${SDL2_LIBRARIES})
 endif()
 
+# --- SDL2 texture cache library (optional) ----------------------------------
+
+if(SDL2_FOUND AND SDL2_IMAGE_FOUND)
+    add_library(sdl2_texture STATIC src/sdl2_texture.c)
+    target_include_directories(sdl2_texture PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${SDL2_INCLUDE_DIRS}
+        ${SDL2_IMAGE_INCLUDE_DIRS}
+    )
+    target_compile_options(sdl2_texture PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+    target_link_libraries(sdl2_texture PUBLIC ${SDL2_LIBRARIES} ${SDL2_IMAGE_LIBRARIES})
+endif()
+
 # --- Tests ------------------------------------------------------------------
 
 option(BUILD_TESTING "Build unit tests" ON)
