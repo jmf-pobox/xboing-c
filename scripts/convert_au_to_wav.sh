@@ -27,7 +27,7 @@ failed=0
 
 for dir in sounds sounds/originals; do
     if [[ ! -d "$dir" ]]; then
-        echo "WARN: $dir/ not found, skipping."
+        echo "WARN: $dir/ not found, skipping." >&2
         continue
     fi
 
@@ -41,7 +41,7 @@ for dir in sounds sounds/originals; do
             continue
         fi
 
-        if sox "$au_file" -e signed-integer -b 16 "$wav_file"; then
+        if sox "$au_file" -e signed-integer -b 16 -c 1 -r 8000 "$wav_file"; then
             converted=$((converted + 1))
         else
             echo "FAIL: $au_file" >&2
