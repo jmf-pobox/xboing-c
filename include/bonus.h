@@ -29,7 +29,7 @@
  * enhancements, or modifications.
  */
 
-/* 
+/*
  * =========================================================================
  *
  * $Id: bonus.h,v 1.1.1.1 1994/12/16 01:36:50 jck Exp $
@@ -56,30 +56,30 @@
  *  Constants and macros:
  */
 
-#define SMALL_TITLE_WIDTH		237
-#define SMALL_TITLE_HEIGHT		37
+#define SMALL_TITLE_WIDTH 237
+#define SMALL_TITLE_HEIGHT 37
 
-#define SMALL_TITLE_WC		(SMALL_TITLE_WIDTH / 2)
-#define SMALL_TITLE_HC		(SMALL_TITLE_HEIGHT / 2)
+#define SMALL_TITLE_WC (SMALL_TITLE_WIDTH / 2)
+#define SMALL_TITLE_HC (SMALL_TITLE_HEIGHT / 2)
 
-#define MAX_BONUS           8
+#define MAX_BONUS 8
 
 /*
  *  Type declarations:
  */
 
-enum BonusStates 
-{ 
-	BONUS_TEXT, 
-	BONUS_SCORE, 
-	BONUS_BONUS, 
-	BONUS_LEVEL, 
-	BONUS_BULLET, 
-	BONUS_TIME, 
-	BONUS_HSCORE, 
-	BONUS_END_TEXT, 
-	BONUS_WAIT, 
-	BONUS_FINISH
+enum BonusStates
+{
+    BONUS_TEXT,
+    BONUS_SCORE,
+    BONUS_BONUS,
+    BONUS_LEVEL,
+    BONUS_BULLET,
+    BONUS_TIME,
+    BONUS_HSCORE,
+    BONUS_END_TEXT,
+    BONUS_WAIT,
+    BONUS_FINISH
 };
 
 /*
@@ -99,7 +99,6 @@ void MoveSmallIntroTitle(Display *display, Window window, int x, int y);
 void ComputeAndAddBonusScore(void);
 void SetBonusWait(enum BonusStates newMode, int waitFrame);
 int GetNumberBonus(void);
-
 
 extern enum BonusStates BonusState;
 
