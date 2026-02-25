@@ -29,7 +29,7 @@
  * enhancements, or modifications.
  */
 
-/* 
+/*
  * =========================================================================
  *
  * $Id: inst.h,v 1.1.1.1 1994/12/16 01:36:52 jck Exp $
@@ -60,13 +60,13 @@
  *  Type declarations:
  */
 
-enum InstructStates 
-{ 
-	INSTRUCT_TITLE, 
-	INSTRUCT_TEXT, 
-	INSTRUCT_SPARKLE, 
-	INSTRUCT_WAIT, 
-	INSTRUCT_FINISH 
+enum InstructStates
+{
+    INSTRUCT_TITLE,
+    INSTRUCT_TEXT,
+    INSTRUCT_SPARKLE,
+    INSTRUCT_WAIT,
+    INSTRUCT_FINISH
 };
 
 /*
