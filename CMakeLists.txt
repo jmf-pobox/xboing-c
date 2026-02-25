@@ -282,6 +282,18 @@ if(SDL2_FOUND AND SDL2_MIXER_FOUND)
     target_link_libraries(sdl2_audio PUBLIC ${SDL2_LIBRARIES} ${SDL2_MIXER_LIBRARIES})
 endif()
 
+# --- SDL2 input mapping library (optional) -----------------------------------
+
+if(SDL2_FOUND)
+    add_library(sdl2_input STATIC src/sdl2_input.c)
+    target_include_directories(sdl2_input PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${SDL2_INCLUDE_DIRS}
+    )
+    target_compile_options(sdl2_input PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+    target_link_libraries(sdl2_input PUBLIC ${SDL2_LIBRARIES})
+endif()
+
 # --- Tests ------------------------------------------------------------------
 
 option(BUILD_TESTING "Build unit tests" ON)
