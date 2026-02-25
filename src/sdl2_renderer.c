@@ -40,6 +40,11 @@ sdl2_renderer_t *sdl2_renderer_create(const sdl2_renderer_config_t *config)
         return NULL;
     }
 
+    if (config->logical_width <= 0 || config->logical_height <= 0 || config->scale <= 0)
+    {
+        return NULL;
+    }
+
     sdl2_renderer_t *ctx = calloc(1, sizeof(*ctx));
     if (ctx == NULL)
     {
@@ -165,13 +170,17 @@ bool sdl2_renderer_toggle_fullscreen(sdl2_renderer_t *ctx)
 
     if (ctx->fullscreen)
     {
-        SDL_SetWindowFullscreen(ctx->window, 0);
-        ctx->fullscreen = false;
+        if (SDL_SetWindowFullscreen(ctx->window, 0) == 0)
+        {
+            ctx->fullscreen = false;
+        }
     }
     else
     {
-        SDL_SetWindowFullscreen(ctx->window, SDL_WINDOW_FULLSCREEN_DESKTOP);
-        ctx->fullscreen = true;
+        if (SDL_SetWindowFullscreen(ctx->window, SDL_WINDOW_FULLSCREEN_DESKTOP) == 0)
+        {
+            ctx->fullscreen = true;
+        }
     }
 
     return ctx->fullscreen;

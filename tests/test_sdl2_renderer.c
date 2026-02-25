@@ -189,10 +189,43 @@ static void test_destroy_null(void **state)
 }
 
 /* =========================================================================
- * Group 7: Window title
+ * Group 7: Invalid config
  * ========================================================================= */
 
-/* TC-11: Custom title is reflected in SDL_GetWindowTitle. */
+/* TC-11: Zero scale returns NULL. */
+static void test_create_zero_scale(void **state)
+{
+    (void)state;
+    sdl2_renderer_config_t cfg = sdl2_renderer_config_defaults();
+    cfg.scale = 0;
+    assert_null(sdl2_renderer_create(&cfg));
+}
+
+/* TC-12: Negative dimensions return NULL. */
+static void test_create_negative_dimensions(void **state)
+{
+    (void)state;
+    sdl2_renderer_config_t cfg = sdl2_renderer_config_defaults();
+    cfg.logical_width = -1;
+    assert_null(sdl2_renderer_create(&cfg));
+
+    cfg = sdl2_renderer_config_defaults();
+    cfg.logical_height = -1;
+    assert_null(sdl2_renderer_create(&cfg));
+}
+
+/* TC-13: NULL config returns NULL. */
+static void test_create_null_config(void **state)
+{
+    (void)state;
+    assert_null(sdl2_renderer_create(NULL));
+}
+
+/* =========================================================================
+ * Group 8: Window title
+ * ========================================================================= */
+
+/* TC-14: Custom title is reflected in SDL_GetWindowTitle. */
 static void test_custom_title(void **state)
 {
     (void)state;
@@ -231,7 +264,11 @@ int main(void)
         cmocka_unit_test(test_is_fullscreen_initial),
         /* Group 6: Null safety */
         cmocka_unit_test(test_destroy_null),
-        /* Group 7: Window title */
+        /* Group 7: Invalid config */
+        cmocka_unit_test(test_create_zero_scale),
+        cmocka_unit_test(test_create_negative_dimensions),
+        cmocka_unit_test(test_create_null_config),
+        /* Group 8: Window title */
         cmocka_unit_test(test_custom_title),
     };
 
