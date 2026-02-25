@@ -490,3 +490,62 @@ What this module does NOT do:
   of the legacy pattern.
 - Tests verify all cursor types can be created and set in headless mode
   (`SDL_VIDEODRIVER=dummy`).
+
+## ADR-009: SDL2 logical render regions
+
+**Status:** Accepted
+
+**Context:**
+The legacy XBoing creates 10 X11 child windows inside `mainWindow` via
+`CreateAllWindows()` in `stage.c:218-371`. Each child window acts as an
+independent rendering surface with its own coordinate system: `playWindow`
+(495x580 at offset 35,60), `scoreWindow` (224x42 at 35,10),
+`levelWindow` (286x52 at 284,5), `messWindow` (247x30 at 35,655),
+`specialWindow` (180x35 at 292,655), `timeWindow` (61x35 at 477,655),
+plus editor-only `blockWindow` and `typeWindow`, and a centered modal
+`inputWindow`. A `bufferWindow` provides double-buffering.
+
+SDL2 uses a single renderer with `SDL_RenderSetClipRect()` for region-scoped
+drawing, eliminating the need for child windows entirely.
+
+**Decision:**
+Create an `sdl2_regions` module (`src/sdl2_regions.c`,
+`include/sdl2_regions.h`) that defines named `SDL_Rect` constants for all
+game regions. Key design points:
+
+1. **No opaque context.** Like the color module, regions are pure static
+   data — `SDL_Rect` constants with no mutable state. All coordinates are
+   computed from the legacy stage.c formulas and verified by tests.
+
+2. **Nine named regions.** `sdl2_region_id_t` enumerates all legacy
+   sub-windows: PLAY, SCORE, LEVEL, MESSAGE, SPECIAL, TIMER (gameplay),
+   EDITOR, EDITOR_TYPE (editor mode), and DIALOGUE (modal input).
+   The `bufferWindow` is omitted — SDL2's renderer handles double-buffering
+   internally.
+
+3. **Logical coordinates.** All regions use the 575x720 logical coordinate
+   system matching `SDL2R_LOGICAL_WIDTH` x `SDL2R_LOGICAL_HEIGHT` from the
+   renderer module. `SDL_RenderSetLogicalSize()` handles scaling to physical
+   window size.
+
+4. **Hit testing.** `sdl2_region_hit_test(x, y)` maps a logical pixel
+   coordinate to its containing region, useful for mouse click dispatch.
+
+5. **Static library.** Built as `libsdl2_regions.a`, conditional on
+   `SDL2_FOUND`. Only depends on base SDL2 for `SDL_Rect` and
+   `SDL_PointInRect`.
+
+What this module does NOT do:
+
+- `SDL_RenderSetClipRect` calls (callers apply clip rects as needed)
+- Region resizing or dynamic layout (fixed logical coordinates)
+- Wiring into legacy call sites (separate migration task)
+
+**Consequences:**
+
+- Region coordinates are verified against the legacy stage.c formulas by
+  20 characterization tests, ensuring pixel-accurate layout matching.
+- The enum + function API provides type safety and centralized coordinate
+  management — no magic numbers scattered across rendering code.
+- Hit testing enables clean mouse event routing without manual coordinate
+  comparisons at each call site.
