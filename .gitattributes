@@ -2,6 +2,7 @@
 # Use bd merge for beads JSONL files
 .beads/issues.jsonl merge=beads
 
-# Binary audio assets — prevent line-ending normalization
+# Binary assets — prevent line-ending normalization
 *.au -text
 *.wav -text
+*.ttf -text

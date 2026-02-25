@@ -181,6 +181,13 @@ install(DIRECTORY sounds/
         PATTERN "*.wav"
     PATTERN "CVS" EXCLUDE)
 
+install(DIRECTORY assets/fonts/
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/xboing/fonts"
+    FILES_MATCHING
+        PATTERN "*.ttf"
+        PATTERN "LICENSE"
+    PATTERN "CVS" EXCLUDE)
+
 install(FILES docs/problems.doc
     DESTINATION "${CMAKE_INSTALL_DATADIR}/xboing/docs")
 
