@@ -19,6 +19,17 @@
                 "CMAKE_C_FLAGS": "-fsanitize=address,undefined -fno-omit-frame-pointer",
                 "CMAKE_EXE_LINKER_FLAGS": "-fsanitize=address,undefined"
             }
+        },
+        {
+            "name": "install",
+            "displayName": "Install (FHS paths)",
+            "binaryDir": "${sourceDir}/build-install",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "CMAKE_INSTALL_PREFIX": "/usr",
+                "XBOING_USE_INSTALLED_PATHS": "ON",
+                "BUILD_TESTING": "OFF"
+            }
         }
     ]
 }

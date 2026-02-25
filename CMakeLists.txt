@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
 project(xboing C)
+include(GNUInstallDirs)
 
 # Export compile_commands.json for clang-tidy
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -69,16 +70,31 @@ add_executable(xboing
     keysedit.c
 )
 
-# --- Compile definitions (match Makefile exactly) ---------------------------
+# --- Compile definitions ----------------------------------------------------
 
-target_compile_definitions(xboing PRIVATE
-    "HIGH_SCORE_FILE=\"./.xboing.scr\""
-    "LEVEL_INSTALL_DIR=\"./levels\""
-    "SOUNDS_DIR=\"./sounds\""
-    "READMEP_FILE=\"./docs/problems.doc\""
-    "AUDIO_AVAILABLE=\"True\""
-    "AUDIO_FILE=\"audio/LINUXaudio.c\""
-)
+option(XBOING_USE_INSTALLED_PATHS
+    "Set asset paths to installed FHS locations instead of relative (development) paths"
+    OFF)
+
+if(XBOING_USE_INSTALLED_PATHS)
+    target_compile_definitions(xboing PRIVATE
+        "HIGH_SCORE_FILE=\"./.xboing.scr\""
+        "LEVEL_INSTALL_DIR=\"${CMAKE_INSTALL_FULL_DATADIR}/xboing/levels\""
+        "SOUNDS_DIR=\"${CMAKE_INSTALL_FULL_DATADIR}/xboing/sounds\""
+        "READMEP_FILE=\"${CMAKE_INSTALL_FULL_DATADIR}/xboing/docs/problems.doc\""
+        "AUDIO_AVAILABLE=\"True\""
+        "AUDIO_FILE=\"audio/LINUXaudio.c\""
+    )
+else()
+    target_compile_definitions(xboing PRIVATE
+        "HIGH_SCORE_FILE=\"./.xboing.scr\""
+        "LEVEL_INSTALL_DIR=\"./levels\""
+        "SOUNDS_DIR=\"./sounds\""
+        "READMEP_FILE=\"./docs/problems.doc\""
+        "AUDIO_AVAILABLE=\"True\""
+        "AUDIO_FILE=\"audio/LINUXaudio.c\""
+    )
+endif()
 
 # --- Include directories ----------------------------------------------------
 
@@ -149,6 +165,27 @@ target_link_libraries(xboing PRIVATE
     m
 )
 
+# --- Install rules ----------------------------------------------------------
+
+install(TARGETS xboing RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
+
+install(DIRECTORY levels/
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/xboing/levels"
+    FILES_MATCHING PATTERN "*.data"
+    PATTERN "CVS" EXCLUDE)
+
+install(DIRECTORY sounds/
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/xboing/sounds"
+    FILES_MATCHING PATTERN "*.au"
+    PATTERN "CVS" EXCLUDE)
+
+install(FILES docs/problems.doc
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/xboing/docs")
+
+install(FILES xboing.man
+    DESTINATION "${CMAKE_INSTALL_MANDIR}/man6"
+    RENAME xboing.6)
+
 # --- Tests ------------------------------------------------------------------
 
 option(BUILD_TESTING "Build unit tests" ON)
@@ -173,4 +210,10 @@ if(BUILD_TESTING)
 else()
     message(STATUS "  CMocka:     (tests disabled)")
 endif()
+if(XBOING_USE_INSTALLED_PATHS)
+    message(STATUS "  Asset paths:    installed (${CMAKE_INSTALL_FULL_DATADIR}/xboing/)")
+else()
+    message(STATUS "  Asset paths:    development (relative to CWD)")
+endif()
+message(STATUS "  Install prefix: ${CMAKE_INSTALL_PREFIX}")
 message(STATUS "")
