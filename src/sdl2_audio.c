@@ -426,6 +426,106 @@ int sdl2_audio_get_volume(const sdl2_audio_t *ctx)
     return ctx->volume;
 }
 
+/* =========================================================================
+ * Volume percentage API
+ * ========================================================================= */
+
+/*
+ * Convert a percentage (0-100) to SDL2_mixer volume (0-128).
+ * Uses integer rounding: (percent * 128 + 50) / 100.
+ */
+static int percent_to_sdl(int percent)
+{
+    if (percent <= 0)
+    {
+        return 0;
+    }
+    if (percent >= SDL2A_VOLUME_PERCENT_MAX)
+    {
+        return MIX_MAX_VOLUME;
+    }
+    return (percent * MIX_MAX_VOLUME + 50) / SDL2A_VOLUME_PERCENT_MAX;
+}
+
+/*
+ * Convert SDL2_mixer volume (0-128) to a percentage (0-100).
+ * Inverse of percent_to_sdl with rounding.
+ */
+static int sdl_to_percent(int volume)
+{
+    if (volume <= 0)
+    {
+        return 0;
+    }
+    if (volume >= MIX_MAX_VOLUME)
+    {
+        return SDL2A_VOLUME_PERCENT_MAX;
+    }
+    return (volume * SDL2A_VOLUME_PERCENT_MAX + MIX_MAX_VOLUME / 2) / MIX_MAX_VOLUME;
+}
+
+void sdl2_audio_set_volume_percent(sdl2_audio_t *ctx, int percent)
+{
+    if (ctx == NULL)
+    {
+        return;
+    }
+
+    if (percent < SDL2A_VOLUME_PERCENT_MIN)
+    {
+        percent = SDL2A_VOLUME_PERCENT_MIN;
+    }
+    if (percent > SDL2A_VOLUME_PERCENT_MAX)
+    {
+        percent = SDL2A_VOLUME_PERCENT_MAX;
+    }
+
+    int sdl_vol = percent_to_sdl(percent);
+    ctx->volume = sdl_vol;
+    Mix_Volume(-1, sdl_vol);
+}
+
+int sdl2_audio_get_volume_percent(const sdl2_audio_t *ctx)
+{
+    if (ctx == NULL)
+    {
+        return 0;
+    }
+    return sdl_to_percent(ctx->volume);
+}
+
+int sdl2_audio_volume_up(sdl2_audio_t *ctx)
+{
+    if (ctx == NULL)
+    {
+        return 0;
+    }
+
+    int pct = sdl_to_percent(ctx->volume);
+    if (pct < SDL2A_VOLUME_PERCENT_MAX)
+    {
+        pct += SDL2A_VOLUME_STEP;
+        sdl2_audio_set_volume_percent(ctx, pct);
+    }
+    return sdl_to_percent(ctx->volume);
+}
+
+int sdl2_audio_volume_down(sdl2_audio_t *ctx)
+{
+    if (ctx == NULL)
+    {
+        return 0;
+    }
+
+    int pct = sdl_to_percent(ctx->volume);
+    if (pct > SDL2A_VOLUME_PERCENT_MIN)
+    {
+        pct -= SDL2A_VOLUME_STEP;
+        sdl2_audio_set_volume_percent(ctx, pct);
+    }
+    return sdl_to_percent(ctx->volume);
+}
+
 // cppcheck-suppress constParameterPointer
 void sdl2_audio_halt(sdl2_audio_t *ctx)
 {
