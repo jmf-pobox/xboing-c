@@ -256,3 +256,11 @@ add_executable(test_sdl2_cli test_sdl2_cli.c)
 target_compile_options(test_sdl2_cli PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
 target_link_libraries(test_sdl2_cli PRIVATE sdl2_cli ${CMOCKA_LIBRARIES})
 add_test(NAME test_sdl2_cli COMMAND test_sdl2_cli)
+
+# Ball physics system tests (bead xboing-1ka.1)
+# Pure logic tests — no SDL2, X11, video, or audio driver needed.
+# Links against ball_system static library (includes ball_math.c + libm).
+add_executable(test_ball_system test_ball_system.c)
+target_compile_options(test_ball_system PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+target_link_libraries(test_ball_system PRIVATE ball_system ${CMOCKA_LIBRARIES})
+add_test(NAME test_ball_system COMMAND test_ball_system)
