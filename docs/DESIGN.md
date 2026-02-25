@@ -428,3 +428,65 @@ What this module does NOT do:
   and cross-consistency between named colors and gradient arrays.
 - The `by_name()` function provides a drop-in replacement path for legacy
   `ColourNameToPixel()` calls during migration.
+
+## ADR-008: SDL2 cursor management
+
+**Status:** Accepted
+
+**Context:**
+The legacy XBoing uses 5 cursor types managed via `ChangePointer()` in
+`init.c:702-745`. Four use `XCreateFontCursor()` with X11 cursor font
+shapes (`XC_watch`, `XC_plus`, `XC_hand2`, `XC_pirate`). The invisible
+cursor uses `XCreatePixmapCursor()` with a blank 1x1 pixmap. The function
+frees the previous cursor with `XFreeCursor()` before creating a new one
+(create-on-switch pattern). Call sites: 1 in `main.c` (initial hide),
+8 in `editor.c` (mode-dependent cursor changes).
+
+**Decision:**
+Create an `sdl2_cursor` module (`src/sdl2_cursor.c`, `include/sdl2_cursor.h`)
+that pre-creates all cursor types and switches between them. Key design points:
+
+1. **Opaque context with pre-created cursors (best-effort).** Unlike the
+   legacy create-on-switch pattern, cursor handles are created upfront in
+   `sdl2_cursor_create()` and cached for the context lifetime. Switching
+   is O(1) `SDL_SetCursor()` with no allocation. Creation is best-effort:
+   some video drivers (e.g. dummy for CI) don't support system cursors.
+   Missing cursors are stored as NULL and `set()` gracefully skips
+   `SDL_SetCursor` while still tracking the active cursor ID.
+
+2. **System cursors.** SDL2 system cursors (`SDL_CreateSystemCursor`) map
+   directly to platform-native cursors:
+   - `SDL2CUR_WAIT` → `SDL_SYSTEM_CURSOR_WAIT`
+   - `SDL2CUR_PLUS` → `SDL_SYSTEM_CURSOR_CROSSHAIR`
+   - `SDL2CUR_POINT` → `SDL_SYSTEM_CURSOR_HAND`
+   - `SDL2CUR_SKULL` → `SDL_SYSTEM_CURSOR_CROSSHAIR` (no pirate equivalent)
+   - `SDL2CUR_NONE` → hidden via `SDL_ShowCursor(SDL_DISABLE)`
+
+3. **Skull cursor substitute.** SDL2 has no pirate/skull system cursor.
+   Crosshair is used as a stand-in because the skull cursor only appears
+   in the level editor during block deletion — crosshair is the closest
+   contextual match. A custom cursor image could replace this later.
+
+4. **Visibility toggle for NONE.** Rather than creating a transparent
+   cursor (which is platform-dependent), `SDL2CUR_NONE` hides the cursor
+   via `SDL_ShowCursor(SDL_DISABLE)` and re-shows it when switching to any
+   visible cursor type.
+
+5. **Current cursor tracking.** The context tracks which cursor ID is
+   active, queryable via `sdl2_cursor_current()`. This enables editor code
+   to check the current state without maintaining a separate variable.
+
+What this module does NOT do:
+
+- Custom cursor images (could be added for skull via `SDL_CreateColorCursor`)
+- Pointer grabbing (SDL2 handles this differently; separate concern)
+- Wiring into legacy call sites (separate migration task)
+
+**Consequences:**
+
+- Cursor creation is all-or-nothing at context init, matching the pattern
+  of other SDL2 modules.
+- No per-switch allocation or deallocation eliminates the create/free churn
+  of the legacy pattern.
+- Tests verify all cursor types can be created and set in headless mode
+  (`SDL_VIDEODRIVER=dummy`).
