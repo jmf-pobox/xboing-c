@@ -79,3 +79,61 @@ Design constraints:
 - `paths_init_explicit()` makes the module fully testable without `setenv()`.
 - Wiring requires touching 7 legacy files; deferring that to a separate PR
   limits blast radius and keeps this change reviewable.
+
+## ADR-003: FHS-compliant CMake install targets
+
+**Status:** Accepted
+
+**Context:**
+The CMake build had zero `install()` rules. The binary and assets only worked when
+run from the repository root because all path defines were relative (`./levels`,
+`./sounds`). This made it impossible for downstream packagers to install the game
+to standard system locations.
+
+The legacy code already has a two-tier path resolution mechanism: environment
+variable first (`XBOING_LEVELS_DIR`, etc.), then compile-time define
+(`LEVEL_INSTALL_DIR`, etc.). This means we can switch between development and
+installed paths purely through compile definitions — no C source changes needed.
+
+**Decision:**
+Add a CMake option `XBOING_USE_INSTALLED_PATHS` (default `OFF`) that controls
+whether compile definitions use relative paths (development) or absolute FHS paths
+(installed). Add `install()` rules for the binary, levels, sounds, docs, and man
+page regardless of the option setting.
+
+Two modes:
+
+- **Default** (`OFF`): relative paths (`./levels`, `./sounds`). The existing
+  development workflow is unchanged — `./xboing` runs from the repo root.
+- **Packager** (`ON`): absolute paths via `GNUInstallDirs`
+  (`${CMAKE_INSTALL_FULL_DATADIR}/xboing/levels`, etc.). The installed binary
+  finds assets at their FHS locations.
+
+FHS install layout:
+
+```text
+${CMAKE_INSTALL_BINDIR}/xboing
+${CMAKE_INSTALL_DATADIR}/xboing/levels/*.data
+${CMAKE_INSTALL_DATADIR}/xboing/sounds/*.au
+${CMAKE_INSTALL_DATADIR}/xboing/docs/problems.doc
+${CMAKE_INSTALL_MANDIR}/man6/xboing.6
+```
+
+A CMake preset (`install`) provides the packager configuration with
+`CMAKE_INSTALL_PREFIX=/usr` and `XBOING_USE_INSTALLED_PATHS=ON`.
+
+What is explicitly out of scope:
+
+- `paths.c` XDG integration (ADR-002, separate wiring task)
+- `.desktop` file, AppStream metadata, icons
+- CPack packaging configuration
+- `HIGH_SCORE_FILE` relocation (deferred to `paths.c` wiring)
+
+**Consequences:**
+
+- Packagers can build and install with `cmake --preset install && cmake --install`.
+- Development workflow is completely unchanged (default OFF).
+- No C source files are modified — the existing compile-define mechanism is reused.
+- `FILES_MATCHING PATTERN` in install rules excludes stale `CVS/` directories.
+- The `install` preset disables tests (`BUILD_TESTING=OFF`) since installed
+  builds do not need the test harness.
