@@ -241,3 +241,11 @@ add_executable(test_sdl2_state test_sdl2_state.c)
 target_compile_options(test_sdl2_state PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
 target_link_libraries(test_sdl2_state PRIVATE sdl2_state ${CMOCKA_LIBRARIES})
 add_test(NAME test_sdl2_state COMMAND test_sdl2_state)
+
+# Fixed-timestep game loop tests (bead xboing-cks.1)
+# Pure logic tests — no SDL2, video, or audio driver needed.
+# Synthetic time injection makes all tests deterministic.
+add_executable(test_sdl2_loop test_sdl2_loop.c)
+target_compile_options(test_sdl2_loop PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+target_link_libraries(test_sdl2_loop PRIVATE sdl2_loop ${CMOCKA_LIBRARIES})
+add_test(NAME test_sdl2_loop COMMAND test_sdl2_loop)

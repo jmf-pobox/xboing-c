@@ -305,6 +305,17 @@ target_include_directories(sdl2_state PUBLIC
 )
 target_compile_options(sdl2_state PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
 
+# --- Fixed-timestep game loop library ----------------------------------------
+#
+# Pure C module — no SDL2 dependency.  Manages accumulator-based fixed-timestep
+# timing with configurable speed levels and spiral-of-death prevention.
+
+add_library(sdl2_loop STATIC src/sdl2_loop.c)
+target_include_directories(sdl2_loop PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+target_compile_options(sdl2_loop PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+
 # --- Tests ------------------------------------------------------------------
 
 option(BUILD_TESTING "Build unit tests" ON)
