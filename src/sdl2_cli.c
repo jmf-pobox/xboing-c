@@ -34,6 +34,7 @@ static bool match_option(const char *arg, const char *option)
  * Try to consume the next argv element as an integer value.
  * Returns true and writes *value on success; returns false on parse failure.
  */
+// cppcheck-suppress constParameter
 static bool parse_int_arg(int argc, char *const argv[], int *i, int *value)
 {
     if (*i + 1 >= argc)
@@ -58,6 +59,7 @@ static bool parse_int_arg(int argc, char *const argv[], int *i, int *value)
  * Try to consume the next argv element as a string value.
  * Returns true and writes *value on success.
  */
+// cppcheck-suppress constParameter
 static bool parse_str_arg(int argc, char *const argv[], int *i, const char **value)
 {
     if (*i + 1 >= argc)
