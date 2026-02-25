@@ -316,6 +316,17 @@ target_include_directories(sdl2_loop PUBLIC
 )
 target_compile_options(sdl2_loop PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
 
+# --- CLI option parsing library ----------------------------------------------
+#
+# Pure C module — no SDL2 dependency.  Parses command-line arguments into a
+# config struct for the SDL2-based game binary.
+
+add_library(sdl2_cli STATIC src/sdl2_cli.c)
+target_include_directories(sdl2_cli PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+target_compile_options(sdl2_cli PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+
 # --- Tests ------------------------------------------------------------------
 
 option(BUILD_TESTING "Build unit tests" ON)

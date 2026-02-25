@@ -802,3 +802,61 @@ Replace the sleep-based timing with a fixed-timestep accumulator pattern:
   changes, pause semantics, spiral-of-death clamping, and alpha interpolation.
 - Synthetic time injection enables fully deterministic testing with no sleep
   or wall-clock dependency.
+
+## ADR-014: Command-line option parsing
+
+**Status:** Accepted
+**Date:** 2026-02-25
+**Bead:** xboing-1fr.4
+
+**Context:**
+
+The legacy CLI parser in `init.c:507-693` uses `compareArgument()` — a
+case-sensitive prefix matcher implemented with `strncmp()` — to parse 17
+command-line options. Four of
+these are X11-specific (`-display`, `-sync`, `-usedefcmap`, `-noicon`) and
+have no SDL2 equivalent. The parser is tightly coupled to global variables
+(`noSound`, `grabPointer`, `debug`, etc.) and calls side-effecting functions
+(`SetUserSpeed()`, `SetNickName()`, `PrintUsage()`) during parsing.
+
+**Decision:**
+
+Extract CLI parsing into a standalone pure-C module with no SDL2 dependency:
+
+- **Config struct pattern** — `sdl2_cli_config_t` is a plain struct returned
+  by `sdl2_cli_config_defaults()`, populated by `sdl2_cli_parse()`. Caller
+  wires values into SDL2 subsystems; parser has no side effects.
+- **Exact match** — drops the legacy prefix-matching behavior to avoid
+  ambiguity. Options must be typed in full (e.g., `-speed`, not `-sp`).
+- **13 options preserved** — all gameplay-affecting options from legacy:
+  `-help`, `-usage`, `-version`, `-setup`, `-scores`, `-debug`, `-keys`,
+  `-sound`, `-nosfx`, `-grab`, `-speed N`, `-startlevel N`, `-maxvol N`,
+  `-nickname STR`.
+- **4 options dropped** — `-display` (SDL2 uses `SDL_VIDEODRIVER`),
+  `-sync` (no X protocol sync), `-usedefcmap` (no colormap),
+  `-noicon` (SDL2 handles window icons via API).
+- **Status code return** — `SDL2C_EXIT_*` codes signal informational flags
+  (help, version, setup, scores) — caller decides how to print and exit.
+  `SDL2C_ERR_*` codes signal parse errors with `bad_option` out-parameter.
+- **Nickname truncation** — matches legacy behavior of silently truncating
+  nicknames longer than 20 characters.
+- **Integer validation** — `strtol()` with `ERANGE` and `INT_MIN`/`INT_MAX`
+  bounds checking replaces legacy `atoi()` (which silently returns 0 on
+  non-numeric input).  Non-numeric arguments return `ERR_INVALID_VALUE`
+  (distinct from `ERR_MISSING_VALUE` for exhausted argv).
+
+**What we are NOT doing:**
+
+- Printing help text, version info, or scores (caller responsibility)
+- Wiring parsed values into SDL2 subsystems (integration task)
+- Supporting environment variable overrides for CLI options
+- Implementing `--long-option` syntax (preserving legacy single-dash style)
+
+**Consequences:**
+
+- The ~240-line module replaces the 186-line coupled parser with a pure
+  function that is fully testable without any display, audio, or game state.
+- 44 tests across 11 groups verify defaults, NULL safety, all exit flags,
+  all boolean flags, integer range validation, nickname handling, error
+  paths, option combinations, and status strings.
+- No SDL2 dependency — the library links with only libc.
