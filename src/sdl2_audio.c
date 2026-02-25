@@ -29,6 +29,7 @@ struct sdl2_audio
     struct sdl2_audio_entry entries[SDL2A_MAX_SOUNDS];
     int count;
     int volume;
+    bool audio_subsystem_owned;
     bool audio_opened;
     bool mixer_initialized;
 };
@@ -264,6 +265,7 @@ sdl2_audio_t *sdl2_audio_create(const sdl2_audio_config_t *config, sdl2_audio_st
 
     ctx->count = 0;
     ctx->volume = config->volume;
+    ctx->audio_subsystem_owned = false;
     ctx->audio_opened = false;
     ctx->mixer_initialized = false;
 
@@ -281,12 +283,17 @@ sdl2_audio_t *sdl2_audio_create(const sdl2_audio_config_t *config, sdl2_audio_st
             }
             return NULL;
         }
+        ctx->audio_subsystem_owned = true;
     }
 
     /* Open the audio device via SDL_mixer. */
     if (Mix_OpenAudio(config->frequency, MIX_DEFAULT_FORMAT, 2, config->chunk_size) != 0)
     {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "sdl2_audio: Mix_OpenAudio: %s", Mix_GetError());
+        if (ctx->audio_subsystem_owned)
+        {
+            SDL_QuitSubSystem(SDL_INIT_AUDIO);
+        }
         free(ctx);
         if (status != NULL)
         {
@@ -354,8 +361,13 @@ void sdl2_audio_destroy(sdl2_audio_t *ctx)
 
     if (ctx->mixer_initialized)
     {
-        /* Balance the implicit Mix_Init(0) from Mix_OpenAudio. */
+        /* Clean up SDL_mixer internal state. Mix_Init is not required for WAV files. */
         Mix_Quit();
+    }
+
+    if (ctx->audio_subsystem_owned)
+    {
+        SDL_QuitSubSystem(SDL_INIT_AUDIO);
     }
 
     free(ctx);
