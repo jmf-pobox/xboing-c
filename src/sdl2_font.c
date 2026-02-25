@@ -90,8 +90,15 @@ static sdl2_font_status_t render_text(sdl2_font_t *ctx, TTF_Font *font, const ch
     }
 
     SDL_Rect dst = {x, y, w, h};
-    SDL_RenderCopy(ctx->renderer, texture, NULL, &dst);
+    int rc = SDL_RenderCopy(ctx->renderer, texture, NULL, &dst);
     SDL_DestroyTexture(texture);
+
+    if (rc != 0)
+    {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "sdl2_font: SDL_RenderCopy failed: %s",
+                     SDL_GetError());
+        return SDL2F_ERR_RENDER_FAILED;
+    }
 
     return SDL2F_OK;
 }
@@ -280,7 +287,8 @@ sdl2_font_status_t sdl2_font_draw_shadow_centred(sdl2_font_t *ctx, sdl2_font_id_
     int text_w = 0;
     if (text[0] != '\0')
     {
-        if (TTF_SizeUTF8(ctx->slots[font_id].font, text, &text_w, NULL) != 0)
+        int text_h = 0;
+        if (TTF_SizeUTF8(ctx->slots[font_id].font, text, &text_w, &text_h) != 0)
         {
             return SDL2F_ERR_RENDER_FAILED;
         }

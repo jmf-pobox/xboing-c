@@ -74,14 +74,20 @@ sdl2_font_config_t sdl2_font_config_defaults(void);
  * Create a font context.  Opens all four TTF fonts from font_dir.
  * All four fonts must load successfully (all-or-nothing).
  *
+ * Single-context invariant: at most one sdl2_font_t may be alive at a
+ * time.  The implementation calls TTF_Init() on first create and
+ * TTF_Quit() on destroy; a second concurrent context would have its
+ * TTF state pulled out from under it.  (Same pattern as sdl2_texture_t
+ * with IMG_Init/IMG_Quit.)
+ *
  * Returns NULL on failure; *status indicates the reason.
  * The caller owns the returned context and must call sdl2_font_destroy().
  */
 sdl2_font_t *sdl2_font_create(const sdl2_font_config_t *config, sdl2_font_status_t *status);
 
 /*
- * Destroy the font context: closes all TTF_Font handles, calls
- * TTF_Quit() if this context initialized SDL2_ttf, and frees memory.
+ * Destroy the font context: closes all TTF_Font handles, shuts down
+ * SDL2_ttf if this context initialized it, and frees memory.
  * Safe to call with NULL.
  */
 void sdl2_font_destroy(sdl2_font_t *ctx);
