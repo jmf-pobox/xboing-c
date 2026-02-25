@@ -154,3 +154,17 @@ if(SDL2_FOUND)
     add_test(NAME test_sdl2_renderer COMMAND test_sdl2_renderer)
     set_tests_properties(test_sdl2_renderer PROPERTIES ENVIRONMENT "SDL_VIDEODRIVER=dummy")
 endif()
+
+# SDL2 texture cache tests (bead xboing-oaa.2)
+# Links against sdl2_texture and sdl2_renderer static libraries.
+# Uses SDL_VIDEODRIVER=dummy and real PNGs from assets/images/.
+if(SDL2_FOUND AND SDL2_IMAGE_FOUND)
+    add_executable(test_sdl2_texture test_sdl2_texture.c)
+    target_compile_options(test_sdl2_texture PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+    target_link_libraries(test_sdl2_texture PRIVATE
+        sdl2_texture sdl2_renderer ${CMOCKA_LIBRARIES})
+    add_test(NAME test_sdl2_texture COMMAND test_sdl2_texture)
+    set_tests_properties(test_sdl2_texture PROPERTIES
+        ENVIRONMENT "SDL_VIDEODRIVER=dummy"
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+endif()

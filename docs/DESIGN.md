@@ -206,3 +206,73 @@ What this module does NOT do (deferred to later beads):
   X11 code hard to test.
 - Future layout work can define logical regions that map 1:1 to the original
   sub-window positions, rendering into the single SDL2 target.
+
+## ADR-005: SDL2 texture loading and caching
+
+**Status:** Accepted
+
+**Context:**
+XBoing loads 188 XPM sprites at compile time via `#include "bitmaps/balls/ball1.xpm"`,
+creates X11 Pixmap+Mask pairs with `XpmCreatePixmapFromData()`, and draws them with
+`RenderShape()` (XSetClipMask + XCopyArea). All 180 PNG equivalents already exist
+at `assets/images/` (8-bit RGBA with alpha transparency, same dimensions as originals).
+
+The SDL2 renderer (ADR-004) provides the `SDL_Renderer*` needed to create
+`SDL_Texture` objects. This module handles the loading and caching of those
+textures. Rendering them to screen is a separate concern (future bead).
+
+**Decision:**
+Create an `sdl2_texture` module (`src/sdl2_texture.c`, `include/sdl2_texture.h`)
+that loads PNG images into SDL_Texture objects and caches them for O(1) lookup
+by string key. Key design points:
+
+1. **String keys** (e.g., `"balls/ball1"`). Derived from the file path relative
+   to the base directory with the `.png` extension stripped. No enum with 180
+   entries to maintain. A future sprite catalog module can map game concepts to
+   keys.
+
+2. **Eager loading.** All PNGs are loaded at init, matching the legacy pattern
+   where all XPM bitmaps are compiled in and created at startup. 180 small files
+   (~100KB total) make this trivial.
+
+3. **FNV-1a hash map with open addressing.** 256 slots for ~180 entries gives
+   ~70% load factor. The table is write-once at init (plus optional `load_file()`
+   calls) and read-many per frame. Linear probing is cache-friendly and simple.
+
+4. **Recursive `opendir()`/`readdir()` for directory walking.** Avoids `nftw()`
+   which uses static state in its callback and complicates parameter passing.
+   Recursive `opendir()` keeps the scan state on the call stack.
+
+5. **`sdl2_texture_load_file()` public seam.** Enables testing individual
+   texture loads without scanning a directory tree. Also supports late-loading
+   of assets that are not in the base directory.
+
+6. **Opaque context struct.** Same pattern as `sdl2_renderer_t`: heap-allocated,
+   no global state, fully testable.
+
+7. **Borrowed renderer pointer.** The cache stores the `SDL_Renderer*` but does
+   not own it. The caller must ensure the renderer outlives the texture cache
+   (natural in practice: renderer is created first, destroyed last).
+
+8. **Partial load tolerance.** Individual file failures are logged but do not
+   abort cache creation. Only structural failures (NULL renderer, IMG_Init
+   failure, unreadable base directory) cause `create()` to return NULL.
+
+What this module does NOT do (deferred to later beads):
+
+- Sprite rendering (separate concern: draw commands, source rects, dest rects)
+- Animation frame management (game modules own frame sequencing)
+- Sprite sheet/atlas packing (premature optimization for 180 small textures)
+- Color tinting/palette manipulation (xboing-oaa.4)
+- `paths.c` integration (base_dir string is the seam for future wiring)
+
+**Consequences:**
+
+- All PNG loading and caching lives in one module with a clean API.
+- Game modules will look up textures by key (`"balls/ball1"`) rather than
+  indexing into global Pixmap arrays.
+- Tests use the dummy video driver and real PNGs, verifying actual SDL2
+  texture creation end-to-end.
+- The `load_file()` seam enables targeted tests without full directory scans.
+- The 256-slot hash map is adequate for the current 180 textures with room for
+  growth. If the asset count doubles, the constant can be increased.
