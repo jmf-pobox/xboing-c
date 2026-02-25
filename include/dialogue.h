@@ -29,7 +29,7 @@
  * enhancements, or modifications.
  */
 
-/* 
+/*
  * =========================================================================
  *
  * $Id: dialogue.h,v 1.1.1.1 1994/12/16 01:36:55 jck Exp $
@@ -56,16 +56,16 @@
  *  Constants and macros:
  */
 
-#define DIALOGUE_WIDTH 		((int) (PLAY_WIDTH / 1.3))
-#define DIALOGUE_HEIGHT 	120
+#define DIALOGUE_WIDTH ((int)(PLAY_WIDTH / 1.3))
+#define DIALOGUE_HEIGHT 120
 
-#define DISK_ICON			1
-#define TEXT_ICON			2
+#define DISK_ICON 1
+#define TEXT_ICON 2
 
-#define TEXT_ENTRY_ONLY		1
-#define NUMERIC_ENTRY_ONLY	2
-#define ALL_ENTRY			3
-#define YES_NO_ENTRY		4
+#define TEXT_ENTRY_ONLY 1
+#define NUMERIC_ENTRY_ONLY 2
+#define ALL_ENTRY 3
+#define YES_NO_ENTRY 4
 
 /*
  *  Type declarations:
@@ -86,11 +86,9 @@ enum DialogueStates
 
 void ProcessDialogue(Display *display);
 void handleDialogueKeys(Display *display, XEvent event);
-char *UserInputDialogueMessage(Display *display, char *message, int type,
-	int entryValidation);
+char *UserInputDialogueMessage(Display *display, char *message, int type, int entryValidation);
 void FreeDialoguePixmaps(Display *display);
-void InitialiseDialoguePixmaps(Display *display, Window window, 
-		Colormap colormap);
+void InitialiseDialoguePixmaps(Display *display, Window window, Colormap colormap);
 
 extern Pixmap question, questionM;
 extern Pixmap floppy, floppyM;

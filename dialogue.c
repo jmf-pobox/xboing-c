@@ -26,7 +26,7 @@
  * enhancements, or modifications.
  */
 
-/* 
+/*
  * =========================================================================
  *
  * $Id: dialogue.c,v 1.1.1.1 1994/12/16 01:36:43 jck Exp $
@@ -47,24 +47,24 @@
  *  Include file dependencies:
  */
 
+#include <X11/Xlib.h>
+#include <X11/Xos.h>
+#include <X11/Xutil.h>
+#include <X11/keysym.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stddef.h>
-#include <X11/Xlib.h>
-#include <X11/Xutil.h>
-#include <X11/Xos.h>
-#include <X11/keysym.h>
 #include <xpm.h>
 
-#include "error.h"
-#include "level.h"
-#include "init.h"
-#include "sfx.h"
 #include "audio.h"
-#include "stage.h"
+#include "error.h"
+#include "init.h"
 #include "intro.h"
+#include "level.h"
 #include "main.h"
 #include "misc.h"
+#include "sfx.h"
+#include "stage.h"
 
 #include "bitmaps/floppy.xpm"
 #include "bitmaps/question.xpm"
@@ -87,125 +87,122 @@ static void handleDialogueEventLoop(Display *display);
  *  Internal variable declarations:
  */
 
-enum 	DialogueStates dialogueState;
-int 	dialogueType, validation;
-char 	theMessage[80];
-char 	currentInput[1024];
-Pixmap 	question, questionM;
-Pixmap 	floppy, floppyM;
-Pixmap 	text, textM;
+enum DialogueStates dialogueState;
+int dialogueType, validation;
+char theMessage[80];
+char currentInput[1024];
+Pixmap question, questionM;
+Pixmap floppy, floppyM;
+Pixmap text, textM;
 
-void InitialiseDialoguePixmaps(Display *display, Window window,
-    Colormap colormap)
+void InitialiseDialoguePixmaps(Display *display, Window window, Colormap colormap)
 {
-    XpmAttributes   attributes;
-    int         XpmErrorStatus;
+    XpmAttributes attributes;
+    int XpmErrorStatus;
 
     attributes.valuemask = XpmColormap;
     attributes.colormap = colormap;
 
     /* Create the playfield background pixmaps */
 
-    XpmErrorStatus = XpmCreatePixmapFromData(display, window,
-        floppy_xpm, &floppy, &floppyM, &attributes);
-    HandleXPMError(display, XpmErrorStatus, 
-		"InitialiseDialoguePixmaps(floppy)");
+    XpmErrorStatus =
+        XpmCreatePixmapFromData(display, window, floppy_xpm, &floppy, &floppyM, &attributes);
+    HandleXPMError(display, XpmErrorStatus, "InitialiseDialoguePixmaps(floppy)");
 
-    XpmErrorStatus = XpmCreatePixmapFromData(display, window,
-        question_xpm, &question, &questionM, &attributes);
-    HandleXPMError(display, XpmErrorStatus, 
-		"InitialiseDialoguePixmaps(question)");
+    XpmErrorStatus =
+        XpmCreatePixmapFromData(display, window, question_xpm, &question, &questionM, &attributes);
+    HandleXPMError(display, XpmErrorStatus, "InitialiseDialoguePixmaps(question)");
 
-    XpmErrorStatus = XpmCreatePixmapFromData(display, window,
-        text_xpm, &text, &textM, &attributes);
-    HandleXPMError(display, XpmErrorStatus, 
-		"InitialiseDialoguePixmaps(text)");
+    XpmErrorStatus = XpmCreatePixmapFromData(display, window, text_xpm, &text, &textM, &attributes);
+    HandleXPMError(display, XpmErrorStatus, "InitialiseDialoguePixmaps(text)");
 }
 
 void FreeDialoguePixmaps(Display *display)
 {
     /* Free all the Dialogue Pixmaps */
-    if (floppy)    		XFreePixmap(display, floppy);
-    if (floppyM)    	XFreePixmap(display, floppyM);
-    if (question)    	XFreePixmap(display, question);
-    if (questionM)    	XFreePixmap(display, questionM);
-    if (text)    		XFreePixmap(display, text);
-    if (textM)    		XFreePixmap(display, textM);
+    if (floppy)
+        XFreePixmap(display, floppy);
+    if (floppyM)
+        XFreePixmap(display, floppyM);
+    if (question)
+        XFreePixmap(display, question);
+    if (questionM)
+        XFreePixmap(display, questionM);
+    if (text)
+        XFreePixmap(display, text);
+    if (textM)
+        XFreePixmap(display, textM);
 }
 
-char *UserInputDialogueMessage(Display *display, char *message, int type,
-	int entryValidation)
+char *UserInputDialogueMessage(Display *display, char *message, int type, int entryValidation)
 {
-	/* Change the message for the dialogue */
-	strcpy(theMessage, message);
+    /* Change the message for the dialogue */
+    strcpy(theMessage, message);
 
-	dialogueState 	= DIALOGUE_MAP;
-	oldMode 		= mode;
-	dialogueType 	= type;
-	validation 		= entryValidation;
-	mode 			= MODE_DIALOGUE;
+    dialogueState = DIALOGUE_MAP;
+    oldMode = mode;
+    dialogueType = type;
+    validation = entryValidation;
+    mode = MODE_DIALOGUE;
 
-	/* Null the current input string */
-	strcpy(currentInput, "");
+    /* Null the current input string */
+    strcpy(currentInput, "");
 
-	handleDialogueEventLoop(display);
+    handleDialogueEventLoop(display);
 
-	DEBUG("UserInputDialogueMessage() returning input value.");
+    DEBUG("UserInputDialogueMessage() returning input value.");
 
-	return (currentInput);
+    return (currentInput);
 }
 
 static void ShowUserInputDialogue(Display *display)
 {
-	int dw = DIALOGUE_WIDTH;
+    int dw = DIALOGUE_WIDTH;
 
-	XMapWindow(display, inputWindow);
+    XMapWindow(display, inputWindow);
 
-	/* Change the background to a pattern */
-	DrawStageBackground(display, inputWindow, BACKGROUND_1, True);
-	XSetWindowBorder(display, inputWindow, red);
+    /* Change the background to a pattern */
+    DrawStageBackground(display, inputWindow, BACKGROUND_1, True);
+    XSetWindowBorder(display, inputWindow, red);
 
-	/* Draw the message string */
-	DrawShadowCentredText(display, inputWindow, textFont, 
-		theMessage, 10, green, dw);
+    /* Draw the message string */
+    DrawShadowCentredText(display, inputWindow, textFont, theMessage, 10, green, dw);
 
-	DEBUG("ShowUserInputDialogue() setting icon for dialogue.");
+    DEBUG("ShowUserInputDialogue() setting icon for dialogue.");
 
-	switch (dialogueType)
-	{
-		case DISK_ICON:
-			RenderShape(display, inputWindow, 
-				floppy, floppyM, 2, 4, 32, 32, False);
-			break;
-			
-		case TEXT_ICON:
-			RenderShape(display, inputWindow, 
-				text, textM, 2, 4, 32, 32, False);
-			break;
-	}
+    switch (dialogueType)
+    {
+        case DISK_ICON:
+            RenderShape(display, inputWindow, floppy, floppyM, 2, 4, 32, 32, False);
+            break;
 
-	DrawLine(display, inputWindow, 10, 45, dw - 10, 45, white, 2);
+        case TEXT_ICON:
+            RenderShape(display, inputWindow, text, textM, 2, 4, 32, 32, False);
+            break;
+    }
 
-	redrawCurrentInput(display);
+    DrawLine(display, inputWindow, 10, 45, dw - 10, 45, white, 2);
 
-	DEBUG("ShowUserInputDialogue() mapping dialogue now.");
+    redrawCurrentInput(display);
 
-	/*XMapWindow(display, inputWindow);*/
-	XFlush(display);
+    DEBUG("ShowUserInputDialogue() mapping dialogue now.");
 
-	DEBUG("ShowUserInputDialogue() mapping complete.");
+    /*XMapWindow(display, inputWindow);*/
+    XFlush(display);
+
+    DEBUG("ShowUserInputDialogue() mapping complete.");
 }
 
 static void RemoveUserInputDialogue(Display *display)
 {
-	while (WindowFadeEffect(display, inputWindow, 
-		DIALOGUE_WIDTH, DIALOGUE_HEIGHT));
+    while (WindowFadeEffect(display, inputWindow, DIALOGUE_WIDTH, DIALOGUE_HEIGHT))
+        ;
 
-	DEBUG("RemoveUserInputDialogue() unmapping dialogue.");
+    DEBUG("RemoveUserInputDialogue() unmapping dialogue.");
 
-	/* Unmap the user input dialogue */
-	XUnmapWindow(display, inputWindow);
-	XFlush(display);
+    /* Unmap the user input dialogue */
+    XUnmapWindow(display, inputWindow);
+    XFlush(display);
 }
 
 void ProcessDialogue(Display *display)
@@ -214,106 +211,105 @@ void ProcessDialogue(Display *display)
     switch (dialogueState)
     {
         case DIALOGUE_MAP:
-			ShowUserInputDialogue(display);
-			dialogueState = DIALOGUE_TEXT;
+            ShowUserInputDialogue(display);
+            dialogueState = DIALOGUE_TEXT;
             break;
 
         case DIALOGUE_UNMAP:
-			RemoveUserInputDialogue(display);
-			dialogueState = DIALOGUE_FINISHED;
-			mode = oldMode;
+            RemoveUserInputDialogue(display);
+            dialogueState = DIALOGUE_FINISHED;
+            mode = oldMode;
             break;
 
         case DIALOGUE_TEXT:
-			break;
+            break;
 
         case DIALOGUE_FINISHED:
-			break;
+            break;
 
-		default:
-			break;
-	}
+        default:
+            break;
+    }
 }
 
 static void redrawCurrentInput(Display *display)
 {
-	XClearArea(display, inputWindow, 0, 50, DIALOGUE_WIDTH, 50, False);
-	if (strlen(currentInput) > 0)
-		DrawShadowCentredText(display, inputWindow, textFont, currentInput, 
-			70, yellow, DIALOGUE_WIDTH);
-	else
-		RenderShape(display, inputWindow, question, questionM, 
-			(DIALOGUE_WIDTH / 2) - 16, 70, 
-			32, 32, False);
+    XClearArea(display, inputWindow, 0, 50, DIALOGUE_WIDTH, 50, False);
+    if (strlen(currentInput) > 0)
+        DrawShadowCentredText(display, inputWindow, textFont, currentInput, 70, yellow,
+                              DIALOGUE_WIDTH);
+    else
+        RenderShape(display, inputWindow, question, questionM, (DIALOGUE_WIDTH / 2) - 16, 70, 32,
+                    32, False);
 }
 
 static void validateDialogueKeys(Display *display, KeySym keysym, char *str)
 {
-	/* Check the type of keyboard input needed */
-	switch (validation)
-	{
-		case TEXT_ENTRY_ONLY:	/* Strictly text only */
-			if (keysym < XK_space || keysym > XK_z)
-				return;
-			break;
+    /* Check the type of keyboard input needed */
+    switch (validation)
+    {
+        case TEXT_ENTRY_ONLY: /* Strictly text only */
+            if (keysym < XK_space || keysym > XK_z)
+                return;
+            break;
 
-		case YES_NO_ENTRY:	/* Strictly text Yy/Nn only */
-			if (keysym != XK_y && keysym != XK_Y 
-				&& keysym != XK_n && keysym != XK_N)
-				return;
-			break;
+        case YES_NO_ENTRY: /* Strictly text Yy/Nn only */
+            if (keysym != XK_y && keysym != XK_Y && keysym != XK_n && keysym != XK_N)
+                return;
+            break;
 
-		case NUMERIC_ENTRY_ONLY:	/* Strictly numbers only */
-			if (keysym < XK_0 || keysym > XK_9)
-				return;
-			break;
+        case NUMERIC_ENTRY_ONLY: /* Strictly numbers only */
+            if (keysym < XK_0 || keysym > XK_9)
+                return;
+            break;
 
-		case ALL_ENTRY:	/* Anything goes */
-			if (keysym < XK_space || keysym > XK_asciitilde)
-				return;
-			break;
-	}
+        case ALL_ENTRY: /* Anything goes */
+            if (keysym < XK_space || keysym > XK_asciitilde)
+                return;
+            break;
+    }
 
-	/* Check the width of the text is not out of bounds */
-	if (XTextWidth(textFont, currentInput, strlen(currentInput)) 
-		< (DIALOGUE_WIDTH - 20))
-	{
-		if (validation == YES_NO_ENTRY)
-		{
-			if (strlen(currentInput) == 0)
-			{
-				/* Now add that key to the input string */
-				strncat(currentInput, str, 1);
-				redrawCurrentInput(display);
-			}
-		}
-		else
-		{
-			/* Now add that key to the input string */
-			strncat(currentInput, str, 1);
-			redrawCurrentInput(display);
-		}
+    /* Check the width of the text is not out of bounds */
+    if (XTextWidth(textFont, currentInput, strlen(currentInput)) < (DIALOGUE_WIDTH - 20))
+    {
+        if (validation == YES_NO_ENTRY)
+        {
+            if (strlen(currentInput) == 0)
+            {
+                /* Now add that key to the input string */
+                strncat(currentInput, str, 1);
+                redrawCurrentInput(display);
+            }
+        }
+        else
+        {
+            /* Now add that key to the input string */
+            strncat(currentInput, str, 1);
+            redrawCurrentInput(display);
+        }
 
-		/* Play a bit of sound */
-   		if (noSound == False) playSoundFile("click", 70);
-	}
-	else
-	{
-		/* Play a bit of sound */
-   		if (noSound == False) playSoundFile("tone", 40);
-	}
+        /* Play a bit of sound */
+        if (noSound == False)
+            playSoundFile("click", 70);
+    }
+    else
+    {
+        /* Play a bit of sound */
+        if (noSound == False)
+            playSoundFile("tone", 40);
+    }
 }
 
 void handleDialogueKeys(Display *display, XEvent event)
 {
-	char *str;
-	int len;
+    char *str;
+    int len;
     KeySym keysym;
     int count;
     XComposeStatus compose;
 
-	/* Obtain a small buffer */
-	str = (char *) malloc(5 * sizeof(char));
+    /* Obtain a small buffer */
+    str = (char *)malloc(5 * sizeof(char));
 
     /* Lookup a keysym using the event key */
     count = XLookupString(&event.xkey, str, 1, &keysym, &compose);
@@ -321,35 +317,36 @@ void handleDialogueKeys(Display *display, XEvent event)
     /* Switch on the keysym */
     switch (keysym)
     {
-        case XK_Escape:  
-			dialogueState = DIALOGUE_UNMAP;
-			break;
+        case XK_Escape:
+            dialogueState = DIALOGUE_UNMAP;
+            break;
 
         case XK_Return:
-			dialogueState = DIALOGUE_UNMAP;
-			break;
+            dialogueState = DIALOGUE_UNMAP;
+            break;
 
         case XK_Delete:
         case XK_BackSpace:
-			len = strlen(currentInput);
-			if (len > 0)
-			{
-				/* Backspace the text */
-				currentInput[len-1] = '\0';
-				redrawCurrentInput(display);
+            len = strlen(currentInput);
+            if (len > 0)
+            {
+                /* Backspace the text */
+                currentInput[len - 1] = '\0';
+                redrawCurrentInput(display);
 
-				/* Play a bit of sound */
-   				if (noSound == False) playSoundFile("key", 70);
-			}
-			break;
+                /* Play a bit of sound */
+                if (noSound == False)
+                    playSoundFile("key", 70);
+            }
+            break;
 
-		default:
-			validateDialogueKeys(display, keysym, str);
-			break;
-	}
+        default:
+            validateDialogueKeys(display, keysym, str);
+            break;
+    }
 
-	/* Free the temp string */
-	free(str);
+    /* Free the temp string */
+    free(str);
 }
 
 static void handleDialogueEventLoop(Display *display)
@@ -359,11 +356,11 @@ static void handleDialogueEventLoop(Display *display)
 
     pending = 0;
 
-	ProcessDialogue(display);
-	XFlush(display);
+    ProcessDialogue(display);
+    XFlush(display);
     XNextEvent(display, &event);
 
-	/* Now handle all valid dialogue entry events */
+    /* Now handle all valid dialogue entry events */
     while (dialogueState != DIALOGUE_FINISHED)
     {
         /* handle and audio device events if supported */
@@ -379,7 +376,7 @@ static void handleDialogueEventLoop(Display *display)
             /* Get the next X event thanks */
             XNextEvent(display, &event);
 
-            switch(event.type)
+            switch (event.type)
             {
                 case KeyPress:
                     handleDialogueKeys(display, event);
@@ -396,7 +393,6 @@ static void handleDialogueEventLoop(Display *display)
             pending--;
         }
 
-		ProcessDialogue(display);
-	}
+        ProcessDialogue(display);
+    }
 }
-
