@@ -378,7 +378,7 @@ static void test_double_pause(void **state)
  * Group 7: Alpha interpolation
  * ========================================================================= */
 
-static void test_alpha_zero_on_exact_tick(void **state)
+static void test_alpha_zero_on_exact_multiple(void **state)
 {
     (void)state;
     callback_log_t log;
@@ -386,7 +386,24 @@ static void test_alpha_zero_on_exact_tick(void **state)
     sdl2_loop_t *ctx = create_default_loop(&log, &status);
 
     /* Speed 1: interval = 13500 us = 13.5 ms.
-     * Inject exactly 14 ms → 1 tick, 500 us leftover.
+     * Inject exactly 27 ms → 2 ticks, 0 us leftover.
+     * alpha = 0 / 13500 = 0.0 */
+    sdl2_loop_set_speed(ctx, 1);
+    sdl2_loop_update(ctx, 27);
+    assert_float_equal(sdl2_loop_alpha(ctx), 0.0, 0.0001);
+
+    sdl2_loop_destroy(ctx);
+}
+
+static void test_alpha_nonzero_on_remainder(void **state)
+{
+    (void)state;
+    callback_log_t log;
+    sdl2_loop_status_t status;
+    sdl2_loop_t *ctx = create_default_loop(&log, &status);
+
+    /* Speed 1: interval = 13500 us = 13.5 ms.
+     * Inject 14 ms → 1 tick, 500 us leftover.
      * alpha = 500 / 13500 ≈ 0.037 */
     sdl2_loop_set_speed(ctx, 1);
     sdl2_loop_update(ctx, 14);
@@ -614,7 +631,8 @@ int main(void)
         cmocka_unit_test(test_pause_null),
         cmocka_unit_test(test_double_pause),
         /* Group 7: Alpha interpolation */
-        cmocka_unit_test(test_alpha_zero_on_exact_tick),
+        cmocka_unit_test(test_alpha_zero_on_exact_multiple),
+        cmocka_unit_test(test_alpha_nonzero_on_remainder),
         cmocka_unit_test(test_alpha_within_range),
         cmocka_unit_test(test_alpha_passed_to_render),
         cmocka_unit_test(test_alpha_null),

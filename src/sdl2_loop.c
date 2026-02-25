@@ -103,6 +103,13 @@ int sdl2_loop_update(sdl2_loop_t *ctx, uint64_t elapsed_ms)
         return 0;
     }
 
+    /* Clamp elapsed_ms to prevent overflow in the ms→us conversion.
+     * 2^53 us ≈ 285 years — far beyond any real frame delta. */
+    if (elapsed_ms > UINT64_MAX / US_PER_MS)
+    {
+        elapsed_ms = UINT64_MAX / US_PER_MS;
+    }
+
     /* Add elapsed time to accumulator (ms → us). */
     ctx->accumulator_us += elapsed_ms * US_PER_MS;
 

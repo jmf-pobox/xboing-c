@@ -65,7 +65,8 @@ typedef enum
 typedef void (*sdl2_loop_tick_fn)(void *user_data);
 
 /*
- * Render callback.  Called exactly once per update, after all logic ticks.
+ * Render callback.  Called exactly once per update when not paused, after
+ * all logic ticks.  Not called while paused (update() returns 0 immediately).
  * alpha is the interpolation factor [0.0, 1.0) representing how far the
  * accumulator is between the last tick and the next.  Use this to
  * interpolate visual positions for smooth rendering.

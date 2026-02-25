@@ -798,7 +798,7 @@ Replace the sleep-based timing with a fixed-timestep accumulator pattern:
   accumulator-based timing.
 - All 9 legacy speed levels are reproduced exactly with sub-millisecond
   precision.
-- 34 tests across 11 groups verify tick dispatch, accumulator behavior, speed
+- 35 tests across 11 groups verify tick dispatch, accumulator behavior, speed
   changes, pause semantics, spiral-of-death clamping, and alpha interpolation.
 - Synthetic time injection enables fully deterministic testing with no sleep
   or wall-clock dependency.
