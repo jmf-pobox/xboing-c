@@ -182,3 +182,12 @@ if(SDL2_FOUND AND SDL2_TTF_FOUND)
         ENVIRONMENT "SDL_VIDEODRIVER=dummy"
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 endif()
+
+# SDL2 color system tests (bead xboing-oaa.4)
+# Pure data tests — no video driver needed, but SDL2 headers required.
+if(SDL2_FOUND)
+    add_executable(test_sdl2_color test_sdl2_color.c)
+    target_compile_options(test_sdl2_color PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+    target_link_libraries(test_sdl2_color PRIVATE sdl2_color ${CMOCKA_LIBRARIES})
+    add_test(NAME test_sdl2_color COMMAND test_sdl2_color)
+endif()
