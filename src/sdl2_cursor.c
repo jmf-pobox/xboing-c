@@ -73,8 +73,8 @@ sdl2_cursor_t *sdl2_cursor_create(sdl2_cursor_status_t *status)
         if (ctx->cursors[i] == NULL)
         {
             SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-                        "sdl2_cursor: SDL_CreateSystemCursor(%d) unavailable: %s", i,
-                        SDL_GetError());
+                        "sdl2_cursor: cursor %d (SDL_SystemCursor %d) unavailable: %s", i,
+                        (int)system_cursor_map[i], SDL_GetError());
         }
     }
 

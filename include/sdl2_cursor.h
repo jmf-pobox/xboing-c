@@ -14,7 +14,9 @@
 
 #include <SDL2/SDL.h>
 
-/* Cursor identifiers — match the legacy CURSOR_* defines in init.h. */
+/* Cursor identifiers — correspond to the legacy CURSOR_* defines in init.h.
+ * Note: legacy values are 1-based (CURSOR_WAIT=1..CURSOR_SKULL=5);
+ * these are 0-based for array indexing.  Migration code must map. */
 typedef enum
 {
     SDL2CUR_WAIT = 0,  /* Watch/hourglass (legacy XC_watch) */
