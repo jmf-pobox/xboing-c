@@ -860,3 +860,95 @@ Extract CLI parsing into a standalone pure-C module with no SDL2 dependency:
   all boolean flags, integer range validation, nickname handling, error
   paths, option combinations, and status strings.
 - No SDL2 dependency — the library links with only libc.
+
+## ADR-015: Callback-based ball physics system
+
+**Status:** Accepted
+**Date:** 2026-02-25
+**Bead:** xboing-1ka.1
+
+**Context:**
+
+`ball.c` is 2093 lines with tight X11 coupling: `Display`/`Window` parameters
+on every function, 48 XPM pixmap loads, `XRectInRegion()` for block collision,
+and 10+ extern globals (`frame`, `speedLevel`, `paddlePos`, `paddleDx`, etc.).
+This makes it impossible to test, impossible to port incrementally, and the
+single largest obstacle to SDL2 migration.
+
+Six pure physics functions are already extracted to `ball_math.c` (207 lines,
+16 characterization tests). `ball_types.h` has the `BALL` struct and constants
+with no X11 dependency. The extraction proved the approach works.
+
+**Decision:**
+
+Create a `ball_system` module (`src/ball_system.c`, `include/ball_system.h`)
+that owns the `BALL` array and all physics logic, communicating side effects
+through an injected callback table. Key design points:
+
+1. **Opaque context pattern.** `ball_system_t` is heap-allocated and opaque.
+   No global state. All functions take a context pointer. Same pattern as
+   `sdl2_state_t`, `sdl2_loop_t`, and other modernized modules.
+
+2. **Environment struct replaces extern globals.** `ball_system_env_t`
+   carries the 10 values that `ball.c` reads from globals (`frame`,
+   `speedLevel`, `paddlePos`, `paddleDx`, `GetPaddleSize()`, etc.).
+   Passed per-frame to `ball_system_update()`, never cached. This makes
+   the module deterministic and testable without global state setup.
+
+3. **Callback table for side effects.** `ball_system_callbacks_t` has 7
+   function pointers replacing direct calls to other modules:
+   - `check_region` — replaces `XRectInRegion()` for block collision
+   - `on_block_hit` — replaces `HandleTheBlocks()` side-effect dispatch
+   - `cell_available` — replaces direct block grid queries in teleport
+   - `on_sound` — replaces `playSoundFile()` calls
+   - `on_score` — replaces `AddToScore()` calls
+   - `on_message` — replaces `SetCurrentMessage()` calls
+   - `on_event` — replaces lifecycle side effects (DeadBall, AddABullet)
+
+   Any callback may be NULL (no-op). This enables testing with stubs and
+   allows the integration layer to wire in either legacy X11 or SDL2
+   implementations.
+
+4. **No rendering.** The module reports render state via
+   `ball_system_get_render_info()`. The integration layer draws using
+   SDL2 textures or legacy X11 pixmaps. Rendering is never the ball
+   system's concern.
+
+5. **Block collision abstracted.** The `check_region` callback replaces
+   `XRectInRegion()`, allowing the ball system to work with legacy X11
+   regions during transition OR a future pure-C collision system.
+
+6. **Reuses ball_math.c.** Calls existing extracted functions for paddle
+   bounce, speed normalization, ball-to-ball collision, and grid conversion.
+   No duplication.
+
+7. **Preserves known bugs.** The line 1744 bug (via `ball_math_collide()`)
+   and zero-velocity clamp (via `ball_math_normalize_speed()`) are preserved
+   as characterized by the existing 16 ball_math tests.
+
+8. **Three-PR decomposition.** The module is too large for a single PR:
+   - PR 1: Header + lifecycle + ball management + queries (~550 lines)
+   - PR 2: State machine + wall/paddle collision (~550 lines added)
+   - PR 3: Block collision + ball-to-ball + multiball (~400 lines added)
+
+**What we are NOT doing:**
+
+- Block system port (xboing-1ka.2 — separate bead)
+- SDL2 rendering of balls (integration layer, future task)
+- EyeDude collision (separate module concern)
+- Asset conversion XPM to PNG (separate infrastructure)
+- Wiring into the game loop (integration layer)
+- Modifying ball_math.c or ball_types.h (reused as-is)
+
+**Consequences:**
+
+- The ball physics module becomes fully testable with CMocka stubs, no
+  display or window system required.
+- The callback table provides a clean seam between ball physics and the
+  rest of the game — either legacy X11 or SDL2 can implement the callbacks.
+- The environment struct eliminates 10+ extern globals, making data flow
+  explicit and deterministic.
+- The three-PR approach keeps each change reviewable while building toward
+  the complete port.
+- The guide direction table, state machine dispatch, and all physics math
+  are preserved exactly as characterized by existing tests.

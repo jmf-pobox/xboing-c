@@ -327,6 +327,19 @@ target_include_directories(sdl2_cli PUBLIC
 )
 target_compile_options(sdl2_cli PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
 
+# --- Ball physics system library ---------------------------------------------
+#
+# Pure C module — no SDL2 or X11 dependency.  Owns the BALL array, state
+# machine dispatch, physics, and queries.  Side effects communicated via
+# injected callback table.  Links ball_math.c for extracted physics functions.
+
+add_library(ball_system STATIC src/ball_system.c ball_math.c)
+target_include_directories(ball_system PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+target_compile_options(ball_system PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+target_link_libraries(ball_system PUBLIC m)
+
 # --- Tests ------------------------------------------------------------------
 
 option(BUILD_TESTING "Build unit tests" ON)
