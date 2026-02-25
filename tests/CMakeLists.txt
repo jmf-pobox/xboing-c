@@ -191,3 +191,13 @@ if(SDL2_FOUND)
     target_link_libraries(test_sdl2_color PRIVATE sdl2_color ${CMOCKA_LIBRARIES})
     add_test(NAME test_sdl2_color COMMAND test_sdl2_color)
 endif()
+
+# SDL2 cursor management tests (bead xboing-oaa.5)
+# Uses SDL_VIDEODRIVER=dummy for headless CI testing.
+if(SDL2_FOUND)
+    add_executable(test_sdl2_cursor test_sdl2_cursor.c)
+    target_compile_options(test_sdl2_cursor PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+    target_link_libraries(test_sdl2_cursor PRIVATE sdl2_cursor ${CMOCKA_LIBRARIES})
+    add_test(NAME test_sdl2_cursor COMMAND test_sdl2_cursor)
+    set_tests_properties(test_sdl2_cursor PROPERTIES ENVIRONMENT "SDL_VIDEODRIVER=dummy")
+endif()
