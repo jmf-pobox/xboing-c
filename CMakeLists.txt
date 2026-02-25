@@ -269,6 +269,19 @@ if(SDL2_FOUND)
     target_link_libraries(sdl2_regions PUBLIC ${SDL2_LIBRARIES})
 endif()
 
+# --- SDL2 audio library (optional) ------------------------------------------
+
+if(SDL2_FOUND AND SDL2_MIXER_FOUND)
+    add_library(sdl2_audio STATIC src/sdl2_audio.c)
+    target_include_directories(sdl2_audio PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${SDL2_INCLUDE_DIRS}
+        ${SDL2_MIXER_INCLUDE_DIRS}
+    )
+    target_compile_options(sdl2_audio PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+    target_link_libraries(sdl2_audio PUBLIC ${SDL2_LIBRARIES} ${SDL2_MIXER_LIBRARIES})
+endif()
+
 # --- Tests ------------------------------------------------------------------
 
 option(BUILD_TESTING "Build unit tests" ON)
