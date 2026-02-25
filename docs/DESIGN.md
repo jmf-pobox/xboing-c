@@ -606,3 +606,81 @@ Replace the fork+pipe architecture with SDL2_mixer:
   and block break simultaneously), improving the audio experience.
 - 24 characterization tests verify caching, playback, volume control, and
   error handling under the dummy audio driver.
+
+## ADR-011: SDL2 input action mapping
+
+**Status:** Accepted
+**Date:** 2026-02-25
+**Bead:** xboing-cks.3
+
+**Context:**
+
+The legacy input system uses `XLookupString()` to convert X11 KeyPress events
+into `KeySym` values, then routes them through nested switch/if chains in
+`main.c` (`handleGameKeys`, `handleIntroKeys`, `handleMiscKeys`,
+`handleSpeedKeys`, etc.). Key bindings are hardcoded as `XK_*` constants.
+Mouse input is polled separately via `XQueryPointer()`. There is no way to
+rebind keys without recompiling.
+
+**Decision:**
+
+Replace the XKeySym switch dispatch with a scancode-to-action mapping layer:
+
+- **Action enum** — 31 game actions covering movement, gameplay, menu
+  navigation, global controls, and 9 speed levels. Editor-specific actions
+  are deferred to the editor migration bead.
+- **Dual binding slots** — each action supports up to 2 scancodes
+  (primary + secondary), matching legacy dual bindings (e.g., Left arrow
+  OR J for paddle left).
+- **Reverse lookup table** — a `SDL_Scancode -> action` array
+  (`SDL_NUM_SCANCODES` entries) provides O(1) event dispatch. Rebuilt
+  automatically when bindings change.
+- **Level + edge trigger** — `pressed()` returns true while a key is held;
+  `just_pressed()` returns true only for the first frame (filtered by
+  `event->key.repeat`). Matches legacy behavior where movement uses
+  held state and one-shot actions use key-down events.
+- **Mouse tracking** — position and button state updated from
+  `SDL_MOUSEMOTION` / `SDL_MOUSEBUTTONDOWN` / `SDL_MOUSEBUTTONUP` events.
+- **Modifier queries** — `shift_held()` for the few legacy actions that
+  distinguish case (e.g., h vs H for global vs personal scores).
+- **Rebindable at runtime** — `bind()` / `reset_bindings()` API with
+  validation. No config file serialization yet (deferred to config bead).
+
+**Default bindings match legacy XBoing controls:**
+
+| Action | Primary | Secondary |
+| ------ | ------- | --------- |
+| Left | Left arrow | J |
+| Right | Right arrow | L |
+| Shoot | K | - |
+| Pause | P | - |
+| Quit | Q | - |
+| Speed 1-9 | 1-9 | - |
+
+**Known limitation — scancode vs keysym:**
+
+Legacy used `XK_plus` (Shift+=) for volume up and `XK_equal` for the debug
+next-level command. Since both share `SDL_SCANCODE_EQUALS`, scancode-only
+mapping cannot distinguish them. Volume up keeps the `=` key (more commonly
+used); next-level was moved to backslash (`\`). If modifier-aware bindings
+are needed in the future, the binding model can be extended to include a
+required modifier mask.
+
+**What we are NOT doing:**
+
+- Wiring into legacy event loop (separate migration task)
+- Editor-specific key bindings (editor migration bead)
+- Config file serialization of bindings (config bead xboing-1fr.3)
+- Gamepad/joystick support (not in original game)
+- Modifier-aware bindings (scancode+Shift combos — deferred, see above)
+
+**Consequences:**
+
+- Game logic queries semantic actions instead of raw keycodes, decoupling
+  input handling from platform-specific key representations.
+- The rebinding API enables future key configuration without recompilation.
+- Dual-binding key-up correctly tracks per-scancode state — releasing one
+  bound key does not clear the action while the other is still held.
+- 40 characterization tests verify default bindings, key press/release state
+  tracking, dual-binding behavior, edge triggers, mouse input, modifier
+  queries, rebinding, and error handling.

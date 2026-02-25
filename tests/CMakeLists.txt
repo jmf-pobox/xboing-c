@@ -224,3 +224,13 @@ if(SDL2_FOUND AND SDL2_MIXER_FOUND)
         ENVIRONMENT "SDL_AUDIODRIVER=dummy"
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 endif()
+
+# SDL2 input mapping tests (bead xboing-cks.3)
+# Pure data tests — synthesizes SDL_Event structs directly.
+# No video or audio driver needed.
+if(SDL2_FOUND)
+    add_executable(test_sdl2_input test_sdl2_input.c)
+    target_compile_options(test_sdl2_input PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+    target_link_libraries(test_sdl2_input PRIVATE sdl2_input ${CMOCKA_LIBRARIES})
+    add_test(NAME test_sdl2_input COMMAND test_sdl2_input)
+endif()
