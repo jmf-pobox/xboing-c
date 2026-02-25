@@ -26,7 +26,7 @@
  * enhancements, or modifications.
  */
 
-/* 
+/*
  * =========================================================================
  *
  * $Id: misc.c,v 1.1.1.1 1994/12/16 01:36:47 jck Exp $
@@ -47,22 +47,22 @@
  *  Include file dependencies:
  */
 
+#include <X11/Xlib.h>
+#include <X11/Xos.h>
+#include <X11/Xutil.h>
+#include <ctype.h>
+#include <netinet/in.h>
+#include <pwd.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stddef.h>
-#include <ctype.h>
-#include <unistd.h>
 #include <sys/param.h>
-#include <pwd.h>
-#include <X11/Xlib.h>
-#include <X11/Xutil.h>
-#include <X11/Xos.h>
-#include <netinet/in.h>
+#include <unistd.h>
 
-#include "init.h"
-#include "error.h"
-#include "stage.h"
 #include "dialogue.h"
+#include "error.h"
+#include "init.h"
+#include "stage.h"
 
 #include "misc.h"
 
@@ -84,17 +84,17 @@ void usleep(unsigned long usec)
 #ifdef SYSV
 #ifdef __clipper__
     struct timeval tv;
-    tv.tv_sec=((usec)/1000);
-    tv.tv_usec=(((usec)%1000)*1000);
-    select(1,NULL,NULL,NULL,&tv);
+    tv.tv_sec = ((usec) / 1000);
+    tv.tv_usec = (((usec) % 1000) * 1000);
+    select(1, NULL, NULL, NULL, &tv);
 #else
-    poll((struct poll *) 0, (size_t) 0, usec / 1000);   /* ms resolution */
+    poll((struct poll *)0, (size_t)0, usec / 1000); /* ms resolution */
 #endif
 #else
     struct timeval timeout;
-    timeout.tv_usec = usec % (unsigned long) 1000000;
-    timeout.tv_sec = usec / (unsigned long) 1000000;
-    select(0, (void *) 0, (void *) 0, (void *) 0, &timeout);
+    timeout.tv_usec = usec % (unsigned long)1000000;
+    timeout.tv_sec = usec / (unsigned long)1000000;
+    select(0, (void *)0, (void *)0, (void *)0, &timeout);
 #endif
 }
 #endif
@@ -107,101 +107,100 @@ void sleepSync(Display *display, unsigned long ms)
         usleep(ms * 300);
 }
 
-void DrawLine(Display *display, Window window, int x, int y, int x2, int y2, 
-	int colour, int width)
+void DrawLine(Display *display, Window window, int x, int y, int x2, int y2, int colour, int width)
 {
-	/* Change the width of the line */
-	XSetLineAttributes(display, gccopy, width, LineSolid, CapProjecting,
-		JoinMiter);
+    /* Change the width of the line */
+    XSetLineAttributes(display, gccopy, width, LineSolid, CapProjecting, JoinMiter);
 
-	/* Set the foreground color */
-	XSetForeground(display, gccopy, colour);
+    /* Set the foreground color */
+    XSetForeground(display, gccopy, colour);
 
-	/* Draw the line using simple copy mode (works on TrueColor displays) */
-	XDrawLine(display, window, gccopy, x, y, x2, y2);
+    /* Draw the line using simple copy mode (works on TrueColor displays) */
+    XDrawLine(display, window, gccopy, x, y, x2, y2);
 }
 
-void DrawShadowCentredText(Display *display, Window window, XFontStruct *font,
-	char *string, int y, int colour, int width)
+void DrawShadowCentredText(Display *display, Window window, XFontStruct *font, char *string, int y,
+                           int colour, int width)
 {
     int plen, len, x;
 
-	/* String length */
+    /* String length */
     len = strlen(string);
 
-	/* Length of string in pixels */
+    /* Length of string in pixels */
     plen = XTextWidth(font, string, len);
 
-	/* Start drawing so the text is centered */
+    /* Start drawing so the text is centered */
     x = (width / 2) - (plen / 2);
 
-	/* Draw the text with a shadow */
-    DrawText(display, window, x+2, y + 2, font, black, string, -1);
+    /* Draw the text with a shadow */
+    DrawText(display, window, x + 2, y + 2, font, black, string, -1);
     DrawText(display, window, x, y, font, colour, string, -1);
 }
 
-void DrawShadowText(Display *display, Window window, XFontStruct *font,
-	char *string, int x, int y, int colour)
+void DrawShadowText(Display *display, Window window, XFontStruct *font, char *string, int x, int y,
+                    int colour)
 {
-	/* Draw the text with a shadow */
-    DrawText(display, window, x+2, y + 2, font, black, string, -1);
+    /* Draw the text with a shadow */
+    DrawText(display, window, x + 2, y + 2, font, black, string, -1);
     DrawText(display, window, x, y, font, colour, string, -1);
 }
 
-void DrawTextFast(Display *display, Window window, int x, int y, XFontStruct *font, 
-	int colour, char *text, int numChar)
+void DrawTextFast(Display *display, Window window, int x, int y, XFontStruct *font, int colour,
+                  char *text, int numChar)
 {
-	int len = strlen(text);
+    int len = strlen(text);
 
-	/* If numchar is passed > 0 then only draw numChar characters */
-	if (numChar > 0) 
-		len = numChar;
+    /* If numchar is passed > 0 then only draw numChar characters */
+    if (numChar > 0)
+        len = numChar;
 
-	/* Change to the new font */
-	XSetFont(display, gccopy, font->fid);
+    /* Change to the new font */
+    XSetFont(display, gccopy, font->fid);
 
-	/* Change the drawing function */
-	XSetForeground(display, gccopy, colour);
+    /* Change the drawing function */
+    XSetForeground(display, gccopy, colour);
 
-	/* Draw the string into the drawable */
-	XDrawString(display, window, gccopy, x, y + font->ascent, text, len);
+    /* Draw the string into the drawable */
+    XDrawString(display, window, gccopy, x, y + font->ascent, text, len);
 }
 
-void DrawText(Display *display, Window window, int x, int y, XFontStruct *font, 
-	int colour, char *text, int numChar)
+void DrawText(Display *display, Window window, int x, int y, XFontStruct *font, int colour,
+              char *text, int numChar)
 {
-	int len = strlen(text);
+    int len = strlen(text);
 
-	/* If numchar is passed > 0 then only draw numChar characters */
-	if (numChar > 0) 
-		len = numChar;
+    /* If numchar is passed > 0 then only draw numChar characters */
+    if (numChar > 0)
+        len = numChar;
 
-	/* Change to the new font */
-	XSetFont(display, gccopy, font->fid);
+    /* Change to the new font */
+    XSetFont(display, gccopy, font->fid);
 
-	/* Set the foreground color */
-	XSetForeground(display, gccopy, colour);
+    /* Set the foreground color */
+    XSetForeground(display, gccopy, colour);
 
-	/* Draw the string using simple copy mode (works on TrueColor displays) */
-	XDrawString(display, window, gccopy, x, y + font->ascent, text, len);
+    /* Draw the string using simple copy mode (works on TrueColor displays) */
+    XDrawString(display, window, gccopy, x, y + font->ascent, text, len);
 }
 
-void RenderShape(Display *display, Window window, Pixmap pixmap, 
-	Pixmap mask, int x, int y, int w, int h, int clear)
+void RenderShape(Display *display, Window window, Pixmap pixmap, Pixmap mask, int x, int y, int w,
+                 int h, int clear)
 {
-	/* Clear the background first? */
-    if (clear) XClearArea(display, window, x, y, w, h, False);
+    /* Clear the background first? */
+    if (clear)
+        XClearArea(display, window, x, y, w, h, False);
 
-	/* Set to dest x and y clip origin */
-    XSetClipOrigin(display, gc, x, y); 
+    /* Set to dest x and y clip origin */
+    XSetClipOrigin(display, gc, x, y);
 
-	/* Set the clipping mask */
-    XSetClipMask(display, gc, mask);   
+    /* Set the clipping mask */
+    XSetClipMask(display, gc, mask);
 
     XCopyArea(display, pixmap, window, gc, 0, 0, w, h, x, y);
 
-	/* Unset clip (or add a clip gc) */
-    XSetClipMask(display, gc, None);   
+    /* Unset clip (or add a clip gc) */
+    XSetClipMask(display, gc, None);
 }
 
 void FreeMisc(Display *display)
@@ -219,15 +218,15 @@ int ColourNameToPixel(Display *display, Colormap colormap, char *colourName)
      * needs a colormap for its color-name database lookup — any valid
      * colormap works — while XAllocColor correctly targets our private map.
      */
-    if (XParseColor(display, DefaultColormap(display,
-        XDefaultScreen(display)), colourName, &colour) != 0)
+    if (XParseColor(display, DefaultColormap(display, XDefaultScreen(display)), colourName,
+                    &colour) != 0)
     {
         /* Now allocate the colour */
         if (XAllocColor(display, colormap, &colour) != 0)
-		{
-        	/* Success - return the pixel id */
-        	return colour.pixel;
-		}
+        {
+            /* Success - return the pixel id */
+            return colour.pixel;
+        }
     }
 
     /* Obviously a problem so barf */
@@ -236,7 +235,6 @@ int ColourNameToPixel(Display *display, Colormap colormap, char *colourName)
     /* NOT REACHED */
     return 1;
 }
-
 
 char *getUsersFullName(void)
 {
@@ -247,13 +245,14 @@ char *getUsersFullName(void)
 
     /* Get user information from password file */
     if (!(pass = getpwuid(getuid())))
-        return("Anonymous?");       /* Unknown user oops. */
+        return ("Anonymous?"); /* Unknown user oops. */
 
     /* find a comma indicating further info after name */
     comma = strchr(pass->pw_gecos, ',');
 
     /* NULL out the comma */
-    if (comma) *comma = '\0';
+    if (comma)
+        *comma = '\0';
 
     /* Use the nickname if not null otherwise password file name */
     cp1 = pass->pw_gecos;
@@ -263,28 +262,29 @@ char *getUsersFullName(void)
      * old UNIX systems is supposed to be the users user name with the
      * first letter uppercased.
      */
-    while(*cp1)
+    while (*cp1)
     {
         /* Look for the '&' symbol */
-        if(*cp1 != '&')
+        if (*cp1 != '&')
             *cp2++ = *cp1++;
         else
         {
             /* A ha. Now copy the users name to be in place of '&' */
             strcpy(cp2, pass->pw_name);
-       
+
             /* Convert the first letter to uppercase. */
-            if(islower(*cp2))
+            if (islower(*cp2))
                 *cp2 = toupper(*cp2);
 
             /* Continue with the remaining string */
-            while(*cp2) cp2++;
-                cp1++;
+            while (*cp2)
+                cp2++;
+            cp1++;
         }
     }
 
     /* Return their name without any trailing stuff */
-    return(fullname);
+    return (fullname);
 }
 
 char *GetHomeDir(void)
@@ -300,7 +300,7 @@ char *GetHomeDir(void)
      */
 
     if ((ptr = getenv("HOME")) != NULL)
-        (void) strcpy(dest, ptr);
+        (void)strcpy(dest, ptr);
     else
     {
         /* HOME variable is not present so get USER var */
@@ -314,7 +314,7 @@ char *GetHomeDir(void)
         }
 
         if (pw)
-            (void) strcpy(dest, pw->pw_dir);
+            (void)strcpy(dest, pw->pw_dir);
         else
             *dest = '\0';
     }
@@ -327,26 +327,25 @@ int ResizeMainWindow(Display *display, Window window, int width, int height)
 {
     XWindowChanges values;
     unsigned int value_mask;
-	int screen = XDefaultScreen(display);
+    int screen = XDefaultScreen(display);
 
     values.width = width;
     values.height = height;
     value_mask = CWWidth | CWHeight;
 
     if (XReconfigureWMWindow(display, window, screen, value_mask, &values) == 0)
-		return False;
+        return False;
 
-	sleepSync(display, 100);
-	return True;
+    sleepSync(display, 100);
+    return True;
 }
 
-int ObtainWindowWidthHeight(Display *display, Window window, 
-	int *width, int *height)
+int ObtainWindowWidthHeight(Display *display, Window window, int *width, int *height)
 {
     XWindowAttributes attributes;
 
     if (XGetWindowAttributes(display, window, &attributes) == 0)
-		ErrorMessage("Unable to obtain window attributes.");
+        ErrorMessage("Unable to obtain window attributes.");
 
     *width = attributes.width;
     *height = attributes.height;
@@ -362,15 +361,14 @@ int ObtainMousePosition(Display *display, Window window, int *x, int *y)
     *y = 0;
 
     /* Obtain the position of the pointer in window */
-    if (XQueryPointer(display, window, &root, &child,
-        &rx, &ry, &x1, &y1, &mask) == True)
+    if (XQueryPointer(display, window, &root, &child, &rx, &ry, &x1, &y1, &mask) == True)
     {
         *x = x1;
         *y = y1;
-		return True;
+        return True;
     }
 
-	return False;
+    return False;
 }
 
 int YesNoDialogue(Display *display, char *message)
@@ -380,60 +378,60 @@ int YesNoDialogue(Display *display, char *message)
     str[0] = '\0';
 
     /* Obtain a string from the user. Should contain NULL or numbers */
-    strcpy(str, UserInputDialogueMessage(display, message, TEXT_ICON, 
-		YES_NO_ENTRY));
+    strcpy(str, UserInputDialogueMessage(display, message, TEXT_ICON, YES_NO_ENTRY));
 
     /* Nothing input so just return */
-    if (str[0] == '\0') return False;
+    if (str[0] == '\0')
+        return False;
 
-	DEBUG("YesNoDialogue() got an answer.");
+    DEBUG("YesNoDialogue() got an answer.");
 
-	if (tolower(str[0]) == 'y') return True;
-	if (tolower(str[0]) == 'n') return False;
+    if (tolower(str[0]) == 'y')
+        return True;
+    if (tolower(str[0]) == 'n')
+        return False;
 
-	/* Just in case */
-	return False;
+    /* Just in case */
+    return False;
 }
 
-Pixmap ScalePixmap(Display *display, Window window, Pixmap source, 
-	int swidth, int sheight, int dwidth, int dheight)
+Pixmap ScalePixmap(Display *display, Window window, Pixmap source, int swidth, int sheight,
+                   int dwidth, int dheight)
 {
-   	Pixmap 	temp, dest;
-   	int 		j, end;
-   	float 	i;
-   	float 	xscale, yscale;
+    Pixmap temp, dest;
+    int j, end;
+    float i;
+    float xscale, yscale;
 
-   	xscale = (float) swidth / (float) dwidth;         /* Scaling factors */
-   	yscale = (float) sheight / (float) dheight;
+    xscale = (float)swidth / (float)dwidth; /* Scaling factors */
+    yscale = (float)sheight / (float)dheight;
 
-   	dest = XCreatePixmap(display, window, dwidth, dheight, 
-		DefaultDepth(display, XDefaultScreen(display)));
-   	temp = XCreatePixmap(display, window, dwidth, sheight, 
-		DefaultDepth(display, XDefaultScreen(display)));
+    dest = XCreatePixmap(display, window, dwidth, dheight,
+                         DefaultDepth(display, XDefaultScreen(display)));
+    temp = XCreatePixmap(display, window, dwidth, sheight,
+                         DefaultDepth(display, XDefaultScreen(display)));
 
-   	j = 0;
-   	end = dwidth * xscale;
+    j = 0;
+    end = dwidth * xscale;
 
-   	/* Scale width of source into temp pixmap */
-   	for(i = 0; i < end; i += xscale)
-	{
-      XCopyArea(display, source, temp, gccopy, 
-		(int) i, 0, 1, sheight, j++, 0);
-	}
+    /* Scale width of source into temp pixmap */
+    for (i = 0; i < end; i += xscale)
+    {
+        XCopyArea(display, source, temp, gccopy, (int)i, 0, 1, sheight, j++, 0);
+    }
 
-   	j = 0;
-   	end = dheight * yscale;
+    j = 0;
+    end = dheight * yscale;
 
-   	/* Scale height of temp into dest pixmap */
-   	for(i = 0; i < end; i += yscale)
-	{
-      	XCopyArea(display, temp, dest, gccopy, 
-			0, (int) i, dwidth, 1, 0, j++);
-	}
+    /* Scale height of temp into dest pixmap */
+    for (i = 0; i < end; i += yscale)
+    {
+        XCopyArea(display, temp, dest, gccopy, 0, (int)i, dwidth, 1, 0, j++);
+    }
 
-   	XFreePixmap(display, temp);
+    XFreePixmap(display, temp);
 
-   	return (Pixmap) dest;
+    return (Pixmap)dest;
 }
 
 void Draw4PointCurve(Display *display, Window window, XPoint *p, int num_steps)
@@ -441,59 +439,57 @@ void Draw4PointCurve(Display *display, Window window, XPoint *p, int num_steps)
     double t, t_sq, t_cb, incr;
     double r1, r2, r3, r4;
     ushort curve_x, curve_y;
-	int ptIndex;
-	long maxLines;
-	XPoint 	*pts;
+    int ptIndex;
+    long maxLines;
+    XPoint *pts;
 
-	/* 
-	 * First check and see if the maximum number of points the X Server can
+    /*
+     * First check and see if the maximum number of points the X Server can
      * draw is less than the number of steps wanted - most likely to be ok.
      */
 
-	maxLines = (double) (XMaxRequestSize(display) - 3) / 2.0;
-	if (num_steps > maxLines)
-		num_steps = maxLines;
-	
-    incr = 1.0 / (double) num_steps;
+    maxLines = (double)(XMaxRequestSize(display) - 3) / 2.0;
+    if (num_steps > maxLines)
+        num_steps = maxLines;
 
-	if ((pts = (XPoint *) malloc(num_steps * sizeof(XPoint))) == 
-		(XPoint *)0)
-	{
-    	/* Obviously a problem so barf */
-    	ShutDown(display, 1, "Unable to malloc memory for Draw4PointCurve().");
-	}
+    incr = 1.0 / (double)num_steps;
 
-	ptIndex = 0;
+    if ((pts = (XPoint *)malloc(num_steps * sizeof(XPoint))) == (XPoint *)0)
+    {
+        /* Obviously a problem so barf */
+        ShutDown(display, 1, "Unable to malloc memory for Draw4PointCurve().");
+    }
 
-	pts[ptIndex].x = p[0].x;
-	pts[ptIndex].y = p[0].y;
+    ptIndex = 0;
+
+    pts[ptIndex].x = p[0].x;
+    pts[ptIndex].y = p[0].y;
 
     for (t = incr; t <= 1.01; t += incr)
     {
         t_sq = t * t;
         t_cb = t * t_sq;
 
-        r1 = (1 - 3*t + 3*t_sq -   t_cb) * (double) p[0].x;
-        r2 = (    3*t - 6*t_sq + 3*t_cb) * (double) p[1].x;
-        r3 = (          3*t_sq - 3*t_cb) * (double) p[2].x;
-        r4 = (                     t_cb) * (double) p[3].x;
-        curve_x = (ushort) (r1 + r2 + r3 + r4);
+        r1 = (1 - 3 * t + 3 * t_sq - t_cb) * (double)p[0].x;
+        r2 = (3 * t - 6 * t_sq + 3 * t_cb) * (double)p[1].x;
+        r3 = (3 * t_sq - 3 * t_cb) * (double)p[2].x;
+        r4 = (t_cb) * (double)p[3].x;
+        curve_x = (ushort)(r1 + r2 + r3 + r4);
 
-        r1 = (1 - 3*t + 3*t_sq -   t_cb) * (double) p[0].y;
-        r2 = (    3*t - 6*t_sq + 3*t_cb) * (double) p[1].y;
-        r3 = (          3*t_sq - 3*t_cb) * (double) p[2].y;
-        r4 = (                     t_cb) * (double) p[3].y;
-        curve_y = (ushort) (r1 + r2 + r3 + r4);
+        r1 = (1 - 3 * t + 3 * t_sq - t_cb) * (double)p[0].y;
+        r2 = (3 * t - 6 * t_sq + 3 * t_cb) * (double)p[1].y;
+        r3 = (3 * t_sq - 3 * t_cb) * (double)p[2].y;
+        r4 = (t_cb) * (double)p[3].y;
+        curve_y = (ushort)(r1 + r2 + r3 + r4);
 
-		ptIndex++;
-		pts[ptIndex].x = curve_x;
-		pts[ptIndex].y = curve_y;
+        ptIndex++;
+        pts[ptIndex].x = curve_x;
+        pts[ptIndex].y = curve_y;
     }
 
-	/* Now draw the curve based on a whole heap of lines */
-	XDrawLines(display, window, gc, pts, ptIndex, CoordModeOrigin);
+    /* Now draw the curve based on a whole heap of lines */
+    XDrawLines(display, window, gc, pts, ptIndex, CoordModeOrigin);
 
-	/* Don't forget to free points */
-	free(pts);
+    /* Don't forget to free points */
+    free(pts);
 }
-
