@@ -73,6 +73,32 @@ ctest --test-dir build --output-on-failure
 | **shellcheck** | Shell script linting | `apt install shellcheck` |
 | **bd** | Issue tracking with dependency chains | [github.com/steveyegge/beads](https://github.com/steveyegge/beads) |
 
+## Codebase Knowledge Base (Quarry)
+
+The entire repository is indexed in a **quarry** semantic search collection (`xboing`). Use it to find code, understand subsystems, and answer questions about the codebase without reading files one by one.
+
+**When to use quarry:**
+
+- Exploring an unfamiliar subsystem before making changes ("how does bonus scoring work?")
+- Finding all code related to a concept across multiple files ("block collision handling")
+- Answering design questions ("what block types exist and how are they scored?")
+- Locating constants, definitions, or patterns scattered across the codebase
+
+**When NOT to use quarry — use Grep/Glob instead:**
+
+- Looking for a specific symbol, function name, or string literal (`score_block_hit_points`)
+- Finding a file by name or path pattern (`tests/test_*.c`)
+- Checking exact current file contents (Read the file directly)
+
+**Commands:**
+
+- `/find <query>` — search the knowledge base (keywords or questions)
+- `/ingest .` — re-sync the index after significant code changes
+- `/explain <topic>` — get an explanation of a topic from indexed documents
+- `/source <claim>` — find the original document backing a claim
+
+**Keep the index fresh:** Run `/ingest .` after large merges or multi-file changes to ensure search results reflect the current codebase.
+
 ## Quality Gates
 
 Run before every commit. Zero warnings, zero errors, all tests green.
