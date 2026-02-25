@@ -168,3 +168,17 @@ if(SDL2_FOUND AND SDL2_IMAGE_FOUND)
         ENVIRONMENT "SDL_VIDEODRIVER=dummy"
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 endif()
+
+# SDL2 font rendering tests (bead xboing-oaa.3)
+# Links against sdl2_font and sdl2_renderer static libraries.
+# Uses SDL_VIDEODRIVER=dummy and real TTFs from assets/fonts/.
+if(SDL2_FOUND AND SDL2_TTF_FOUND)
+    add_executable(test_sdl2_font test_sdl2_font.c)
+    target_compile_options(test_sdl2_font PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+    target_link_libraries(test_sdl2_font PRIVATE
+        sdl2_font sdl2_renderer ${CMOCKA_LIBRARIES})
+    add_test(NAME test_sdl2_font COMMAND test_sdl2_font)
+    set_tests_properties(test_sdl2_font PROPERTIES
+        ENVIRONMENT "SDL_VIDEODRIVER=dummy"
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+endif()

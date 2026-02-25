@@ -220,6 +220,19 @@ if(SDL2_FOUND AND SDL2_IMAGE_FOUND)
     target_link_libraries(sdl2_texture PUBLIC ${SDL2_LIBRARIES} ${SDL2_IMAGE_LIBRARIES})
 endif()
 
+# --- SDL2 font rendering library (optional) ---------------------------------
+
+if(SDL2_FOUND AND SDL2_TTF_FOUND)
+    add_library(sdl2_font STATIC src/sdl2_font.c)
+    target_include_directories(sdl2_font PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${SDL2_INCLUDE_DIRS}
+        ${SDL2_TTF_INCLUDE_DIRS}
+    )
+    target_compile_options(sdl2_font PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+    target_link_libraries(sdl2_font PUBLIC ${SDL2_LIBRARIES} ${SDL2_TTF_LIBRARIES})
+endif()
+
 # --- Tests ------------------------------------------------------------------
 
 option(BUILD_TESTING "Build unit tests" ON)
