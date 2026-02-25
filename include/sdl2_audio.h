@@ -27,6 +27,13 @@
 /* Default sound directory (relative to CWD). */
 #define SDL2A_DEFAULT_SOUND_DIR "sounds"
 
+/* Legacy volume range: 0-100 percentage. */
+#define SDL2A_VOLUME_PERCENT_MIN 0
+#define SDL2A_VOLUME_PERCENT_MAX 100
+
+/* Volume step for increment/decrement (1%). */
+#define SDL2A_VOLUME_STEP 1
+
 /* Status codes returned by sdl2_audio functions. */
 typedef enum
 {
@@ -105,6 +112,31 @@ void sdl2_audio_set_volume(sdl2_audio_t *ctx, int volume);
 
 /* Get the current master volume. */
 int sdl2_audio_get_volume(const sdl2_audio_t *ctx);
+
+/*
+ * Set the master volume as a percentage (0-100).
+ * Maps legacy XBoing volume (0% = silent, 100% = full) to SDL2_mixer
+ * range (0-128).  Values outside 0-100 are clamped.
+ */
+void sdl2_audio_set_volume_percent(sdl2_audio_t *ctx, int percent);
+
+/*
+ * Get the current master volume as a percentage (0-100).
+ * Inverse of set_volume_percent — maps SDL2_mixer 0-128 back to 0-100.
+ */
+int sdl2_audio_get_volume_percent(const sdl2_audio_t *ctx);
+
+/*
+ * Increment the volume by SDL2A_VOLUME_STEP percent (1%).
+ * No-op if already at 100%.  Returns the new percentage.
+ */
+int sdl2_audio_volume_up(sdl2_audio_t *ctx);
+
+/*
+ * Decrement the volume by SDL2A_VOLUME_STEP percent (1%).
+ * No-op if already at 0%.  Returns the new percentage.
+ */
+int sdl2_audio_volume_down(sdl2_audio_t *ctx);
 
 /* Halt all currently playing channels immediately. */
 void sdl2_audio_halt(sdl2_audio_t *ctx);

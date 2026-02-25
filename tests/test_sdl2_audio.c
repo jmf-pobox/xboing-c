@@ -248,7 +248,119 @@ static void test_volume_null_ctx(void **state)
 }
 
 /* =========================================================================
- * Group 6: Status strings
+ * Group 6: Volume percentage API
+ * ========================================================================= */
+
+static void test_volume_percent_default(void **state)
+{
+    sdl2_audio_t *ctx = (sdl2_audio_t *)*state;
+    /* Default volume is MIX_MAX_VOLUME (128), which maps to 100%. */
+    assert_int_equal(sdl2_audio_get_volume_percent(ctx), 100);
+}
+
+static void test_volume_percent_set_get(void **state)
+{
+    sdl2_audio_t *ctx = (sdl2_audio_t *)*state;
+    sdl2_audio_set_volume_percent(ctx, 50);
+    assert_int_equal(sdl2_audio_get_volume_percent(ctx), 50);
+}
+
+static void test_volume_percent_zero(void **state)
+{
+    sdl2_audio_t *ctx = (sdl2_audio_t *)*state;
+    sdl2_audio_set_volume_percent(ctx, 0);
+    assert_int_equal(sdl2_audio_get_volume_percent(ctx), 0);
+    assert_int_equal(sdl2_audio_get_volume(ctx), 0);
+}
+
+static void test_volume_percent_full(void **state)
+{
+    sdl2_audio_t *ctx = (sdl2_audio_t *)*state;
+    sdl2_audio_set_volume_percent(ctx, 100);
+    assert_int_equal(sdl2_audio_get_volume_percent(ctx), 100);
+    assert_int_equal(sdl2_audio_get_volume(ctx), MIX_MAX_VOLUME);
+}
+
+static void test_volume_percent_clamp_low(void **state)
+{
+    sdl2_audio_t *ctx = (sdl2_audio_t *)*state;
+    sdl2_audio_set_volume_percent(ctx, -10);
+    assert_int_equal(sdl2_audio_get_volume_percent(ctx), 0);
+}
+
+static void test_volume_percent_clamp_high(void **state)
+{
+    sdl2_audio_t *ctx = (sdl2_audio_t *)*state;
+    sdl2_audio_set_volume_percent(ctx, 200);
+    assert_int_equal(sdl2_audio_get_volume_percent(ctx), 100);
+}
+
+static void test_volume_percent_round_trip(void **state)
+{
+    sdl2_audio_t *ctx = (sdl2_audio_t *)*state;
+    /* Test that set→get round-trips for all valid percentages. */
+    for (int pct = 0; pct <= 100; pct++)
+    {
+        sdl2_audio_set_volume_percent(ctx, pct);
+        int got = sdl2_audio_get_volume_percent(ctx);
+        /* Allow ±1 rounding tolerance due to integer 0-100 ↔ 0-128 mapping. */
+        assert_true(got >= pct - 1 && got <= pct + 1);
+    }
+}
+
+static void test_volume_percent_null_ctx(void **state)
+{
+    (void)state;
+    sdl2_audio_set_volume_percent(NULL, 50); /* must not crash */
+    assert_int_equal(sdl2_audio_get_volume_percent(NULL), 0);
+}
+
+static void test_volume_up(void **state)
+{
+    sdl2_audio_t *ctx = (sdl2_audio_t *)*state;
+    sdl2_audio_set_volume_percent(ctx, 50);
+    int pct = sdl2_audio_volume_up(ctx);
+    assert_int_equal(pct, 51);
+}
+
+static void test_volume_down(void **state)
+{
+    sdl2_audio_t *ctx = (sdl2_audio_t *)*state;
+    sdl2_audio_set_volume_percent(ctx, 50);
+    int pct = sdl2_audio_volume_down(ctx);
+    assert_int_equal(pct, 49);
+}
+
+static void test_volume_up_at_max(void **state)
+{
+    sdl2_audio_t *ctx = (sdl2_audio_t *)*state;
+    sdl2_audio_set_volume_percent(ctx, 100);
+    int pct = sdl2_audio_volume_up(ctx);
+    assert_int_equal(pct, 100);
+}
+
+static void test_volume_down_at_min(void **state)
+{
+    sdl2_audio_t *ctx = (sdl2_audio_t *)*state;
+    sdl2_audio_set_volume_percent(ctx, 0);
+    int pct = sdl2_audio_volume_down(ctx);
+    assert_int_equal(pct, 0);
+}
+
+static void test_volume_up_null(void **state)
+{
+    (void)state;
+    assert_int_equal(sdl2_audio_volume_up(NULL), 0);
+}
+
+static void test_volume_down_null(void **state)
+{
+    (void)state;
+    assert_int_equal(sdl2_audio_volume_down(NULL), 0);
+}
+
+/* =========================================================================
+ * Group 7: Status strings
  * ========================================================================= */
 
 static void test_status_strings_all_valid(void **state)
@@ -326,6 +438,31 @@ int main(void)
         cmocka_unit_test(test_volume_null_ctx),
     };
 
+    const struct CMUnitTest volume_percent_tests[] = {
+        cmocka_unit_test_setup_teardown(test_volume_percent_default, setup_audio_ctx,
+                                        teardown_audio_ctx),
+        cmocka_unit_test_setup_teardown(test_volume_percent_set_get, setup_audio_ctx,
+                                        teardown_audio_ctx),
+        cmocka_unit_test_setup_teardown(test_volume_percent_zero, setup_audio_ctx,
+                                        teardown_audio_ctx),
+        cmocka_unit_test_setup_teardown(test_volume_percent_full, setup_audio_ctx,
+                                        teardown_audio_ctx),
+        cmocka_unit_test_setup_teardown(test_volume_percent_clamp_low, setup_audio_ctx,
+                                        teardown_audio_ctx),
+        cmocka_unit_test_setup_teardown(test_volume_percent_clamp_high, setup_audio_ctx,
+                                        teardown_audio_ctx),
+        cmocka_unit_test_setup_teardown(test_volume_percent_round_trip, setup_audio_ctx,
+                                        teardown_audio_ctx),
+        cmocka_unit_test(test_volume_percent_null_ctx),
+        cmocka_unit_test_setup_teardown(test_volume_up, setup_audio_ctx, teardown_audio_ctx),
+        cmocka_unit_test_setup_teardown(test_volume_down, setup_audio_ctx, teardown_audio_ctx),
+        cmocka_unit_test_setup_teardown(test_volume_up_at_max, setup_audio_ctx, teardown_audio_ctx),
+        cmocka_unit_test_setup_teardown(test_volume_down_at_min, setup_audio_ctx,
+                                        teardown_audio_ctx),
+        cmocka_unit_test(test_volume_up_null),
+        cmocka_unit_test(test_volume_down_null),
+    };
+
     const struct CMUnitTest status_tests[] = {
         cmocka_unit_test(test_status_strings_all_valid),
         cmocka_unit_test(test_status_string_unknown),
@@ -341,6 +478,8 @@ int main(void)
                                           group_teardown_sdl);
     failed += cmocka_run_group_tests_name("volume control", volume_tests, group_setup_sdl,
                                           group_teardown_sdl);
+    failed += cmocka_run_group_tests_name("volume percentage", volume_percent_tests,
+                                          group_setup_sdl, group_teardown_sdl);
     failed += cmocka_run_group_tests_name("status strings", status_tests, NULL, NULL);
     return failed;
 }
