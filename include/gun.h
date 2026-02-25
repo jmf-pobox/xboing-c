@@ -29,7 +29,7 @@
  * enhancements, or modifications.
  */
 
-/* 
+/*
  * =========================================================================
  *
  * $Id: gun.h,v 1.1.1.1 1994/12/16 01:36:51 jck Exp $
@@ -56,7 +56,7 @@
  *  Constants and macros:
  */
 
-#define MAX_BULLETS         20
+#define MAX_BULLETS 20
 
 /*
  *  Type declarations:
