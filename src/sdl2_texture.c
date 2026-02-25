@@ -234,7 +234,7 @@ static int scan_directory(sdl2_texture_t *ctx, const char *dir_path, size_t base
     }
 
     int failures = 0;
-    struct dirent *entry;
+    const struct dirent *entry;
 
     while ((entry = readdir(dir)) != NULL)
     {
