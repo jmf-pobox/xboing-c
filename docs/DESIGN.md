@@ -741,3 +741,64 @@ Replace the switch dispatch with a function pointer table:
   fragile global `oldMode` variable.
 - 37 tests across 10 groups verify transitions, callback ordering, dialogue
   save/restore, frame counter behavior, and all query functions.
+
+## ADR-013: Fixed-timestep game loop with accumulator
+
+**Status:** Accepted
+**Date:** 2026-02-25
+**Bead:** xboing-cks.1
+
+**Context:**
+
+The legacy game loop in `main.c` uses `XPending()`/`XPeekEvent()` for input and
+`sleepSync()` with `usleep(speed * 300)` for frame pacing. The effective tick
+interval is `1500 * (10 - speedLevel)` microseconds, giving 9 speed levels from
+warp 1 (13.5ms, ~74 tps) to warp 9 (1.5ms, ~667 tps). This couples physics
+rate to sleep precision and CPU scheduling jitter.
+
+**Decision:**
+
+Replace the sleep-based timing with a fixed-timestep accumulator pattern:
+
+- **Opaque context pattern** — `sdl2_loop_t` allocated by `create()`, freed
+  by `destroy()`. No globals, fully testable via synthetic time injection.
+- **Time-source agnostic** — callers pass `elapsed_ms` from `SDL_GetTicks64()`
+  delta or inject synthetic time for testing. No internal clock dependency.
+- **Microsecond precision** — accumulator tracks time in microseconds to handle
+  sub-millisecond tick intervals at high speed levels (warp 9 = 1.5ms).
+- **Tick/render separation** — `tick_fn` fires zero or more times per update
+  (once per consumed interval); `render_fn` fires exactly once with an
+  interpolation alpha in [0.0, 1.0).
+- **9 speed levels** — `tick_interval_us = 1500 * (10 - speed_level)`, matching
+  the legacy formula exactly. Speed can be changed mid-game; the accumulator
+  is preserved across speed changes.
+- **Spiral-of-death prevention** — `SDL2L_MAX_TICKS_PER_UPDATE` (10) caps the
+  number of logic ticks per frame. When hit, the accumulator is cleared to
+  prevent perpetual catch-up after breakpoints or suspends.
+- **Pause semantics** — when paused, `update()` returns 0 and does not dispatch
+  callbacks. On unpause, the accumulator is cleared to prevent a burst of
+  catch-up ticks from time elapsed while paused.
+- **NULL-safe callbacks** — either `tick_fn` or `render_fn` may be NULL.
+- **Pure C** — no SDL2 dependency. The loop timing is game logic, not
+  platform code.
+
+**What we are NOT doing:**
+
+- Wiring into SDL2 event loop (separate migration task — the main loop will
+  call `sdl2_loop_update()` with the delta from `SDL_GetTicks64()`)
+- Implementing `SDL_WaitEvent` for pause mode (handled by the event loop layer)
+- Variable timestep or frame-rate-independent physics (fixed timestep is
+  simpler and matches legacy behavior)
+- Render interpolation in game modules (alpha is provided but interpolation
+  is a future enhancement)
+
+**Consequences:**
+
+- The ~210-line module replaces `sleepSync()` / `usleep()` with deterministic
+  accumulator-based timing.
+- All 9 legacy speed levels are reproduced exactly with sub-millisecond
+  precision.
+- 34 tests across 11 groups verify tick dispatch, accumulator behavior, speed
+  changes, pause semantics, spiral-of-death clamping, and alpha interpolation.
+- Synthetic time injection enables fully deterministic testing with no sleep
+  or wall-clock dependency.
