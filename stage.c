@@ -26,7 +26,7 @@
  * enhancements, or modifications.
  */
 
-/* 
+/*
  * =========================================================================
  *
  * $Id: stage.c,v 1.1.1.1 1994/12/16 01:36:45 jck Exp $
@@ -47,39 +47,39 @@
  *  Include file dependencies:
  */
 
+#include <X11/Xlib.h>
+#include <X11/Xos.h>
+#include <X11/Xutil.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stddef.h>
-#include <X11/Xlib.h>
-#include <X11/Xutil.h>
-#include <X11/Xos.h>
 #include <xpm.h>
 
-#include "bitmaps/bgrnds/mnbgrnd.xpm"
-#include "bitmaps/bgrnds/space.xpm"
 #include "bitmaps/bgrnds/bgrnd.xpm"
 #include "bitmaps/bgrnds/bgrnd2.xpm"
 #include "bitmaps/bgrnds/bgrnd3.xpm"
 #include "bitmaps/bgrnds/bgrnd4.xpm"
 #include "bitmaps/bgrnds/bgrnd5.xpm"
-#include "bitmaps/icon.xpm"
+#include "bitmaps/bgrnds/mnbgrnd.xpm"
+#include "bitmaps/bgrnds/space.xpm"
 #include "bitmaps/eyes/deveyes.xpm"
 #include "bitmaps/eyes/deveyes1.xpm"
 #include "bitmaps/eyes/deveyes2.xpm"
 #include "bitmaps/eyes/deveyes3.xpm"
 #include "bitmaps/eyes/deveyes4.xpm"
 #include "bitmaps/eyes/deveyes5.xpm"
+#include "bitmaps/icon.xpm"
 
-#include "error.h"
-#include "blocks.h"
-#include "editor.h"
-#include "sfx.h"
 #include "ball.h"
+#include "blocks.h"
+#include "dialogue.h"
+#include "editor.h"
+#include "error.h"
+#include "init.h"
 #include "misc.h"
 #include "paddle.h"
-#include "dialogue.h"
+#include "sfx.h"
 #include "version.h"
-#include "init.h"
 
 #include "stage.h"
 
@@ -87,15 +87,15 @@
  *  Internal macro definitions:
  */
 
-#define LEFT_OFFSET	    10
-#define RIGHT_OFFSET    10
-#define TOP_OFFSET      10
-#define MIDDLE_OFFSET   10
+#define LEFT_OFFSET 10
+#define RIGHT_OFFSET 10
+#define TOP_OFFSET 10
+#define MIDDLE_OFFSET 10
 
-#define	DEVILEYE_WIDTH		57
-#define	DEVILEYE_HEIGHT		16
-#define	DEVILEYE_WC			(DEVILEYE_WIDTH / 2)
-#define	DEVILEYE_HC			(DEVILEYE_HEIGHT / 2)
+#define DEVILEYE_WIDTH 57
+#define DEVILEYE_HEIGHT 16
+#define DEVILEYE_WC (DEVILEYE_WIDTH / 2)
+#define DEVILEYE_HC (DEVILEYE_HEIGHT / 2)
 
 /*
  *  Internal type declarations:
@@ -107,486 +107,477 @@ static Window SetWMIcon(Display *display);
  *  Internal variable declarations:
  */
 
-Window 	iconWindow;
-Window 	inputWindow;
-Window 	mainWindow;
-Window 	scoreWindow;
-Window 	levelWindow;
-Window 	playWindow;
-Window 	bufferWindow;
-Window 	messWindow;
-Window 	specialWindow;
-Window 	timeWindow;
-Window 	blockWindow;
-Window 	typeWindow;
-Pixmap	mainBackPixmap, iconPixmap, spacePixmap;
-Pixmap  back1Pixmap, back2Pixmap, back3Pixmap, back4Pixmap, back5Pixmap;
-Pixmap  devilblink[6], devilblinkM[6];
-int 	devilx, devily;
-int 	blinkslides[] = { 0, 1, 2, 3, 4, 5, 5, 4, 3, 2, 1, 0, 0, 0, 
-					      0, 1, 2, 3, 4, 5, 5, 4, 3, 2, 1, 0 };
+Window iconWindow;
+Window inputWindow;
+Window mainWindow;
+Window scoreWindow;
+Window levelWindow;
+Window playWindow;
+Window bufferWindow;
+Window messWindow;
+Window specialWindow;
+Window timeWindow;
+Window blockWindow;
+Window typeWindow;
+Pixmap mainBackPixmap, iconPixmap, spacePixmap;
+Pixmap back1Pixmap, back2Pixmap, back3Pixmap, back4Pixmap, back5Pixmap;
+Pixmap devilblink[6], devilblinkM[6];
+int devilx, devily;
+int blinkslides[] = {0, 1, 2, 3, 4, 5, 5, 4, 3, 2, 1, 0, 0, 0, 0, 1, 2, 3, 4, 5, 5, 4, 3, 2, 1, 0};
 
-
-void InitialiseMainBackPixmap(Display *display, Window window, 
-	Colormap colormap)
+void InitialiseMainBackPixmap(Display *display, Window window, Colormap colormap)
 {
-	XpmAttributes   attributes;
-	int		    XpmErrorStatus;
+    XpmAttributes attributes;
+    int XpmErrorStatus;
 
-	attributes.valuemask = XpmColormap;
-	attributes.colormap = colormap;
+    attributes.valuemask = XpmColormap;
+    attributes.colormap = colormap;
 
     /* Create the playfield background pixmaps */
 
-	XpmErrorStatus = XpmCreatePixmapFromData(display, window, 
-		mainbackground_xpm, &mainBackPixmap, NULL, &attributes);
-	HandleXPMError(display, XpmErrorStatus, "InitialiseMainBackPixmap()");
+    XpmErrorStatus = XpmCreatePixmapFromData(display, window, mainbackground_xpm, &mainBackPixmap,
+                                             NULL, &attributes);
+    HandleXPMError(display, XpmErrorStatus, "InitialiseMainBackPixmap()");
 
-	XpmErrorStatus = XpmCreatePixmapFromData(display, window, 
-		space_xpm, &spacePixmap, NULL, &attributes);
-	HandleXPMError(display, XpmErrorStatus, "InitialiseMainBackPixmap(space)");
+    XpmErrorStatus =
+        XpmCreatePixmapFromData(display, window, space_xpm, &spacePixmap, NULL, &attributes);
+    HandleXPMError(display, XpmErrorStatus, "InitialiseMainBackPixmap(space)");
 
-	XpmErrorStatus = XpmCreatePixmapFromData(display, window, background_xpm,
-		&back1Pixmap, NULL, &attributes);
-	HandleXPMError(display, XpmErrorStatus, "InitialiseMainBackPixmap()");
+    XpmErrorStatus =
+        XpmCreatePixmapFromData(display, window, background_xpm, &back1Pixmap, NULL, &attributes);
+    HandleXPMError(display, XpmErrorStatus, "InitialiseMainBackPixmap()");
 
-	XpmErrorStatus = XpmCreatePixmapFromData(display, window, background2_xpm,
-		&back2Pixmap, NULL, &attributes);
-	HandleXPMError(display, XpmErrorStatus, "InitialiseMainBackPixmap()");
+    XpmErrorStatus =
+        XpmCreatePixmapFromData(display, window, background2_xpm, &back2Pixmap, NULL, &attributes);
+    HandleXPMError(display, XpmErrorStatus, "InitialiseMainBackPixmap()");
 
-	XpmErrorStatus = XpmCreatePixmapFromData(display, window, background3_xpm,
-		&back3Pixmap, NULL, &attributes);
-	HandleXPMError(display, XpmErrorStatus, "InitialiseMainBackPixmap()");
+    XpmErrorStatus =
+        XpmCreatePixmapFromData(display, window, background3_xpm, &back3Pixmap, NULL, &attributes);
+    HandleXPMError(display, XpmErrorStatus, "InitialiseMainBackPixmap()");
 
-	XpmErrorStatus = XpmCreatePixmapFromData(display, window, background4_xpm,
-		&back4Pixmap, NULL, &attributes);
-	HandleXPMError(display, XpmErrorStatus, "InitialiseMainBackPixmap()");
+    XpmErrorStatus =
+        XpmCreatePixmapFromData(display, window, background4_xpm, &back4Pixmap, NULL, &attributes);
+    HandleXPMError(display, XpmErrorStatus, "InitialiseMainBackPixmap()");
 
-	XpmErrorStatus = XpmCreatePixmapFromData(display, window, background5_xpm,
-		&back5Pixmap, NULL, &attributes);
-	HandleXPMError(display, XpmErrorStatus, "InitialiseMainBackPixmap()");
+    XpmErrorStatus =
+        XpmCreatePixmapFromData(display, window, background5_xpm, &back5Pixmap, NULL, &attributes);
+    HandleXPMError(display, XpmErrorStatus, "InitialiseMainBackPixmap()");
 
-	/* Devil blink animation */
+    /* Devil blink animation */
 
-	XpmErrorStatus = XpmCreatePixmapFromData(display, window, devileyes_xpm,
-		&devilblink[0], &devilblinkM[0], &attributes);
-	HandleXPMError(display, XpmErrorStatus, 
-		"InitialiseMainBackPixmap(devilblink[0])");
+    XpmErrorStatus = XpmCreatePixmapFromData(display, window, devileyes_xpm, &devilblink[0],
+                                             &devilblinkM[0], &attributes);
+    HandleXPMError(display, XpmErrorStatus, "InitialiseMainBackPixmap(devilblink[0])");
 
-	XpmErrorStatus = XpmCreatePixmapFromData(display, window, devileyes1_xpm,
-		&devilblink[1], &devilblinkM[1], &attributes);
-	HandleXPMError(display, XpmErrorStatus, 
-		"InitialiseMainBackPixmap(devilblink[1])");
+    XpmErrorStatus = XpmCreatePixmapFromData(display, window, devileyes1_xpm, &devilblink[1],
+                                             &devilblinkM[1], &attributes);
+    HandleXPMError(display, XpmErrorStatus, "InitialiseMainBackPixmap(devilblink[1])");
 
-	XpmErrorStatus = XpmCreatePixmapFromData(display, window, devileyes2_xpm,
-		&devilblink[2], &devilblinkM[2], &attributes);
-	HandleXPMError(display, XpmErrorStatus, 
-		"InitialiseMainBackPixmap(devilblink[2])");
+    XpmErrorStatus = XpmCreatePixmapFromData(display, window, devileyes2_xpm, &devilblink[2],
+                                             &devilblinkM[2], &attributes);
+    HandleXPMError(display, XpmErrorStatus, "InitialiseMainBackPixmap(devilblink[2])");
 
-	XpmErrorStatus = XpmCreatePixmapFromData(display, window, devileyes3_xpm,
-		&devilblink[3], &devilblinkM[3], &attributes);
-	HandleXPMError(display, XpmErrorStatus, 
-		"InitialiseMainBackPixmap(devilblink[3])");
+    XpmErrorStatus = XpmCreatePixmapFromData(display, window, devileyes3_xpm, &devilblink[3],
+                                             &devilblinkM[3], &attributes);
+    HandleXPMError(display, XpmErrorStatus, "InitialiseMainBackPixmap(devilblink[3])");
 
-	XpmErrorStatus = XpmCreatePixmapFromData(display, window, devileyes4_xpm,
-		&devilblink[4], &devilblinkM[4], &attributes);
-	HandleXPMError(display, XpmErrorStatus, 
-		"InitialiseMainBackPixmap(devilblink[4])");
+    XpmErrorStatus = XpmCreatePixmapFromData(display, window, devileyes4_xpm, &devilblink[4],
+                                             &devilblinkM[4], &attributes);
+    HandleXPMError(display, XpmErrorStatus, "InitialiseMainBackPixmap(devilblink[4])");
 
-	XpmErrorStatus = XpmCreatePixmapFromData(display, window, devileyes5_xpm,
-		&devilblink[5], &devilblinkM[5], &attributes);
-	HandleXPMError(display, XpmErrorStatus, 
-		"InitialiseMainBackPixmap(devilblink[5])");
+    XpmErrorStatus = XpmCreatePixmapFromData(display, window, devileyes5_xpm, &devilblink[5],
+                                             &devilblinkM[5], &attributes);
+    HandleXPMError(display, XpmErrorStatus, "InitialiseMainBackPixmap(devilblink[5])");
 
-	/* Free the xpm pixmap attributes */
-	XpmFreeAttributes(&attributes);
+    /* Free the xpm pixmap attributes */
+    XpmFreeAttributes(&attributes);
 }
 
 void ClearMainWindow(Display *display, Window window)
 {
-	/* Make sure that it is drawn */
-	XSetWindowBackgroundPixmap(display, mainWindow, spacePixmap);
-	XClearWindow(display, mainWindow);
+    /* Make sure that it is drawn */
+    XSetWindowBackgroundPixmap(display, mainWindow, spacePixmap);
+    XClearWindow(display, mainWindow);
 }
 
 void SetWindowSizeHints(Display *display, int w, int h)
 {
-	XSizeHints 		sizehints;
-	
-	/* Setup the max and minimum size that the window will be */
-	sizehints.flags 		= PPosition | PSize | PMinSize | PMaxSize;
-	sizehints.min_width 	= w;
-	sizehints.min_height	= h;
-	sizehints.max_width 	= w;
-	sizehints.max_height	= h;
+    XSizeHints sizehints;
 
-	/* Now set the window manager size hints properties */
-	XSetWMNormalHints(display, mainWindow, &sizehints);
+    /* Setup the max and minimum size that the window will be */
+    sizehints.flags = PPosition | PSize | PMinSize | PMaxSize;
+    sizehints.min_width = w;
+    sizehints.min_height = h;
+    sizehints.max_width = w;
+    sizehints.max_height = h;
+
+    /* Now set the window manager size hints properties */
+    XSetWMNormalHints(display, mainWindow, &sizehints);
 }
 
-void CreateAllWindows(Display *display, Colormap colormap,
-	char **argv, int argc)
+void CreateAllWindows(Display *display, Colormap colormap, char **argv, int argc)
 {
-    char 			title[80];
-	int 			offsetX, offsetY, scoreWidth;
-	XWMHints 		wmhints;
-	XClassHint 		classhints;
-	XSizeHints 		sizehints;
-	XTextProperty 	windowName, iconName;
-	XSetWindowAttributes winattr;
-	unsigned long 	valuemask;
-	int temp;
+    char title[80];
+    int offsetX, offsetY, scoreWidth;
+    XWMHints wmhints;
+    XClassHint classhints;
+    XSizeHints sizehints;
+    XTextProperty windowName, iconName;
+    XSetWindowAttributes winattr;
+    unsigned long valuemask;
+    int temp;
 
-	char *window_Name 	= "- XBoing II -";
-	char *icon_Name 	= "XBoing II";
+    char *window_Name = "- XBoing II -";
+    char *icon_Name = "XBoing II";
 
-	offsetX = MAIN_WIDTH / 2;
-	offsetY = MAIN_HEIGHT / 2;
-	scoreWidth = 224;
+    offsetX = MAIN_WIDTH / 2;
+    offsetY = MAIN_HEIGHT / 2;
+    scoreWidth = 224;
 
-	DEBUG("Creating windows ....");
+    DEBUG("Creating windows ....");
 
-	/* Create the main window */
-    mainWindow = XCreateSimpleWindow(display,
-		RootWindow(display, DefaultScreen(display)), 0, 0,
-		PLAY_WIDTH + MAIN_WIDTH + 10, PLAY_HEIGHT + MAIN_HEIGHT + 10, 2, 
-		red, black);
+    /* Create the main window */
+    mainWindow = XCreateSimpleWindow(display, RootWindow(display, DefaultScreen(display)), 0, 0,
+                                     PLAY_WIDTH + MAIN_WIDTH + 10, PLAY_HEIGHT + MAIN_HEIGHT + 10,
+                                     2, red, black);
 
-	/* Create the score window */
-    scoreWindow = XCreateSimpleWindow(display, mainWindow, 
-		offsetX, 10, scoreWidth, 42, 0, white, black);
+    /* Create the score window */
+    scoreWindow =
+        XCreateSimpleWindow(display, mainWindow, offsetX, 10, scoreWidth, 42, 0, white, black);
 
-	/* Create the level window */
-    levelWindow = XCreateSimpleWindow(display, mainWindow, 
-		scoreWidth + offsetX + 25, 5, 
-			PLAY_WIDTH + offsetX - 20 - scoreWidth, 52, 0, white, black);
+    /* Create the level window */
+    levelWindow = XCreateSimpleWindow(display, mainWindow, scoreWidth + offsetX + 25, 5,
+                                      PLAY_WIDTH + offsetX - 20 - scoreWidth, 52, 0, white, black);
 
-	/* Create the playing area window */
-    playWindow = XCreateSimpleWindow(display, mainWindow, 
-		offsetX, 60, PLAY_WIDTH, PLAY_HEIGHT, 2, red, black);
+    /* Create the playing area window */
+    playWindow = XCreateSimpleWindow(display, mainWindow, offsetX, 60, PLAY_WIDTH, PLAY_HEIGHT, 2,
+                                     red, black);
 
-	/* Create the buffer playing area window NON VISIBLE */
-    bufferWindow = XCreateSimpleWindow(display, mainWindow, 
-		offsetX, 60, PLAY_WIDTH, PLAY_HEIGHT, 2, red, black);
+    /* Create the buffer playing area window NON VISIBLE */
+    bufferWindow = XCreateSimpleWindow(display, mainWindow, offsetX, 60, PLAY_WIDTH, PLAY_HEIGHT, 2,
+                                       red, black);
 
-	/* Create the message area window */
-    messWindow = XCreateSimpleWindow(display, mainWindow, 
-		offsetX, 65 + PLAY_HEIGHT + 10, PLAY_WIDTH / 2, MESS_HEIGHT, 0, 
-		white, black);
+    /* Create the message area window */
+    messWindow = XCreateSimpleWindow(display, mainWindow, offsetX, 65 + PLAY_HEIGHT + 10,
+                                     PLAY_WIDTH / 2, MESS_HEIGHT, 0, white, black);
 
-	/* Create the special bonus area window */
-    specialWindow = XCreateSimpleWindow(display, mainWindow, 
-		offsetX + PLAY_WIDTH / 2 + 10, 65 + PLAY_HEIGHT + 10, 
-		180, MESS_HEIGHT + 5, 0, white, black);
+    /* Create the special bonus area window */
+    specialWindow =
+        XCreateSimpleWindow(display, mainWindow, offsetX + PLAY_WIDTH / 2 + 10,
+                            65 + PLAY_HEIGHT + 10, 180, MESS_HEIGHT + 5, 0, white, black);
 
-	/* Create the timer area window */
-    timeWindow = XCreateSimpleWindow(display, mainWindow, 
-		offsetX + PLAY_WIDTH / 2 + 10 + 180 + 5, 
-		65 + PLAY_HEIGHT + 10, PLAY_WIDTH / 8, MESS_HEIGHT + 5, 
-		0, white, black);
+    /* Create the timer area window */
+    timeWindow = XCreateSimpleWindow(display, mainWindow, offsetX + PLAY_WIDTH / 2 + 10 + 180 + 5,
+                                     65 + PLAY_HEIGHT + 10, PLAY_WIDTH / 8, MESS_HEIGHT + 5, 0,
+                                     white, black);
 
-	/* Create the blocks window for editor */
-    blockWindow = XCreateSimpleWindow(display, mainWindow, 
-		offsetX + PLAY_WIDTH + 15, 60, EDITOR_TOOL_WIDTH, PLAY_HEIGHT, 
-		2, red, black);
+    /* Create the blocks window for editor */
+    blockWindow = XCreateSimpleWindow(display, mainWindow, offsetX + PLAY_WIDTH + 15, 60,
+                                      EDITOR_TOOL_WIDTH, PLAY_HEIGHT, 2, red, black);
 
-	/* Create the type of blocks currently active window for editor */
-    typeWindow = XCreateSimpleWindow(display, mainWindow, 
-		offsetX + PLAY_WIDTH + 15, 65 + PLAY_HEIGHT + 5, 
-		EDITOR_TOOL_WIDTH, TYPE_HEIGHT, 
-		2, red, black);
+    /* Create the type of blocks currently active window for editor */
+    typeWindow =
+        XCreateSimpleWindow(display, mainWindow, offsetX + PLAY_WIDTH + 15, 65 + PLAY_HEIGHT + 5,
+                            EDITOR_TOOL_WIDTH, TYPE_HEIGHT, 2, red, black);
 
-	/* Create the input dialogue window */
-    inputWindow = XCreateSimpleWindow(display, mainWindow, 
-		((PLAY_WIDTH + MAIN_WIDTH) / 2) - (DIALOGUE_WIDTH / 2), 
-		((PLAY_HEIGHT + MAIN_HEIGHT) / 2) - (DIALOGUE_HEIGHT / 2), 
-		DIALOGUE_WIDTH, DIALOGUE_HEIGHT, 
-		4, red, black);
+    /* Create the input dialogue window */
+    inputWindow = XCreateSimpleWindow(display, mainWindow,
+                                      ((PLAY_WIDTH + MAIN_WIDTH) / 2) - (DIALOGUE_WIDTH / 2),
+                                      ((PLAY_HEIGHT + MAIN_HEIGHT) / 2) - (DIALOGUE_HEIGHT / 2),
+                                      DIALOGUE_WIDTH, DIALOGUE_HEIGHT, 4, red, black);
 
-	DEBUG("Creating windows finished.");
+    DEBUG("Creating windows finished.");
 
     /* Set window manager properties */
-	sprintf(title, "XBoing V%d.%d", VERSION, REVNUM + buildNum);
+    sprintf(title, "XBoing V%d.%d", VERSION, REVNUM + buildNum);
 
-	if (XStringListToTextProperty(&window_Name, 1, &windowName) == 0)
-		ShutDown(display, 1, "Cannot create window name resource.");
+    if (XStringListToTextProperty(&window_Name, 1, &windowName) == 0)
+        ShutDown(display, 1, "Cannot create window name resource.");
 
-	if (XStringListToTextProperty(&icon_Name, 1, &iconName) == 0) 
-		ShutDown(display, 1, "Cannot create icon name resource.");
+    if (XStringListToTextProperty(&icon_Name, 1, &iconName) == 0)
+        ShutDown(display, 1, "Cannot create icon name resource.");
 
-	if (noicon == False)
-		iconWindow = SetWMIcon(display);
+    if (noicon == False)
+        iconWindow = SetWMIcon(display);
 
-	/* Various window manager settings */
-    wmhints.initial_state 	= NormalState;
-	wmhints.input 			= True;
+    /* Various window manager settings */
+    wmhints.initial_state = NormalState;
+    wmhints.input = True;
 
-	if (noicon == False)
-	{
-		/* Don't create an icon if the user doesn't want it */
-		wmhints.icon_pixmap 	= iconPixmap;
-		wmhints.icon_window 	= iconWindow;
-		wmhints.flags = StateHint | InputHint | IconPixmapHint | IconWindowHint;
-	}
-	else
-		wmhints.flags = StateHint | InputHint;
+    if (noicon == False)
+    {
+        /* Don't create an icon if the user doesn't want it */
+        wmhints.icon_pixmap = iconPixmap;
+        wmhints.icon_window = iconWindow;
+        wmhints.flags = StateHint | InputHint | IconPixmapHint | IconWindowHint;
+    }
+    else
+        wmhints.flags = StateHint | InputHint;
 
-	/* Set the class for XBoing */
-	classhints.res_name		= "XBoing";
-	classhints.res_class 	= "XBoing";
+    /* Set the class for XBoing */
+    classhints.res_name = "XBoing";
+    classhints.res_class = "XBoing";
 
-	/* Setup the max and minimum size that the window will be */
-	sizehints.flags 		= PPosition | PSize | PMinSize | PMaxSize;
-	sizehints.min_width 	= PLAY_WIDTH + MAIN_WIDTH + 10;
-	sizehints.min_height	= PLAY_HEIGHT + MAIN_HEIGHT + 10;
-	sizehints.max_width 	= PLAY_WIDTH + MAIN_WIDTH + 10;
-	sizehints.max_height	= PLAY_HEIGHT + MAIN_HEIGHT + 10;
+    /* Setup the max and minimum size that the window will be */
+    sizehints.flags = PPosition | PSize | PMinSize | PMaxSize;
+    sizehints.min_width = PLAY_WIDTH + MAIN_WIDTH + 10;
+    sizehints.min_height = PLAY_HEIGHT + MAIN_HEIGHT + 10;
+    sizehints.max_width = PLAY_WIDTH + MAIN_WIDTH + 10;
+    sizehints.max_height = PLAY_HEIGHT + MAIN_HEIGHT + 10;
 
-	/* Now set the window manager properties */
-	XSetWMProperties(display, mainWindow, &windowName, &iconName,
-		argv, argc, &sizehints, &wmhints, &classhints);
+    /* Now set the window manager properties */
+    XSetWMProperties(display, mainWindow, &windowName, &iconName, argv, argc, &sizehints, &wmhints,
+                     &classhints);
 
-	/* Free the text property values allocated by XStringListToTextProperty */
-	if (windowName.value) XFree(windowName.value);
-	if (iconName.value) XFree(iconName.value);
+    /* Free the text property values allocated by XStringListToTextProperty */
+    if (windowName.value)
+        XFree(windowName.value);
+    if (iconName.value)
+        XFree(iconName.value);
 
-	DEBUG("Setting WM properties.");
+    DEBUG("Setting WM properties.");
 
-	if (noicon == False)
-	{
-		/* Set the current icon as the window's background pixmap */
-		XSetWindowBackgroundPixmap(display, iconWindow, iconPixmap);
-		XClearWindow(display, iconWindow);
-	}
+    if (noicon == False)
+    {
+        /* Set the current icon as the window's background pixmap */
+        XSetWindowBackgroundPixmap(display, iconWindow, iconPixmap);
+        XClearWindow(display, iconWindow);
+    }
 
-	valuemask = CWColormap;
-	winattr.colormap = colormap;
+    valuemask = CWColormap;
+    winattr.colormap = colormap;
 
-	/* Check if the server allows backing store */
+    /* Check if the server allows backing store */
     if (DoesBackingStore(XDefaultScreenOfDisplay(display)) == Always)
-	{
-		/* Ok we want backing store as it is very useful */
-		valuemask |= CWBackingStore;
-		winattr.backing_store = Always;
-	}
+    {
+        /* Ok we want backing store as it is very useful */
+        valuemask |= CWBackingStore;
+        winattr.backing_store = Always;
+    }
 
-	DEBUG("Changing window attributes.");
+    DEBUG("Changing window attributes.");
 
-	XChangeWindowAttributes(display, mainWindow, 	valuemask, &winattr);
-	XChangeWindowAttributes(display, playWindow, 	valuemask, &winattr);
-	XChangeWindowAttributes(display, bufferWindow, 	valuemask, &winattr);
-	XChangeWindowAttributes(display, levelWindow, 	valuemask, &winattr);
-	XChangeWindowAttributes(display, scoreWindow, 	valuemask, &winattr);
-	XChangeWindowAttributes(display, messWindow, 	valuemask, &winattr);
-	XChangeWindowAttributes(display, specialWindow, valuemask, &winattr);
-	XChangeWindowAttributes(display, timeWindow, 	valuemask, &winattr);
-	XChangeWindowAttributes(display, inputWindow, 	valuemask, &winattr);
-	XChangeWindowAttributes(display, blockWindow, 	valuemask, &winattr);
-	XChangeWindowAttributes(display, typeWindow, 	valuemask, &winattr);
+    XChangeWindowAttributes(display, mainWindow, valuemask, &winattr);
+    XChangeWindowAttributes(display, playWindow, valuemask, &winattr);
+    XChangeWindowAttributes(display, bufferWindow, valuemask, &winattr);
+    XChangeWindowAttributes(display, levelWindow, valuemask, &winattr);
+    XChangeWindowAttributes(display, scoreWindow, valuemask, &winattr);
+    XChangeWindowAttributes(display, messWindow, valuemask, &winattr);
+    XChangeWindowAttributes(display, specialWindow, valuemask, &winattr);
+    XChangeWindowAttributes(display, timeWindow, valuemask, &winattr);
+    XChangeWindowAttributes(display, inputWindow, valuemask, &winattr);
+    XChangeWindowAttributes(display, blockWindow, valuemask, &winattr);
+    XChangeWindowAttributes(display, typeWindow, valuemask, &winattr);
 }
 
 void SetBackgrounds(Display *display, Colormap colormap)
 {
-	InitialiseMainBackPixmap(display, mainWindow, colormap);
+    InitialiseMainBackPixmap(display, mainWindow, colormap);
 
-	ClearMainWindow(display, mainWindow);
-	XSetWindowBackgroundPixmap(display, levelWindow, ParentRelative);
-	XClearWindow(display, levelWindow);
-	XSetWindowBackgroundPixmap(display, scoreWindow, ParentRelative);
-	XClearWindow(display, scoreWindow);
-	XSetWindowBackgroundPixmap(display, specialWindow, ParentRelative);
-	XClearWindow(display, specialWindow);
-	XSetWindowBackgroundPixmap(display, timeWindow, ParentRelative);
-	XClearWindow(display, timeWindow);
+    ClearMainWindow(display, mainWindow);
+    XSetWindowBackgroundPixmap(display, levelWindow, ParentRelative);
+    XClearWindow(display, levelWindow);
+    XSetWindowBackgroundPixmap(display, scoreWindow, ParentRelative);
+    XClearWindow(display, scoreWindow);
+    XSetWindowBackgroundPixmap(display, specialWindow, ParentRelative);
+    XClearWindow(display, specialWindow);
+    XSetWindowBackgroundPixmap(display, timeWindow, ParentRelative);
+    XClearWindow(display, timeWindow);
 
-	XClearWindow(display, inputWindow);
+    XClearWindow(display, inputWindow);
 }
 
 void MapAllWindows(Display *display)
 {
-	/* Actually make everything visible */
-  	XMapWindow(display, specialWindow);
-  	XMapWindow(display, timeWindow);
-  	XMapWindow(display, messWindow);
-	XMapWindow(display, playWindow);
-	XMapWindow(display, levelWindow);
-	XMapWindow(display, scoreWindow);
-	XMapWindow(display, mainWindow);
-	XFlush(display);
+    /* Actually make everything visible */
+    XMapWindow(display, specialWindow);
+    XMapWindow(display, timeWindow);
+    XMapWindow(display, messWindow);
+    XMapWindow(display, playWindow);
+    XMapWindow(display, levelWindow);
+    XMapWindow(display, scoreWindow);
+    XMapWindow(display, mainWindow);
+    XFlush(display);
 }
 
 void RedrawPlayWindow(Display *display, Window window)
 {
-	/* Redraw the main playfield */
-	XClearWindow(display, playWindow);
-	RedrawAllBlocks(display, window);
-	RedrawPaddle(display, window);
-	RedrawBall(display, window);
+    /* Redraw the main playfield */
+    XClearWindow(display, playWindow);
+    RedrawAllBlocks(display, window);
+    RedrawPaddle(display, window);
+    RedrawBall(display, window);
 }
 
 void FreeBackgroundPixmaps(Display *display)
 {
-	int i;
+    int i;
 
-	/* Free all the backgound pixmaps */
-    if (back1Pixmap)	XFreePixmap(display, back1Pixmap); 
-	if (back2Pixmap)	XFreePixmap(display, back2Pixmap);
-	if (back3Pixmap)	XFreePixmap(display, back3Pixmap); 
-	if (back4Pixmap)	XFreePixmap(display, back4Pixmap);
-	if (back5Pixmap)	XFreePixmap(display, back5Pixmap); 
+    /* Free all the backgound pixmaps */
+    if (back1Pixmap)
+        XFreePixmap(display, back1Pixmap);
+    if (back2Pixmap)
+        XFreePixmap(display, back2Pixmap);
+    if (back3Pixmap)
+        XFreePixmap(display, back3Pixmap);
+    if (back4Pixmap)
+        XFreePixmap(display, back4Pixmap);
+    if (back5Pixmap)
+        XFreePixmap(display, back5Pixmap);
 
-	/* Free the icon and main background pixmaps */
-	if (iconPixmap)		XFreePixmap(display, iconPixmap);
-    if (mainBackPixmap)	XFreePixmap(display, mainBackPixmap); 
-    if (spacePixmap)	XFreePixmap(display, spacePixmap); 
+    /* Free the icon and main background pixmaps */
+    if (iconPixmap)
+        XFreePixmap(display, iconPixmap);
+    if (mainBackPixmap)
+        XFreePixmap(display, mainBackPixmap);
+    if (spacePixmap)
+        XFreePixmap(display, spacePixmap);
 
-	for (i = 0; i < 6; i++)
-	{
-		/* Free all devil blink eyes */
-		if (devilblink[i])	XFreePixmap(display, devilblink[i]); 
-		if (devilblinkM[i])	XFreePixmap(display, devilblinkM[i]); 
-	}
+    for (i = 0; i < 6; i++)
+    {
+        /* Free all devil blink eyes */
+        if (devilblink[i])
+            XFreePixmap(display, devilblink[i]);
+        if (devilblinkM[i])
+            XFreePixmap(display, devilblinkM[i]);
+    }
 }
 
 static Window SetWMIcon(Display *display)
 {
-    XpmAttributes   attributes;
-	Window	   		win, root;
-	Colormap		iconcolormap;
-	int		    	XpmErrorStatus;
-							
-	/* Suss out the root window */
-	root = RootWindow(display, DefaultScreen(display));
+    XpmAttributes attributes;
+    Window win, root;
+    Colormap iconcolormap;
+    int XpmErrorStatus;
 
-	if (!(win = XCreateSimpleWindow(display, root,
-		0, 0, 50, 50, 0, CopyFromParent, CopyFromParent)))
-	{
-		/* Well, what a bummer. Just use default icon then. */
-		ErrorMessage("Cannot create icon pixmap.");
-		return ((Window) NULL);
-	}
+    /* Suss out the root window */
+    root = RootWindow(display, DefaultScreen(display));
 
-	/* Create a new colourmap for the icon window */
-	iconcolormap = XDefaultColormap(display, XDefaultScreen(display));
+    if (!(win =
+              XCreateSimpleWindow(display, root, 0, 0, 50, 50, 0, CopyFromParent, CopyFromParent)))
+    {
+        /* Well, what a bummer. Just use default icon then. */
+        ErrorMessage("Cannot create icon pixmap.");
+        return ((Window)NULL);
+    }
 
-	/* Create all xpm pixmap blocks from the files */
-	attributes.colormap = iconcolormap;
-	attributes.valuemask = XpmColormap;
-	XpmErrorStatus = XpmCreatePixmapFromData(display, win, 
-		icon_xpm, &iconPixmap, NULL, &attributes);
-	HandleXPMError(display, XpmErrorStatus, "InitialiseWMIcon()");
+    /* Create a new colourmap for the icon window */
+    iconcolormap = XDefaultColormap(display, XDefaultScreen(display));
 
-	/* Make the new window have the new colourmap */
-	XSetWindowColormap(display, win, iconcolormap);
+    /* Create all xpm pixmap blocks from the files */
+    attributes.colormap = iconcolormap;
+    attributes.valuemask = XpmColormap;
+    XpmErrorStatus =
+        XpmCreatePixmapFromData(display, win, icon_xpm, &iconPixmap, NULL, &attributes);
+    HandleXPMError(display, XpmErrorStatus, "InitialiseWMIcon()");
 
-	/* Free the background pixmap attributes */
-	XpmFreeAttributes(&attributes);
+    /* Make the new window have the new colourmap */
+    XSetWindowColormap(display, win, iconcolormap);
 
-	return win;
+    /* Free the background pixmap attributes */
+    XpmFreeAttributes(&attributes);
+
+    return win;
 }
 
-void DrawStageBackground(Display *display, Window window, int stageType,
-	int clear)
+void DrawStageBackground(Display *display, Window window, int stageType, int clear)
 {
-	char type[80];
+    char type[80];
 
-	if (debug == True)
-	{
-		sprintf(type, "Changing background to type %d.", stageType);
-		DEBUG(type);
-	}
+    if (debug == True)
+    {
+        sprintf(type, "Changing background to type %d.", stageType);
+        DEBUG(type);
+    }
 
-	switch (stageType)
-	{
-		case BACKGROUND_SPACE:
-			XSetWindowBackgroundPixmap(display, window, spacePixmap);
-			break;
+    switch (stageType)
+    {
+        case BACKGROUND_SPACE:
+            XSetWindowBackgroundPixmap(display, window, spacePixmap);
+            break;
 
-		case BACKGROUND_SEE_THRU:
-			XSetWindowBackgroundPixmap(display, window, ParentRelative);
-			break;
+        case BACKGROUND_SEE_THRU:
+            XSetWindowBackgroundPixmap(display, window, ParentRelative);
+            break;
 
-		case BACKGROUND_BLACK:
-			XSetWindowBackground(display, window, black);
-			break;
+        case BACKGROUND_BLACK:
+            XSetWindowBackground(display, window, black);
+            break;
 
-		case BACKGROUND_WHITE:
-			XSetWindowBackground(display, window, white);
-			break;
+        case BACKGROUND_WHITE:
+            XSetWindowBackground(display, window, white);
+            break;
 
-		case BACKGROUND_0:
-			XSetWindowBackgroundPixmap(display, window, mainBackPixmap);
-			break;
+        case BACKGROUND_0:
+            XSetWindowBackgroundPixmap(display, window, mainBackPixmap);
+            break;
 
-		case BACKGROUND_1:
-			XSetWindowBackgroundPixmap(display, window, back1Pixmap);
-			break;
+        case BACKGROUND_1:
+            XSetWindowBackgroundPixmap(display, window, back1Pixmap);
+            break;
 
-		case BACKGROUND_2:
-			XSetWindowBackgroundPixmap(display, window, back2Pixmap);
-			break;
+        case BACKGROUND_2:
+            XSetWindowBackgroundPixmap(display, window, back2Pixmap);
+            break;
 
-		case BACKGROUND_3:
-			XSetWindowBackgroundPixmap(display, window, back3Pixmap);
-			break;
-																						case BACKGROUND_4:
-			XSetWindowBackgroundPixmap(display, window, back4Pixmap);
-			break;
+        case BACKGROUND_3:
+            XSetWindowBackgroundPixmap(display, window, back3Pixmap);
+            break;
+        case BACKGROUND_4:
+            XSetWindowBackgroundPixmap(display, window, back4Pixmap);
+            break;
 
-		case BACKGROUND_5:
-			XSetWindowBackgroundPixmap(display, window, back5Pixmap);
-			break;
+        case BACKGROUND_5:
+            XSetWindowBackgroundPixmap(display, window, back5Pixmap);
+            break;
 
-		default:
-			ErrorMessage("Unknown background type requested.");
-	}
+        default:
+            ErrorMessage("Unknown background type requested.");
+    }
 
-	/* Flush the new background */
-	if (clear == True)
-		XClearWindow(display, window);
+    /* Flush the new background */
+    if (clear == True)
+        XClearWindow(display, window);
 }
 
 void ClearDevilEyes(Display *display, Window window)
 {
-	/* Clear the devil eyes from current location */
-	XClearArea(display, window, 
-		devilx - DEVILEYE_WC, devily - DEVILEYE_HC, 
-		DEVILEYE_WIDTH, DEVILEYE_HEIGHT, False);
+    /* Clear the devil eyes from current location */
+    XClearArea(display, window, devilx - DEVILEYE_WC, devily - DEVILEYE_HC, DEVILEYE_WIDTH,
+               DEVILEYE_HEIGHT, False);
 }
 
-static void DrawTheDevilEye(Display *display, Window window, int x, int y,
-    int slide)
+static void DrawTheDevilEye(Display *display, Window window, int x, int y, int slide)
 {
-	/* Draw a frame of the devil eyes */
-    RenderShape(display, window, devilblink[slide], devilblinkM[slide],
-    	x - DEVILEYE_WC, y - DEVILEYE_HC, DEVILEYE_WIDTH, DEVILEYE_HEIGHT,
-        False);
+    /* Draw a frame of the devil eyes */
+    RenderShape(display, window, devilblink[slide], devilblinkM[slide], x - DEVILEYE_WC,
+                y - DEVILEYE_HC, DEVILEYE_WIDTH, DEVILEYE_HEIGHT, False);
 }
 
 int BlinkDevilEyes(Display *display, Window window)
 {
-	static int slide = 0;
-	static int first = True;
+    static int slide = 0;
+    static int first = True;
 
-	if (first)
-	{
-		/* Setup the eyes */
-		devilx = PLAY_WIDTH - DEVILEYE_WC - 5;
-		devily = PLAY_HEIGHT - DEVILEYE_HC - 5;
-		first = False;
-		slide = 0;
-	}
+    if (first)
+    {
+        /* Setup the eyes */
+        devilx = PLAY_WIDTH - DEVILEYE_WC - 5;
+        devily = PLAY_HEIGHT - DEVILEYE_HC - 5;
+        first = False;
+        slide = 0;
+    }
 
-	/*ClearDevilEyes(display, playWindow);*/
-	DrawTheDevilEye(display, playWindow, devilx, devily, blinkslides[slide]);
+    /*ClearDevilEyes(display, playWindow);*/
+    DrawTheDevilEye(display, playWindow, devilx, devily, blinkslides[slide]);
 
-	slide++;
-	if (slide == 26)
-	{
-		first = True;
-		slide = 0;
-		return False;
-	}
+    slide++;
+    if (slide == 26)
+    {
+        first = True;
+        slide = 0;
+        return False;
+    }
 
-	return True;
+    return True;
 }

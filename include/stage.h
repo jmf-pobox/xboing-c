@@ -29,7 +29,7 @@
  * enhancements, or modifications.
  */
 
-/* 
+/*
  * =========================================================================
  *
  * $Id: stage.h,v 1.1.1.1 1994/12/16 01:36:53 jck Exp $
@@ -56,28 +56,28 @@
  *  Constants and macros:
  */
 
-#define MAIN_WIDTH  70
+#define MAIN_WIDTH 70
 #define MAIN_HEIGHT 130
 
-#define PLAY_WIDTH  495
+#define PLAY_WIDTH 495
 #define PLAY_HEIGHT 580
 
-#define TOTAL_WIDTH  (MAIN_WIDTH + PLAY_WIDTH)
+#define TOTAL_WIDTH (MAIN_WIDTH + PLAY_WIDTH)
 #define TOTAL_HEIGHT (MAIN_HEIGHT + PLAY_HEIGHT)
 
 #define MESS_HEIGHT 30
 #define TYPE_HEIGHT (MESS_HEIGHT + 5)
 
-#define BACKGROUND_WHITE   -2
-#define BACKGROUND_BLACK   -1
-#define BACKGROUND_0    	0
-#define BACKGROUND_1    	1
-#define BACKGROUND_2    	2
-#define BACKGROUND_3    	3
-#define BACKGROUND_4    	4
-#define BACKGROUND_5    	5
+#define BACKGROUND_WHITE -2
+#define BACKGROUND_BLACK -1
+#define BACKGROUND_0 0
+#define BACKGROUND_1 1
+#define BACKGROUND_2 2
+#define BACKGROUND_3 3
+#define BACKGROUND_4 4
+#define BACKGROUND_5 5
 #define BACKGROUND_SEE_THRU 10
-#define BACKGROUND_SPACE 	11
+#define BACKGROUND_SPACE 11
 
 /*
  *  Type declarations:
@@ -97,16 +97,13 @@ extern Window timeWindow;
 extern Window inputWindow;
 extern Window blockWindow, typeWindow;
 
-void CreateAllWindows(Display *display, Colormap colormap, char **argv, 
-	int argc);
+void CreateAllWindows(Display *display, Colormap colormap, char **argv, int argc);
 void RedrawPlayWindow(Display *display, Window window);
 void MapAllWindows(Display *display);
 void ClearMainWindow(Display *display, Window window);
-void DrawStageBackground(Display *display, Window window, int stageType,
-	int clear);
+void DrawStageBackground(Display *display, Window window, int stageType, int clear);
 void SetBackgrounds(Display *display, Colormap colormap);
 int BlinkDevilEyes(Display *display, Window window);
 void SetWindowSizeHints(Display *display, int w, int h);
-
 
 #endif
