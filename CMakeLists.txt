@@ -176,7 +176,9 @@ install(DIRECTORY levels/
 
 install(DIRECTORY sounds/
     DESTINATION "${CMAKE_INSTALL_DATADIR}/xboing/sounds"
-    FILES_MATCHING PATTERN "*.au"
+    FILES_MATCHING
+        PATTERN "*.au"
+        PATTERN "*.wav"
     PATTERN "CVS" EXCLUDE)
 
 install(FILES docs/problems.doc
