@@ -29,7 +29,7 @@
  * enhancements, or modifications.
  */
 
-/* 
+/*
  * =========================================================================
  *
  * $Id: editor.h,v 1.1.1.1 1994/12/16 01:36:55 jck Exp $
@@ -56,19 +56,19 @@
  *  Constants and macros:
  */
 
-#define EDITOR_TOOL_WIDTH 	120
+#define EDITOR_TOOL_WIDTH 120
 
 /*
  *  Type declarations:
  */
 
-enum EditStates 
-{ 
-	EDIT_LEVEL, 
-	EDIT_NONE, 
-	EDIT_TEST, 
-	EDIT_WAIT, 
-	EDIT_FINISH 
+enum EditStates
+{
+    EDIT_LEVEL,
+    EDIT_NONE,
+    EDIT_TEST,
+    EDIT_WAIT,
+    EDIT_FINISH
 };
 
 /*
@@ -84,7 +84,6 @@ void handleEditorKeys(Display *display, KeySym keysym);
 void HandleEditorMouseButtons(Display *display, XEvent event, int Down);
 void HandleButtonMotion(Display *display, XEvent event);
 
-extern 	enum EditStates EditState;
-
+extern enum EditStates EditState;
 
 #endif
