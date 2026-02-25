@@ -29,7 +29,7 @@
  * enhancements, or modifications.
  */
 
-/* 
+/*
  * =========================================================================
  *
  * $Id: sfx.h,v 1.1.1.1 1994/12/16 01:36:53 jck Exp $
@@ -56,12 +56,12 @@
  *  Constants and macros:
  */
 
-#define SFX_NONE        0
-#define SFX_SHAKE      	1
-#define SFX_FADE  		2
-#define SFX_BLIND  		3
-#define SFX_SHATTER  	4
-#define SFX_STATIC  	5
+#define SFX_NONE 0
+#define SFX_SHAKE 1
+#define SFX_FADE 2
+#define SFX_BLIND 3
+#define SFX_SHATTER 4
+#define SFX_STATIC 5
 
 /*
  *  Type declarations:
@@ -85,6 +85,5 @@ void useSpecialEffects(int state);
 void ResetBorderGlow(Display *display, Window window);
 void BorderGlow(Display *display, Window window);
 void FadeAwayArea(Display *display, Window window, int x, int y, int w, int h);
-
 
 #endif
