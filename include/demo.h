@@ -29,7 +29,7 @@
  * enhancements, or modifications.
  */
 
-/* 
+/*
  * =========================================================================
  *
  * $Id: demo.h,v 1.1.1.1 1994/12/16 01:36:55 jck Exp $
@@ -60,14 +60,14 @@
  *  Type declarations:
  */
 
-enum DemoStates 
-{ 
-	DEMO_TITLE, 
-	DEMO_BLOCKS, 
-	DEMO_TEXT, 
-	DEMO_SPARKLE, 
-	DEMO_WAIT, 
-	DEMO_FINISH 
+enum DemoStates
+{
+    DEMO_TITLE,
+    DEMO_BLOCKS,
+    DEMO_TEXT,
+    DEMO_SPARKLE,
+    DEMO_WAIT,
+    DEMO_FINISH
 };
 
 /*
@@ -81,7 +81,6 @@ void FreeDemonstration(Display *display);
 void ResetDemonstration(void);
 void DoDemoTitle(Display *display, Window window);
 
-extern 	enum DemoStates DemoState;
-
+extern enum DemoStates DemoState;
 
 #endif
