@@ -276,3 +276,90 @@ What this module does NOT do (deferred to later beads):
 - The `load_file()` seam enables targeted tests without full directory scans.
 - The 256-slot hash map is adequate for the current 180 textures with room for
   growth. If the asset count doubles, the constant can be increased.
+
+## ADR-006: SDL2 TTF font rendering
+
+**Status:** Accepted
+
+**Context:**
+XBoing loads four Adobe Helvetica XLFD bitmap fonts at startup via
+`XLoadQueryFont()` in `init.c:225-253`:
+
+| Global | XLFD pattern | Size | Style |
+| -------- | ------------- | ------ | ------- |
+| `titleFont` | `-adobe-helvetica-bold-r-*-*-24-*` | 24pt | Bold |
+| `textFont` | `-adobe-helvetica-medium-r-*-*-18-*` | 18pt | Regular |
+| `dataFont` | `-adobe-helvetica-bold-r-*-*-14-*` | 14pt | Bold |
+| `copyFont` | `-adobe-helvetica-medium-r-*-*-12-*` | 12pt | Regular |
+
+Three text drawing functions in `misc.c:122-185` handle all 161 text rendering
+call sites across 18 files: `DrawText`, `DrawShadowText`, and
+`DrawShadowCentredText`. XLFD bitmap fonts (`xfonts-75dpi`, `xfonts-100dpi`)
+are disappearing from modern Linux distributions — they are no longer installed
+by default.
+
+Liberation Sans (metrically equivalent Helvetica substitute, SIL Open Font
+License) is already bundled at `assets/fonts/` with Regular and Bold variants.
+SDL2_TTF is already discovered by `pkg_check_modules` in CMakeLists.txt.
+
+**Decision:**
+Create an `sdl2_font` module (`src/sdl2_font.c`, `include/sdl2_font.h`) that
+loads Liberation Sans TTF fonts via SDL2_TTF and provides text drawing functions
+matching the legacy API surface. Key design points:
+
+1. **Enum-indexed font slots.** Four fonts are stored in a fixed-size array
+   indexed by `sdl2_font_id_t` (TITLE, TEXT, DATA, COPY). A hash map or
+   dynamic container would be over-engineering for exactly four entries.
+
+2. **Transient texture per draw.** Each text draw call follows the pattern:
+   `TTF_RenderUTF8_Blended()` → `SDL_CreateTextureFromSurface()` →
+   `SDL_RenderCopy()` → destroy texture. This matches the legacy immediate-mode
+   rendering where `XDrawString()` draws directly without caching. At ~20 text
+   draws per frame, the overhead is negligible. Text caching can be added later
+   if profiling shows it matters.
+
+3. **Fixed 2px shadow offset.** `SDL2F_SHADOW_OFFSET = 2` matches the legacy
+   `DrawShadowText` which draws at `(x+2, y+2)` with black, then `(x, y)` with
+   the foreground color.
+
+4. **`y` = top of text area.** Both legacy `DrawText` (which adds
+   `font->ascent` internally before calling `XDrawString`) and
+   `SDL_RenderCopy` use top-left origin. The caller provides the top of the
+   text area in both systems, preserving coordinate semantics.
+
+5. **`SDL_Color` for color parameters.** The legacy code uses `int` X11 pixel
+   values. The SDL2 path uses `SDL_Color` (RGBA). Bridging legacy color names
+   to `SDL_Color` values is the responsibility of the color system module
+   (xboing-oaa.4), not this module.
+
+6. **No `numChar` parameter.** The legacy `DrawText` accepts a `numChar`
+   parameter, but nearly all 161 call sites pass `-1` (full string). Callers
+   that need a substring can truncate before calling. This simplifies the API.
+
+7. **All-or-nothing font loading.** If any of the four TTF fonts fails to open,
+   `sdl2_font_create()` returns NULL. All four fonts are required for the game
+   to render correctly. This is stricter than the legacy code (which falls back
+   to `fixed` font), but appropriate for a controlled asset set where missing
+   fonts indicate a packaging or installation error.
+
+8. **Opaque context struct.** Same pattern as `sdl2_renderer_t` and
+   `sdl2_texture_t`: heap-allocated, no global state, fully testable.
+
+What this module does NOT do (deferred to later beads):
+
+- Wiring into legacy 161 call sites (separate migration task)
+- Color name resolution (`"red"` → `SDL_Color`) (xboing-oaa.4)
+- Text caching (premature; profile first if needed)
+- Rich text, word wrapping, or multi-line rendering (game uses single-line text)
+- Changes to the legacy `xboing` target
+
+**Consequences:**
+
+- All TTF font management lives in one module with a clean API.
+- The four-slot enum provides compile-time safety — no string lookups for fonts.
+- Tests run under `SDL_VIDEODRIVER=dummy` with real TTF files, verifying actual
+  SDL2_TTF rendering end-to-end.
+- Liberation Sans metrics closely match the original Helvetica, minimizing
+  layout adjustments when wiring into legacy call sites.
+- The transient texture approach is simple and correct; caching is a future
+  optimization if profiling justifies it.
