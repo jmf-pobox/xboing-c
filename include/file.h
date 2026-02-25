@@ -29,7 +29,7 @@
  * enhancements, or modifications.
  */
 
-/* 
+/*
  * =========================================================================
  *
  * $Id: file.h,v 1.1.1.1 1994/12/16 01:36:54 jck Exp $
@@ -50,15 +50,15 @@
  *  Dependencies on other include files:
  */
 
+#include <X11/Xlib.h>
 #include <stdio.h>
 #include <time.h>
-#include <X11/Xlib.h>
 
 /*
  *  Constants and macros:
  */
 
-#define SAVE_VERSION 	2
+#define SAVE_VERSION 2
 
 /*
  *  Type declarations:
@@ -66,15 +66,15 @@
 
 typedef struct
 {
-	u_long 	version;	/* Version of save game format */
-    u_long  score;      /* Score so far */
-    u_long  level;      /* level number */
-	int		levelTime;	/* Time left for level */
-    time_t  gameTime;   /* Time taken to complete game so far */
-	int		livesLeft;	/* Number of lives left */
-	int		startLevel;	/* Level game started on */
-	int		paddleSize;	/* The current paddle size */
-	int 	numBullets;	/* Number of bullets in store */
+    u_long version;  /* Version of save game format */
+    u_long score;    /* Score so far */
+    u_long level;    /* level number */
+    int levelTime;   /* Time left for level */
+    time_t gameTime; /* Time taken to complete game so far */
+    int livesLeft;   /* Number of lives left */
+    int startLevel;  /* Level game started on */
+    int paddleSize;  /* The current paddle size */
+    int numBullets;  /* Number of bullets in store */
 } saveGameStruct;
 
 /*
