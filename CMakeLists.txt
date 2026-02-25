@@ -294,6 +294,17 @@ if(SDL2_FOUND)
     target_link_libraries(sdl2_input PUBLIC ${SDL2_LIBRARIES})
 endif()
 
+# --- Game state machine library -----------------------------------------------
+#
+# Pure C module — no SDL2 dependency.  Manages game mode transitions with
+# function pointer dispatch, dialogue push/pop, and frame counting.
+
+add_library(sdl2_state STATIC src/sdl2_state.c)
+target_include_directories(sdl2_state PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+target_compile_options(sdl2_state PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+
 # --- Tests ------------------------------------------------------------------
 
 option(BUILD_TESTING "Build unit tests" ON)
