@@ -363,3 +363,68 @@ What this module does NOT do (deferred to later beads):
   layout adjustments when wiring into legacy call sites.
 - The transient texture approach is simple and correct; caching is a future
   optimization if profiling justifies it.
+
+## ADR-007: SDL2 RGBA color system
+
+**Status:** Accepted
+
+**Context:**
+The legacy XBoing uses X11 PseudoColor/TrueColor colormaps to manage colors.
+Eight named color globals (`red`, `tann`, `yellow`, `green`, `white`, `black`,
+`blue`, `purple`) are initialized via `ColourNameToPixel()` in `init.c:180-191`,
+which calls `XParseColor()` + `XAllocColor()` to convert X11 color names to
+pixel values. Two gradient arrays (`reds[7]`, `greens[7]`) initialized from hex
+shorthand (`#f00` through `#300`, `#0f0` through `#030`) in
+`init.c:193-217` drive the border glow animation in `sfx.c`.
+
+SDL2 uses direct RGBA color values (`SDL_Color` structs) rather than colormap
+indices. The X11 color indirection (name → pixel index → actual RGB) is
+unnecessary in SDL2's TrueColor-only world.
+
+**Decision:**
+Create an `sdl2_color` module (`src/sdl2_color.c`, `include/sdl2_color.h`) that
+provides precomputed RGBA color data matching the legacy X11 color values.
+Key design points:
+
+1. **No opaque context.** Unlike the renderer, texture, and font modules,
+   the color system has no mutable state and owns no SDL resources. All data
+   is `static const` in the `.c` file, accessed through pure functions.
+
+2. **Enum-indexed named colors.** `sdl2_color_id_t` enumerates the 8 legacy
+   globals (RED, TAN, YELLOW, GREEN, WHITE, BLACK, BLUE, PURPLE). Lookup by
+   enum is O(1) array indexing with bounds checking.
+
+3. **X11 rgb.txt values.** All RGBA values are verified against
+   `/usr/share/X11/rgb.txt` to ensure exact color matching. Notably, X11
+   "green" is RGB(0, 255, 0), not CSS "green" RGB(0, 128, 0).
+
+4. **Precomputed gradient arrays.** `sdl2_color_red_gradient(i)` and
+   `sdl2_color_green_gradient(i)` return 7-step gradients matching the legacy
+   hex values. The X11 3-digit hex `#RGB` expansion rule (each digit repeated:
+   `#d00` → `#DD0000`) is applied at compile time, not runtime.
+
+5. **String lookup function.** `sdl2_color_by_name()` supports both named
+   colors ("red", "yellow") and 3-digit hex shorthand ("#f00", "#0b0"),
+   case-insensitive. This is the migration seam for `ColourNameToPixel()`
+   call sites that use string color names.
+
+6. **Static library.** Built as `libsdl2_color.a`, conditional on `SDL2_FOUND`.
+   No SDL2_image or SDL2_ttf dependency — only the base SDL2 header for
+   `SDL_Color`.
+
+What this module does NOT do:
+
+- Full X11 color name database (only the 8 names the game uses)
+- 6-digit hex parsing `#RRGGBB` (not used by legacy code)
+- Runtime colormap allocation or palette manipulation
+- Wiring into legacy call sites (separate migration task)
+
+**Consequences:**
+
+- Color values are compile-time constants with zero runtime overhead.
+- The enum + function API provides type safety over the legacy `int` pixel
+  values — callers cannot accidentally pass a random integer as a color.
+- Tests verify exact RGBA values against X11 rgb.txt, gradient monotonicity,
+  and cross-consistency between named colors and gradient arrays.
+- The `by_name()` function provides a drop-in replacement path for legacy
+  `ColourNameToPixel()` calls during migration.
