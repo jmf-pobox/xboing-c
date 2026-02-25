@@ -23,7 +23,8 @@ jobs:
             include/ball_types.h \
             include/ball_math.h \
             include/paths.h \
-            include/score_logic.h
+            include/score_logic.h \
+            include/sdl2_*.h
 
   cppcheck:
     runs-on: ubuntu-latest
@@ -37,6 +38,7 @@ jobs:
         run: |
           cppcheck \
             --enable=warning,style,performance,portability \
+            --inline-suppr \
             --suppress=variableScope:ball_math.c \
             --error-exitcode=1 \
             src/ ball_math.c

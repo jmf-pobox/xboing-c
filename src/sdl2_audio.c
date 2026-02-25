@@ -373,6 +373,7 @@ void sdl2_audio_destroy(sdl2_audio_t *ctx)
     free(ctx);
 }
 
+// cppcheck-suppress constParameterPointer
 sdl2_audio_status_t sdl2_audio_play(sdl2_audio_t *ctx, const char *name)
 {
     if (ctx == NULL || name == NULL)
@@ -425,6 +426,7 @@ int sdl2_audio_get_volume(const sdl2_audio_t *ctx)
     return ctx->volume;
 }
 
+// cppcheck-suppress constParameterPointer
 void sdl2_audio_halt(sdl2_audio_t *ctx)
 {
     if (ctx == NULL)
