@@ -29,7 +29,7 @@
  * enhancements, or modifications.
  */
 
-/* 
+/*
  * =========================================================================
  *
  * $Id: mess.h,v 1.1.1.1 1994/12/16 01:36:53 jck Exp $
@@ -64,11 +64,9 @@
  *  Function prototypes:
  */
 
-void InitialiseMessageSystem(Display *display, Window window, 
-	Colormap colormap);
+void InitialiseMessageSystem(Display *display, Window window, Colormap colormap);
 void FreeMessageSystem(Display *display);
-void SetCurrentMessage(Display *display, Window window, 
-	char *newMessage, int clear);
+void SetCurrentMessage(Display *display, Window window, char *newMessage, int clear);
 void DisplayCurrentMessage(Display *display, Window window);
 
 #endif
