@@ -210,3 +210,17 @@ if(SDL2_FOUND)
     target_link_libraries(test_sdl2_regions PRIVATE sdl2_regions ${CMOCKA_LIBRARIES})
     add_test(NAME test_sdl2_regions COMMAND test_sdl2_regions)
 endif()
+
+# SDL2 audio system tests (bead xboing-0lu.1)
+# Links against sdl2_audio static library.
+# Uses SDL_AUDIODRIVER=dummy for headless CI testing.
+# Loads real WAV files from sounds/ directory.
+if(SDL2_FOUND AND SDL2_MIXER_FOUND)
+    add_executable(test_sdl2_audio test_sdl2_audio.c)
+    target_compile_options(test_sdl2_audio PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+    target_link_libraries(test_sdl2_audio PRIVATE sdl2_audio ${CMOCKA_LIBRARIES})
+    add_test(NAME test_sdl2_audio COMMAND test_sdl2_audio)
+    set_tests_properties(test_sdl2_audio PROPERTIES
+        ENVIRONMENT "SDL_AUDIODRIVER=dummy"
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+endif()

@@ -549,3 +549,60 @@ What this module does NOT do:
   management — no magic numbers scattered across rendering code.
 - Hit testing enables clean mouse event routing without manual coordinate
   comparisons at each call site.
+
+## ADR-010: SDL2_mixer audio system
+
+**Status:** Accepted
+**Date:** 2026-02-25
+**Bead:** xboing-0lu.1
+
+**Context:**
+
+The legacy audio system uses a fork+pipe architecture that writes raw audio
+data to `/dev/dsp` (OSS). This requires a long-lived child process, platform-
+specific driver files (12 drivers for different Unix variants), and only
+supports sequential playback of Sun Audio (.au) files. OSS is deprecated on
+modern Linux; `/dev/dsp` no longer exists without compatibility layers.
+
+**Decision:**
+
+Replace the fork+pipe architecture with SDL2_mixer:
+
+- **Opaque context pattern** — `sdl2_audio_t` allocated by `create()`, freed
+  by `destroy()`. No globals, fully testable.
+- **Eager WAV caching** — `create()` scans the sound directory, loads all
+  `.wav` files via `Mix_LoadWAV()`, and stores them in an FNV-1a hash map
+  keyed by basename (e.g., "boing.wav" -> key "boing"). Same hash map
+  pattern as `sdl2_texture.c`.
+- **WAV format** — SDL2_mixer natively loads WAV. All 46 sounds already
+  have `.wav` versions alongside the legacy `.au` files.
+- **Concurrent playback** — `Mix_PlayChannel(-1, chunk, 0)` auto-picks the
+  first available channel. 16 channels allocated by default (legacy could
+  only play one sound at a time).
+- **Global volume** — `set_volume()` applies to all channels via
+  `Mix_Volume(-1, vol)`. The legacy `playSoundFile()` accepted a per-call
+  volume parameter but every driver implementation ignored it.
+- **Best-effort loading** — individual WAV load failures are logged but do
+  not abort initialization. Only structural failures (Mix_OpenAudio failure,
+  unreadable directory) cause `create()` to return NULL.
+- **SDL_AUDIODRIVER=dummy** — headless CI testing works without a real audio
+  device. Mix_OpenAudio, Mix_LoadWAV, and Mix_PlayChannel all succeed
+  (silently) under the dummy audio driver.
+
+**What we are NOT doing:**
+
+- Wiring into legacy 161 call sites (separate migration task)
+- Per-call volume control (legacy always ignored it; bead xboing-0lu.2)
+- Streaming audio or music playback (game only uses short sound effects)
+- Converting .au files (WAV versions already exist)
+
+**Consequences:**
+
+- The ~220-line module replaces 12 platform-specific audio drivers and the
+  fork+pipe child process architecture.
+- Sound effects are cached in memory for O(1) lookup and instant playback
+  with no file I/O per play call.
+- Concurrent playback enables overlapping sound effects (e.g., ball bounce
+  and block break simultaneously), improving the audio experience.
+- 24 characterization tests verify caching, playback, volume control, and
+  error handling under the dummy audio driver.
