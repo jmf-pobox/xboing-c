@@ -28,7 +28,12 @@ struct sdl2_input
      * SDL2I_ACTION_COUNT means "no action bound to this scancode". */
     sdl2_input_action_t scancode_map[SDL_NUM_SCANCODES];
 
-    /* Action state. */
+    /* Per-scancode pressed state — used to derive per-action state correctly
+     * when an action has multiple scancodes bound (dual binding).  Releasing
+     * one bound key should not clear the action if the other is still held. */
+    bool scancode_pressed[SDL_NUM_SCANCODES];
+
+    /* Per-action derived state. */
     bool pressed[SDL2I_ACTION_COUNT];      /* currently held */
     bool just_pressed[SDL2I_ACTION_COUNT]; /* pressed this frame */
 
@@ -91,6 +96,31 @@ static bool is_valid_action(sdl2_input_action_t action)
 static bool is_valid_slot(int slot)
 {
     return slot >= 0 && slot < SDL2I_MAX_BINDINGS;
+}
+
+static bool is_valid_scancode(SDL_Scancode sc)
+{
+    return sc == SDL_SCANCODE_UNKNOWN || (sc > SDL_SCANCODE_UNKNOWN && sc < SDL_NUM_SCANCODES);
+}
+
+/*
+ * Recompute the pressed state for a single action based on which of its
+ * bound scancodes are currently held.  This correctly handles dual bindings:
+ * the action stays pressed as long as at least one bound key is held.
+ */
+static void recompute_action_pressed(sdl2_input_t *ctx, sdl2_input_action_t action)
+{
+    bool held = false;
+    for (int s = 0; s < SDL2I_MAX_BINDINGS; s++)
+    {
+        SDL_Scancode sc = ctx->bindings[action].keys[s];
+        if (sc != SDL_SCANCODE_UNKNOWN && sc < SDL_NUM_SCANCODES && ctx->scancode_pressed[sc])
+        {
+            held = true;
+            break;
+        }
+    }
+    ctx->pressed[action] = held;
 }
 
 /*
@@ -179,8 +209,9 @@ void sdl2_input_process_event(sdl2_input_t *ctx, const SDL_Event *event)
         {
             ctx->modifiers = event->key.keysym.mod;
             SDL_Scancode sc = event->key.keysym.scancode;
-            if (sc < SDL_NUM_SCANCODES)
+            if (sc > SDL_SCANCODE_UNKNOWN && sc < SDL_NUM_SCANCODES)
             {
+                ctx->scancode_pressed[sc] = true;
                 sdl2_input_action_t action = ctx->scancode_map[sc];
                 if (action < SDL2I_ACTION_COUNT)
                 {
@@ -198,12 +229,15 @@ void sdl2_input_process_event(sdl2_input_t *ctx, const SDL_Event *event)
         {
             ctx->modifiers = event->key.keysym.mod;
             SDL_Scancode sc = event->key.keysym.scancode;
-            if (sc < SDL_NUM_SCANCODES)
+            if (sc > SDL_SCANCODE_UNKNOWN && sc < SDL_NUM_SCANCODES)
             {
+                ctx->scancode_pressed[sc] = false;
                 sdl2_input_action_t action = ctx->scancode_map[sc];
                 if (action < SDL2I_ACTION_COUNT)
                 {
-                    ctx->pressed[action] = false;
+                    /* Recompute from all bound scancodes — releasing one key
+                     * should not clear the action if the other is still held. */
+                    recompute_action_pressed(ctx, action);
                 }
             }
             break;
@@ -215,16 +249,28 @@ void sdl2_input_process_event(sdl2_input_t *ctx, const SDL_Event *event)
             break;
 
         case SDL_MOUSEBUTTONDOWN:
-            ctx->mouse_buttons |= (Uint32)SDL_BUTTON((unsigned)event->button.button);
+        {
+            Uint8 button = event->button.button;
+            if (button >= SDL_BUTTON_LEFT && button <= SDL_BUTTON_X2)
+            {
+                ctx->mouse_buttons |= (Uint32)SDL_BUTTON(button);
+            }
             ctx->mouse_x = event->button.x;
             ctx->mouse_y = event->button.y;
             break;
+        }
 
         case SDL_MOUSEBUTTONUP:
-            ctx->mouse_buttons &= (Uint32)~SDL_BUTTON((unsigned)event->button.button);
+        {
+            Uint8 button = event->button.button;
+            if (button >= SDL_BUTTON_LEFT && button <= SDL_BUTTON_X2)
+            {
+                ctx->mouse_buttons &= (Uint32)~SDL_BUTTON(button);
+            }
             ctx->mouse_x = event->button.x;
             ctx->mouse_y = event->button.y;
             break;
+        }
 
         default:
             break;
@@ -323,9 +369,19 @@ sdl2_input_status_t sdl2_input_bind(sdl2_input_t *ctx, sdl2_input_action_t actio
     {
         return SDL2I_ERR_INVALID_SLOT;
     }
+    if (!is_valid_scancode(key))
+    {
+        return SDL2I_ERR_INVALID_SCANCODE;
+    }
 
     ctx->bindings[action].keys[slot] = key;
     rebuild_scancode_map(ctx);
+
+    /* Clear pressed state for the affected action — bindings changed, so
+     * old key-up events may never arrive for the previous binding. */
+    ctx->pressed[action] = false;
+    ctx->just_pressed[action] = false;
+
     return SDL2I_OK;
 }
 
@@ -347,6 +403,11 @@ void sdl2_input_reset_bindings(sdl2_input_t *ctx)
 
     memcpy(ctx->bindings, default_bindings, sizeof(default_bindings));
     rebuild_scancode_map(ctx);
+
+    /* Clear all pressed state — bindings changed globally. */
+    memset(ctx->pressed, 0, sizeof(ctx->pressed));
+    memset(ctx->just_pressed, 0, sizeof(ctx->just_pressed));
+    memset(ctx->scancode_pressed, 0, sizeof(ctx->scancode_pressed));
 }
 
 /* =========================================================================
@@ -437,6 +498,8 @@ const char *sdl2_input_status_string(sdl2_input_status_t status)
             return "invalid action ID";
         case SDL2I_ERR_INVALID_SLOT:
             return "invalid binding slot";
+        case SDL2I_ERR_INVALID_SCANCODE:
+            return "invalid scancode";
         case SDL2I_ERR_ALLOC_FAILED:
             return "allocation failed";
     }

@@ -657,18 +657,30 @@ Replace the XKeySym switch dispatch with a scancode-to-action mapping layer:
 | Quit | Q | - |
 | Speed 1-9 | 1-9 | - |
 
+**Known limitation — scancode vs keysym:**
+
+Legacy used `XK_plus` (Shift+=) for volume up and `XK_equal` for the debug
+next-level command. Since both share `SDL_SCANCODE_EQUALS`, scancode-only
+mapping cannot distinguish them. Volume up keeps the `=` key (more commonly
+used); next-level was moved to backslash (`\`). If modifier-aware bindings
+are needed in the future, the binding model can be extended to include a
+required modifier mask.
+
 **What we are NOT doing:**
 
 - Wiring into legacy event loop (separate migration task)
 - Editor-specific key bindings (editor migration bead)
 - Config file serialization of bindings (config bead xboing-1fr.3)
 - Gamepad/joystick support (not in original game)
+- Modifier-aware bindings (scancode+Shift combos — deferred, see above)
 
 **Consequences:**
 
 - Game logic queries semantic actions instead of raw keycodes, decoupling
   input handling from platform-specific key representations.
 - The rebinding API enables future key configuration without recompilation.
-- 38 characterization tests verify default bindings, key press/release state
-  tracking, edge triggers, mouse input, modifier queries, rebinding, and
-  error handling — all without requiring a video or audio driver.
+- Dual-binding key-up correctly tracks per-scancode state — releasing one
+  bound key does not clear the action while the other is still held.
+- 40 characterization tests verify default bindings, key press/release state
+  tracking, dual-binding behavior, edge triggers, mouse input, modifier
+  queries, rebinding, and error handling.

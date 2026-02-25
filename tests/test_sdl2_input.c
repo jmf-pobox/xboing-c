@@ -242,6 +242,31 @@ static void test_unbound_scancode_ignored(void **state)
     }
 }
 
+static void test_dual_binding_release_one(void **state)
+{
+    sdl2_input_t *ctx = (sdl2_input_t *)*state;
+
+    /* Press primary (Left arrow) for LEFT. */
+    SDL_Event primary_down = make_key_event(SDL_KEYDOWN, SDL_SCANCODE_LEFT, 0);
+    sdl2_input_process_event(ctx, &primary_down);
+    assert_true(sdl2_input_pressed(ctx, SDL2I_LEFT));
+
+    /* Also press secondary (J) for LEFT. */
+    SDL_Event secondary_down = make_key_event(SDL_KEYDOWN, SDL_SCANCODE_J, 0);
+    sdl2_input_process_event(ctx, &secondary_down);
+    assert_true(sdl2_input_pressed(ctx, SDL2I_LEFT));
+
+    /* Release primary — secondary still held, action should persist. */
+    SDL_Event primary_up = make_key_event(SDL_KEYUP, SDL_SCANCODE_LEFT, 0);
+    sdl2_input_process_event(ctx, &primary_up);
+    assert_true(sdl2_input_pressed(ctx, SDL2I_LEFT));
+
+    /* Release secondary — both released, action should clear. */
+    SDL_Event secondary_up = make_key_event(SDL_KEYUP, SDL_SCANCODE_J, 0);
+    sdl2_input_process_event(ctx, &secondary_up);
+    assert_false(sdl2_input_pressed(ctx, SDL2I_LEFT));
+}
+
 /* =========================================================================
  * Group 4: Mouse
  * ========================================================================= */
@@ -296,6 +321,26 @@ static void test_mouse_invalid_button(void **state)
     sdl2_input_t *ctx = (sdl2_input_t *)*state;
     assert_false(sdl2_input_mouse_pressed(ctx, 0));
     assert_false(sdl2_input_mouse_pressed(ctx, 6));
+}
+
+static void test_mouse_invalid_button_event(void **state)
+{
+    sdl2_input_t *ctx = (sdl2_input_t *)*state;
+
+    /* Feed an invalid button=0 event — should be ignored (no bit set). */
+    SDL_Event down = make_mouse_button(SDL_MOUSEBUTTONDOWN, 0, 100, 200);
+    sdl2_input_process_event(ctx, &down);
+
+    /* No buttons should be registered as pressed. */
+    assert_false(sdl2_input_mouse_pressed(ctx, 1));
+    assert_false(sdl2_input_mouse_pressed(ctx, 2));
+    assert_false(sdl2_input_mouse_pressed(ctx, 3));
+
+    /* Position still updates (button value is invalid, not the position). */
+    int x = 0, y = 0;
+    sdl2_input_get_mouse(ctx, &x, &y);
+    assert_int_equal(x, 100);
+    assert_int_equal(y, 200);
 }
 
 /* =========================================================================
@@ -448,6 +493,7 @@ static void test_all_statuses_have_strings(void **state)
         SDL2I_ERR_NULL_ARG,
         SDL2I_ERR_INVALID_ACTION,
         SDL2I_ERR_INVALID_SLOT,
+        SDL2I_ERR_INVALID_SCANCODE,
         SDL2I_ERR_ALLOC_FAILED,
     };
     for (size_t i = 0; i < sizeof(codes) / sizeof(codes[0]); i++)
@@ -497,6 +543,7 @@ int main(void)
                                         teardown_input),
         cmocka_unit_test_setup_teardown(test_secondary_binding, setup_input, teardown_input),
         cmocka_unit_test_setup_teardown(test_unbound_scancode_ignored, setup_input, teardown_input),
+        cmocka_unit_test_setup_teardown(test_dual_binding_release_one, setup_input, teardown_input),
     };
 
     const struct CMUnitTest mouse_tests[] = {
@@ -506,6 +553,8 @@ int main(void)
         cmocka_unit_test_setup_teardown(test_mouse_multiple_buttons, setup_input, teardown_input),
         cmocka_unit_test(test_mouse_null_ctx),
         cmocka_unit_test_setup_teardown(test_mouse_invalid_button, setup_input, teardown_input),
+        cmocka_unit_test_setup_teardown(test_mouse_invalid_button_event, setup_input,
+                                        teardown_input),
     };
 
     const struct CMUnitTest modifier_tests[] = {

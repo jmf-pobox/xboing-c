@@ -87,6 +87,7 @@ typedef enum
     SDL2I_ERR_NULL_ARG,
     SDL2I_ERR_INVALID_ACTION,
     SDL2I_ERR_INVALID_SLOT,
+    SDL2I_ERR_INVALID_SCANCODE,
     SDL2I_ERR_ALLOC_FAILED
 } sdl2_input_status_t;
 
@@ -106,8 +107,14 @@ typedef struct sdl2_input sdl2_input_t;
  *   Left/J = left,  Right/L = right,  K = shoot,  P = pause,
  *   T = tilt,  D = kill ball,  Z = save,  X = load,  Escape = abort,
  *   Space = start,  C = cycle,  H = scores,  E = editor,  W = set level,
- *   Q = quit,  +/- = volume,  A = audio,  S = sfx,  G = control toggle,
- *   I = iconify,  = = next level (debug),  1-9 = speed levels.
+ *   Q = quit,  =/KP+ = volume up,  -/KP- = volume down,
+ *   A = audio,  S = sfx,  G = control toggle,
+ *   I = iconify,  \ = next level (debug),  1-9 = speed levels.
+ *
+ * Note: Legacy used XK_plus (Shift+=) for volume up and XK_equal for the
+ * debug next-level command.  Scancode-only mapping cannot distinguish these
+ * since they share SDL_SCANCODE_EQUALS.  Volume up keeps the = key;
+ * next-level was moved to backslash.
  *
  * Returns NULL on allocation failure.
  */
