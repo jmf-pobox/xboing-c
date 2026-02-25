@@ -26,7 +26,7 @@
  * enhancements, or modifications.
  */
 
-/* 
+/*
  * =========================================================================
  *
  * $Id: inst.c,v 1.1.1.1 1994/12/16 01:36:46 jck Exp $
@@ -47,35 +47,35 @@
  *  Include file dependencies:
  */
 
+#include <X11/Xlib.h>
+#include <X11/Xos.h>
+#include <X11/Xutil.h>
+#include <math.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stddef.h>
-#include <math.h>
-#include <X11/Xlib.h>
-#include <X11/Xutil.h>
-#include <X11/Xos.h>
 #include <xpm.h>
 
+#include "audio.h"
+#include "ball.h"
+#include "blocks.h"
+#include "bonus.h"
+#include "demo.h"
 #include "error.h"
 #include "highscore.h"
-#include "misc.h"
-#include "main.h"
 #include "init.h"
-#include "stage.h"
-#include "bonus.h"
-#include "special.h"
-#include "blocks.h"
-#include "ball.h"
-#include "score.h"
-#include "paddle.h"
-#include "level.h"
-#include "mess.h"
-#include "sfx.h"
-#include "version.h"
 #include "intro.h"
-#include "audio.h"
 #include "keys.h"
-#include "demo.h"
+#include "level.h"
+#include "main.h"
+#include "mess.h"
+#include "misc.h"
+#include "paddle.h"
+#include "score.h"
+#include "sfx.h"
+#include "special.h"
+#include "stage.h"
+#include "version.h"
 
 #include "inst.h"
 
@@ -83,7 +83,7 @@
  *  Internal macro definitions:
  */
 
-#define GAP		5
+#define GAP 5
 
 /*
  *  Internal type declarations:
@@ -105,70 +105,64 @@ static enum InstructStates waitMode;
 
 void SetUpInstructions(Display *display, Window window, Colormap colormap)
 {
-	/* Umm. Reset the instructions to default state */
-	ResetInstructions();
+    /* Umm. Reset the instructions to default state */
+    ResetInstructions();
 }
 
-char *instructionText[] =
-{
-	"XBoing is a blockout game where you use a paddle to bounce",
-	"a proton ball around an arena full of nasties while keeping",
-	"the ball from leaving the arena via the bottom rebound wall.",
-	NULL,
-	"Each block has a point value associated with it. Some blocks",
-	"may award you more points for hitting them a number of times.",
-	"Some blocks may toggle extra time/points or even special effects",
-	"such as no walls, machine gun, sticky paddle, reverse controls, etc.",
-	NULL,
-	"Your paddle is equipped with special bullets that can disintegrate",
-	"a block. You only have a limited supply of bullets so use them wisely.",
-	NULL,
-	"The multiple ball block will give you an extra ball to play with in",
-	"the arena. This ball will act like any other ball except that when",
-	"it dies it will not force a new ball to start. You can shoot your",
-	"own ball so watch out. The death symbol is not too healthy either.",
-	NULL,
-	"Sometimes a special block may appear or be added to another block",
-	"that will effect the gameplay if hit. They also disappear randomly.",
-	NULL,
-	"Please read the manual for more information on how to play."
-};
-
+char *instructionText[] = {"XBoing is a blockout game where you use a paddle to bounce",
+                           "a proton ball around an arena full of nasties while keeping",
+                           "the ball from leaving the arena via the bottom rebound wall.",
+                           NULL,
+                           "Each block has a point value associated with it. Some blocks",
+                           "may award you more points for hitting them a number of times.",
+                           "Some blocks may toggle extra time/points or even special effects",
+                           "such as no walls, machine gun, sticky paddle, reverse controls, etc.",
+                           NULL,
+                           "Your paddle is equipped with special bullets that can disintegrate",
+                           "a block. You only have a limited supply of bullets so use them wisely.",
+                           NULL,
+                           "The multiple ball block will give you an extra ball to play with in",
+                           "the arena. This ball will act like any other ball except that when",
+                           "it dies it will not force a new ball to start. You can shoot your",
+                           "own ball so watch out. The death symbol is not too healthy either.",
+                           NULL,
+                           "Sometimes a special block may appear or be added to another block",
+                           "that will effect the gameplay if hit. They also disappear randomly.",
+                           NULL,
+                           "Please read the manual for more information on how to play."};
 
 static void DoText(Display *display, Window window)
 {
-	char string[80];
-	int y, i = 0, j = 0;
+    char string[80];
+    int y, i = 0, j = 0;
 
-	SetCurrentMessage(display, messWindow, "Save the rainforests", False);
+    SetCurrentMessage(display, messWindow, "Save the rainforests", False);
 
-	DrawShadowCentredText(display, window, titleFont, 
-		"- Instructions -", 110, red, PLAY_WIDTH);
+    DrawShadowCentredText(display, window, titleFont, "- Instructions -", 110, red, PLAY_WIDTH);
 
-	y = 150;
+    y = 150;
 
-	/* Loop through all text printing it centred */
-	for (i = 0; i < (sizeof(instructionText) / sizeof(char *)); i++)
-	{
-		/* If the text is not null then print it */
-		if (instructionText[i] != '\0')
-		{
-			strcpy(string, instructionText[i]); 
-			DrawShadowCentredText(display, window, dataFont, 
-				string, y, j % 2 ? greens[0] : greens[2], PLAY_WIDTH);
-			y += dataFont->ascent + GAP;
-			j++;
-		}
-		else
-			y += dataFont->ascent + GAP;
-	}
+    /* Loop through all text printing it centred */
+    for (i = 0; i < (sizeof(instructionText) / sizeof(char *)); i++)
+    {
+        /* If the text is not null then print it */
+        if (instructionText[i] != '\0')
+        {
+            strcpy(string, instructionText[i]);
+            DrawShadowCentredText(display, window, dataFont, string, y,
+                                  j % 2 ? greens[0] : greens[2], PLAY_WIDTH);
+            y += dataFont->ascent + GAP;
+            j++;
+        }
+        else
+            y += dataFont->ascent + GAP;
+    }
 
-	y += dataFont->ascent + GAP/2;
+    y += dataFont->ascent + GAP / 2;
 
-	/* Draw the standard message */
-	strcpy(string, "Insert coin to start the game");
-	DrawShadowCentredText(display, window, textFont, string, 
-		PLAY_HEIGHT - 40, tann, PLAY_WIDTH);
+    /* Draw the standard message */
+    strcpy(string, "Insert coin to start the game");
+    DrawShadowCentredText(display, window, textFont, string, PLAY_HEIGHT - 40, tann, PLAY_WIDTH);
 }
 
 static void DoSparkle(Display *display, Window window)
@@ -183,8 +177,8 @@ static void DoSparkle(Display *display, Window window)
 
     if (!store)
     {
-        store = XCreatePixmap(display, window, 20, 20,
-            DefaultDepth(display, XDefaultScreen(display)));
+        store =
+            XCreatePixmap(display, window, 20, 20, DefaultDepth(display, XDefaultScreen(display)));
     }
 
     if (in == 0)
@@ -193,8 +187,7 @@ static void DoSparkle(Display *display, Window window)
     if (frame == nextFrame)
     {
         XCopyArea(display, store, window, gc, 0, 0, 20, 20, x, y);
-        RenderShape(display, window, stars[in], starsM[in],
-            x, y, 20, 20, False);
+        RenderShape(display, window, stars[in], starsM[in], x, y, 20, 20, False);
 
         in++;
         nextFrame = frame + 15;
@@ -212,61 +205,61 @@ static void DoSparkle(Display *display, Window window)
 
 static void DoFinish(Display *display, Window window)
 {
-	ResetDemonstration();
-	mode = MODE_DEMO;
+    ResetDemonstration();
+    mode = MODE_DEMO;
 
     if (noSound == False)
-		playSoundFile("shark", 50);
+        playSoundFile("shark", 50);
 }
-
 
 void Instructions(Display *display, Window window)
 {
-	switch (InstructState)
-	{
-		case INSTRUCT_TITLE:
-			if (getSpecialEffects(display) == True)
-				DoIntroTitle(display, bufferWindow);
-			else
-				DoIntroTitle(display, window);
-			InstructState = INSTRUCT_TEXT;
-			break;
+    switch (InstructState)
+    {
+        case INSTRUCT_TITLE:
+            if (getSpecialEffects(display) == True)
+                DoIntroTitle(display, bufferWindow);
+            else
+                DoIntroTitle(display, window);
+            InstructState = INSTRUCT_TEXT;
+            break;
 
-		case INSTRUCT_TEXT:
-			if (getSpecialEffects(display) == True)
-			{
-				DoText(display, bufferWindow);
-				while (WindowShatterEffect(display, window));
-			}
-			else
-				DoText(display, window);
-			InstructState = INSTRUCT_SPARKLE;
-			break;
+        case INSTRUCT_TEXT:
+            if (getSpecialEffects(display) == True)
+            {
+                DoText(display, bufferWindow);
+                while (WindowShatterEffect(display, window))
+                    ;
+            }
+            else
+                DoText(display, window);
+            InstructState = INSTRUCT_SPARKLE;
+            break;
 
-		case INSTRUCT_SPARKLE:
-			DoSparkle(display, window);
-			BorderGlow(display, window);
-			if ((frame % FLASH) == 0)
-				RandomDrawSpecials(display);
-			break;
+        case INSTRUCT_SPARKLE:
+            DoSparkle(display, window);
+            BorderGlow(display, window);
+            if ((frame % FLASH) == 0)
+                RandomDrawSpecials(display);
+            break;
 
-		case INSTRUCT_FINISH:
-			DoFinish(display, window);
-			break;
+        case INSTRUCT_FINISH:
+            DoFinish(display, window);
+            break;
 
-		case INSTRUCT_WAIT:
-			DoInstructWait();
-			break;
+        case INSTRUCT_WAIT:
+            DoInstructWait();
+            break;
 
-		default:
-			break;
-	}
+        default:
+            break;
+    }
 }
 
 void RedrawInstructions(Display *display, Window window)
 {
-	DoIntroTitle(display, window);
-	DoText(display, window);
+    DoIntroTitle(display, window);
+    DoText(display, window);
 }
 
 void FreeInstructions(Display *display)
@@ -275,22 +268,22 @@ void FreeInstructions(Display *display)
 
 void ResetInstructions(void)
 {
-	InstructState = INSTRUCT_TITLE;
-	nextFrame 	= frame + 100;
-	endFrame 	= frame + 7000;
+    InstructState = INSTRUCT_TITLE;
+    nextFrame = frame + 100;
+    endFrame = frame + 7000;
 
-	DEBUG("Reset Instruction mode.")
+    DEBUG("Reset Instruction mode.")
 }
 
 void SetInstructWait(enum InstructStates newMode, int waitFrame)
 {
-	waitingFrame 	= waitFrame;
-	waitMode 		= newMode;
-	InstructState 	= INSTRUCT_WAIT;
+    waitingFrame = waitFrame;
+    waitMode = newMode;
+    InstructState = INSTRUCT_WAIT;
 }
 
 void DoInstructWait(void)
 {
-	if (frame == waitingFrame)
-		InstructState = waitMode;
+    if (frame == waitingFrame)
+        InstructState = waitMode;
 }

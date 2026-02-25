@@ -29,7 +29,7 @@
  * enhancements, or modifications.
  */
 
-/* 
+/*
  * =========================================================================
  *
  * $Id: main.h,v 1.1.1.1 1994/12/16 01:36:53 jck Exp $
@@ -54,35 +54,35 @@
  *  Constants and macros:
  */
 
-#define PADDLE_ANIMATE_DELAY    5
-#define BONUS_SEED              2000
+#define PADDLE_ANIMATE_DELAY 5
+#define BONUS_SEED 2000
 
-#define CONTROL_KEYS		0	
-#define CONTROL_MOUSE		1	
+#define CONTROL_KEYS 0
+#define CONTROL_MOUSE 1
 
-#define MODE_NONE			0	
-#define MODE_HIGHSCORE		1
-#define MODE_INTRO			2
-#define MODE_GAME			3
-#define MODE_PAUSE			4
-#define MODE_BALL_WAIT		5
-#define MODE_WAIT			6
-#define MODE_BONUS			7
-#define MODE_INSTRUCT		8
-#define MODE_KEYS			9
-#define MODE_PRESENTS		10
-#define MODE_DEMO			11
-#define MODE_PREVIEW		12
-#define MODE_DIALOGUE		13
-#define MODE_EDIT			14
-#define MODE_KEYSEDIT		15
+#define MODE_NONE 0
+#define MODE_HIGHSCORE 1
+#define MODE_INTRO 2
+#define MODE_GAME 3
+#define MODE_PAUSE 4
+#define MODE_BALL_WAIT 5
+#define MODE_WAIT 6
+#define MODE_BONUS 7
+#define MODE_INSTRUCT 8
+#define MODE_KEYS 9
+#define MODE_PRESENTS 10
+#define MODE_DEMO 11
+#define MODE_PREVIEW 12
+#define MODE_DIALOGUE 13
+#define MODE_EDIT 14
+#define MODE_KEYSEDIT 15
 
 /* Speed delay values in milliseconds (original was 1, 5, 9) */
-#define FAST_SPEED         	5
-#define MEDIUM_SPEED        15
-#define SLOW_SPEED          30
+#define FAST_SPEED 5
+#define MEDIUM_SPEED 15
+#define SLOW_SPEED 30
 
-#define MAX_TILTS			3
+#define MAX_TILTS 3
 
 /*
  *  Type declarations:

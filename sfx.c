@@ -26,7 +26,7 @@
  * enhancements, or modifications.
  */
 
-/* 
+/*
  * =========================================================================
  *
  * $Id: sfx.c,v 1.1.1.1 1994/12/16 01:36:45 jck Exp $
@@ -47,24 +47,24 @@
  *  Include file dependencies:
  */
 
+#include <X11/Xlib.h>
+#include <X11/Xos.h>
+#include <X11/Xutil.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stddef.h>
-#include <X11/Xlib.h>
-#include <X11/Xutil.h>
-#include <X11/Xos.h>
 #include <xpm.h>
 
+#include "ball.h"
+#include "blocks.h"
 #include "error.h"
 #include "init.h"
-#include "stage.h"
-#include "score.h"
-#include "blocks.h"
-#include "ball.h"
+#include "intro.h"
 #include "main.h"
 #include "mess.h"
 #include "misc.h"
-#include "intro.h"
+#include "score.h"
+#include "stage.h"
 
 #include "sfx.h"
 
@@ -72,9 +72,9 @@
  *  Internal macro definitions:
  */
 
-#define SHAKE_DELAY			5
-#define NUM_SCAT 			10 
-#define RANDY(range) 		(rand() % (range))
+#define SHAKE_DELAY 5
+#define NUM_SCAT 10
+#define RANDY(range) (rand() % (range))
 
 /*
  *  Internal type declarations:
@@ -86,91 +86,89 @@
 
 static int sfxEndFrame, useSfx;
 int modeSfx;
-static int xscat[NUM_SCAT] = { 1, 9, 3, 6, 2, 4, 0, 7, 5, 8 };
-static int yscat[NUM_SCAT] = { 2, 1, 0, 8, 6, 4, 9, 3, 7, 5 };
+static int xscat[NUM_SCAT] = {1, 9, 3, 6, 2, 4, 0, 7, 5, 8};
+static int yscat[NUM_SCAT] = {2, 1, 0, 8, 6, 4, 9, 3, 7, 5};
 
 void useSpecialEffects(int state)
 {
-	/* Set the state of the special effects - True = use */
-	/* Of course - if the sfx are not possible then no effect */
-	useSfx = state;
+    /* Set the state of the special effects - True = use */
+    /* Of course - if the sfx are not possible then no effect */
+    useSfx = state;
 }
 
 int getSpecialEffects(Display *display)
 {
-	/* Only shake around if the server has backing store on */
-	if (DoesBackingStore(XDefaultScreenOfDisplay(display)) != Always)
-		return -1;
+    /* Only shake around if the server has backing store on */
+    if (DoesBackingStore(XDefaultScreenOfDisplay(display)) != Always)
+        return -1;
 
-	/* Return special effects state - on or off */
-	return useSfx;
+    /* Return special effects state - on or off */
+    return useSfx;
 }
 
 void changeSfxMode(int newMode)
 {
-	modeSfx = newMode;
+    modeSfx = newMode;
 }
 
 int currentSfxMode(void)
 {
-	/* Return the current special effects mode */
-	return modeSfx;
+    /* Return the current special effects mode */
+    return modeSfx;
 }
 
 static void resetEffect(Display *display)
 {
-	/* Just re-centre window return */
-	modeSfx = SFX_NONE;
-	XMoveWindow(display, playWindow, 35, 60);
+    /* Just re-centre window return */
+    modeSfx = SFX_NONE;
+    XMoveWindow(display, playWindow, 35, 60);
 }
 
 int WindowBlindEffect(Display *display, Window window)
 {
-	int x, i;
+    int x, i;
 
-	/* Does the user want special effects */
-	if (useSfx == False)
-	{
-		/* No - Just return out */
-		resetEffect(display);
-		return False;
-	}
+    /* Does the user want special effects */
+    if (useSfx == False)
+    {
+        /* No - Just return out */
+        resetEffect(display);
+        return False;
+    }
 
-	XSetBackground(display, gcsfx, black);
+    XSetBackground(display, gcsfx, black);
 
-	/* Draw a blinds effect where little doors close over screen */
-	for (i = 0; i <= (PLAY_WIDTH / 8); i++)
-		for (x = 0; x <= PLAY_WIDTH; x += (PLAY_WIDTH / 8))
-			XCopyArea(display, bufferWindow, window, gc, 
-				x+i, 0, 1, PLAY_HEIGHT, x+i, 0);
+    /* Draw a blinds effect where little doors close over screen */
+    for (i = 0; i <= (PLAY_WIDTH / 8); i++)
+        for (x = 0; x <= PLAY_WIDTH; x += (PLAY_WIDTH / 8))
+            XCopyArea(display, bufferWindow, window, gc, x + i, 0, 1, PLAY_HEIGHT, x + i, 0);
 
-	/* End of special effect - reset off */
-	resetEffect(display);
-	return False;
+    /* End of special effect - reset off */
+    resetEffect(display);
+    return False;
 }
-
 
 int WindowStaticEffect(Display *display, Window window, int w, int h)
 {
-	static int start = True;
+    static int start = True;
 
-	if (start)
-	{
-		SetSfxEndFrame(frame + 50);
-		start = False;
-	}
+    if (start)
+    {
+        SetSfxEndFrame(frame + 50);
+        start = False;
+    }
 
-	/* Do somehting in here */
+    /* Do somehting in here */
 
-	if (frame >= sfxEndFrame) 
-	{
-		/* End of special effect - reset off */
-		resetEffect(display);
-		start = True;
-		return False;
-	}
+    if (frame >= sfxEndFrame)
+    {
+        /* End of special effect - reset off */
+        resetEffect(display);
+        start = True;
+        return False;
+    }
 
-	return True;
+    return True;
 }
 
 int WindowShatterEffect(Display *display, Window window)
@@ -178,152 +176,149 @@ int WindowShatterEffect(Display *display, Window window)
     int offx, offy, sizeWidth, sizeHeight;
     int srcx, srcy, destx, desty;
 
-	/* Does the user want special effects */
-	if (useSfx == False)
-	{
-		/* No - Just return out */
-		resetEffect(display);
-		return False;
-	}
-
+    /* Does the user want special effects */
+    if (useSfx == False)
+    {
+        /* No - Just return out */
+        resetEffect(display);
+        return False;
+    }
 
     offx = RANDY(NUM_SCAT);
     offy = RANDY(NUM_SCAT);
-	sizeWidth = 200;
-	sizeHeight = 200;
+    sizeWidth = 200;
+    sizeHeight = 200;
 
-	/* Spend a bit of time scattering new pixmap into view */
-	/* Original idea for this effect from xjewel */
+    /* Spend a bit of time scattering new pixmap into view */
+    /* Original idea for this effect from xjewel */
     for (srcx = 0; srcx < NUM_SCAT; srcx++)
     {
-    	for (srcy = 0; srcy < NUM_SCAT; srcy++)
+        for (srcy = 0; srcy < NUM_SCAT; srcy++)
         {
             for (destx = 0; destx <= 4; destx++)
-			{
-            	for (desty = 0; desty <= 5; desty++)
+            {
+                for (desty = 0; desty <= 5; desty++)
                 {
-					XCopyArea(display, bufferWindow, window, gc, 
-                    	(destx * sizeWidth) + 
-                        	xscat[(srcx + srcy + offx) % NUM_SCAT] 
-							* (sizeWidth / NUM_SCAT),
+                    XCopyArea(display, bufferWindow, window, gc,
+                              (destx * sizeWidth) +
+                                  xscat[(srcx + srcy + offx) % NUM_SCAT] * (sizeWidth / NUM_SCAT),
 
-                    	(desty * sizeHeight) + 
-                        	yscat[(srcy + offy) % NUM_SCAT] 
-							* (sizeHeight / NUM_SCAT),
+                              (desty * sizeHeight) +
+                                  yscat[(srcy + offy) % NUM_SCAT] * (sizeHeight / NUM_SCAT),
 
-                    	(sizeWidth  / NUM_SCAT), 
-						(sizeHeight / NUM_SCAT),
+                              (sizeWidth / NUM_SCAT), (sizeHeight / NUM_SCAT),
 
-                    	(destx * sizeWidth) + 
-                        	xscat[(srcx + srcy + offx) % NUM_SCAT] 
-							* (sizeWidth / NUM_SCAT),
+                              (destx * sizeWidth) +
+                                  xscat[(srcx + srcy + offx) % NUM_SCAT] * (sizeWidth / NUM_SCAT),
 
-                    	(desty * sizeHeight) + 
-                        	yscat[(srcy + offy) % NUM_SCAT] 
-							* (sizeHeight / NUM_SCAT));
-               	}
-			}
+                              (desty * sizeHeight) +
+                                  yscat[(srcy + offy) % NUM_SCAT] * (sizeHeight / NUM_SCAT));
+                }
+            }
         }
     }
 
-	/* End of special effect - reset off */
-	resetEffect(display);
-	return False;
+    /* End of special effect - reset off */
+    resetEffect(display);
+    return False;
 }
 
 int WindowFadeEffect(Display *display, Window window, int w, int h)
 {
-	static int done = False;
-	static int first = True;
-	int y;
-	int x;
-	static int i = 0;
+    static int done = False;
+    static int first = True;
+    int y;
+    int x;
+    static int i = 0;
 
-	/* Does the user want special effects */
-	if (useSfx == False)
-	{
-		/* No - Just return out */
-		resetEffect(display);
-		return False;
-	}
+    /* Does the user want special effects */
+    if (useSfx == False)
+    {
+        /* No - Just return out */
+        resetEffect(display);
+        return False;
+    }
 
-	if (first == True)
-	{
-		first = False;
-		XSetForeground(display, gcsfx, black);
-		XSetBackground(display, gcsfx, black);
-		XSetWindowBorder(display, window, red);
-	}
+    if (first == True)
+    {
+        first = False;
+        XSetForeground(display, gcsfx, black);
+        XSetBackground(display, gcsfx, black);
+        XSetWindowBorder(display, window, red);
+    }
 
-	/* Draw vertical lines */
-	for (x = i; x <= w; x += 12)
-		XDrawLine(display, window, gcsfx, x, 0, x, h);
+    /* Draw vertical lines */
+    for (x = i; x <= w; x += 12)
+        XDrawLine(display, window, gcsfx, x, 0, x, h);
 
-	/* Draw horizontal lines */
-	for (y = i; y <= h; y += 12)
-		XDrawLine(display, window, gcsfx, 0, y, w, y);
+    /* Draw horizontal lines */
+    for (y = i; y <= h; y += 12)
+        XDrawLine(display, window, gcsfx, 0, y, w, y);
 
-	/* Fill in grid slowly */
-	i++;
-	if (i > 12) done = True;
+    /* Fill in grid slowly */
+    i++;
+    if (i > 12)
+        done = True;
 
-	if (done == True)
-	{
-		/* End of special effect - reset off */
-		done = False;
-		first = True;
-		i = 0;
-		resetEffect(display);
-		return False;
-	}
+    if (done == True)
+    {
+        /* End of special effect - reset off */
+        done = False;
+        first = True;
+        i = 0;
+        resetEffect(display);
+        return False;
+    }
 
-	/* Keep efect going please */
-	return True;
+    /* Keep efect going please */
+    return True;
 }
 
 int WindowShakeEffect(Display *display, Window window)
 {
-	static int x = 35;
-	static int y = 60;
-	int xi, yi;
+    static int x = 35;
+    static int y = 60;
+    int xi, yi;
 
-	/* Does the user want special effects */
-	if (useSfx == False)
-	{
-		/* No - Just return out */
-		resetEffect(display);
-		return False;
-	}
+    /* Does the user want special effects */
+    if (useSfx == False)
+    {
+        /* No - Just return out */
+        resetEffect(display);
+        return False;
+    }
 
-	/* Only shake around if the server has backing store on */
-	if (DoesBackingStore(XDefaultScreenOfDisplay(display)) != Always)
-	{
-		resetEffect(display);
-		return False;
-	}
+    /* Only shake around if the server has backing store on */
+    if (DoesBackingStore(XDefaultScreenOfDisplay(display)) != Always)
+    {
+        resetEffect(display);
+        return False;
+    }
 
-	if (frame >= sfxEndFrame) 
-	{
-		/* End of special effect - reset off */
-		resetEffect(display);
-		return False;
-	}
-	
-	if ((frame % SHAKE_DELAY) != 0) return True;
+    if (frame >= sfxEndFrame)
+    {
+        /* End of special effect - reset off */
+        resetEffect(display);
+        return False;
+    }
 
-	XMoveWindow(display, window, x, y);
-	XFlush(display);
+    if ((frame % SHAKE_DELAY) != 0)
+        return True;
 
-	xi = (rand() % 6) - 3; 
-	yi = (rand() % 6) - 3; 
-	x = xi + 35; y = yi + 60;
+    XMoveWindow(display, window, x, y);
+    XFlush(display);
 
-	return True;
+    xi = (rand() % 6) - 3;
+    yi = (rand() % 6) - 3;
+    x = xi + 35;
+    y = yi + 60;
+
+    return True;
 }
 
 void SetSfxEndFrame(int endFrame)
 {
-	sfxEndFrame = endFrame;
+    sfxEndFrame = endFrame;
 }
 
 void BorderGlow(Display *display, Window window)
@@ -332,23 +327,23 @@ void BorderGlow(Display *display, Window window)
     static int d = 1;
     static int t = 1;
 
-	/* Does the user want special effects */
-	if (useSfx == False)
-	{
-		/* No - Just return out */
-		return;
-	}
+    /* Does the user want special effects */
+    if (useSfx == False)
+    {
+        /* No - Just return out */
+        return;
+    }
 
-	/* Only update every n frames */
+    /* Only update every n frames */
     if ((frame % 40) == 0)
     {
-		/* Alternate between the red and the green ranges */
+        /* Alternate between the red and the green ranges */
         if (t > 0)
             XSetWindowBorder(display, playWindow, reds[i]);
         else
             XSetWindowBorder(display, playWindow, greens[i]);
 
-		/* Ok change range or fade down again */
+        /* Ok change range or fade down again */
         if (i == 6)
         {
             d = -1;
@@ -358,9 +353,9 @@ void BorderGlow(Display *display, Window window)
         if (i == 0)
             d = 1;
 
-		/* Next range index */
+        /* Next range index */
         i += d;
-     }
+    }
 }
 
 void ResetBorderGlow(Display *display, Window window)
@@ -370,19 +365,19 @@ void ResetBorderGlow(Display *display, Window window)
 
 void FadeAwayArea(Display *display, Window window, int x, int y, int w, int h)
 {
-	int i, x1, y1, step;
+    int i, x1, y1, step;
 
-	step = w / 15;
+    step = w / 15;
 
-	/* Fade away an area slowly so it looks good */
-	for (i = 0; i <= step; i++)
-	{
-		/* Draw vertical lines */
-		for (x1 = i; x1 <= w; x1 += 15)
-			XClearArea(display, window, x + x1, y, 1, h, False);
-	
-		/* Draw horizontal lines */
-		for (y1 = i; y1 <= h; y1 += 15)
-			XClearArea(display, window,  x, y + y1, w, 1, False);
-	}
+    /* Fade away an area slowly so it looks good */
+    for (i = 0; i <= step; i++)
+    {
+        /* Draw vertical lines */
+        for (x1 = i; x1 <= w; x1 += 15)
+            XClearArea(display, window, x + x1, y, 1, h, False);
+
+        /* Draw horizontal lines */
+        for (y1 = i; y1 <= h; y1 += 15)
+            XClearArea(display, window, x, y + y1, w, 1, False);
+    }
 }

@@ -29,7 +29,7 @@
  * enhancements, or modifications.
  */
 
-/* 
+/*
  * =========================================================================
  *
  * $Id: keysedit.h,v 1.1.1.1 1994/12/16 01:36:55 jck Exp $
@@ -60,13 +60,13 @@
  *  Type declarations:
  */
 
-enum KeysEditStates 
-{ 
-	KEYSEDIT_TITLE, 
-	KEYSEDIT_TEXT, 
-	KEYSEDIT_SPARKLE, 
-	KEYSEDIT_WAIT, 
-	KEYSEDIT_FINISH 
+enum KeysEditStates
+{
+    KEYSEDIT_TITLE,
+    KEYSEDIT_TEXT,
+    KEYSEDIT_SPARKLE,
+    KEYSEDIT_WAIT,
+    KEYSEDIT_FINISH
 };
 
 /*

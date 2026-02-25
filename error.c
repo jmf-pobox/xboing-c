@@ -26,7 +26,7 @@
  * enhancements, or modifications.
  */
 
-/* 
+/*
  * =========================================================================
  *
  * $Id: error.c,v 1.1.1.1 1994/12/16 01:36:46 jck Exp $
@@ -50,8 +50,8 @@
 #include <stdio.h>
 #include <xpm.h>
 
-#include "init.h"
 #include "error.h"
+#include "init.h"
 
 /*
  *  Internal macro definitions:
@@ -67,9 +67,9 @@
 
 void NormalMessage(char *message)
 {
-	/* Print a message to standard out flush it */
-	fprintf(stdout, "XBoing - %s\n", message);
-	fflush(stdout);
+    /* Print a message to standard out flush it */
+    fprintf(stdout, "XBoing - %s\n", message);
+    fflush(stdout);
 }
 
 void ErrorMessage(char *message)
@@ -80,70 +80,69 @@ void ErrorMessage(char *message)
 #define READMEP_FILE "README.problems"
 #define READMEP_FILE "README.problems"
 #endif
-	/* Print a standard error message to stdout and flush it */
-	fprintf(stdout, "XBoing - Error: %s\n", message);
-	fprintf(stdout, "\nPlease read `%s' document for help.\n",
-		READMEP_FILE);
-	fflush(stdout);
+    /* Print a standard error message to stdout and flush it */
+    fprintf(stdout, "XBoing - Error: %s\n", message);
+    fprintf(stdout, "\nPlease read `%s' document for help.\n", READMEP_FILE);
+    fflush(stdout);
 }
 
 void WarningMessage(char *message)
 {
-	/* Print a standard warning message to stdout and flush it */
-	fprintf(stdout, "XBoing - Warning: %s\n", message);
-	fflush(stdout);
+    /* Print a standard warning message to stdout and flush it */
+    fprintf(stdout, "XBoing - Warning: %s\n", message);
+    fflush(stdout);
 }
 
 void HandleXPMError(Display *display, int ErrorStatus, char *tag)
 {
     char *error = NULL;
-	char *warning = NULL;
+    char *warning = NULL;
 
-	/* Switch on the type of error returned by xpm library */
-	switch (ErrorStatus) 
-	{
-		case XpmSuccess:
-			return;
+    /* Switch on the type of error returned by xpm library */
+    switch (ErrorStatus)
+    {
+        case XpmSuccess:
+            return;
 
-		case XpmColorError:
-			/* The colour name passed was bung */
-			warning = "Could not parse or alloc requested colour";
-			break;
+        case XpmColorError:
+            /* The colour name passed was bung */
+            warning = "Could not parse or alloc requested colour";
+            break;
 
-		case XpmNoMemory:
-			/* Not enough memory for pixmap */
-			error = "Not enough memory for pixmap creation";
-			break;
+        case XpmNoMemory:
+            /* Not enough memory for pixmap */
+            error = "Not enough memory for pixmap creation";
+            break;
 
-		case XpmColorFailed:
-			/* No more entries available in colourmap */
-			error = "Colourmap is full - cannot allocate a colour";
-			break;
+        case XpmColorFailed:
+            /* No more entries available in colourmap */
+            error = "Colourmap is full - cannot allocate a colour";
+            break;
 
-		case XpmOpenFailed:
-			/* Xpm could not open the pixmap file */
-			error = "Unable to open pixmap file";
-			break;
+        case XpmOpenFailed:
+            /* Xpm could not open the pixmap file */
+            error = "Unable to open pixmap file";
+            break;
 
-		case XpmFileInvalid:
-			/* XPM file contains invalid or corrupt data */
-			error = "XPM file contains invalid or corrupt data";
-			break;
+        case XpmFileInvalid:
+            /* XPM file contains invalid or corrupt data */
+            error = "XPM file contains invalid or corrupt data";
+            break;
 
-		default:
-			/* Unexpected xpm error code */
-			error = "Unexpected xpm error code";
-			break;
-	}
+        default:
+            /* Unexpected xpm error code */
+            error = "Unexpected xpm error code";
+            break;
+    }
 
-	/* If there is to be a warning then issue it */
+    /* If there is to be a warning then issue it */
     if (warning)
-		fprintf(stdout, "%s - Warning: %s.\n", tag, warning);
+        fprintf(stdout, "%s - Warning: %s.\n", tag, warning);
 
-	if (error) 
-	{
-		/* Argg. An error so tell everyone */
-		fprintf(stderr, "%s - Error: %s.\n", tag, error);
-		ShutDown(display, 1, "Fatal error.");
-	}
+    if (error)
+    {
+        /* Argg. An error so tell everyone */
+        fprintf(stderr, "%s - Error: %s.\n", tag, error);
+        ShutDown(display, 1, "Fatal error.");
+    }
 }

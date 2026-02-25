@@ -29,7 +29,7 @@
  * enhancements, or modifications.
  */
 
-/* 
+/*
  * =========================================================================
  *
  * $Id: eyedude.h,v 1.1.1.1 1994/12/16 01:36:55 jck Exp $
@@ -56,18 +56,18 @@
  *  Constants and macros:
  */
 
-#define EYEDUDE_WIDTH       32
-#define EYEDUDE_HEIGHT      32
-#define EYEDUDE_WC          (EYEDUDE_WIDTH / 2)
-#define EYEDUDE_HC          (EYEDUDE_HEIGHT / 2)
+#define EYEDUDE_WIDTH 32
+#define EYEDUDE_HEIGHT 32
+#define EYEDUDE_WC (EYEDUDE_WIDTH / 2)
+#define EYEDUDE_HC (EYEDUDE_HEIGHT / 2)
 
-#define EYEDUDE_FRAME_RATE  30
+#define EYEDUDE_FRAME_RATE 30
 
-#define WALK_LEFT           1
-#define WALK_RIGHT          2
-#define WALK_DEAD          	3
+#define WALK_LEFT 1
+#define WALK_RIGHT 2
+#define WALK_DEAD 3
 
-#define EYEDUDE_HIT_BONUS	10000
+#define EYEDUDE_HIT_BONUS 10000
 
 /*
  *  Type declarations:
@@ -75,12 +75,12 @@
 
 typedef enum EyeDudeStates
 {
-	EYEDUDE_RESET,
-	EYEDUDE_WAIT,
-	EYEDUDE_NONE,
-	EYEDUDE_DIE,
-	EYEDUDE_WALK,
-	EYEDUDE_TURN
+    EYEDUDE_RESET,
+    EYEDUDE_WAIT,
+    EYEDUDE_NONE,
+    EYEDUDE_DIE,
+    EYEDUDE_WALK,
+    EYEDUDE_TURN
 } eyeDudeStates;
 
 /*

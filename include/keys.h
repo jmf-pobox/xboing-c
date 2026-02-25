@@ -29,7 +29,7 @@
  * enhancements, or modifications.
  */
 
-/* 
+/*
  * =========================================================================
  *
  * $Id: keys.h,v 1.1.1.1 1994/12/16 01:36:52 jck Exp $
@@ -60,13 +60,13 @@
  *  Type declarations:
  */
 
-enum KeysStates 
-{ 
-	KEYS_TITLE, 
-	KEYS_TEXT, 
-	KEYS_SPARKLE, 
-	KEYS_WAIT, 
-	KEYS_FINISH 
+enum KeysStates
+{
+    KEYS_TITLE,
+    KEYS_TEXT,
+    KEYS_SPARKLE,
+    KEYS_WAIT,
+    KEYS_FINISH
 };
 
 /*

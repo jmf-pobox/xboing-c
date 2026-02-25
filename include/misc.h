@@ -29,7 +29,7 @@
  * enhancements, or modifications.
  */
 
-/* 
+/*
  * =========================================================================
  *
  * $Id: misc.h,v 1.1.1.1 1994/12/16 01:36:53 jck Exp $
@@ -64,36 +64,31 @@
  *  Function prototypes:
  */
 
-void 	DrawText(Display *display, Window window, int x, int y, 
-			XFontStruct *font, int colour, char *text, int numChar);
-void 	DrawTextFast(Display *display, Window window, int x, int y, 
-			XFontStruct *font, int colour, char *text, int numChar);
-void 	DrawLine(Display *display, Window window, int x, int y, int x2, int y2,
-			int colour, int width);
-void 	RenderShape(Display *display, Window window, Pixmap pixmap,
-			Pixmap mask, int x, int y, int w, int h, int clear);
-void 	DrawShadowCentredText(Display *display, Window window, 
-			XFontStruct *font, char *string, int y, int colour, int width);
-void 	DrawShadowText(Display *display, Window window, XFontStruct *font,
-			char *string, int x, int y, int colour);
-int 	ColourNameToPixel(Display *display, Colormap colormap, 
-			char *colourName);
-void 	FreeMisc(Display *display);
-char 	*getUsersFullName(void);
-char 	*GetHomeDir(void);
-int 	ResizeMainWindow(Display *display, Window window, int width, 
-			int height);
-int 	ObtainWindowWidthHeight(Display *display, Window window,
-			int *width, int *height);
-void 	sleepSync(Display *display, unsigned long ms);
+void DrawText(Display *display, Window window, int x, int y, XFontStruct *font, int colour,
+              char *text, int numChar);
+void DrawTextFast(Display *display, Window window, int x, int y, XFontStruct *font, int colour,
+                  char *text, int numChar);
+void DrawLine(Display *display, Window window, int x, int y, int x2, int y2, int colour, int width);
+void RenderShape(Display *display, Window window, Pixmap pixmap, Pixmap mask, int x, int y, int w,
+                 int h, int clear);
+void DrawShadowCentredText(Display *display, Window window, XFontStruct *font, char *string, int y,
+                           int colour, int width);
+void DrawShadowText(Display *display, Window window, XFontStruct *font, char *string, int x, int y,
+                    int colour);
+int ColourNameToPixel(Display *display, Colormap colormap, char *colourName);
+void FreeMisc(Display *display);
+char *getUsersFullName(void);
+char *GetHomeDir(void);
+int ResizeMainWindow(Display *display, Window window, int width, int height);
+int ObtainWindowWidthHeight(Display *display, Window window, int *width, int *height);
+void sleepSync(Display *display, unsigned long ms);
 #ifdef NEED_USLEEP
-void 	usleep(unsigned long usec);
+void usleep(unsigned long usec);
 #endif
-int 	ObtainMousePosition(Display *display, Window window, int *x, int *y);
-int 	YesNoDialogue(Display *display, char *message);
-Pixmap 	ScalePixmap(Display *display, Window window, Pixmap source,
-			int swidth, int sheight, int dwidth, int dheight);
-void 	Draw4PointCurve(Display *display, Window window, XPoint *p,
-			int num_steps);
+int ObtainMousePosition(Display *display, Window window, int *x, int *y);
+int YesNoDialogue(Display *display, char *message);
+Pixmap ScalePixmap(Display *display, Window window, Pixmap source, int swidth, int sheight,
+                   int dwidth, int dheight);
+void Draw4PointCurve(Display *display, Window window, XPoint *p, int num_steps);
 
 #endif

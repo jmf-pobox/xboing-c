@@ -29,7 +29,7 @@
  * enhancements, or modifications.
  */
 
-/* 
+/*
  * =========================================================================
  *
  * $Id: intro.h,v 1.1.1.1 1994/12/16 01:36:52 jck Exp $
@@ -60,14 +60,14 @@
  *  Type declarations:
  */
 
-enum IntroStates 
-{ 
-	INTRO_TITLE, 
-	INTRO_BLOCKS, 
-	INTRO_TEXT, 
-	INTRO_EXPLODE, 
-	INTRO_WAIT, 
-	INTRO_FINISH 
+enum IntroStates
+{
+    INTRO_TITLE,
+    INTRO_BLOCKS,
+    INTRO_TEXT,
+    INTRO_EXPLODE,
+    INTRO_WAIT,
+    INTRO_FINISH
 };
 
 /*
@@ -82,9 +82,9 @@ void ResetIntroduction(void);
 void DoIntroTitle(Display *display, Window window);
 void DrawIntroTitle(Display *display, Window window, int x, int y);
 
-extern 	enum IntroStates IntroState;
-extern 	Pixmap bigtitlePixmap, bigtitlePixmapM;
-extern	Pixmap stars[12], starsM[12];
-extern 	int nextBlink;
+extern enum IntroStates IntroState;
+extern Pixmap bigtitlePixmap, bigtitlePixmapM;
+extern Pixmap stars[12], starsM[12];
+extern int nextBlink;
 
 #endif

@@ -29,7 +29,7 @@
  * enhancements, or modifications.
  */
 
-/* 
+/*
  * =========================================================================
  *
  * $Id: highscore.h,v 1.1.1.1 1994/12/16 01:36:51 jck Exp $
@@ -58,38 +58,38 @@
  *  Constants and macros:
  */
 
-#define PERSONAL 		1
-#define GLOBAL 			2
+#define PERSONAL 1
+#define GLOBAL 2
 
-#define SCORE_VERSION	2
+#define SCORE_VERSION 2
 
 /*
  *  Type declarations:
  */
 
-enum HighScoreStates 
-{ 
-	HIGHSCORE_TITLE, 
-	HIGHSCORE_SHOW, 
-	HIGHSCORE_WAIT, 
-	HIGHSCORE_SPARKLE, 
-	HIGHSCORE_FINISH
+enum HighScoreStates
+{
+    HIGHSCORE_TITLE,
+    HIGHSCORE_SHOW,
+    HIGHSCORE_WAIT,
+    HIGHSCORE_SPARKLE,
+    HIGHSCORE_FINISH
 };
 
-typedef struct 
+typedef struct
 {
-	u_long 	version;			/* Highscore File version */
-	char 	masterText[80];		/* Boing Masters words of wisdom */
+    u_long version;      /* Highscore File version */
+    char masterText[80]; /* Boing Masters words of wisdom */
 } highScoreHeader;
 
-typedef struct 
+typedef struct
 {
-	u_long 	score;		/* Score */
-	u_long 	level;		/* delta Level reached */
-	time_t 	gameTime;	/* Time taken to complete game */
-	time_t 	time;		/* Date when played */
-	char 	name[40];	/* Full user name */
-	uid_t	userId;		/* Real user id of player */
+    u_long score;    /* Score */
+    u_long level;    /* delta Level reached */
+    time_t gameTime; /* Time taken to complete game */
+    time_t time;     /* Date when played */
+    char name[40];   /* Full user name */
+    uid_t userId;    /* Real user id of player */
 } highScoreEntry;
 
 /*
@@ -103,8 +103,8 @@ void FreeHighScore(Display *display);
 void ResetHighScore(int type);
 int ReadHighScoreTable(int type);
 int WriteHighScoreTable(int type);
-int CheckAndAddScoreToHighScore(u_long score, u_long level, time_t gameTime, 
-	int type, char *message);
+int CheckAndAddScoreToHighScore(u_long score, u_long level, time_t gameTime, int type,
+                                char *message);
 int GetHighScoreRanking(u_long score);
 void CommandlineHighscorePrint(void);
 void SetNickName(char *nick);

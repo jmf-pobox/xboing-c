@@ -29,7 +29,7 @@
  * enhancements, or modifications.
  */
 
-/* 
+/*
  * =========================================================================
  *
  * $Id: init.h,v 1.1.1.1 1994/12/16 01:36:52 jck Exp $
@@ -56,13 +56,15 @@
  *  Constants and macros:
  */
 
-#define DEBUG(x)    if (debug == True) NormalMessage(x);
+#define DEBUG(x)                                                                                   \
+    if (debug == True)                                                                             \
+        NormalMessage(x);
 
-#define CURSOR_WAIT		1
-#define CURSOR_PLUS		2
-#define CURSOR_NONE		3
-#define CURSOR_POINT	4
-#define CURSOR_SKULL	5
+#define CURSOR_WAIT 1
+#define CURSOR_PLUS 2
+#define CURSOR_NONE 3
+#define CURSOR_POINT 4
+#define CURSOR_SKULL 5
 
 /*
  *  Type declarations:

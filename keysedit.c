@@ -26,7 +26,7 @@
  * enhancements, or modifications.
  */
 
-/* 
+/*
  * =========================================================================
  *
  * $Id: keysedit.c,v 1.1.1.1 1994/12/16 01:36:48 jck Exp $
@@ -47,31 +47,31 @@
  *  Include file dependencies:
  */
 
+#include <X11/Xlib.h>
+#include <X11/Xos.h>
+#include <X11/Xutil.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stddef.h>
-#include <X11/Xlib.h>
-#include <X11/Xutil.h>
-#include <X11/Xos.h>
 #include <xpm.h>
 
+#include "audio.h"
+#include "ball.h"
+#include "blocks.h"
 #include "error.h"
 #include "highscore.h"
-#include "special.h"
-#include "misc.h"
-#include "sfx.h"
-#include "main.h"
 #include "init.h"
-#include "stage.h"
-#include "blocks.h"
-#include "ball.h"
-#include "score.h"
-#include "paddle.h"
-#include "level.h"
-#include "mess.h"
-#include "version.h"
-#include "audio.h"
 #include "intro.h"
+#include "level.h"
+#include "main.h"
+#include "mess.h"
+#include "misc.h"
+#include "paddle.h"
+#include "score.h"
+#include "sfx.h"
+#include "special.h"
+#include "stage.h"
+#include "version.h"
 
 #include "keysedit.h"
 
@@ -87,7 +87,6 @@
 
 static void DoKeysEditWait(void);
 
-
 /*
  *  Internal variable declarations:
  */
@@ -100,37 +99,36 @@ static enum KeysEditStates waitMode;
 
 void SetUpKeysEdit(Display *display, Window window, Colormap colormap)
 {
-	ResetKeysEdit();
+    ResetKeysEdit();
 }
 
-char *infoText[] =
-{
+char *infoText[] = {
     "The level editor will allow you to edit any of the levels and",
     "create your own ones. You use the left button for drawing blocks",
-	"and the middle button for erasing. Below lists the keys that can",
-	"be used while in the level editor.",
-	"The bottom four rows are reserved so that your paddle and ball",
-	"has room to start. Design your levels so that it is possible",
-	"to finish. Remember that random specials will appear.",
+    "and the middle button for erasing. Below lists the keys that can",
+    "be used while in the level editor.",
+    "The bottom four rows are reserved so that your paddle and ball",
+    "has room to start. Design your levels so that it is possible",
+    "to finish. Remember that random specials will appear.",
 };
 
 static void DoText(Display *display, Window window)
 {
-	char string[80];
-	int y, i, j, x, y1;
+    char string[80];
+    int y, i, j, x, y1;
 
-	SetCurrentMessage(display, messWindow, "Be happy!", False);
+    SetCurrentMessage(display, messWindow, "Be happy!", False);
 
-	y = 120;
+    y = 120;
 
-	DrawShadowCentredText(display, window, titleFont, 
-		"- Level Editor Controls -", y, red, PLAY_WIDTH);
+    DrawShadowCentredText(display, window, titleFont, "- Level Editor Controls -", y, red,
+                          PLAY_WIDTH);
 
-	y = 160;
+    y = 160;
 
-    DrawLine(display, window, 32, y+2, PLAY_WIDTH - 28, y+2, black, 3);
+    DrawLine(display, window, 32, y + 2, PLAY_WIDTH - 28, y + 2, black, 3);
     DrawLine(display, window, 30, y, PLAY_WIDTH - 30, y, white, 3);
-	y += textFont->ascent;
+    y += textFont->ascent;
 
     /* Loop through all text printing it centred */
     for (i = 0, j = 0; i < (sizeof(infoText) / sizeof(char *)); i++)
@@ -139,8 +137,8 @@ static void DoText(Display *display, Window window)
         if (infoText[i] != '\0')
         {
             strcpy(string, infoText[i]);
-            DrawShadowCentredText(display, window, dataFont,
-                string, y, j % 2 ? greens[0] : greens[2], PLAY_WIDTH);
+            DrawShadowCentredText(display, window, dataFont, string, y,
+                                  j % 2 ? greens[0] : greens[2], PLAY_WIDTH);
             y += dataFont->ascent + GAP;
             j++;
         }
@@ -150,167 +148,164 @@ static void DoText(Display *display, Window window)
 
     y += dataFont->ascent;
 
-	y1 = y;
-	x = 30;
+    y1 = y;
+    x = 30;
 
-	strcpy(string, "<r> = Redraw level");
-	DrawShadowText(display, window, textFont, string, x, y, yellow);
-	y += textFont->ascent + GAP;
+    strcpy(string, "<r> = Redraw level");
+    DrawShadowText(display, window, textFont, string, x, y, yellow);
+    y += textFont->ascent + GAP;
 
-	strcpy(string, "<c> = Clear Level");
-	DrawShadowText(display, window, textFont, string, x, y, yellow);
-	y += textFont->ascent + GAP;
+    strcpy(string, "<c> = Clear Level");
+    DrawShadowText(display, window, textFont, string, x, y, yellow);
+    y += textFont->ascent + GAP;
 
-	strcpy(string, "<q> = Quit editor");
-	DrawShadowText(display, window, textFont, string, x, y, yellow);
-	y += textFont->ascent + GAP;
+    strcpy(string, "<q> = Quit editor");
+    DrawShadowText(display, window, textFont, string, x, y, yellow);
+    y += textFont->ascent + GAP;
 
-	strcpy(string, "<h/v> = Flip horz/vert");
-	DrawShadowText(display, window, textFont, string, x, y, yellow);
-	y += textFont->ascent + GAP;
+    strcpy(string, "<h/v> = Flip horz/vert");
+    DrawShadowText(display, window, textFont, string, x, y, yellow);
+    y += textFont->ascent + GAP;
 
-	strcpy(string, "<H/V> = Scroll horz/vert");
-	DrawShadowText(display, window, textFont, string, x, y, yellow);
-	y += textFont->ascent + GAP;
+    strcpy(string, "<H/V> = Scroll horz/vert");
+    DrawShadowText(display, window, textFont, string, x, y, yellow);
+    y += textFont->ascent + GAP;
 
-	y = y1;
-	x = 270;
+    y = y1;
+    x = 270;
 
-	strcpy(string, "<s> = Save level");
-	DrawShadowText(display, window, textFont, string, x, y, yellow);
-	y += textFont->ascent + GAP;
+    strcpy(string, "<s> = Save level");
+    DrawShadowText(display, window, textFont, string, x, y, yellow);
+    y += textFont->ascent + GAP;
 
-	strcpy(string, "<l> = load level");
-	DrawShadowText(display, window, textFont, string, x, y, yellow);
-	y += textFont->ascent + GAP;
+    strcpy(string, "<l> = load level");
+    DrawShadowText(display, window, textFont, string, x, y, yellow);
+    y += textFont->ascent + GAP;
 
-	strcpy(string, "<t> = Set time limit");
-	DrawShadowText(display, window, textFont, string, x, y, yellow);
-	y += textFont->ascent + GAP;
+    strcpy(string, "<t> = Set time limit");
+    DrawShadowText(display, window, textFont, string, x, y, yellow);
+    y += textFont->ascent + GAP;
 
-	strcpy(string, "<n> = Change level name");
-	DrawShadowText(display, window, textFont, string, x, y, yellow);
-	y += textFont->ascent + GAP;
+    strcpy(string, "<n> = Change level name");
+    DrawShadowText(display, window, textFont, string, x, y, yellow);
+    y += textFont->ascent + GAP;
 
-	strcpy(string, "<p> = Play test");
-	DrawShadowText(display, window, textFont, string, x, y, yellow);
-	y += textFont->ascent + GAP;
+    strcpy(string, "<p> = Play test");
+    DrawShadowText(display, window, textFont, string, x, y, yellow);
+    y += textFont->ascent + GAP;
 
+    y += textFont->ascent + GAP / 2;
 
-	y += textFont->ascent + GAP / 2;
-
-    DrawLine(display, window, 32, y+2, PLAY_WIDTH - 28, y+2, black, 3);
+    DrawLine(display, window, 32, y + 2, PLAY_WIDTH - 28, y + 2, black, 3);
     DrawLine(display, window, 30, y, PLAY_WIDTH - 30, y, white, 3);
 
-	strcpy(string, "Insert coin to start the game");
-	DrawShadowCentredText(display, window, textFont, string, 
-		PLAY_HEIGHT - 30, tann, PLAY_WIDTH);
+    strcpy(string, "Insert coin to start the game");
+    DrawShadowCentredText(display, window, textFont, string, PLAY_HEIGHT - 30, tann, PLAY_WIDTH);
 }
 
 static void DoSparkle(Display *display, Window window)
 {
-	static Pixmap store;
-	static int x = 100;
-	static int y = 20;
-	static int in = 0;
+    static Pixmap store;
+    static int x = 100;
+    static int y = 20;
+    static int in = 0;
 
-	if (frame >= endFrame)
-		KeysEditState = KEYSEDIT_FINISH;
+    if (frame >= endFrame)
+        KeysEditState = KEYSEDIT_FINISH;
 
-	if (!store)
-	{
-		store = XCreatePixmap(display, window, 20, 20,
-			DefaultDepth(display, XDefaultScreen(display)));
-	}
+    if (!store)
+    {
+        store =
+            XCreatePixmap(display, window, 20, 20, DefaultDepth(display, XDefaultScreen(display)));
+    }
 
-	if (in == 0) 
-		XCopyArea(display, window, store, gc, x, y, 20, 20, 0, 0);
+    if (in == 0)
+        XCopyArea(display, window, store, gc, x, y, 20, 20, 0, 0);
 
-	if (frame == startFrame)
-	{
-		XCopyArea(display, store, window, gc, 0, 0, 20, 20, x, y);
-		RenderShape(display, window, stars[in], starsM[in],
-			x, y, 20, 20, False);
+    if (frame == startFrame)
+    {
+        XCopyArea(display, store, window, gc, 0, 0, 20, 20, x, y);
+        RenderShape(display, window, stars[in], starsM[in], x, y, 20, 20, False);
 
-	 	in++;
-		startFrame = frame + 15;
+        in++;
+        startFrame = frame + 15;
 
-		if (in == 11) 
-		{
-			XCopyArea(display, store, window, gc, 0, 0, 20, 20, x, y);
-			in = 0;
-			startFrame = frame + 500;
-			x = (rand() % 474) + 5;
-			y = (rand() % 74) + 5;
-		}	
-	}
+        if (in == 11)
+        {
+            XCopyArea(display, store, window, gc, 0, 0, 20, 20, x, y);
+            in = 0;
+            startFrame = frame + 500;
+            x = (rand() % 474) + 5;
+            y = (rand() % 74) + 5;
+        }
+    }
 }
 
 static void DoFinish(Display *display, Window window)
 {
-	static int toggle = GLOBAL;
+    static int toggle = GLOBAL;
 
-	ResetHighScore(toggle);
-	mode = MODE_HIGHSCORE;
+    ResetHighScore(toggle);
+    mode = MODE_HIGHSCORE;
 
-	/* Switch between the global highscores and personal version */
-	if (toggle == GLOBAL)
-		toggle = PERSONAL;
-	else
-		toggle = GLOBAL;
+    /* Switch between the global highscores and personal version */
+    if (toggle == GLOBAL)
+        toggle = PERSONAL;
+    else
+        toggle = GLOBAL;
 
     if (noSound == False)
-		playSoundFile("warp", 50);
+        playSoundFile("warp", 50);
 }
-
 
 void KeysEdit(Display *display, Window window)
 {
-	switch (KeysEditState)
-	{
-		case KEYSEDIT_TITLE:
-			if (getSpecialEffects(display) == True)
-				DoIntroTitle(display, bufferWindow);
-			else
-				DoIntroTitle(display, window);
-			KeysEditState = KEYSEDIT_TEXT;
-			break;
+    switch (KeysEditState)
+    {
+        case KEYSEDIT_TITLE:
+            if (getSpecialEffects(display) == True)
+                DoIntroTitle(display, bufferWindow);
+            else
+                DoIntroTitle(display, window);
+            KeysEditState = KEYSEDIT_TEXT;
+            break;
 
-		case KEYSEDIT_TEXT:
-			if (getSpecialEffects(display) == True)
-			{
-				DoText(display, bufferWindow);
-				while (WindowShatterEffect(display, window));
-			}
-			else
-				DoText(display, window);
-			KeysEditState = KEYSEDIT_SPARKLE;
-			break;
+        case KEYSEDIT_TEXT:
+            if (getSpecialEffects(display) == True)
+            {
+                DoText(display, bufferWindow);
+                while (WindowShatterEffect(display, window))
+                    ;
+            }
+            else
+                DoText(display, window);
+            KeysEditState = KEYSEDIT_SPARKLE;
+            break;
 
-		case KEYSEDIT_SPARKLE:
-			DoSparkle(display, window);
-			BorderGlow(display, window);
-			if ((frame % FLASH) == 0)
-				RandomDrawSpecials(display);
-			break;
+        case KEYSEDIT_SPARKLE:
+            DoSparkle(display, window);
+            BorderGlow(display, window);
+            if ((frame % FLASH) == 0)
+                RandomDrawSpecials(display);
+            break;
 
-		case KEYSEDIT_FINISH:
-			DoFinish(display, window);
-			break;
+        case KEYSEDIT_FINISH:
+            DoFinish(display, window);
+            break;
 
-		case KEYSEDIT_WAIT:
-			DoKeysEditWait();
-			break;
+        case KEYSEDIT_WAIT:
+            DoKeysEditWait();
+            break;
 
-		default:
-			break;
-	}
+        default:
+            break;
+    }
 }
 
 void RedrawKeysEdit(Display *display, Window window)
 {
-	DoIntroTitle(display, window);
-	DoText(display, window);
+    DoIntroTitle(display, window);
+    DoText(display, window);
 }
 
 void FreeKeyEditControl(Display *display)
@@ -319,15 +314,15 @@ void FreeKeyEditControl(Display *display)
 
 void ResetKeysEdit(void)
 {
-	KeysEditState = KEYSEDIT_TITLE;
-	startFrame 	= frame + 100;
-	endFrame 	= frame + 4000;
+    KeysEditState = KEYSEDIT_TITLE;
+    startFrame = frame + 100;
+    endFrame = frame + 4000;
 
-	DEBUG("Reset KeysEdit mode.")
+    DEBUG("Reset KeysEdit mode.")
 }
 
 static void DoKeysEditWait(void)
 {
-	if (frame == waitingFrame)
-		KeysEditState = waitMode;
+    if (frame == waitingFrame)
+        KeysEditState = waitMode;
 }
