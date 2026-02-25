@@ -29,7 +29,7 @@
  * enhancements, or modifications.
  */
 
-/* 
+/*
  * =========================================================================
  *
  * $Id: level.h,v 1.1.1.1 1994/12/16 01:36:52 jck Exp $
@@ -56,9 +56,9 @@
  *  Constants and macros:
  */
 
-#define SHOTS_TO_KILL_SPECIAL   3
-#define BUF_SIZE 				1024
-#define MAX_NUM_LEVELS  		80
+#define SHOTS_TO_KILL_SPECIAL 3
+#define BUF_SIZE 1024
+#define MAX_NUM_LEVELS 80
 
 /*
  *  Type declarations:
@@ -98,6 +98,5 @@ extern int bonus, livesLeft, bonusBlock;
 extern time_t gameTime;
 extern u_long level;
 extern char levelTitle[BUF_SIZE];
-
 
 #endif

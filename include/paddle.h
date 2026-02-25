@@ -29,7 +29,7 @@
  * enhancements, or modifications.
  */
 
-/* 
+/*
  * =========================================================================
  *
  * $Id: paddle.h,v 1.1.1.1 1994/12/16 01:36:53 jck Exp $
@@ -56,20 +56,20 @@
  *  Constants and macros:
  */
 
-#define PADDLE_LEFT		1
-#define PADDLE_SHOOT	2
-#define PADDLE_RIGHT	3
-#define PADDLE_NONE		0
+#define PADDLE_LEFT 1
+#define PADDLE_SHOOT 2
+#define PADDLE_RIGHT 3
+#define PADDLE_NONE 0
 
-#define PADDLE_SMALL	4
-#define PADDLE_MEDIUM	5
-#define PADDLE_HUGE		6
+#define PADDLE_SMALL 4
+#define PADDLE_MEDIUM 5
+#define PADDLE_HUGE 6
 
-#define DIST_BASE   	30
-#define PADDLE_VEL  	10
+#define DIST_BASE 30
+#define PADDLE_VEL 10
 
-#define PADDLE_HC  		4
-#define PADDLE_HEIGHT 	9
+#define PADDLE_HC 4
+#define PADDLE_HEIGHT 9
 
 /*
  *  Type declarations:
@@ -82,8 +82,7 @@
 void InitialisePaddle(Display *display, Window window, Colormap colormap);
 void FreePaddle(Display *display);
 void DrawPaddle(Display *display, Window window, int x, int y, int size);
-void MovePaddle(Display *display, Window window, int direction, 
-	int size, int xpos);
+void MovePaddle(Display *display, Window window, int direction, int size, int xpos);
 void ResetPaddleStart(Display *display, Window window);
 int GetPaddleSize(void);
 void RedrawPaddle(Display *display, Window window);

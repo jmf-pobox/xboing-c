@@ -26,7 +26,7 @@
  * enhancements, or modifications.
  */
 
-/* 
+/*
  * =========================================================================
  *
  * $Id: special.c,v 1.1.1.1 1994/12/16 01:36:48 jck Exp $
@@ -47,15 +47,15 @@
  *  Include file dependencies:
  */
 
-#include <stdlib.h>
 #include <X11/Xos.h>
+#include <stdlib.h>
 
 #include "init.h"
-#include "misc.h"
-#include "stage.h"
 #include "level.h"
-#include "score.h"
+#include "misc.h"
 #include "paddle.h"
+#include "score.h"
+#include "stage.h"
 
 #include "special.h"
 
@@ -63,7 +63,7 @@
  *  Internal macro definitions:
  */
 
-#define GAP			5
+#define GAP 5
 
 /*
  *  Internal type declarations:
@@ -83,185 +83,171 @@ int x4Bonus;
 
 void TurnSpecialsOff(Display *display)
 {
-	/* Turn all specials off */
+    /* Turn all specials off */
 
-	ToggleFastGun(display, False);
-	ToggleWallsOn(display, False);
-	/*ToggleSaving(display, False);*/
-	ToggleStickyBat(display, False);
-	Togglex2Bonus(display, False);
-	Togglex4Bonus(display, False);
-	ToggleKiller(display, False);
+    ToggleFastGun(display, False);
+    ToggleWallsOn(display, False);
+    /*ToggleSaving(display, False);*/
+    ToggleStickyBat(display, False);
+    Togglex2Bonus(display, False);
+    Togglex4Bonus(display, False);
+    ToggleKiller(display, False);
 }
 
 void Togglex2Bonus(Display *display, int state)
 {
-	/* Set the x2Bonus flag to true or false */
-	x2Bonus = state;
+    /* Set the x2Bonus flag to true or false */
+    x2Bonus = state;
 }
 
 void ToggleKiller(Display *display, int state)
 {
-	/* Set the Killer flag to true or false */
-	Killer = state;
+    /* Set the Killer flag to true or false */
+    Killer = state;
 }
 
 void Togglex4Bonus(Display *display, int state)
 {
-	/* Set the x4Bonus flag to true or false */
-	x4Bonus = state;
+    /* Set the x4Bonus flag to true or false */
+    x4Bonus = state;
 }
 
 void ToggleStickyBat(Display *display, int state)
 {
-	/* Set the stickyBat flag to true or false */
-	stickyBat = state;
+    /* Set the stickyBat flag to true or false */
+    stickyBat = state;
 }
 
 void ToggleSaving(Display *display, int state)
 {
-	/* Set the Saving flag to true or false */
-	saving = state;
+    /* Set the Saving flag to true or false */
+    saving = state;
 }
 
 void ToggleFastGun(Display *display, int state)
 {
-	/* Set the fastgun flag to true or false */
-	fastGun = state;
+    /* Set the fastgun flag to true or false */
+    fastGun = state;
 }
 
 void ToggleWallsOn(Display *display, int state)
 {
-	/* Set the noWalls flag to true or false */
-	noWalls = state;
+    /* Set the noWalls flag to true or false */
+    noWalls = state;
 
-	if (noWalls == True)
-	{
-		/* Turn the wall colour to green */
-		XSetWindowBorder(display, playWindow, green);
-	}
-	else
-	{
-		/* Turn the wall colour to red */
-		XSetWindowBorder(display, playWindow, red);
-	}
+    if (noWalls == True)
+    {
+        /* Turn the wall colour to green */
+        XSetWindowBorder(display, playWindow, green);
+    }
+    else
+    {
+        /* Turn the wall colour to red */
+        XSetWindowBorder(display, playWindow, red);
+    }
 }
 
 void DrawSpecials(Display *display)
 {
-	int y = 3;
-	int x = 5;
-	char string[80];
+    int y = 3;
+    int x = 5;
+    char string[80];
 
-	/* Clear the special window */
-	/*XClearWindow(display, specialWindow);*/
+    /* Clear the special window */
+    /*XClearWindow(display, specialWindow);*/
 
-	strcpy(string, "Reverse");
-	if (reverseOn == True)
-		DrawShadowText(display, specialWindow, copyFont, 
-			string, x, y, yellow);
-	else
-		DrawShadowText(display, specialWindow, copyFont, 
-			string, x, y, white);
+    strcpy(string, "Reverse");
+    if (reverseOn == True)
+        DrawShadowText(display, specialWindow, copyFont, string, x, y, yellow);
+    else
+        DrawShadowText(display, specialWindow, copyFont, string, x, y, white);
 
-	y += copyFont->ascent + GAP;
+    y += copyFont->ascent + GAP;
 
-	strcpy(string, "Sticky");
-	if (stickyBat == True)
-		DrawShadowText(display, specialWindow, copyFont, 
-			string, x, y, yellow);
-	else
-		DrawShadowText(display, specialWindow, copyFont, 
-			string, x, y, white);
+    strcpy(string, "Sticky");
+    if (stickyBat == True)
+        DrawShadowText(display, specialWindow, copyFont, string, x, y, yellow);
+    else
+        DrawShadowText(display, specialWindow, copyFont, string, x, y, white);
 
-	x = 55; y = 3;
+    x = 55;
+    y = 3;
 
-	strcpy(string, "Save");
-	if (saving == True)
-		DrawShadowText(display, specialWindow, copyFont, 
-			string, x, y, yellow);
-	else
-		DrawShadowText(display, specialWindow, copyFont, 
-			string, x, y, white);
+    strcpy(string, "Save");
+    if (saving == True)
+        DrawShadowText(display, specialWindow, copyFont, string, x, y, yellow);
+    else
+        DrawShadowText(display, specialWindow, copyFont, string, x, y, white);
 
-	y += copyFont->ascent + GAP;
+    y += copyFont->ascent + GAP;
 
-	strcpy(string, "FastGun");
-	if (fastGun == True)
-		DrawShadowText(display, specialWindow, copyFont, 
-			string, x, y, yellow);
-	else
-		DrawShadowText(display, specialWindow, copyFont, 
-			string, x, y, white);
+    strcpy(string, "FastGun");
+    if (fastGun == True)
+        DrawShadowText(display, specialWindow, copyFont, string, x, y, yellow);
+    else
+        DrawShadowText(display, specialWindow, copyFont, string, x, y, white);
 
-	x = 110; y = 3;
+    x = 110;
+    y = 3;
 
-	strcpy(string, "NoWall");
-	if (noWalls == True)
-		DrawShadowText(display, specialWindow, copyFont, 
-			string, x, y, yellow);
-	else
-		DrawShadowText(display, specialWindow, copyFont, 
-			string, x, y, white);
+    strcpy(string, "NoWall");
+    if (noWalls == True)
+        DrawShadowText(display, specialWindow, copyFont, string, x, y, yellow);
+    else
+        DrawShadowText(display, specialWindow, copyFont, string, x, y, white);
 
-	y += copyFont->ascent + GAP;
+    y += copyFont->ascent + GAP;
 
-	strcpy(string, "Killer");
-	if (Killer == True)
-		DrawShadowText(display, specialWindow, copyFont, 
-			string, x, y, yellow);
-	else
-		DrawShadowText(display, specialWindow, copyFont, 
-			string, x, y, white);
+    strcpy(string, "Killer");
+    if (Killer == True)
+        DrawShadowText(display, specialWindow, copyFont, string, x, y, yellow);
+    else
+        DrawShadowText(display, specialWindow, copyFont, string, x, y, white);
 
-	x = 155; y = 3;
+    x = 155;
+    y = 3;
 
-	strcpy(string, "x2");
-	if (x2Bonus == True)
-		DrawShadowText(display, specialWindow, copyFont, 
-			string, x, y, yellow);
-	else
-		DrawShadowText(display, specialWindow, copyFont, 
-			string, x, y, white);
+    strcpy(string, "x2");
+    if (x2Bonus == True)
+        DrawShadowText(display, specialWindow, copyFont, string, x, y, yellow);
+    else
+        DrawShadowText(display, specialWindow, copyFont, string, x, y, white);
 
-	y += copyFont->ascent + GAP;
+    y += copyFont->ascent + GAP;
 
-	strcpy(string, "x4");
-	if (x4Bonus == True)
-		DrawShadowText(display, specialWindow, copyFont, 
-			string, x, y, yellow);
-	else
-		DrawShadowText(display, specialWindow, copyFont, 
-			string, x, y, white);
+    strcpy(string, "x4");
+    if (x4Bonus == True)
+        DrawShadowText(display, specialWindow, copyFont, string, x, y, yellow);
+    else
+        DrawShadowText(display, specialWindow, copyFont, string, x, y, white);
 }
-
 
 void RandomDrawSpecials(Display *display)
 {
-	int n;
-	static u_long temp_score = 0;
+    int n;
+    static u_long temp_score = 0;
 
-	/* Randomly change the specials to flash on and off */
-	n = rand() % 100;
-	saving = n > 50 ? True : False;
-	n = rand() % 100;
-	stickyBat = n > 50 ? True : False;
-	n = rand() % 100;
-	Killer = n > 50 ? True : False;
-	n = rand() % 100;
-	x2Bonus = n > 50 ? True : False;
-	n = rand() % 100;
-	x4Bonus = n > 50 ? True : False;
-	n = rand() % 100;
-	fastGun = n > 50 ? True : False;
-	n = rand() % 100;
-	noWalls = n > 50 ? True : False;
-	n = rand() % 100;
-	reverseOn = n > 50 ? True : False;
+    /* Randomly change the specials to flash on and off */
+    n = rand() % 100;
+    saving = n > 50 ? True : False;
+    n = rand() % 100;
+    stickyBat = n > 50 ? True : False;
+    n = rand() % 100;
+    Killer = n > 50 ? True : False;
+    n = rand() % 100;
+    x2Bonus = n > 50 ? True : False;
+    n = rand() % 100;
+    x4Bonus = n > 50 ? True : False;
+    n = rand() % 100;
+    fastGun = n > 50 ? True : False;
+    n = rand() % 100;
+    noWalls = n > 50 ? True : False;
+    n = rand() % 100;
+    reverseOn = n > 50 ? True : False;
 
-	/* Make the score and level number change every now and then too */
-	DisplayLevelNumber(display, levelWindow, (rand() % MAX_NUM_LEVELS) + 1);
-	DisplayScore(display, scoreWindow, (u_long) temp_score++);
+    /* Make the score and level number change every now and then too */
+    DisplayLevelNumber(display, levelWindow, (rand() % MAX_NUM_LEVELS) + 1);
+    DisplayScore(display, scoreWindow, (u_long)temp_score++);
 
-	DrawSpecials(display);
+    DrawSpecials(display);
 }

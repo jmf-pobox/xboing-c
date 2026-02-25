@@ -26,7 +26,7 @@
  * enhancements, or modifications.
  */
 
-/* 
+/*
  * =========================================================================
  *
  * $Id: level.c,v 1.1.1.1 1994/12/16 01:36:47 jck Exp $
@@ -47,37 +47,37 @@
  *  Include file dependencies:
  */
 
+#include <X11/Xlib.h>
+#include <X11/Xos.h>
+#include <X11/Xutil.h>
+#include <assert.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stddef.h>
 #include <time.h>
-#include <assert.h>
-#include <X11/Xlib.h>
-#include <X11/Xutil.h>
-#include <X11/Xos.h>
 #include <xpm.h>
 
 #include "bitmaps/balls/life.xpm"
 
-#include "error.h"
 #include "audio.h"
-#include "dialogue.h"
-#include "special.h"
-#include "intro.h"
-#include "gun.h"
-#include "init.h"
-#include "stage.h"
-#include "sfx.h"
-#include "score.h"
-#include "paddle.h"
+#include "ball.h"
 #include "blocks.h"
 #include "bonus.h"
+#include "dialogue.h"
+#include "error.h"
+#include "file.h"
+#include "gun.h"
 #include "highscore.h"
-#include "ball.h"
+#include "init.h"
+#include "intro.h"
 #include "main.h"
 #include "mess.h"
 #include "misc.h"
-#include "file.h"
+#include "paddle.h"
+#include "score.h"
+#include "sfx.h"
+#include "special.h"
+#include "stage.h"
 
 #include "level.h"
 
@@ -85,9 +85,9 @@
  *  Internal macro definitions:
  */
 
-#define MAX_LIVES			6
-#define START_LIVES			3
-#define NEW_LIVE_SCORE_INC	100000L
+#define MAX_LIVES 6
+#define START_LIVES 3
+#define NEW_LIVE_SCORE_INC 100000L
 
 #define MIN(S, T) ((S) > (T) ? (T) : (S))
 
@@ -101,409 +101,411 @@ static void DrawLevelTimeBonus(Display *display, Window window, int timebonus);
  *  Internal variable declarations:
  */
 
-Pixmap		lifePixmap, lifeMask;	
-int 		livesLeft = 3;
-u_long		level;
-u_long		startlevel;
-time_t		gameTime;
-int			bonus = 1;
-char 		levelTitle[BUF_SIZE];
-int 		bonusBlock = False;
-static int 	bulletPos;
-static int 	timeBonus;
+Pixmap lifePixmap, lifeMask;
+int livesLeft = 3;
+u_long level;
+u_long startlevel;
+time_t gameTime;
+int bonus = 1;
+char levelTitle[BUF_SIZE];
+int bonusBlock = False;
+static int bulletPos;
+static int timeBonus;
 
 void InitialiseLevelInfo(Display *display, Window window, Colormap colormap)
 {
-	XpmAttributes   attributes;
-	int 			XpmErrorStatus;
+    XpmAttributes attributes;
+    int XpmErrorStatus;
 
-	attributes.valuemask = XpmColormap;
-	attributes.colormap = colormap;
+    attributes.valuemask = XpmColormap;
+    attributes.colormap = colormap;
 
-	/* Create xpm pixmap for the life */
-	XpmErrorStatus = XpmCreatePixmapFromData(display, window, life_xpm, 
-		&lifePixmap, &lifeMask, &attributes);
-	HandleXPMError(display, XpmErrorStatus, "InitialiseLevelInfo()");
+    /* Create xpm pixmap for the life */
+    XpmErrorStatus =
+        XpmCreatePixmapFromData(display, window, life_xpm, &lifePixmap, &lifeMask, &attributes);
+    HandleXPMError(display, XpmErrorStatus, "InitialiseLevelInfo()");
 
-	/* Free the xpm pixmap attributes */
-	XpmFreeAttributes(&attributes);
+    /* Free the xpm pixmap attributes */
+    XpmFreeAttributes(&attributes);
 }
 
 void DecLevelTimeBonus(Display *display, Window window)
 {
-	if (timeBonus > 0) 
-	{
-		/* Decrement the time bonus */
-		timeBonus--;	
+    if (timeBonus > 0)
+    {
+        /* Decrement the time bonus */
+        timeBonus--;
 
-		/* Draw the time bonus */
-		DrawLevelTimeBonus(display, window, timeBonus);
+        /* Draw the time bonus */
+        DrawLevelTimeBonus(display, window, timeBonus);
 
-		/* Is the time run out */
-		if (timeBonus == 0)
-		{
-			/* Times up buzzer sound */
-			if (noSound == False) playSoundFile("buzzer", 70);
-		}
-	}
+        /* Is the time run out */
+        if (timeBonus == 0)
+        {
+            /* Times up buzzer sound */
+            if (noSound == False)
+                playSoundFile("buzzer", 70);
+        }
+    }
 }
 
 int GetLevelTimeBonus(void)
 {
-	/* return the time bonus */
-	return timeBonus;	
+    /* return the time bonus */
+    return timeBonus;
 }
 
 void AddToLevelTimeBonus(Display *display, Window window, int seconds)
 {
-	/* add to the time bonus */
-	SetLevelTimeBonus(display, window, timeBonus + seconds);
+    /* add to the time bonus */
+    SetLevelTimeBonus(display, window, timeBonus + seconds);
 }
 
 void SetLevelTimeBonus(Display *display, Window window, int seconds)
 {
-	assert(timeBonus >= 0);
+    assert(timeBonus >= 0);
 
-	/* Reset the time bonus to desired time */
-	timeBonus = seconds;	
+    /* Reset the time bonus to desired time */
+    timeBonus = seconds;
 
-	/* Draw the time bonus */
-	DrawLevelTimeBonus(display, window, timeBonus);
+    /* Draw the time bonus */
+    DrawLevelTimeBonus(display, window, timeBonus);
 }
 
 static void DrawLevelTimeBonus(Display *display, Window window, int timebonus)
 {
-	int len, minutes, seconds;
-	char str[10];
+    int len, minutes, seconds;
+    char str[10];
 
-	/* Work out the minutes and seconds using time bonus */
-	minutes = timebonus / 60;
-	seconds = timebonus % 60;
+    /* Work out the minutes and seconds using time bonus */
+    minutes = timebonus / 60;
+    seconds = timebonus % 60;
 
-	/* Construct a string with the time bonus and draw it */
-	sprintf(str, "%02d:%02d", minutes, seconds);
-	len = strlen(str);
+    /* Construct a string with the time bonus and draw it */
+    sprintf(str, "%02d:%02d", minutes, seconds);
+    len = strlen(str);
 
-	/* Draw the text now thanks  - using title font for big numbers */
-	XClearWindow(display, window);
-	DrawText(display, window, 2, 7, titleFont, black, str, len);
+    /* Draw the text now thanks  - using title font for big numbers */
+    XClearWindow(display, window);
+    DrawText(display, window, 2, 7, titleFont, black, str, len);
 
-	/* The less time you have the more drastic the colour comes */
-	if (timebonus <= 10)
-		DrawText(display, window, 0, 5, titleFont, red, str, len);
-	else if (timebonus <= 60)
-		DrawText(display, window, 0, 5, titleFont, yellow, str, len);
-	else 
-		DrawText(display, window, 0, 5, titleFont, green, str, len);
+    /* The less time you have the more drastic the colour comes */
+    if (timebonus <= 10)
+        DrawText(display, window, 0, 5, titleFont, red, str, len);
+    else if (timebonus <= 60)
+        DrawText(display, window, 0, 5, titleFont, yellow, str, len);
+    else
+        DrawText(display, window, 0, 5, titleFont, green, str, len);
 }
 
 void DrawLife(Display *display, Window window, int x, int y)
 {
-	/* Draw the life pixmap */
-	RenderShape(display, window, lifePixmap, lifeMask, 
-		x-12, y-12, 25, 24, True);
+    /* Draw the life pixmap */
+    RenderShape(display, window, lifePixmap, lifeMask, x - 12, y - 12, 25, 24, True);
 }
 
 void DisplayLevelNumber(Display *display, Window window, u_long level)
 {
-	/* Put the level number up */
-	DrawOutNumber(display, levelWindow, level, 260, 5);
+    /* Put the level number up */
+    DrawOutNumber(display, levelWindow, level, 260, 5);
 }
 
 void DisplayLevelInfo(Display *display, Window window, u_long level)
 {
-	int i;
+    int i;
 
-	/* Clear the window for level information */
-	XClearWindow(display, levelWindow);
+    /* Clear the window for level information */
+    XClearWindow(display, levelWindow);
 
-	DisplayLevelNumber(display, levelWindow, level);
+    DisplayLevelNumber(display, levelWindow, level);
 
-	/* Draw out the lives left pixmaps - only MAX_LIVES will be displayed */
-	for (i = 0; i < MIN(livesLeft, MAX_LIVES); i++)
-		DrawLife(display, window, 175 - (i * 30), 21);
+    /* Draw out the lives left pixmaps - only MAX_LIVES will be displayed */
+    for (i = 0; i < MIN(livesLeft, MAX_LIVES); i++)
+        DrawLife(display, window, 175 - (i * 30), 21);
 
-	/* Draw the score in the score window */
-	DisplayScore(display, scoreWindow, score);
+    /* Draw the score in the score window */
+    DisplayScore(display, scoreWindow, score);
 
-	/* Draw all the bullets in the ammo pouch ;-) */
-	ReDrawBulletsLeft(display);
+    /* Draw all the bullets in the ammo pouch ;-) */
+    ReDrawBulletsLeft(display);
 
-	XFlush(display);
+    XFlush(display);
 }
 
 void SetLevelNumber(int levelNum)
 {
-	level = (u_long) levelNum;
+    level = (u_long)levelNum;
 }
 
 void SetStartingLevel(int levelNum)
 {
-	startlevel = (u_long) levelNum;
+    startlevel = (u_long)levelNum;
 }
 
 void ChangeStartingLevel(Display *display)
 {
-	/*
-	 * This function will display the user input dialogue and ask the
-	 * user for a starting level. It is validated here and if valid it
-	 * will set the new starting level.
-	 */
-	char str[80];
-	int num;
-
+    /*
+     * This function will display the user input dialogue and ask the
+     * user for a starting level. It is validated here and if valid it
+     * will set the new starting level.
+     */
+    char str[80];
+    int num;
 
     sprintf(str, "Level range is [1-%d]", MAX_NUM_LEVELS);
-	SetCurrentMessage(display, messWindow, str, False);
+    SetCurrentMessage(display, messWindow, str, False);
 
-	str[0] = '\0';
+    str[0] = '\0';
 
-	/* Obtain a string from the user. Should contain NULL or numbers */
-	strcpy(str, UserInputDialogueMessage(display,
-    	"Input game starting level number.", TEXT_ICON, NUMERIC_ENTRY_ONLY));
+    /* Obtain a string from the user. Should contain NULL or numbers */
+    strcpy(str, UserInputDialogueMessage(display, "Input game starting level number.", TEXT_ICON,
+                                         NUMERIC_ENTRY_ONLY));
 
-	/* Nothing input so just return */
-	if (str[0] == '\0') return;
+    /* Nothing input so just return */
+    if (str[0] == '\0')
+        return;
 
     /* Obtain the start level setting */
     num = atoi(str);
     if ((num > 0) && (num <= MAX_NUM_LEVELS))
-	{
-		/* Ok now set the new starting level number */
-    	SetStartingLevel(num);
-		sprintf(str, "Starting level set to %d", num);
-		SetCurrentMessage(display, messWindow, str, True);
-	}
-	else
-	{
-		/* Value out of range so let them know the range. */
+    {
+        /* Ok now set the new starting level number */
+        SetStartingLevel(num);
+        sprintf(str, "Starting level set to %d", num);
+        SetCurrentMessage(display, messWindow, str, True);
+    }
+    else
+    {
+        /* Value out of range so let them know the range. */
         sprintf(str, "Invalid - level range [1-%d]", MAX_NUM_LEVELS);
-		SetCurrentMessage(display, messWindow, str, True);
-	}
+        SetCurrentMessage(display, messWindow, str, True);
+    }
 }
 
 int GetStartingLevel(void)
 {
-	return ((int) startlevel);
+    return ((int)startlevel);
 }
 
 void RedrawLevelInfo(Display *display, Window window)
 {
-	DisplayLevelInfo(display, window, level);
+    DisplayLevelInfo(display, window, level);
 }
 
 void FreeLevelInfo(Display *display)
 {
-	/* Free the life pixmap  */
-	if (lifePixmap)		XFreePixmap(display, lifePixmap);
-	if (lifeMask)		XFreePixmap(display, lifeMask);
+    /* Free the life pixmap  */
+    if (lifePixmap)
+        XFreePixmap(display, lifePixmap);
+    if (lifeMask)
+        XFreePixmap(display, lifeMask);
 }
 
 void DeleteABullet(Display *display)
 {
-	bulletPos = 192 - (GetNumberBullets() * 9);
+    bulletPos = 192 - (GetNumberBullets() * 9);
 
-	/* Take a bullet away from ammo belt */
-	EraseTheBullet(display, levelWindow, bulletPos, 43);
+    /* Take a bullet away from ammo belt */
+    EraseTheBullet(display, levelWindow, bulletPos, 43);
 
-	DecNumberBullets();
+    DecNumberBullets();
 }
 
 void AddABullet(Display *display)
 {
-	IncNumberBullets();
+    IncNumberBullets();
 
-	bulletPos = 192 - (GetNumberBullets() * 9);
+    bulletPos = 192 - (GetNumberBullets() * 9);
 
-	/* Add a bullet to the ammo belt */
-	DrawTheBullet(display, levelWindow, bulletPos, 43);
+    /* Add a bullet to the ammo belt */
+    DrawTheBullet(display, levelWindow, bulletPos, 43);
 }
 
 void ReDrawBulletsLeft(Display *display)
 {
-	int x, i;
+    int x, i;
 
-	/* Draw the bullets in the ammo belt */
-	for (i = 0; i < GetNumberBullets(); i++)
-	{
-		x = 192 - ((i+1) * 9);
-		DrawTheBullet(display, levelWindow, x, 43);
-	} 
+    /* Draw the bullets in the ammo belt */
+    for (i = 0; i < GetNumberBullets(); i++)
+    {
+        x = 192 - ((i + 1) * 9);
+        DrawTheBullet(display, levelWindow, x, 43);
+    }
 }
 
 int GetNumberLife(void)
 {
-	return livesLeft;
+    return livesLeft;
 }
 
 void SetLivesLeft(int new)
 {
-	livesLeft = new;
+    livesLeft = new;
 }
 
 void DecExtraLife(Display *display)
 {
-	/* Take a life */
-	if (mode != MODE_EDIT)
-		livesLeft--;
+    /* Take a life */
+    if (mode != MODE_EDIT)
+        livesLeft--;
 
-	if (livesLeft < 0) 
-		livesLeft = 0;
+    if (livesLeft < 0)
+        livesLeft = 0;
 
-	/* redraw the level info */
-	DisplayLevelInfo(display, levelWindow, level);
+    /* redraw the level info */
+    DisplayLevelInfo(display, levelWindow, level);
 }
 
 void AddExtraLife(Display *display)
 {
-	/* Add a new life */
-	livesLeft++;
+    /* Add a new life */
+    livesLeft++;
 
-	SetCurrentMessage(display, messWindow, "Extra ball", True);
+    SetCurrentMessage(display, messWindow, "Extra ball", True);
 
-	/* redraw the level info */
-	DisplayLevelInfo(display, levelWindow, level);
+    /* redraw the level info */
+    DisplayLevelInfo(display, levelWindow, level);
 }
 
 void CheckAndAddExtraLife(Display *display, long score)
 {
-	static int ballInc = 0;
+    static int ballInc = 0;
 
-	/* Add a new life? */
-	if ((score) && ((score / NEW_LIVE_SCORE_INC) != ballInc)) 
-	{
-		/* Add a new life */
-		AddExtraLife(display);
-	}
+    /* Add a new life? */
+    if ((score) && ((score / NEW_LIVE_SCORE_INC) != ballInc))
+    {
+        /* Add a new life */
+        AddExtraLife(display);
+    }
 
-	/* Next inc before adding a new life */
-	ballInc = score / NEW_LIVE_SCORE_INC;
+    /* Next inc before adding a new life */
+    ballInc = score / NEW_LIVE_SCORE_INC;
 }
 
 void HandleGameTimer(Display *display, Window window)
 {
-	static time_t oldTime = 0;
+    static time_t oldTime = 0;
 
-	/* Time to decrement the timer */
-	if (time(NULL) > oldTime)
-	{
-		/* Decrement the timer bonus */
-		DecLevelTimeBonus(display, timeWindow);
-		oldTime = time(NULL);
-	}
+    /* Time to decrement the timer */
+    if (time(NULL) > oldTime)
+    {
+        /* Decrement the timer bonus */
+        DecLevelTimeBonus(display, timeWindow);
+        oldTime = time(NULL);
+    }
 }
 
 void CheckGameRules(Display *display, Window window)
 {
-	CheckAndAddExtraLife(display, score);
+    CheckAndAddExtraLife(display, score);
 
-	HandleGameTimer(display, window);
+    HandleGameTimer(display, window);
 
-	if (StillActiveBlocks() == False)
-	{
-		/* Turn off the x2 x4 bonuses so bonus screen is x2 or x4 */
-		Togglex2Bonus(display, False);
-		Togglex4Bonus(display, False);
-		DrawSpecials(display);
+    if (StillActiveBlocks() == False)
+    {
+        /* Turn off the x2 x4 bonuses so bonus screen is x2 or x4 */
+        Togglex2Bonus(display, False);
+        Togglex4Bonus(display, False);
+        DrawSpecials(display);
 
-		/* Give the play a big head with some applause */
-		if (noSound == False) playSoundFile("applause", 70);
+        /* Give the play a big head with some applause */
+        if (noSound == False)
+            playSoundFile("applause", 70);
 
-		/* Finished level now so set up bonus screen */
+        /* Finished level now so set up bonus screen */
         mode = MODE_BONUS;
-		SetupBonusScreen(display, mainWindow);
-	}
+        SetupBonusScreen(display, mainWindow);
+    }
 }
 
 void UpdateHighScores(Display *display)
 {
-	time_t endTime;
-	u_long theLevel;
-	char message[80];
+    time_t endTime;
+    u_long theLevel;
+    char message[80];
 
-	/* Obtain the game duration in seconds - taking account for pauses */
-	endTime = time(NULL) - gameTime - pausedTime;
+    /* Obtain the game duration in seconds - taking account for pauses */
+    endTime = time(NULL) - gameTime - pausedTime;
 
-	/* Adjust the level so that the starting level is taken into account */
-	theLevel = level - (u_long) GetStartingLevel() + 1L;
+    /* Adjust the level so that the starting level is taken into account */
+    theLevel = level - (u_long)GetStartingLevel() + 1L;
 
-	/* If the user is the new boing master */
-	if (GetHighScoreRanking(score) == 1)
-	{
-		if (noSound == False) playSoundFile("youagod", 99);
+    /* If the user is the new boing master */
+    if (GetHighScoreRanking(score) == 1)
+    {
+        if (noSound == False)
+            playSoundFile("youagod", 99);
 
-		/* Ask them for some words of wisdom */
-		strcpy(message, UserInputDialogueMessage(display,
-        	"Words of wisdom Boing Master?", TEXT_ICON, TEXT_ENTRY_ONLY));
-	}
+        /* Ask them for some words of wisdom */
+        strcpy(message, UserInputDialogueMessage(display, "Words of wisdom Boing Master?",
+                                                 TEXT_ICON, TEXT_ENTRY_ONLY));
+    }
 
-	/* Update the high score table */
-	(void) CheckAndAddScoreToHighScore(score, theLevel, endTime, PERSONAL,
-		message);
-	if (CheckAndAddScoreToHighScore(score, theLevel, endTime, GLOBAL, 
-	  message) == False)
-		ResetHighScore(PERSONAL);
-	else
-		ResetHighScore(GLOBAL);
+    /* Update the high score table */
+    (void)CheckAndAddScoreToHighScore(score, theLevel, endTime, PERSONAL, message);
+    if (CheckAndAddScoreToHighScore(score, theLevel, endTime, GLOBAL, message) == False)
+        ResetHighScore(PERSONAL);
+    else
+        ResetHighScore(GLOBAL);
 }
-
 
 void EndTheGame(Display *display, Window window)
 {
-	/* Game over man! */
-	SetCurrentMessage(display, messWindow, "- Game Over - ", True);
+    /* Game over man! */
+    SetCurrentMessage(display, messWindow, "- Game Over - ", True);
 
-	if (noSound == False) playSoundFile("game_over", 99);
+    if (noSound == False)
+        playSoundFile("game_over", 99);
 
-	TurnSpecialsOff(display);
+    TurnSpecialsOff(display);
 
-	UpdateHighScores(display);
+    UpdateHighScores(display);
 
-	/* redraw the level info */
-	DisplayLevelInfo(display, levelWindow, level);
+    /* redraw the level info */
+    DisplayLevelInfo(display, levelWindow, level);
 
-	/* Reset game and setup for high score table */
-	gameActive = False;
-	SetLevelNumber(GetStartingLevel());
-	ResetIntroduction();
-	mode = MODE_HIGHSCORE;
-
+    /* Reset game and setup for high score table */
+    gameActive = False;
+    SetLevelNumber(GetStartingLevel());
+    ResetIntroduction();
+    mode = MODE_HIGHSCORE;
 }
 
 void DeadBall(Display *display, Window window)
 {
-	if (noSound == False) playSoundFile("balllost", 99);
+    if (noSound == False)
+        playSoundFile("balllost", 99);
 
-	/* More than one ball on screen - 1 died */
-	SetCurrentMessage(display, messWindow, "Another one bites the dust!", True);
+    /* More than one ball on screen - 1 died */
+    SetCurrentMessage(display, messWindow, "Another one bites the dust!", True);
 
-	if (livesLeft <= 0 && GetAnActiveBall() == -1)
-		EndTheGame(display, window);
-	else 
-	{
-		/* Start a new ball if some to spare */
-		if (GetAnActiveBall() == -1 && livesLeft > 0)
-		{
-			/* Last ball on screen died so start a new one */
-			SetCurrentMessage(display, messWindow, "Balls Terminated!", True);
+    if (livesLeft <= 0 && GetAnActiveBall() == -1)
+        EndTheGame(display, window);
+    else
+    {
+        /* Start a new ball if some to spare */
+        if (GetAnActiveBall() == -1 && livesLeft > 0)
+        {
+            /* Last ball on screen died so start a new one */
+            SetCurrentMessage(display, messWindow, "Balls Terminated!", True);
 
-			SetReverseOff();
-			DrawSpecials(display);
+            SetReverseOff();
+            DrawSpecials(display);
 
-			/* Make the paddle the maximum size */
-			ChangePaddleSize(display, window, PAD_EXPAND_BLK);
-			ChangePaddleSize(display, window, PAD_EXPAND_BLK);
+            /* Make the paddle the maximum size */
+            ChangePaddleSize(display, window, PAD_EXPAND_BLK);
+            ChangePaddleSize(display, window, PAD_EXPAND_BLK);
 
-			/* Decrement the number of lives left and display so */
-			DecExtraLife(display);
+            /* Decrement the number of lives left and display so */
+            DecExtraLife(display);
 
-			ResetBallStart(display, window);
-		}
-	}
+            ResetBallStart(display, window);
+        }
+    }
 }
 
 char *GetLevelName(void)
 {
-	/* Return the name of the current level */
-	return (levelTitle);
+    /* Return the name of the current level */
+    return (levelTitle);
 }

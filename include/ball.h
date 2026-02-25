@@ -29,7 +29,7 @@
  * enhancements, or modifications.
  */
 
-/* 
+/*
  * =========================================================================
  *
  * $Id: ball.h,v 1.1.1.1 1994/12/16 01:36:50 jck Exp $
@@ -50,8 +50,8 @@
  *  Dependencies on other include files:
  */
 
-#include <X11/Xlib.h>
 #include "ball_types.h"
+#include <X11/Xlib.h>
 
 /*
  *  Function prototypes:

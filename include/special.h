@@ -29,7 +29,7 @@
  * enhancements, or modifications.
  */
 
-/* 
+/*
  * =========================================================================
  *
  * $Id: special.h,v 1.1.1.1 1994/12/16 01:36:54 jck Exp $
@@ -56,10 +56,10 @@
  *  Constants and macros:
  */
 
-#define REVERSE     1
-#define STICKY      2
+#define REVERSE 1
+#define STICKY 2
 
-#define FLASH		500
+#define FLASH 500
 
 /*
  *  Type declarations:
