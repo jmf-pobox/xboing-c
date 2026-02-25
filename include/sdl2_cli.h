@@ -4,7 +4,7 @@
 /*
  * sdl2_cli.h — Command-line option parsing for SDL2-based XBoing.
  *
- * Replaces the legacy case-insensitive prefix-matching parser in init.c with
+ * Replaces the legacy prefix-matching parser in init.c with
  * a standalone module.  Parses argv into a config struct; the caller wires
  * values into SDL2 subsystems (sdl2_loop, sdl2_audio, etc.).
  *

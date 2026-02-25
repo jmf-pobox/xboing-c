@@ -261,7 +261,8 @@ static void test_speed_non_numeric(void **state)
     sdl2_cli_config_t cfg = sdl2_cli_config_defaults();
     const char *bad = NULL;
     char *const argv[] = {"xboing", "-speed", "abc"};
-    assert_int_equal(sdl2_cli_parse(3, argv, &cfg, &bad), SDL2C_ERR_MISSING_VALUE);
+    assert_int_equal(sdl2_cli_parse(3, argv, &cfg, &bad), SDL2C_ERR_INVALID_VALUE);
+    assert_string_equal(bad, "-speed");
 }
 
 /* =========================================================================

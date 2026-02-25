@@ -7,6 +7,8 @@
 
 #include "sdl2_cli.h"
 
+#include <errno.h>
+#include <limits.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -15,11 +17,11 @@
  * ========================================================================= */
 
 /*
- * Case-insensitive prefix match — replicates the legacy compareArgument
- * behavior from init.c.  Returns true if the first `prefix_len` characters
- * of `arg` match `option` (case-insensitive).
+ * Exact, case-sensitive option match.
  *
- * Unlike the legacy code, we require an exact full match to avoid ambiguity.
+ * Returns true if and only if `arg` and `option` are identical strings.
+ * This is stricter than the legacy compareArgument() in init.c, which
+ * allowed prefix matching via strncmp().  Exact match avoids ambiguity.
  */
 static bool match_option(const char *arg, const char *option)
 {
@@ -31,28 +33,46 @@ static bool match_option(const char *arg, const char *option)
 }
 
 /*
+ * Result of parse_int_arg: missing (argv exhausted), invalid (present but
+ * not a valid integer), or ok (parsed successfully).
+ */
+typedef enum
+{
+    PARSE_INT_OK,
+    PARSE_INT_MISSING,
+    PARSE_INT_INVALID
+} parse_int_result_t;
+
+/*
  * Try to consume the next argv element as an integer value.
- * Returns true and writes *value on success; returns false on parse failure.
+ * Returns PARSE_INT_MISSING if no argument follows, PARSE_INT_INVALID if
+ * the argument is not a valid integer (or overflows), PARSE_INT_OK on
+ * success (writes *value).
  */
 // cppcheck-suppress constParameter
-static bool parse_int_arg(int argc, char *const argv[], int *i, int *value)
+static parse_int_result_t parse_int_arg(int argc, char *const argv[], int *i, int *value)
 {
     if (*i + 1 >= argc)
     {
-        return false;
+        return PARSE_INT_MISSING;
     }
 
     (*i)++;
     char *end = NULL;
+    errno = 0;
     long v = strtol(argv[*i], &end, 10);
 
     if (end == argv[*i] || *end != '\0')
     {
-        return false;
+        return PARSE_INT_INVALID;
+    }
+    if (errno == ERANGE || v < INT_MIN || v > INT_MAX)
+    {
+        return PARSE_INT_INVALID;
     }
 
     *value = (int)v;
-    return true;
+    return PARSE_INT_OK;
 }
 
 /*
@@ -97,6 +117,11 @@ sdl2_cli_status_t sdl2_cli_parse(int argc, char *const argv[], sdl2_cli_config_t
     if (config == NULL)
     {
         return SDL2C_ERR_NULL_ARG;
+    }
+
+    if (bad_option != NULL)
+    {
+        *bad_option = NULL;
     }
 
     for (int i = 1; i < argc; i++)
@@ -162,7 +187,8 @@ sdl2_cli_status_t sdl2_cli_parse(int argc, char *const argv[], sdl2_cli_config_t
         if (match_option(arg, "-speed"))
         {
             int val = 0;
-            if (!parse_int_arg(argc, argv, &i, &val))
+            parse_int_result_t r = parse_int_arg(argc, argv, &i, &val);
+            if (r == PARSE_INT_MISSING)
             {
                 if (bad_option != NULL)
                 {
@@ -170,7 +196,7 @@ sdl2_cli_status_t sdl2_cli_parse(int argc, char *const argv[], sdl2_cli_config_t
                 }
                 return SDL2C_ERR_MISSING_VALUE;
             }
-            if (val < SDL2C_MIN_SPEED || val > SDL2C_MAX_SPEED)
+            if (r == PARSE_INT_INVALID || val < SDL2C_MIN_SPEED || val > SDL2C_MAX_SPEED)
             {
                 if (bad_option != NULL)
                 {
@@ -185,7 +211,8 @@ sdl2_cli_status_t sdl2_cli_parse(int argc, char *const argv[], sdl2_cli_config_t
         if (match_option(arg, "-startlevel"))
         {
             int val = 0;
-            if (!parse_int_arg(argc, argv, &i, &val))
+            parse_int_result_t r = parse_int_arg(argc, argv, &i, &val);
+            if (r == PARSE_INT_MISSING)
             {
                 if (bad_option != NULL)
                 {
@@ -193,7 +220,7 @@ sdl2_cli_status_t sdl2_cli_parse(int argc, char *const argv[], sdl2_cli_config_t
                 }
                 return SDL2C_ERR_MISSING_VALUE;
             }
-            if (val < SDL2C_MIN_LEVEL || val > SDL2C_MAX_LEVEL)
+            if (r == PARSE_INT_INVALID || val < SDL2C_MIN_LEVEL || val > SDL2C_MAX_LEVEL)
             {
                 if (bad_option != NULL)
                 {
@@ -208,7 +235,8 @@ sdl2_cli_status_t sdl2_cli_parse(int argc, char *const argv[], sdl2_cli_config_t
         if (match_option(arg, "-maxvol"))
         {
             int val = 0;
-            if (!parse_int_arg(argc, argv, &i, &val))
+            parse_int_result_t r = parse_int_arg(argc, argv, &i, &val);
+            if (r == PARSE_INT_MISSING)
             {
                 if (bad_option != NULL)
                 {
@@ -216,7 +244,7 @@ sdl2_cli_status_t sdl2_cli_parse(int argc, char *const argv[], sdl2_cli_config_t
                 }
                 return SDL2C_ERR_MISSING_VALUE;
             }
-            if (val < SDL2C_MIN_VOLUME || val > SDL2C_MAX_VOLUME)
+            if (r == PARSE_INT_INVALID || val < SDL2C_MIN_VOLUME || val > SDL2C_MAX_VOLUME)
             {
                 if (bad_option != NULL)
                 {

@@ -812,7 +812,8 @@ Replace the sleep-based timing with a fixed-timestep accumulator pattern:
 **Context:**
 
 The legacy CLI parser in `init.c:507-693` uses `compareArgument()` — a
-case-insensitive prefix matcher — to parse 17 command-line options. Four of
+case-sensitive prefix matcher implemented with `strncmp()` — to parse 17
+command-line options. Four of
 these are X11-specific (`-display`, `-sync`, `-usedefcmap`, `-noicon`) and
 have no SDL2 equivalent. The parser is tightly coupled to global variables
 (`noSound`, `grabPointer`, `debug`, etc.) and calls side-effecting functions
@@ -839,8 +840,10 @@ Extract CLI parsing into a standalone pure-C module with no SDL2 dependency:
   `SDL2C_ERR_*` codes signal parse errors with `bad_option` out-parameter.
 - **Nickname truncation** — matches legacy behavior of silently truncating
   nicknames longer than 20 characters.
-- **Integer validation** — `strtol()` with full error checking replaces
-  legacy `atoi()` (which silently returns 0 on non-numeric input).
+- **Integer validation** — `strtol()` with `ERANGE` and `INT_MIN`/`INT_MAX`
+  bounds checking replaces legacy `atoi()` (which silently returns 0 on
+  non-numeric input).  Non-numeric arguments return `ERR_INVALID_VALUE`
+  (distinct from `ERR_MISSING_VALUE` for exhausted argv).
 
 **What we are NOT doing:**
 
