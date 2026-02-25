@@ -201,3 +201,12 @@ if(SDL2_FOUND)
     add_test(NAME test_sdl2_cursor COMMAND test_sdl2_cursor)
     set_tests_properties(test_sdl2_cursor PROPERTIES ENVIRONMENT "SDL_VIDEODRIVER=dummy")
 endif()
+
+# SDL2 render regions tests (bead xboing-oaa.6)
+# Pure data tests — no video driver needed, but SDL2 headers required.
+if(SDL2_FOUND)
+    add_executable(test_sdl2_regions test_sdl2_regions.c)
+    target_compile_options(test_sdl2_regions PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+    target_link_libraries(test_sdl2_regions PRIVATE sdl2_regions ${CMOCKA_LIBRARIES})
+    add_test(NAME test_sdl2_regions COMMAND test_sdl2_regions)
+endif()
