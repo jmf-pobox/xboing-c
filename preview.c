@@ -26,7 +26,7 @@
  * enhancements, or modifications.
  */
 
-/* 
+/*
  * =========================================================================
  *
  * $Id: preview.c,v 1.1.1.1 1994/12/16 01:36:48 jck Exp $
@@ -47,33 +47,33 @@
  *  Include file dependencies:
  */
 
+#include <X11/Xlib.h>
+#include <X11/Xos.h>
+#include <X11/Xutil.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stddef.h>
-#include <X11/Xlib.h>
-#include <X11/Xutil.h>
-#include <X11/Xos.h>
 #include <xpm.h>
 
-#include "error.h"
-#include "misc.h"
-#include "gun.h"
-#include "main.h"
-#include "init.h"
-#include "file.h"
-#include "inst.h"
-#include "stage.h"
-#include "blocks.h"
-#include "sfx.h"
-#include "special.h"
-#include "ball.h"
-#include "score.h"
-#include "paddle.h"
-#include "level.h"
-#include "mess.h"
 #include "audio.h"
+#include "ball.h"
+#include "blocks.h"
+#include "error.h"
+#include "file.h"
+#include "gun.h"
+#include "init.h"
+#include "inst.h"
 #include "intro.h"
 #include "keys.h"
+#include "level.h"
+#include "main.h"
+#include "mess.h"
+#include "misc.h"
+#include "paddle.h"
+#include "score.h"
+#include "sfx.h"
+#include "special.h"
+#include "stage.h"
 #include "version.h"
 
 #include "preview.h"
@@ -101,23 +101,24 @@ static enum PreviewStates waitMode;
 
 void SetUpPreviewLevel(Display *display, Window window, Colormap colormap)
 {
-	ResetPreviewLevel();
+    ResetPreviewLevel();
 }
 
 static void DoLoadLevel(Display *display, Window window)
 {
-	int lnum = 1;
+    int lnum = 1;
     char levelPath[1024];
     char str2[80];
     char *str;
     static int bgrnd = 1;
 
     bgrnd++;
-    if (bgrnd == 6) bgrnd = 2;
+    if (bgrnd == 6)
+        bgrnd = 2;
     DrawStageBackground(display, window, bgrnd, True);
 
-	/* choose a random level */
-	lnum = (rand() % (MAX_NUM_LEVELS - 1)) + 1;
+    /* choose a random level */
+    lnum = (rand() % (MAX_NUM_LEVELS - 1)) + 1;
 
     /* Construct the Preview level filename */
     if ((str = getenv("XBOING_LEVELS_DIR")) != NULL)
@@ -125,39 +126,37 @@ static void DoLoadLevel(Display *display, Window window)
     else
         sprintf(levelPath, "%s/level%02d.data", LEVEL_INSTALL_DIR, lnum);
 
-	/* Read in a Preview level */
+    /* Read in a Preview level */
     if (ReadNextLevel(display, window, levelPath, True) == False)
         ShutDown(display, 1, "Sorry, invalid level specified.");
 
-	sprintf(str2, "- %s -", GetLevelName());
-	DrawShadowCentredText(display, window, titleFont, 
-		str2, PLAY_HEIGHT - 80, red, PLAY_WIDTH);
+    sprintf(str2, "- %s -", GetLevelName());
+    DrawShadowCentredText(display, window, titleFont, str2, PLAY_HEIGHT - 80, red, PLAY_WIDTH);
 
-	/* Be very friendly */
-	sprintf(str2, "Preview of level %d", lnum);
-	SetCurrentMessage(display, messWindow, str2, False);
+    /* Be very friendly */
+    sprintf(str2, "Preview of level %d", lnum);
+    SetCurrentMessage(display, messWindow, str2, False);
 
-	DisplayLevelInfo(display, levelWindow, (u_long) lnum);
+    DisplayLevelInfo(display, levelWindow, (u_long)lnum);
 }
 
 static void DoText(Display *display, Window window)
 {
-	char string[80];
-	int y;
+    char string[80];
+    int y;
 
-	y = PLAY_HEIGHT - 27;
+    y = PLAY_HEIGHT - 27;
 
-	strcpy(string, "Insert coin to start the game");
-	DrawShadowCentredText(display, window, textFont, 
-		string, y, tann, PLAY_WIDTH);
+    strcpy(string, "Insert coin to start the game");
+    DrawShadowCentredText(display, window, textFont, string, y, tann, PLAY_WIDTH);
 
-	if (noSound == False) 
-	{
-		if ((rand() % 3) == 0)
-			playSoundFile("looksbad", 80);
-	}
+    if (noSound == False)
+    {
+        if ((rand() % 3) == 0)
+            playSoundFile("looksbad", 80);
+    }
 
-	SetPreviewWait(PREVIEW_FINISH, frame + 5000);
+    SetPreviewWait(PREVIEW_FINISH, frame + 5000);
 }
 
 static void DoFinish(Display *display, Window window)
@@ -173,47 +172,48 @@ static void DoFinish(Display *display, Window window)
 
 void PreviewLevel(Display *display, Window window)
 {
-	switch (PreviewState)
-	{
-		case PREVIEW_LEVEL:
-			if (getSpecialEffects(display) == True)
-				DoLoadLevel(display, bufferWindow);
-			else
-				DoLoadLevel(display, window);
-			PreviewState = PREVIEW_TEXT;
-			break;
+    switch (PreviewState)
+    {
+        case PREVIEW_LEVEL:
+            if (getSpecialEffects(display) == True)
+                DoLoadLevel(display, bufferWindow);
+            else
+                DoLoadLevel(display, window);
+            PreviewState = PREVIEW_TEXT;
+            break;
 
-		case PREVIEW_TEXT:
-			if (getSpecialEffects(display) == True)
-			{
-				DoText(display, bufferWindow);
-				while (WindowShatterEffect(display, window));
-			}
-			else
-				DoText(display, window);
-			break;
+        case PREVIEW_TEXT:
+            if (getSpecialEffects(display) == True)
+            {
+                DoText(display, bufferWindow);
+                while (WindowShatterEffect(display, window))
+                    ;
+            }
+            else
+                DoText(display, window);
+            break;
 
-		case PREVIEW_FINISH:
-			DoFinish(display, window);
-			break;
+        case PREVIEW_FINISH:
+            DoFinish(display, window);
+            break;
 
-		case PREVIEW_WAIT:
-			BorderGlow(display, window);
+        case PREVIEW_WAIT:
+            BorderGlow(display, window);
             if ((frame % FLASH) == 0)
                 RandomDrawSpecials(display);
 
-			DoPreviewWait();
-			break;
+            DoPreviewWait();
+            break;
 
-		default:
-			break;
-	}
+        default:
+            break;
+    }
 }
 
 void RedrawPreviewLevel(Display *display, Window window)
 {
-	DoLoadLevel(display, window);
-	DoText(display, window);
+    DoLoadLevel(display, window);
+    DoText(display, window);
 }
 
 void FreePreviewLevel(Display *display)
@@ -222,20 +222,20 @@ void FreePreviewLevel(Display *display)
 
 void ResetPreviewLevel(void)
 {
-	PreviewState = PREVIEW_LEVEL;
+    PreviewState = PREVIEW_LEVEL;
 
-	DEBUG("Reset PreviewLevel mode.")
+    DEBUG("Reset PreviewLevel mode.")
 }
 
 void SetPreviewWait(enum PreviewStates newMode, int waitFrame)
 {
-	waitingFrame = waitFrame;
-	waitMode = newMode;
-	PreviewState = PREVIEW_WAIT;
+    waitingFrame = waitFrame;
+    waitMode = newMode;
+    PreviewState = PREVIEW_WAIT;
 }
 
 void DoPreviewWait(void)
 {
-	if (frame == waitingFrame)
-		PreviewState = waitMode;
+    if (frame == waitingFrame)
+        PreviewState = waitMode;
 }

@@ -29,7 +29,7 @@
  * enhancements, or modifications.
  */
 
-/* 
+/*
  * =========================================================================
  *
  * $Id: preview.h,v 1.1.1.1 1994/12/16 01:36:55 jck Exp $
@@ -60,12 +60,12 @@
  *  Type declarations:
  */
 
-enum PreviewStates 
-{ 
-	PREVIEW_LEVEL, 
-	PREVIEW_TEXT, 
-	PREVIEW_WAIT, 
-	PREVIEW_FINISH 
+enum PreviewStates
+{
+    PREVIEW_LEVEL,
+    PREVIEW_TEXT,
+    PREVIEW_WAIT,
+    PREVIEW_FINISH
 };
 
 /*
@@ -78,7 +78,6 @@ void RedrawPreviewLevel(Display *display, Window window);
 void FreePreviewLevel(Display *display);
 void ResetPreviewLevel(void);
 
-extern 	enum PreviewStates PreviewState;
-
+extern enum PreviewStates PreviewState;
 
 #endif
