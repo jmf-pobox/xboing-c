@@ -29,7 +29,7 @@
  * enhancements, or modifications.
  */
 
-/* 
+/*
  * =========================================================================
  *
  * $Id: presents.h,v 1.1.1.1 1994/12/16 01:36:54 jck Exp $
@@ -60,22 +60,22 @@
  *  Type declarations:
  */
 
-enum PresentStates 
-{ 
-	PRESENT_WAIT,
-	PRESENT_FLAG,
-	PRESENT_FINISH,
-	PRESENT_LETTERS,
-	PRESENT_SFX,
-	PRESENT_SPECIAL_TEXT1,
-	PRESENT_SPECIAL_TEXT2,
-	PRESENT_SPECIAL_TEXT3,
-	PRESENT_CLEAR,
-	PRESENT_SHINE,
-	PRESENT_TEXT1,
-	PRESENT_TEXT2,
-	PRESENT_TEXT3,
-	PRESENT_TEXT_CLEAR
+enum PresentStates
+{
+    PRESENT_WAIT,
+    PRESENT_FLAG,
+    PRESENT_FINISH,
+    PRESENT_LETTERS,
+    PRESENT_SFX,
+    PRESENT_SPECIAL_TEXT1,
+    PRESENT_SPECIAL_TEXT2,
+    PRESENT_SPECIAL_TEXT3,
+    PRESENT_CLEAR,
+    PRESENT_SHINE,
+    PRESENT_TEXT1,
+    PRESENT_TEXT2,
+    PRESENT_TEXT3,
+    PRESENT_TEXT_CLEAR
 };
 
 /*
@@ -90,7 +90,7 @@ void ResetPresents(void);
 void QuickFinish(Display *display, Window window);
 void FreeSomePresents(Display *display);
 
-extern 	enum PresentStates PresentState;
+extern enum PresentStates PresentState;
 extern Pixmap earthPixmap, earthPixmapM;
 
 #endif
