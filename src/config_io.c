@@ -257,7 +257,7 @@ static int read_config_toml(FILE *fp, config_data_t *data)
 
     /* An empty file or comment-only file is valid — defaults are fine. */
     (void)found_any;
-    return 0;
+    return ferror(fp) ? -1 : 0;
 }
 
 /* =========================================================================
