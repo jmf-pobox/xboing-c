@@ -10,7 +10,7 @@
  * of the 18-row block grid are reserved for the paddle area.
  *
  * Opaque context pattern: no globals, fully testable with CMocka stubs.
- * See ADR-037 in docs/DESIGN.md for design rationale.
+ * See docs/DESIGN.md for design rationale.
  */
 
 #ifndef EDITOR_SYSTEM_H
@@ -166,7 +166,7 @@ void editor_system_update(editor_system_t *ctx, int frame);
 /* Return the current editor state. */
 editor_state_t editor_system_get_state(const editor_system_t *ctx);
 
-/* Reset editor to EDIT_LEVEL state. */
+/* Reset editor to EDITOR_STATE_LEVEL state. */
 void editor_system_reset(editor_system_t *ctx);
 
 /* =========================================================================

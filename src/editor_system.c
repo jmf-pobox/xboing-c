@@ -4,7 +4,7 @@
  * Extracted from legacy editor.c (1199 lines of X11-coupled code) into
  * a callback-based module with zero platform dependencies.
  *
- * See ADR-037 in docs/DESIGN.md for design rationale.
+ * See docs/DESIGN.md for design rationale.
  */
 
 #include "editor_system.h"
@@ -87,34 +87,22 @@ static int in_editable_bounds(int row, int col)
 }
 
 /*
- * Normalize random blocks: if a cell has the random flag set,
- * force its block_type back to RANDOM_BLK.  This is needed before
- * and after board transforms so the transform operates on RANDOM_BLK
- * type values rather than the resolved random type.
+ * Normalize random blocks.
+ *
+ * In the legacy editor, this walked the internal board representation and,
+ * for any cell with the "random" flag set, forced its block_type back to
+ * RANDOM_BLK so that board transforms operated on RANDOM_BLK values rather
+ * than on a resolved concrete type.
+ *
+ * In this callback-based implementation, editor_cell_t does not expose a
+ * "random" flag, and the normalization of random blocks (if needed) is
+ * handled by the integration layer via the callback interface / level
+ * loading path.  As a result, this function is intentionally a no-op and
+ * exists only for API completeness and to mirror the legacy structure.
  */
 static void normalize_random_blocks(editor_system_t *ctx)
 {
-    editor_cell_t cell;
-
-    if (ctx->cb.query_cell == NULL)
-        return;
-
-    for (int r = 0; r < EDITOR_MAX_ROW_EDIT; r++)
-    {
-        for (int c = 0; c < EDITOR_MAX_COL_EDIT; c++)
-        {
-            if (ctx->cb.query_cell(r, c, &cell, ctx->user_data) && cell.occupied)
-            {
-                /* Check if cell was originally a random block */
-                if (cell.block_type == RANDOM_BLK)
-                    continue; /* Already correct */
-                /* The legacy code checked blocks[r][c].random flag.
-                 * We rely on query_cell returning the current type.
-                 * Random blocks that were resolved keep RANDOM_BLK type
-                 * through the level_system loading path. */
-            }
-        }
-    }
+    (void)ctx; /* Normalization is delegated to the integration layer. */
 }
 
 static void place_block(editor_system_t *ctx, int row, int col, int block_type, int counter_slide,
