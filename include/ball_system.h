@@ -177,13 +177,50 @@ ball_system_status_t ball_system_clear(ball_system_t *ctx, int index);
 ball_system_status_t ball_system_clear_all(ball_system_t *ctx);
 
 /* =========================================================================
- * Per-frame update (PR 2+)
+ * Ball state control
+ * ========================================================================= */
+
+/*
+ * Change ball state (e.g., BALL_POP to kill a ball).
+ * When entering BALL_POP, sets up the pop animation countdown.
+ */
+ball_system_status_t ball_system_change_mode(ball_system_t *ctx, const ball_system_env_t *env,
+                                             int index, enum BallStates mode);
+
+/*
+ * Activate the first READY ball — applies guide direction and fires it.
+ * Returns the slot index of the activated ball, or -1 if none waiting.
+ */
+int ball_system_activate_waiting(ball_system_t *ctx, const ball_system_env_t *env);
+
+/*
+ * Create a new ball on the paddle (reset after death).
+ * Adds a ball at the paddle position in BALL_WAIT → BALL_CREATE sequence.
+ * Emits BALL_EVT_RESET_START via callback.
+ * Returns the slot index, or -1 if all slots full.
+ */
+int ball_system_reset_start(ball_system_t *ctx, const ball_system_env_t *env);
+
+/*
+ * Auto-tilt: randomize ball velocity to break infinite loops.
+ * Only affects balls in BALL_ACTIVE state.
+ * Emits BALL_EVT_TILT and "Auto Tilt Activated" message via callbacks.
+ */
+void ball_system_do_tilt(ball_system_t *ctx, const ball_system_env_t *env, int index);
+
+/* =========================================================================
+ * Per-frame update
  * ========================================================================= */
 
 /*
  * Main update: iterate all active balls, dispatch state machine.
  * This is the equivalent of legacy HandleBallMode().
- * (Stubbed in PR 1 — implementation lands in PR 2.)
+ *
+ * Handles: BALL_CREATE animation, BALL_READY (follow paddle + auto-activate),
+ * BALL_ACTIVE (physics + wall/paddle collision), BALL_DIE (move until off-screen),
+ * BALL_POP (countdown animation), BALL_WAIT (frame delay).
+ *
+ * Block collision and ball-to-ball collision are handled via callbacks (PR 3).
  */
 void ball_system_update(ball_system_t *ctx, const ball_system_env_t *env);
 
