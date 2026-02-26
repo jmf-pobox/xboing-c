@@ -491,6 +491,18 @@ target_include_directories(demo_system PUBLIC
 )
 target_compile_options(demo_system PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
 
+# --- Keys and editor controls screen sequencer library -----------------------
+#
+# Pure C module — no SDL2 or X11 dependency.  Owns both the game controls
+# screen (key bindings + mouse diagram) and editor controls screen (editor
+# instructions + editor key bindings).  Static data tables for key bindings.
+
+add_library(keys_system STATIC src/keys_system.c)
+target_include_directories(keys_system PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+target_compile_options(keys_system PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+
 # --- Tests ------------------------------------------------------------------
 
 option(BUILD_TESTING "Build unit tests" ON)
