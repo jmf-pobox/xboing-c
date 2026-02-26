@@ -352,6 +352,17 @@ target_include_directories(block_system PUBLIC
 )
 target_compile_options(block_system PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
 
+# --- Paddle system library --------------------------------------------------
+#
+# Pure C module — no SDL2 or X11 dependency.  Owns paddle position, size,
+# control flags (reverse, sticky), and movement logic with clamping.
+
+add_library(paddle_system STATIC src/paddle_system.c)
+target_include_directories(paddle_system PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+target_compile_options(paddle_system PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+
 # --- Tests ------------------------------------------------------------------
 
 option(BUILD_TESTING "Build unit tests" ON)
