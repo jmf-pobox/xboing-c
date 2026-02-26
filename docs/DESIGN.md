@@ -1554,3 +1554,56 @@ Key design choices:
   wipe position) is owned by the opaque context.
 - 18 CMocka tests across 7 groups cover lifecycle, flag state, letter
   stamping, sparkle, typewriter, curtain wipe, skip, and null safety.
+
+## ADR-026: Pure C intro and instructions screen sequencer
+
+**Status:** Accepted
+
+**Context:**
+Legacy `intro.c` (472 lines) and `inst.c` (290 lines) implement two
+related screens: the intro screen (title + 22 block descriptions +
+sparkle animation + devil eyes blink) and the instructions screen
+(title + 20-line instruction text + sparkle animation).  Both share
+the sparkle star animation pattern and big title bitmap.
+
+Both modules use function-local statics for sparkle state and global
+variables for frame timing.  The block descriptions in DoBlocks() are
+hardcoded as 22 sequential draw calls with varying x/y offsets.
+The instruction text in inst.c is a static string array with NULL
+spacers.
+
+**Decision:**
+Create a single `intro_system.c`/`intro_system.h` module that handles
+both screens, selected by an `intro_screen_mode_t` parameter.
+
+Key design choices:
+
+1. **Two modes, one module:** INTRO mode flows TITLE -> BLOCKS -> TEXT
+   -> SPARKLE.  INSTRUCT mode flows TITLE -> TEXT -> SPARKLE (skips
+   BLOCKS).  Both share sparkle animation code.
+
+2. **Static data tables:** The 22 block descriptions and 20 instruction
+   text lines are const static arrays, replacing hardcoded draw calls.
+   Each block entry stores type enum, x/y position, x/y adjustments,
+   and description string.
+
+3. **Injectable random function:** `intro_rand_fn` for deterministic
+   sparkle position testing.
+
+4. **Timing queries:** `should_blink()` and `should_draw_specials()`
+   let the integration layer know when to trigger devil eyes and
+   special effect draws, matching legacy `HandleBlink()` and
+   `FLASH` interval logic.
+
+5. **End frame offset:** Intro ends at +3000 frames, instructions at
+   +7000 frames, matching legacy values.
+
+**Consequences:**
+
+- Eliminates all X11 dependency from both intro and instructions
+  screens.
+- Block descriptions are data-driven instead of hardcoded draw calls.
+- Shared sparkle animation eliminates code duplication between the
+  two modules.
+- 17 CMocka tests across 7 groups cover lifecycle, both state flows,
+  block table, instruction text, sparkle/blink, and null safety.
