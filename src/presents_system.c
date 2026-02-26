@@ -207,7 +207,7 @@ static void do_sparkle(presents_system_t *ctx)
         ctx->sparkle_frame++;
         ctx->sparkle_wait_frame = ctx->current_frame + PRESENTS_SPARKLE_STEP;
 
-        if (ctx->sparkle_frame > PRESENTS_SPARKLE_FRAMES)
+        if (ctx->sparkle_frame >= PRESENTS_SPARKLE_FRAMES)
         {
             ctx->sparkle_done = 1;
             /* Prepare typewriter state. */
@@ -266,9 +266,9 @@ static void init_typewriter_texts(presents_system_t *ctx)
         ctx->typewriter_len[i] = (int)strlen(ctx->typewriter_text[i]);
         ctx->typewriter_chars[i] = 0;
         /* y positions: legacy uses 550, then 550 + line_height + 5, etc.
-         * We store base offsets; integration layer computes actual y from
-         * font metrics.  Use 550 as base y. */
-        ctx->typewriter_y[i] = 550;
+         * Use a reasonable default line spacing (24px approximates the
+         * legacy font metrics).  Integration layer can adjust. */
+        ctx->typewriter_y[i] = 550 + i * 24;
     }
 }
 
@@ -295,7 +295,7 @@ static void do_typewriter(presents_system_t *ctx, int line, presents_state_t nex
         ctx->typewriter_chars[line]++;
         ctx->next_frame = ctx->current_frame + PRESENTS_TYPEWRITER_CHAR_DELAY;
 
-        if (ctx->typewriter_chars[line] > ctx->typewriter_len[line])
+        if (ctx->typewriter_chars[line] >= ctx->typewriter_len[line])
         {
             ctx->typewriter_first_entry = 1;
             set_wait(ctx, next_state, ctx->current_frame + after_delay);
