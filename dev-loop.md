@@ -8,7 +8,7 @@ the `/autopilot` skill.
 
 ### 1. Preflight
 
-```
+```bash
 bd ready                          # Pick the highest-priority unblocked bead
 bd show <id>                      # Read description and dependencies
 ```
@@ -16,14 +16,14 @@ bd show <id>                      # Read description and dependencies
 Choose the **workflow tier** based on design ambiguity:
 
 | Tier | When | Tool |
-|------|------|------|
+| ---- | ---- | ---- |
 | T3: Direct | Obvious implementation, fewer than 3 files | Manual or plan mode |
 | T2: Feature Dev | Multi-file, needs codebase exploration | `/feature-dev` |
 | T1: Forge | Competing design approaches, cross-cutting | `/feature-forge` |
 
 ### 2. Claim and Branch
 
-```
+```bash
 bd update <id> --status=in_progress
 git checkout -b <prefix>/<slug> master
 ```
