@@ -198,6 +198,9 @@ install(FILES xboing.man
 install(FILES packaging/xboing.desktop
     DESTINATION "${CMAKE_INSTALL_DATADIR}/applications")
 
+install(FILES packaging/com.github.xboing.metainfo.xml
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/metainfo")
+
 install(FILES packaging/icons/xboing-16.png
     DESTINATION "${CMAKE_INSTALL_DATADIR}/icons/hicolor/16x16/apps"
     RENAME xboing.png)
