@@ -503,6 +503,18 @@ target_include_directories(keys_system PUBLIC
 )
 target_compile_options(keys_system PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
 
+# --- Modal input dialogue system library -------------------------------------
+#
+# Pure C module — no SDL2 or X11 dependency.  Owns modal text input with
+# 4 validation modes (text, numeric, all printable, yes/no), input buffer
+# management, and submit/cancel state machine.
+
+add_library(dialogue_system STATIC src/dialogue_system.c)
+target_include_directories(dialogue_system PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+target_compile_options(dialogue_system PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+
 # --- Tests ------------------------------------------------------------------
 
 option(BUILD_TESTING "Build unit tests" ON)
