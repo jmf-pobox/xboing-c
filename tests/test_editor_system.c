@@ -108,6 +108,7 @@ static void stub_clear_grid(void *ud)
     s->clear_count++;
 }
 
+/* cppcheck-suppress constParameterCallback ; signature must match callback type */
 static int stub_query_cell(int row, int col, editor_cell_t *cell, void *ud)
 {
     const test_state_t *s = (const test_state_t *)ud;
@@ -158,6 +159,7 @@ static void stub_error(const char *message, void *ud)
     s->error_count++;
 }
 
+/* cppcheck-suppress constParameterCallback ; signature must match callback type */
 static const char *stub_input_dialogue(const char *message, int numeric_only, void *ud)
 {
     const test_state_t *s = (const test_state_t *)ud;
@@ -166,6 +168,7 @@ static const char *stub_input_dialogue(const char *message, int numeric_only, vo
     return s->dialogue_result;
 }
 
+/* cppcheck-suppress constParameterCallback ; signature must match callback type */
 static int stub_yes_no_dialogue(const char *message, void *ud)
 {
     const test_state_t *s = (const test_state_t *)ud;
@@ -321,7 +324,7 @@ static void test_initial_state_is_level(void **vstate)
 
 static void test_update_level_transitions_to_none(void **vstate)
 {
-    test_fixture_t *f = (test_fixture_t *)*vstate;
+    const test_fixture_t *f = (const test_fixture_t *)*vstate;
     /* After setup, state should be NONE (setup runs the initial update) */
     assert_int_equal(editor_system_get_state(f->editor), EDITOR_STATE_NONE);
 }
@@ -363,14 +366,14 @@ static void test_wait_state(void **vstate)
 
 static void test_palette_init_count(void **vstate)
 {
-    test_fixture_t *f = (test_fixture_t *)*vstate;
+    const test_fixture_t *f = (const test_fixture_t *)*vstate;
     /* MAX_STATIC_BLOCKS (25) + 5 counter variants = 30 */
     assert_int_equal(editor_system_get_palette_count(f->editor), MAX_STATIC_BLOCKS + 5);
 }
 
 static void test_palette_first_entry(void **vstate)
 {
-    test_fixture_t *f = (test_fixture_t *)*vstate;
+    const test_fixture_t *f = (const test_fixture_t *)*vstate;
     const editor_palette_entry_t *e = editor_system_get_palette_entry(f->editor, 0);
     assert_non_null(e);
     assert_int_equal(e->block_type, 0);
@@ -379,7 +382,7 @@ static void test_palette_first_entry(void **vstate)
 
 static void test_palette_counter_entries(void **vstate)
 {
-    test_fixture_t *f = (test_fixture_t *)*vstate;
+    const test_fixture_t *f = (const test_fixture_t *)*vstate;
     /* Counter entries start at index MAX_STATIC_BLOCKS */
     for (int i = 0; i < 5; i++)
     {
@@ -407,7 +410,7 @@ static void test_palette_select_invalid(void **vstate)
 
 static void test_palette_entry_out_of_bounds(void **vstate)
 {
-    test_fixture_t *f = (test_fixture_t *)*vstate;
+    const test_fixture_t *f = (const test_fixture_t *)*vstate;
     assert_null(editor_system_get_palette_entry(f->editor, -1));
     assert_null(editor_system_get_palette_entry(f->editor, EDITOR_MAX_PALETTE + 1));
 }
@@ -470,7 +473,7 @@ static void test_mouse_release_resets_action(void **vstate)
 
     int x = CELL_CENTER_X(3);
     int y = CELL_CENTER_Y(2);
-    editor_system_mouse_button(f->editor, x, y, 1, 1); /* Press */
+    editor_system_mouse_button(f->editor, x, y, 1, 1);                               /* Press */
     editor_draw_action_t action = editor_system_mouse_button(f->editor, x, y, 1, 0); /* Release */
 
     assert_int_equal(action, EDITOR_ACTION_NOP);
@@ -769,7 +772,7 @@ static void test_key_load_invalid_range(void **vstate)
     int before = f->state.load_count;
     editor_system_key_input(f->editor, EDITOR_KEY_LOAD);
     assert_int_equal(f->state.load_count, before); /* No load call */
-    assert_true(f->state.last_message_sticky);      /* Error message shown */
+    assert_true(f->state.last_message_sticky);     /* Error message shown */
 }
 
 static void test_key_time(void **vstate)
@@ -829,20 +832,20 @@ static void test_key_flip_h(void **vstate)
 
 static void test_is_modified_initially_false(void **vstate)
 {
-    test_fixture_t *f = (test_fixture_t *)*vstate;
+    const test_fixture_t *f = (const test_fixture_t *)*vstate;
     /* After initial load, modified is false */
     assert_false(editor_system_is_modified(f->editor));
 }
 
 static void test_get_draw_action_initial(void **vstate)
 {
-    test_fixture_t *f = (test_fixture_t *)*vstate;
+    const test_fixture_t *f = (const test_fixture_t *)*vstate;
     assert_int_equal(editor_system_get_draw_action(f->editor), EDITOR_ACTION_NOP);
 }
 
 static void test_get_level_number_initial(void **vstate)
 {
-    test_fixture_t *f = (test_fixture_t *)*vstate;
+    const test_fixture_t *f = (const test_fixture_t *)*vstate;
     assert_int_equal(editor_system_get_level_number(f->editor), 0);
 }
 
