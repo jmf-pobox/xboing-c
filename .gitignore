@@ -9,3 +9,5 @@ build/
 build-asan/
 build-install/
 .claude/settings.local.json
+.envrc
+.direnv
