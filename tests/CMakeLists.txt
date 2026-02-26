@@ -377,3 +377,11 @@ add_executable(test_dialogue_system test_dialogue_system.c)
 target_compile_options(test_dialogue_system PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
 target_link_libraries(test_dialogue_system PRIVATE dialogue_system ${CMOCKA_LIBRARIES})
 add_test(NAME test_dialogue_system COMMAND test_dialogue_system)
+
+# High score display screen sequencer tests (bead xboing-dm8.6)
+# Pure logic tests — no SDL2, X11, video, or audio driver needed.
+# Links against highscore_system static library.
+add_executable(test_highscore_system test_highscore_system.c)
+target_compile_options(test_highscore_system PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+target_link_libraries(test_highscore_system PRIVATE highscore_system ${CMOCKA_LIBRARIES})
+add_test(NAME test_highscore_system COMMAND test_highscore_system)

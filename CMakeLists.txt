@@ -515,6 +515,18 @@ target_include_directories(dialogue_system PUBLIC
 )
 target_compile_options(dialogue_system PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
 
+# --- High score display screen sequencer library ----------------------------
+#
+# Pure C module — no SDL2 or X11 dependency.  Owns the high score display
+# state machine (title, show, sparkle loop, finish) with title sparkle,
+# row sparkle, and specials timing.  Score data provided by integration.
+
+add_library(highscore_system STATIC src/highscore_system.c)
+target_include_directories(highscore_system PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+target_compile_options(highscore_system PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+
 # --- Tests ------------------------------------------------------------------
 
 option(BUILD_TESTING "Build unit tests" ON)
