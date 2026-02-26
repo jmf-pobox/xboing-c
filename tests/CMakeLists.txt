@@ -337,3 +337,11 @@ add_executable(test_eyedude_system test_eyedude_system.c)
 target_compile_options(test_eyedude_system PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
 target_link_libraries(test_eyedude_system PRIVATE eyedude_system ${CMOCKA_LIBRARIES})
 add_test(NAME test_eyedude_system COMMAND test_eyedude_system)
+
+# Presents/splash screen sequencer tests (bead xboing-dm8.1)
+# Pure logic tests — no SDL2, X11, video, or audio driver needed.
+# Links against presents_system static library.
+add_executable(test_presents_system test_presents_system.c)
+target_compile_options(test_presents_system PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+target_link_libraries(test_presents_system PRIVATE presents_system ${CMOCKA_LIBRARIES})
+add_test(NAME test_presents_system COMMAND test_presents_system)

@@ -455,6 +455,18 @@ target_include_directories(eyedude_system PUBLIC
 )
 target_compile_options(eyedude_system PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
 
+# --- Presents/splash screen sequencer library --------------------------------
+#
+# Pure C module — no SDL2 or X11 dependency.  Owns the 14-state presents
+# animation sequence (flag, credits, letter stamps, sparkle, typewriter
+# text, curtain wipe).  Side effects via injected callback table.
+
+add_library(presents_system STATIC src/presents_system.c)
+target_include_directories(presents_system PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+target_compile_options(presents_system PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+
 # --- Tests ------------------------------------------------------------------
 
 option(BUILD_TESTING "Build unit tests" ON)
