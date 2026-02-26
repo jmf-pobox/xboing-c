@@ -393,3 +393,11 @@ add_executable(test_message_system test_message_system.c)
 target_compile_options(test_message_system PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
 target_link_libraries(test_message_system PRIVATE message_system ${CMOCKA_LIBRARIES})
 add_test(NAME test_message_system COMMAND test_message_system)
+
+# High score JSON I/O tests (bead xboing-1fr.1)
+# Tests JSON read/write round-trips, sorting, insertion, ranking, and error handling.
+# Links against highscore_io static library (which depends on highscore_system for types).
+add_executable(test_highscore_io test_highscore_io.c)
+target_compile_options(test_highscore_io PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+target_link_libraries(test_highscore_io PRIVATE highscore_io ${CMOCKA_LIBRARIES})
+add_test(NAME test_highscore_io COMMAND test_highscore_io)

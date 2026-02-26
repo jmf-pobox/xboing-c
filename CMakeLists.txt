@@ -539,6 +539,18 @@ target_include_directories(message_system PUBLIC
 )
 target_compile_options(message_system PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
 
+# --- High score JSON I/O library -------------------------------------------
+#
+# Pure C module — no SDL2 or X11 dependency.  Reads and writes high score
+# tables as JSON files, with sorting, insertion, and atomic writes.
+# Replaces the legacy binary format with htonl/ntohl byte ordering.
+
+add_library(highscore_io STATIC src/highscore_io.c)
+target_include_directories(highscore_io PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+target_compile_options(highscore_io PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+
 # --- Tests ------------------------------------------------------------------
 
 option(BUILD_TESTING "Build unit tests" ON)
