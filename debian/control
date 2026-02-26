@@ -1,0 +1,27 @@
+Source: xboing
+Section: games
+Priority: optional
+Maintainer: Justin Freeman <jmf@pobox.com>
+Build-Depends: debhelper-compat (= 13),
+               cmake (>= 3.16),
+               libsdl2-dev,
+               libsdl2-image-dev,
+               libsdl2-mixer-dev,
+               libsdl2-ttf-dev,
+               libcmocka-dev
+Standards-Version: 4.6.2
+Homepage: https://github.com/jmf-pobox/xboing-c
+Rules-Requires-Root: no
+
+Package: xboing
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Classic breakout-style arcade game
+ XBoing is a blockout-style arcade game where you control a paddle to
+ bounce a ball and destroy blocks. Originally created in 1993 for X11
+ by Justin C. Kibell, it features 80 levels with 30 different block
+ types, power-ups, a built-in level editor, and multiball gameplay.
+ .
+ The game includes special blocks like bombs, death blocks, teleporters,
+ and roaming blocks that add variety and challenge. Collect bonuses for
+ extra lives, score multipliers, machine guns, and more.
