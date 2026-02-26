@@ -68,6 +68,8 @@ typedef struct
     int no_walls;    /* extern int noWalls */
     int killer;      /* extern int Killer */
     int sticky_bat;  /* extern int stickyBat */
+    int col_width;   /* colWidth (PLAY_WIDTH / MAX_COL) */
+    int row_height;  /* rowHeight (PLAY_HEIGHT / MAX_ROW) */
 } ball_system_env_t;
 
 /* =========================================================================
@@ -208,6 +210,14 @@ int ball_system_reset_start(ball_system_t *ctx, const ball_system_env_t *env);
  */
 void ball_system_do_tilt(ball_system_t *ctx, const ball_system_env_t *env, int index);
 
+/*
+ * Split a ball in two (multiball bonus).
+ * Adds a new ball in BALL_ACTIVE state at a random empty cell.
+ * Emits BALL_EVT_SPLIT via callback.
+ * Returns the new ball's slot index, or -1 if all slots full.
+ */
+int ball_system_split(ball_system_t *ctx, const ball_system_env_t *env);
+
 /* =========================================================================
  * Per-frame update
  * ========================================================================= */
@@ -220,7 +230,8 @@ void ball_system_do_tilt(ball_system_t *ctx, const ball_system_env_t *env, int i
  * BALL_ACTIVE (physics + wall/paddle collision), BALL_DIE (move until off-screen),
  * BALL_POP (countdown animation), BALL_WAIT (frame delay).
  *
- * Block collision and ball-to-ball collision are handled via callbacks (PR 3).
+ * Block collision via check_region/on_block_hit callbacks.
+ * Ball-to-ball collision via ball_math_will_collide/ball_math_collide.
  */
 void ball_system_update(ball_system_t *ctx, const ball_system_env_t *env);
 

@@ -15,6 +15,11 @@
  *   Group 6: Paddle collision (4 tests)
  *   Group 9: Guide direction (2 tests)
  *   Group 11: Speed normalization + auto-tilt (2 tests)
+ *
+ * PR 3 test groups:
+ *   Group 7: Block collision (4 tests)
+ *   Group 8: Ball-to-ball collision (3 tests)
+ *   Group 12: Multiball / split (2 tests)
  */
 
 #include <setjmp.h>
@@ -41,6 +46,8 @@ static ball_system_env_t make_env(int frame)
     env.paddle_size = 50;
     env.play_width = 495;
     env.play_height = 580;
+    env.col_width = 55;  /* 495 / 9 */
+    env.row_height = 32; /* 580 / 18 */
     return env;
 }
 
@@ -93,6 +100,57 @@ static void cb_on_message(const char *msg, void *ud)
     log->message_count++;
     strncpy(log->last_message, msg, sizeof(log->last_message) - 1);
     log->last_message[sizeof(log->last_message) - 1] = '\0';
+}
+
+/* ---- Block collision callback helpers for PR 3 tests ---- */
+
+typedef struct
+{
+    /* check_region: when hit_row/hit_col match, return hit_region */
+    int hit_row;
+    int hit_col;
+    int hit_region;
+    int check_count;
+    /* on_block_hit: return value (0 = bounce, nonzero = no bounce) */
+    int block_hit_return;
+    int block_hit_count;
+    int block_hit_row;
+    int block_hit_col;
+    /* cell_available: which cell is available */
+    int avail_row;
+    int avail_col;
+    int cell_avail_count;
+} test_block_cb_t;
+
+static int cb_check_region(int row, int col, int bx, int by, int bdx, void *ud)
+{
+    test_block_cb_t *bc = (test_block_cb_t *)ud;
+    (void)bx;
+    (void)by;
+    (void)bdx;
+    bc->check_count++;
+    if (row == bc->hit_row && col == bc->hit_col)
+    {
+        return bc->hit_region;
+    }
+    return BALL_REGION_NONE;
+}
+
+static int cb_on_block_hit(int row, int col, int ball_index, void *ud)
+{
+    test_block_cb_t *bc = (test_block_cb_t *)ud;
+    (void)ball_index;
+    bc->block_hit_count++;
+    bc->block_hit_row = row;
+    bc->block_hit_col = col;
+    return bc->block_hit_return;
+}
+
+static int cb_cell_available(int row, int col, void *ud)
+{
+    test_block_cb_t *bc = (test_block_cb_t *)ud;
+    bc->cell_avail_count++;
+    return (row == bc->avail_row && col == bc->avail_col) ? 1 : 0;
 }
 
 static ball_system_callbacks_t make_test_callbacks(void)
@@ -1053,6 +1111,316 @@ static void test_auto_tilt_fires(void **state)
 }
 
 /* =========================================================================
+ * Group 7: Block collision
+ * ========================================================================= */
+
+/* TC-42: Block collision bounces ball off top of block. */
+static void test_block_collision_bounce_top(void **state)
+{
+    (void)state;
+    test_block_cb_t bc = {0};
+    /* Place a block at row 5, col 4. Ball moving downward will hit top. */
+    bc.hit_row = 5;
+    bc.hit_col = 4;
+    bc.hit_region = BALL_REGION_TOP;
+    bc.block_hit_return = 0; /* bounce normally */
+
+    ball_system_callbacks_t cbs = {0};
+    cbs.check_region = cb_check_region;
+    cbs.on_block_hit = cb_on_block_hit;
+    ball_system_t *ctx = ball_system_create(&cbs, &bc, NULL);
+    ball_system_env_t env = make_env(100);
+
+    /* Place ball at (220, 155) with downward velocity.
+     * col = 220/55 = 4, row = 155/32 = 4 (one above hit_row=5).
+     * With dy=5, ball will step through and reach row 5. */
+    ball_system_add(ctx, &env, 220, 155, 3, 5, NULL);
+    ball_system_change_mode(ctx, &env, 0, BALL_ACTIVE);
+
+    env.frame = 100;
+    ball_system_update(ctx, &env);
+
+    /* Block hit callback should have been called */
+    assert_true(bc.block_hit_count > 0);
+    assert_int_equal(bc.block_hit_row, 5);
+    assert_int_equal(bc.block_hit_col, 4);
+
+    ball_system_destroy(ctx);
+}
+
+/* TC-43: Block collision with killer mode (no bounce). */
+static void test_block_collision_no_bounce(void **state)
+{
+    (void)state;
+    test_block_cb_t bc = {0};
+    bc.hit_row = 5;
+    bc.hit_col = 4;
+    bc.hit_region = BALL_REGION_TOP;
+    bc.block_hit_return = 1; /* no bounce — killer/teleport */
+
+    ball_system_callbacks_t cbs = {0};
+    cbs.check_region = cb_check_region;
+    cbs.on_block_hit = cb_on_block_hit;
+    ball_system_t *ctx = ball_system_create(&cbs, &bc, NULL);
+    ball_system_env_t env = make_env(100);
+
+    ball_system_add(ctx, &env, 220, 155, 3, 5, NULL);
+    ball_system_change_mode(ctx, &env, 0, BALL_ACTIVE);
+
+    env.frame = 100;
+    ball_system_update(ctx, &env);
+
+    /* Block hit callback should have been called */
+    assert_true(bc.block_hit_count > 0);
+
+    /* Ball should still be active (callback handled it) */
+    assert_int_equal(ball_system_get_state(ctx, 0), BALL_ACTIVE);
+
+    ball_system_destroy(ctx);
+}
+
+/* TC-44: No block collision when check_region returns NONE. */
+static void test_block_no_collision(void **state)
+{
+    (void)state;
+    test_block_cb_t bc = {0};
+    /* No hit configured — check_region always returns NONE */
+    bc.hit_row = -1;
+    bc.hit_col = -1;
+    bc.hit_region = BALL_REGION_NONE;
+
+    ball_system_callbacks_t cbs = {0};
+    cbs.check_region = cb_check_region;
+    cbs.on_block_hit = cb_on_block_hit;
+    ball_system_t *ctx = ball_system_create(&cbs, &bc, NULL);
+    ball_system_env_t env = make_env(100);
+
+    ball_system_add(ctx, &env, 200, 200, 3, -3, NULL);
+    ball_system_change_mode(ctx, &env, 0, BALL_ACTIVE);
+
+    env.frame = 100;
+    ball_system_update(ctx, &env);
+
+    /* No block hit should have been called */
+    assert_int_equal(bc.block_hit_count, 0);
+
+    ball_system_destroy(ctx);
+}
+
+/* TC-45: Block collision bounces ball off left side. */
+static void test_block_collision_bounce_left(void **state)
+{
+    (void)state;
+    test_block_cb_t bc = {0};
+    bc.hit_row = 5;
+    bc.hit_col = 4;
+    bc.hit_region = BALL_REGION_LEFT;
+    bc.block_hit_return = 0;
+
+    ball_system_callbacks_t cbs = {0};
+    cbs.check_region = cb_check_region;
+    cbs.on_block_hit = cb_on_block_hit;
+    ball_system_t *ctx = ball_system_create(&cbs, &bc, NULL);
+    ball_system_env_t env = make_env(100);
+
+    /* Ball moving rightward into block */
+    ball_system_add(ctx, &env, 215, 160, 5, 0, NULL);
+    ball_system_change_mode(ctx, &env, 0, BALL_ACTIVE);
+
+    env.frame = 100;
+    ball_system_update(ctx, &env);
+
+    assert_true(bc.block_hit_count > 0);
+
+    ball_system_destroy(ctx);
+}
+
+/* =========================================================================
+ * Group 8: Ball-to-ball collision
+ * ========================================================================= */
+
+/* TC-46: Two active balls near each other trigger ball2ball sound. */
+static void test_ball_to_ball_collision_sound(void **state)
+{
+    (void)state;
+    test_cb_log_t log = {0};
+    ball_system_callbacks_t cbs = make_test_callbacks();
+    ball_system_t *ctx = ball_system_create(&cbs, &log, NULL);
+    ball_system_env_t env = make_env(100);
+
+    /* Ball 0 at paddle position heading down — will hit paddle on update.
+     * Paddle hit sets lastPaddleHitFrame properly (avoids tilt randomization).
+     * After paddle bounce: ball 0 at ~(247, 539) with dx=2, dy=-11.
+     *
+     * Ball 1 at (247, 518) heading down slowly — within collision range
+     * of ball 0 after paddle bounce. Distance ≈ 21, combined radius = 20.
+     * Swept-circle test detects collision (tmin ≈ 0.07). */
+    ball_system_add(ctx, &env, env.paddle_pos, 536, 0, 5, NULL);
+    ball_system_change_mode(ctx, &env, 0, BALL_ACTIVE);
+    ball_system_add(ctx, &env, env.paddle_pos, 518, 0, 3, NULL);
+    ball_system_change_mode(ctx, &env, 1, BALL_ACTIVE);
+
+    env.frame = 100;
+    ball_system_update(ctx, &env);
+
+    /* ball2ball fires after paddle sound, so it should be the last sound.
+     * At least 2 sounds: "paddle" + "ball2ball". */
+    assert_true(log.sound_count >= 2);
+    assert_string_equal(log.last_sound, "ball2ball");
+
+    ball_system_destroy(ctx);
+}
+
+/* TC-47: Distant balls do not trigger ball-to-ball collision. */
+static void test_ball_to_ball_no_collision(void **state)
+{
+    (void)state;
+    test_cb_log_t log = {0};
+    ball_system_callbacks_t cbs = make_test_callbacks();
+    ball_system_t *ctx = ball_system_create(&cbs, &log, NULL);
+    ball_system_env_t env = make_env(100);
+
+    /* Place two balls far apart */
+    ball_system_add(ctx, &env, 50, 200, 3, -3, NULL);
+    ball_system_change_mode(ctx, &env, 0, BALL_ACTIVE);
+    ball_system_add(ctx, &env, 400, 200, -3, -3, NULL);
+    ball_system_change_mode(ctx, &env, 1, BALL_ACTIVE);
+
+    env.frame = 100;
+    ball_system_update(ctx, &env);
+
+    /* No ball2ball sound */
+    int found_b2b = 0;
+    if (log.sound_count > 0 && strcmp(log.last_sound, "ball2ball") == 0)
+    {
+        found_b2b = 1;
+    }
+    assert_int_equal(found_b2b, 0);
+
+    ball_system_destroy(ctx);
+}
+
+/* TC-48: Ball-to-ball collision only checked for ACTIVE balls. */
+static void test_ball_to_ball_skips_inactive(void **state)
+{
+    (void)state;
+    test_cb_log_t log = {0};
+    ball_system_callbacks_t cbs = make_test_callbacks();
+    ball_system_t *ctx = ball_system_create(&cbs, &log, NULL);
+    ball_system_env_t env = make_env(100);
+
+    /* Ball 0 active, ball 1 in CREATE state (close but not active) */
+    ball_system_add(ctx, &env, 200, 200, 5, -3, NULL);
+    ball_system_change_mode(ctx, &env, 0, BALL_ACTIVE);
+    ball_system_add(ctx, &env, 210, 200, -5, -3, NULL);
+    /* Ball 1 stays in BALL_CREATE — should not participate in b2b */
+
+    env.frame = 100;
+    ball_system_update(ctx, &env);
+
+    /* No ball2ball sound (ball 1 is not ACTIVE) */
+    int found_b2b = 0;
+    if (log.sound_count > 0 && strcmp(log.last_sound, "ball2ball") == 0)
+    {
+        found_b2b = 1;
+    }
+    assert_int_equal(found_b2b, 0);
+
+    ball_system_destroy(ctx);
+}
+
+/* =========================================================================
+ * Group 12: Multiball (split)
+ * ========================================================================= */
+
+/* TC-49: Split with teleport places ball at available cell. */
+static void test_split_teleports_ball(void **state)
+{
+    (void)state;
+    test_block_cb_t bc = {0};
+    bc.avail_row = 5;
+    bc.avail_col = 4;
+
+    ball_system_callbacks_t cbs = {0};
+    cbs.cell_available = cb_cell_available;
+    ball_system_t *ctx = ball_system_create(&cbs, &bc, NULL);
+    ball_system_env_t env = make_env(100);
+
+    /* Add an initial ball so slot 0 is occupied */
+    ball_system_add(ctx, &env, 200, 200, 3, -3, NULL);
+
+    /* Split should add a second ball and teleport it */
+    int j = ball_system_split(ctx, &env);
+    assert_true(j > 0);
+    assert_int_equal(ball_system_get_state(ctx, j), BALL_ACTIVE);
+
+    /* Verify the ball was teleported (cell_available was called) */
+    assert_true(bc.cell_avail_count > 0);
+
+    ball_system_destroy(ctx);
+}
+
+/* TC-50: Split adds a new ball and emits SPLIT event. */
+static void test_split_adds_ball(void **state)
+{
+    (void)state;
+    test_cb_log_t log = {0};
+    ball_system_callbacks_t cbs = make_test_callbacks();
+    ball_system_t *ctx = ball_system_create(&cbs, &log, NULL);
+    ball_system_env_t env = make_env(100);
+
+    /* Add an initial ball so slot 0 is occupied */
+    ball_system_add(ctx, &env, 200, 200, 3, -3, NULL);
+
+    /* Split should add a second ball */
+    int j = ball_system_split(ctx, &env);
+    assert_true(j > 0);
+
+    /* New ball should be ACTIVE */
+    assert_int_equal(ball_system_get_state(ctx, j), BALL_ACTIVE);
+
+    /* SPLIT event should have been emitted */
+    int found_split = 0;
+    for (int e = 0; e < log.event_count; e++)
+    {
+        if (log.events[e] == BALL_EVT_SPLIT)
+        {
+            found_split = 1;
+        }
+    }
+    assert_true(found_split);
+
+    /* Message should say "Another ball!" */
+    assert_string_equal(log.last_message, "Another ball!");
+
+    ball_system_destroy(ctx);
+}
+
+/* TC-50: Split when all slots full shows failure message. */
+static void test_split_full_shows_message(void **state)
+{
+    (void)state;
+    test_cb_log_t log = {0};
+    ball_system_callbacks_t cbs = make_test_callbacks();
+    ball_system_t *ctx = ball_system_create(&cbs, &log, NULL);
+    ball_system_env_t env = make_env(100);
+
+    /* Fill all slots */
+    for (int i = 0; i < MAX_BALLS; i++)
+    {
+        ball_system_add(ctx, &env, i * 50, 200, 3, -3, NULL);
+    }
+
+    /* Split should fail */
+    int j = ball_system_split(ctx, &env);
+    assert_int_equal(j, -1);
+
+    assert_string_equal(log.last_message, "Cannot add ball!");
+
+    ball_system_destroy(ctx);
+}
+
+/* =========================================================================
  * Main
  * ========================================================================= */
 
@@ -1109,6 +1477,19 @@ int main(void)
         cmocka_unit_test(test_queries_null_safe),
         cmocka_unit_test(test_status_strings),
         cmocka_unit_test(test_state_names),
+        /* Group 7: Block collision */
+        cmocka_unit_test(test_block_collision_bounce_top),
+        cmocka_unit_test(test_block_collision_no_bounce),
+        cmocka_unit_test(test_block_no_collision),
+        cmocka_unit_test(test_block_collision_bounce_left),
+        /* Group 8: Ball-to-ball collision */
+        cmocka_unit_test(test_ball_to_ball_collision_sound),
+        cmocka_unit_test(test_ball_to_ball_no_collision),
+        cmocka_unit_test(test_ball_to_ball_skips_inactive),
+        /* Group 12: Multiball (split) */
+        cmocka_unit_test(test_split_teleports_ball),
+        cmocka_unit_test(test_split_adds_ball),
+        cmocka_unit_test(test_split_full_shows_message),
     };
     return cmocka_run_group_tests(tests, NULL, NULL);
 }
