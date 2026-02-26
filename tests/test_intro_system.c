@@ -294,9 +294,18 @@ static void test_blink_fires_in_intro(void **state)
         intro_system_update(ctx, i);
     }
 
+    /* Blink should NOT fire before next_blink. */
+    intro_system_update(ctx, 9);
+    assert_int_equal(intro_system_should_blink(ctx), 0);
+
     /* Blink should fire at next_blink (frame 10). */
     intro_system_update(ctx, 10);
     assert_int_equal(intro_system_should_blink(ctx), 1);
+
+    /* After firing, next blink is at frame 10 + BLINK_GAP.
+     * Frame 11 should NOT blink. */
+    intro_system_update(ctx, 11);
+    assert_int_equal(intro_system_should_blink(ctx), 0);
     intro_system_destroy(ctx);
 }
 

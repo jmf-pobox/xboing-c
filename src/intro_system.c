@@ -118,13 +118,13 @@ static int get_rand(intro_system_t *ctx)
     return rand();
 }
 
-static void sparkle_init(intro_system_t *ctx)
+static void sparkle_init(intro_system_t *ctx, int initial_delay)
 {
     ctx->sparkle_x = 100;
     ctx->sparkle_y = 20;
     ctx->sparkle_frame = 0;
     ctx->sparkle_started = 0;
-    ctx->sparkle_next_frame = ctx->current_frame + 10;
+    ctx->sparkle_next_frame = ctx->current_frame + initial_delay;
     ctx->sparkle_bg_saved = 0;
     ctx->sparkle_restore = 0;
 }
@@ -167,6 +167,11 @@ static void blink_update(intro_system_t *ctx)
     if (ctx->current_frame >= ctx->next_blink)
     {
         ctx->blink_active = 1;
+        /* Advance to next blink cycle.  Legacy alternates between
+         * BLINK_RATE (during animation) and BLINK_GAP (between blinks).
+         * We emit one pulse per gap; integration layer drives the
+         * multi-frame blink animation. */
+        ctx->next_blink = ctx->current_frame + INTRO_BLINK_GAP;
     }
 }
 
@@ -195,8 +200,9 @@ static void do_blocks(intro_system_t *ctx)
 
 static void do_text(intro_system_t *ctx)
 {
-    /* Text drawn once.  Advance to sparkle loop. */
-    sparkle_init(ctx);
+    /* Text drawn once.  Advance to sparkle loop.
+     * Sparkle state was initialized in begin(), matching legacy where
+     * Reset*() sets up the frame counters before the state machine runs. */
     ctx->state = INTRO_STATE_SPARKLE;
 }
 
@@ -292,7 +298,10 @@ void intro_system_begin(intro_system_t *ctx, intro_screen_mode_t mode, int frame
     ctx->sound.name = NULL;
     ctx->sound.volume = 0;
 
-    sparkle_init(ctx);
+    /* Legacy intro uses startFrame = frame+10; instructions uses
+     * nextFrame = frame+100. */
+    int sparkle_delay = (mode == INTRO_MODE_INTRO) ? 10 : 100;
+    sparkle_init(ctx, sparkle_delay);
 }
 
 int intro_system_update(intro_system_t *ctx, int frame)
