@@ -340,6 +340,18 @@ target_include_directories(ball_system PUBLIC
 target_compile_options(ball_system PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
 target_link_libraries(ball_system PUBLIC m)
 
+# --- Block grid system library -----------------------------------------------
+#
+# Pure C module — no SDL2 or X11 dependency.  Owns the 18x9 block grid,
+# collision geometry (pure C triangles replacing X11 Regions), block info
+# catalog, and grid queries.  Links score_logic.c for hit point calculation.
+
+add_library(block_system STATIC src/block_system.c src/score_logic.c)
+target_include_directories(block_system PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+target_compile_options(block_system PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+
 # --- Tests ------------------------------------------------------------------
 
 option(BUILD_TESTING "Build unit tests" ON)
