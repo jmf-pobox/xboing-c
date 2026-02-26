@@ -195,6 +195,25 @@ install(FILES xboing.man
     DESTINATION "${CMAKE_INSTALL_MANDIR}/man6"
     RENAME xboing.6)
 
+install(FILES packaging/xboing.desktop
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/applications")
+
+install(FILES packaging/icons/xboing-16.png
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/icons/hicolor/16x16/apps"
+    RENAME xboing.png)
+install(FILES packaging/icons/xboing-32.png
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/icons/hicolor/32x32/apps"
+    RENAME xboing.png)
+install(FILES packaging/icons/xboing-48.png
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/icons/hicolor/48x48/apps"
+    RENAME xboing.png)
+install(FILES packaging/icons/xboing-128.png
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/icons/hicolor/128x128/apps"
+    RENAME xboing.png)
+install(FILES packaging/icons/xboing-256.png
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/icons/hicolor/256x256/apps"
+    RENAME xboing.png)
+
 # --- SDL2 renderer library (optional) ---------------------------------------
 
 if(SDL2_FOUND)

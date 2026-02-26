@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=XBoing
+GenericName=Block Breaker
+Comment=Classic breakout-style arcade game
+Exec=xboing
+Icon=xboing
+Terminal=false
+Categories=Game;ArcadeGame;BlocksGame;
+Keywords=breakout;arkanoid;blocks;paddle;ball;arcade;
+StartupNotify=false
