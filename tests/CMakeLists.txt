@@ -410,6 +410,14 @@ target_compile_options(test_savegame_io PRIVATE ${XBOING_STRICT_WARNINGS} -Werro
 target_link_libraries(test_savegame_io PRIVATE savegame_io ${CMOCKA_LIBRARIES})
 add_test(NAME test_savegame_io COMMAND test_savegame_io)
 
+# Level editor system tests (bead xboing-9pl.1)
+# Pure logic tests — no SDL2, X11, video, or audio driver needed.
+# Links against editor_system static library.
+add_executable(test_editor_system test_editor_system.c)
+target_compile_options(test_editor_system PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+target_link_libraries(test_editor_system PRIVATE editor_system ${CMOCKA_LIBRARIES})
+add_test(NAME test_editor_system COMMAND test_editor_system)
+
 # TOML config I/O tests (bead xboing-1fr.3)
 # Tests TOML read/write round-trips, parsing, file operations, error handling.
 # Links against config_io static library.

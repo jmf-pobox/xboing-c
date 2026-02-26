@@ -563,6 +563,18 @@ target_include_directories(savegame_io PUBLIC
 )
 target_compile_options(savegame_io PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
 
+# --- Level editor system library -------------------------------------------
+#
+# Pure C module — no SDL2 or X11 dependency.  Owns editor state machine,
+# grid editing (draw/erase), board transforms (flip/scroll H/V), palette
+# management, and save/load coordination via injected callbacks.
+
+add_library(editor_system STATIC src/editor_system.c)
+target_include_directories(editor_system PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+target_compile_options(editor_system PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+
 # --- TOML config I/O library -----------------------------------------------
 #
 # Pure C module — no SDL2 or X11 dependency.  Reads and writes user
