@@ -306,8 +306,9 @@ int gun_system_shoot(gun_system_t *ctx, const gun_system_env_t *env)
         if (env->fast_gun)
         {
             /* Dual fire: two bullets at ±(paddle_size/3) from center */
-            start_a_bullet(ctx, env->paddle_pos - (env->paddle_size / 3), 1);
-            status = start_a_bullet(ctx, env->paddle_pos + (env->paddle_size / 3), 1);
+            int s1 = start_a_bullet(ctx, env->paddle_pos - (env->paddle_size / 3), 1);
+            int s2 = start_a_bullet(ctx, env->paddle_pos + (env->paddle_size / 3), 1);
+            status = s1 || s2;
         }
         else
         {

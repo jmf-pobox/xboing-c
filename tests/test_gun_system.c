@@ -9,7 +9,7 @@
  *   1. Lifecycle (3 tests)
  *   2. Ammo management (6 tests)
  *   3. Shooting — normal mode (4 tests)
- *   4. Shooting — fast gun mode (3 tests)
+ *   4. Shooting — fast gun mode (4 tests)
  *   5. Bullet movement and top-wall tinks (3 tests)
  *   6. Collision — ball hit (2 tests)
  *   7. Collision — eyedude hit (2 tests)
@@ -52,8 +52,10 @@ typedef struct
     int block_hit_last_col;
 
     /* Ball hit */
-    int ball_hit_return; /* Ball index to return (-1 = miss) */
-    int ball_hit_count;  /* Number of on_ball_hit calls */
+    int ball_hit_return;      /* Ball index to return (-1 = miss) */
+    int ball_hit_max;         /* Max hits before returning -1 (0 = unlimited) */
+    int ball_hit_check_count; /* Number of check_ball_hit calls */
+    int ball_hit_count;       /* Number of on_ball_hit calls */
     int ball_hit_last_index;
 
     /* Eyedude hit */
@@ -100,6 +102,12 @@ static int stub_check_ball_hit(int bx, int by, void *ud)
     (void)bx;
     (void)by;
     stub_state_t *s = ud;
+    s->ball_hit_check_count++;
+    /* If max is set, only return hit for the first N checks */
+    if (s->ball_hit_max > 0 && s->ball_hit_check_count > s->ball_hit_max)
+    {
+        return -1;
+    }
     return s->ball_hit_return;
 }
 
@@ -450,6 +458,49 @@ static void test_fast_gun_full_array(void **state)
     /* Next shot should fail (array full) */
     int fired = gun_system_shoot(ctx, &env);
     assert_int_equal(fired, 0);
+
+    gun_system_destroy(ctx);
+}
+
+static void test_fast_gun_one_slot_free(void **state)
+{
+    (void)state;
+    stub_state_t s;
+    gun_system_t *ctx = create_test_ctx(&s);
+    gun_system_env_t env = make_env(0, 200, 60, 1);
+
+    gun_system_set_ammo(ctx, 100);
+    gun_system_set_unlimited(ctx, 1);
+
+    /* Fill all 40 slots (20 fast-gun shots * 2 bullets each) */
+    for (int i = 0; i < 20; i++)
+    {
+        gun_system_shoot(ctx, &env);
+    }
+    assert_int_equal(gun_system_get_active_bullet_count(ctx), 40);
+
+    /* Kill exactly one bullet using one-shot ball_hit callback:
+     * ball_hit_max=1 means only the first check returns a hit. */
+    s.ball_hit_return = 0;
+    s.ball_hit_max = 1;
+    env.frame = 3; /* 3 % 3 == 0, triggers bullet update */
+    gun_system_update(ctx, &env);
+    assert_int_equal(gun_system_get_active_bullet_count(ctx), 39);
+
+    /* Reset stubs, try fast-gun shot with only 1 free slot */
+    s.ball_hit_return = -1;
+    s.ball_hit_max = 0;
+    s.ball_hit_check_count = 0;
+    s.sound_count = 0;
+    memset(s.last_sound, 0, sizeof(s.last_sound));
+
+    int fired = gun_system_shoot(ctx, &env);
+
+    /* First bullet spawns (success), second fails (array full).
+     * With the fix, status = s1 || s2 = true, so ammo consumed + sound. */
+    assert_int_equal(fired, 1);
+    assert_int_equal(gun_system_get_active_bullet_count(ctx), 40);
+    assert_string_equal(s.last_sound, "shotgun");
 
     gun_system_destroy(ctx);
 }
@@ -930,6 +981,7 @@ int main(void)
         cmocka_unit_test(test_fast_gun_spawns_two_bullets),
         cmocka_unit_test(test_fast_gun_multiple_shots),
         cmocka_unit_test(test_fast_gun_full_array),
+        cmocka_unit_test(test_fast_gun_one_slot_free),
 
         /* Group 5: Bullet movement and top-wall tinks */
         cmocka_unit_test(test_bullet_moves_upward),

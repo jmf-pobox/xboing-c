@@ -88,7 +88,9 @@ typedef struct
 
     /*
      * Check if bullet at center (bx, by) hits the eyedude.
-     * Returns nonzero on hit.  Only checked when eyedude is in walk mode.
+     * Called whenever a bullet is active; implementation must return 0 when
+     * the eyedude is not hittable (e.g., not in walk mode).  Returns
+     * nonzero on hit.
      */
     int (*check_eyedude_hit)(int bx, int by, void *ud);
 
