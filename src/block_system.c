@@ -651,6 +651,7 @@ int block_system_check_region(int row, int col, int bx, int by, int bdx, void *u
     return region;
 }
 
+/* cppcheck-suppress constParameterPointer ; signature must match ball_system.h callback */
 int block_system_cell_available(int row, int col, void *ud)
 {
     const block_system_t *ctx = (const block_system_t *)ud;
