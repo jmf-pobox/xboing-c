@@ -41,6 +41,9 @@
 #define BALL_AUTO_ACTIVE_DELAY 3000
 
 #define DIST_BALL_OF_PADDLE 45
+#ifndef DIST_BASE
+#define DIST_BASE 30
+#endif
 
 #define PADDLE_BALL_FRAME_TILT 5000
 
