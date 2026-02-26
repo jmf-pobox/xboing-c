@@ -1607,3 +1607,50 @@ Key design choices:
   two modules.
 - 17 CMocka tests across 7 groups cover lifecycle, both state flows,
   block table, instruction text, sparkle/blink, and null safety.
+
+### ADR-027: Pure C demo and preview screen sequencer
+
+**Status:** Accepted
+**Date:** 2026-02-25
+**Bead:** xboing-dm8.3
+
+**Context:**
+Legacy `demo.c` (343 lines) and `preview.c` (242 lines) implement two
+attract-mode screens that share the sparkle animation loop and FLASH
+interval logic for specials redraw.  Both use X11 Display/Window
+parameters, extern globals, and direct draw calls.  The demo screen
+shows a ball trail illustration with descriptive text, then loops in
+a sparkle animation.  The preview screen loads a random level and
+waits before cycling.
+
+**Decision:**
+Create a single `demo_system.c`/`demo_system.h` module that handles
+both screens, selected by a `demo_screen_mode_t` parameter.
+
+Key design choices:
+
+1. **Two modes, one module:** DEMO mode flows TITLE -> BLOCKS -> TEXT
+   -> SPARKLE(5000) -> FINISH.  PREVIEW mode flows TITLE (loads random
+   level via callback) -> TEXT -> WAIT(5000) -> FINISH.  Both share
+   sparkle animation and FLASH interval logic.
+
+2. **Static data tables:** The 10 ball trail positions and 5 descriptive
+   text lines are const static arrays, replacing hardcoded draw calls.
+
+3. **Injectable random function:** `demo_rand_fn` for deterministic
+   level selection and sparkle position testing.
+
+4. **Level loading via callback:** `on_load_level(level_num, user_data)`
+   lets the integration layer handle actual level file I/O.
+
+5. **Specials query:** `should_draw_specials()` returns true at FLASH
+   intervals (every 30 frames) during SPARKLE and WAIT states,
+   matching legacy behavior.
+
+**Consequences:**
+
+- Eliminates all X11 dependency from both demo and preview screens.
+- Ball trail and text are data-driven instead of hardcoded draw calls.
+- Shared sparkle and FLASH logic eliminates code duplication.
+- 15 CMocka tests across 6 groups cover lifecycle, both state flows,
+  data tables, sparkle/specials, and null safety.

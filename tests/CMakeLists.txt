@@ -353,3 +353,11 @@ add_executable(test_intro_system test_intro_system.c)
 target_compile_options(test_intro_system PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
 target_link_libraries(test_intro_system PRIVATE intro_system ${CMOCKA_LIBRARIES})
 add_test(NAME test_intro_system COMMAND test_intro_system)
+
+# Demo and preview screen sequencer tests (bead xboing-dm8.3)
+# Pure logic tests — no SDL2, X11, video, or audio driver needed.
+# Links against demo_system static library.
+add_executable(test_demo_system test_demo_system.c)
+target_compile_options(test_demo_system PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+target_link_libraries(test_demo_system PRIVATE demo_system ${CMOCKA_LIBRARIES})
+add_test(NAME test_demo_system COMMAND test_demo_system)

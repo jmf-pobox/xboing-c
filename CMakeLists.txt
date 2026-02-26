@@ -479,6 +479,18 @@ target_include_directories(intro_system PUBLIC
 )
 target_compile_options(intro_system PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
 
+# --- Demo and preview screen sequencer library --------------------------------
+#
+# Pure C module — no SDL2 or X11 dependency.  Owns both the demo screen
+# (gameplay illustration + sparkle loop) and preview screen (random level
+# display + timed wait).  Static data tables for ball trail and text.
+
+add_library(demo_system STATIC src/demo_system.c)
+target_include_directories(demo_system PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+target_compile_options(demo_system PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+
 # --- Tests ------------------------------------------------------------------
 
 option(BUILD_TESTING "Build unit tests" ON)
