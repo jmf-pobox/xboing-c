@@ -563,6 +563,18 @@ target_include_directories(savegame_io PUBLIC
 )
 target_compile_options(savegame_io PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
 
+# --- TOML config I/O library -----------------------------------------------
+#
+# Pure C module — no SDL2 or X11 dependency.  Reads and writes user
+# preferences as minimal TOML (flat key=value, no tables).  Replaces
+# compile-time defines and env vars for persistent user settings.
+
+add_library(config_io STATIC src/config_io.c)
+target_include_directories(config_io PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+target_compile_options(config_io PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+
 # --- Tests ------------------------------------------------------------------
 
 option(BUILD_TESTING "Build unit tests" ON)

@@ -409,3 +409,11 @@ add_executable(test_savegame_io test_savegame_io.c)
 target_compile_options(test_savegame_io PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
 target_link_libraries(test_savegame_io PRIVATE savegame_io ${CMOCKA_LIBRARIES})
 add_test(NAME test_savegame_io COMMAND test_savegame_io)
+
+# TOML config I/O tests (bead xboing-1fr.3)
+# Tests TOML read/write round-trips, parsing, file operations, error handling.
+# Links against config_io static library.
+add_executable(test_config_io test_config_io.c)
+target_compile_options(test_config_io PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+target_link_libraries(test_config_io PRIVATE config_io ${CMOCKA_LIBRARIES})
+add_test(NAME test_config_io COMMAND test_config_io)
