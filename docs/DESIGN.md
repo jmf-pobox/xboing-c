@@ -1654,3 +1654,51 @@ Key design choices:
 - Shared sparkle and FLASH logic eliminates code duplication.
 - 15 CMocka tests across 6 groups cover lifecycle, both state flows,
   data tables, sparkle/specials, and null safety.
+
+### ADR-028: Pure C keys and editor controls screen sequencer
+
+**Status:** Accepted
+**Date:** 2026-02-25
+**Bead:** xboing-dm8.4
+
+**Context:**
+Legacy `keys.c` (385 lines) and `keysedit.c` (328 lines) implement two
+help screens that share a 5-state machine (TITLE -> TEXT -> SPARKLE ->
+FINISH) with identical sparkle animation and 4000-frame end timers.
+Both use X11 Display/Window parameters, font metrics, and direct draw
+calls.  The game controls screen shows a mouse diagram with arrows
+and 20 key bindings in two columns.  The editor controls screen shows
+7 lines of instructions and 10 key bindings in two columns.
+
+**Decision:**
+Create a single `keys_system.c`/`keys_system.h` module that handles
+both screens, selected by a `keys_screen_mode_t` parameter.
+
+Key design choices:
+
+1. **Two modes, one module:** Both GAME and EDITOR modes share the
+   same state flow (TITLE -> TEXT -> SPARKLE -> FINISH).  The module
+   provides separate data table queries for each mode's content.
+
+2. **Static data tables:** 20 game key bindings, 7 editor info lines,
+   and 10 editor key bindings are const static arrays with column
+   assignment, replacing hardcoded `strcpy`+draw call sequences.
+
+3. **Blink timing:** Game mode fires blink events at configurable
+   intervals.  Editor mode never blinks, matching legacy behavior
+   where only `keys.c` calls `HandleBlink()`.
+
+4. **Sound differentiation:** Game finish plays "boing" (transitions
+   to keysedit), editor finish plays "warp" (transitions to highscore).
+
+5. **Layout delegation:** Column x positions and spacing constants are
+   provided as `#define`s.  Font-dependent y positioning is left to the
+   integration layer.
+
+**Consequences:**
+
+- Eliminates all X11 dependency from both keys screens.
+- Key bindings are data-driven instead of hardcoded draw call sequences.
+- Shared sparkle and state machine eliminate code duplication.
+- 16 CMocka tests across 7 groups cover lifecycle, both state flows,
+  data tables, sparkle/specials, blink, and null safety.
