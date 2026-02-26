@@ -1189,3 +1189,67 @@ Key design choices:
   score digits without reimplementing the right-alignment math.
 - `add_raw()` supports bonus score commits where the multiplier was
   already applied by the caller.
+
+### ADR-020: Pure C level file loading system
+
+**Status:** Accepted
+**Date:** 2026-02-26
+**Bead:** xboing-1ka.6
+
+**Context:**
+
+`file.c` (643 lines) contains `ReadNextLevel()` which parses level data
+files (title, time bonus, 15x9 character grid) and calls `AddNewBlock()`
+for each non-empty cell.  It has tight X11 coupling (Display/Window
+parameters, `XDestroyRegion` calls via `ClearBlockArray`), reads globals
+(`frame`, `debug`, `level`), and directly references the block grid.
+
+The level file format is plain text: line 1 = title, line 2 = time
+bonus (seconds), lines 3-17 = 15 rows of 9 characters.  26 distinct
+characters map to block types.  80 level files cycle via modular
+wrapping.  Background cycling (2→3→4→5→2) is managed per level
+transition.
+
+**Decision:**
+
+Create `level_system` as a pure C module using the opaque context and
+callback injection patterns established by the other system modules.
+
+Key design choices:
+
+1. **Single callback:** `on_add_block(row, col, block_type, counter_slide)`
+   fires for each non-empty cell during parsing.  The integration layer
+   calls `block_system_add()` in its callback, keeping level_system
+   independent of block_system.
+
+2. **Character mapping as public utility:** `level_system_char_to_block()`
+   is exposed so tests can verify the mapping table independently of
+   file I/O.  It encodes all 26 character-to-block-type mappings
+   including `LEVEL_SHOTS_TO_KILL=3` for special blocks.
+
+3. **Level wrapping as stateless utility:** `level_system_wrap_number()`
+   implements the modular formula: `level % 80`, mapping 0 to 80.
+   Produces range 1..80 for any positive input.
+
+4. **Background cycling on context:** `level_system_advance_background()`
+   cycles 2→3→4→5→2.  Initial state is 1 so the first advance produces
+   2, matching legacy `SetupStage()` behavior.
+
+5. **Path resolution delegated:** The caller resolves the absolute file
+   path (via `paths_level_file()` or direct construction) and passes it
+   to `level_system_load_file()`.  This keeps the parser maximally
+   testable — tests pass local file paths directly.
+
+6. **Newline guard:** Legacy code dereferences `strchr(title, '\n')`
+   without null check.  The port guards against missing newlines.
+
+**Consequences:**
+
+- Eliminates all X11 dependency from level file parsing.
+- The 26-character mapping table and `SHOTS_TO_KILL` dispatch are
+  centralized in one switch statement, replacing the scattered if/else
+  chain in legacy `ReadNextLevel()`.
+- Tests load real level files from the `levels/` directory, providing
+  characterization coverage of the actual game data.
+- `SaveLevelDataFile()` (the reverse mapping) is not yet ported —
+  it belongs to the editor/save-game subsystem.

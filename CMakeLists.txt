@@ -401,6 +401,18 @@ target_include_directories(score_system PUBLIC
 target_compile_options(score_system PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
 target_link_libraries(score_system PUBLIC score_logic)
 
+# --- Level file loading library ----------------------------------------------
+#
+# Pure C module — no SDL2 or X11 dependency.  Owns level file parsing,
+# character-to-block-type mapping, level number wrapping, and background
+# cycling.  Delegates block creation via injected callback.
+
+add_library(level_system STATIC src/level_system.c)
+target_include_directories(level_system PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+target_compile_options(level_system PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+
 # --- Tests ------------------------------------------------------------------
 
 option(BUILD_TESTING "Build unit tests" ON)

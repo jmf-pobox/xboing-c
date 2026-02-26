@@ -293,3 +293,15 @@ add_executable(test_score_system test_score_system.c)
 target_compile_options(test_score_system PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
 target_link_libraries(test_score_system PRIVATE score_system ${CMOCKA_LIBRARIES})
 add_test(NAME test_score_system COMMAND test_score_system)
+
+# Level file loading system tests (bead xboing-1ka.6)
+# Pure logic tests — no SDL2, X11, video, or audio driver needed.
+# Links against level_system static library.
+# Tests load real level files from the source levels/ directory.
+add_executable(test_level_system test_level_system.c)
+target_compile_definitions(test_level_system PRIVATE
+    LEVELS_DIR="${CMAKE_SOURCE_DIR}/levels"
+)
+target_compile_options(test_level_system PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+target_link_libraries(test_level_system PRIVATE level_system ${CMOCKA_LIBRARIES})
+add_test(NAME test_level_system COMMAND test_level_system)
