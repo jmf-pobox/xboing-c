@@ -139,8 +139,8 @@ void block_system_destroy(block_system_t *ctx);
  * frame: current game frame (used for animation timing on RANDOM, DROP,
  *        ROAMER, EXTRABALL, DEATH block types).
  *
- * Preserves legacy AddNewBlock() bounds check bug: row > MAX_ROW and
- * col > MAX_COL are accepted (should be >= MAX_ROW/MAX_COL).
+ * Fixes legacy AddNewBlock() bounds check bug: row >= MAX_ROW and
+ * col >= MAX_COL are now correctly rejected (legacy used > instead of >=).
  */
 block_system_status_t block_system_add(block_system_t *ctx, int row, int col, int block_type,
                                        int counter_slide, int frame);

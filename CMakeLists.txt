@@ -343,7 +343,7 @@ target_link_libraries(ball_system PUBLIC m)
 # --- Block grid system library -----------------------------------------------
 #
 # Pure C module — no SDL2 or X11 dependency.  Owns the 18x9 block grid,
-# collision geometry (pure C triangles replacing X11 Regions), block info
+# collision geometry (pure C diagonal cross-product collision replacing X11 Regions), block info
 # catalog, and grid queries.  Links score_logic.c for hit point calculation.
 
 add_library(block_system STATIC src/block_system.c src/score_logic.c)

@@ -13,7 +13,6 @@
 #include "score_logic.h" /* score_block_hit_points() */
 
 #include <stdlib.h>
-#include <string.h>
 
 /* =========================================================================
  * Internal block entry — replaces legacy struct aBlock
@@ -433,10 +432,9 @@ block_system_status_t block_system_add(block_system_t *ctx, int row, int col, in
     }
 
     /*
-     * Legacy bounds check bug: blocks.c:2272-2275 uses > instead of >=.
-     * This allows row==MAX_ROW and col==MAX_COL to pass, which would be
-     * one past the end.  We preserve this behavior for characterization
-     * equivalence but guard against actual out-of-bounds access.
+     * Fixes legacy bounds check bug: blocks.c:2272-2275 uses > instead
+     * of >=, allowing row==MAX_ROW and col==MAX_COL (one past the end).
+     * We use >= to correctly reject these out-of-bounds values.
      */
     if (row < 0 || row >= MAX_ROW || col < 0 || col >= MAX_COL)
     {
