@@ -51,6 +51,12 @@ struct sfx_system
     int glow_direction; /* +1 = ascending, -1 = descending */
     int glow_phase;     /* +1 = red, -1 = green */
 
+    /* Devil eyes state */
+    int deveye_slide;  /* Current position in the 26-step blink sequence */
+    int deveye_active; /* 1 = animation running, 0 = idle */
+    int deveye_x;      /* Computed draw position X */
+    int deveye_y;      /* Computed draw position Y */
+
     /* Callbacks */
     sfx_system_callbacks_t callbacks;
     void *user_data;
@@ -519,4 +525,69 @@ int sfx_system_fadeaway_steps(int w)
         return 0;
     }
     return w / SFX_FADEAWAY_STRIDE + 1;
+}
+
+/* =========================================================================
+ * Devil eyes blink animation
+ * ========================================================================= */
+
+/* Legacy 26-step blink sequence from stage.c:126 */
+static const int deveye_seq[SFX_DEVEYE_SEQ_LEN] = {0, 1, 2, 3, 4, 5, 5, 4, 3, 2, 1, 0, 0,
+                                                   0, 0, 1, 2, 3, 4, 5, 5, 4, 3, 2, 1, 0};
+
+void sfx_system_start_deveyes(sfx_system_t *ctx)
+{
+    if (ctx)
+    {
+        ctx->deveye_slide = 0;
+        ctx->deveye_active = 1;
+    }
+}
+
+int sfx_system_update_deveyes(sfx_system_t *ctx, int play_w, int play_h)
+{
+    if (ctx == NULL || !ctx->deveye_active)
+    {
+        return 0;
+    }
+
+    /* Compute position: bottom-right of play area, matching legacy
+     * devilx = PLAY_WIDTH - DEVILEYE_WC - 5
+     * devily = PLAY_HEIGHT - DEVILEYE_HC - 5
+     * Then draw at (devilx - DEVILEYE_WC, devily - DEVILEYE_HC) */
+    int half_w = SFX_DEVEYE_WIDTH / 2;
+    int half_h = SFX_DEVEYE_HEIGHT / 2;
+    int cx = play_w - half_w - SFX_DEVEYE_MARGIN;
+    int cy = play_h - half_h - SFX_DEVEYE_MARGIN;
+    ctx->deveye_x = cx - half_w;
+    ctx->deveye_y = cy - half_h;
+
+    ctx->deveye_slide++;
+    if (ctx->deveye_slide >= SFX_DEVEYE_SEQ_LEN)
+    {
+        ctx->deveye_slide = 0;
+        ctx->deveye_active = 0;
+        return 0;
+    }
+
+    return 1;
+}
+
+sfx_deveye_info_t sfx_system_get_deveye_info(const sfx_system_t *ctx)
+{
+    sfx_deveye_info_t info = {0, 0, 0, 0};
+    if (ctx == NULL)
+    {
+        return info;
+    }
+
+    info.active = ctx->deveye_active;
+    if (ctx->deveye_active && ctx->deveye_slide < SFX_DEVEYE_SEQ_LEN)
+    {
+        info.frame_index = deveye_seq[ctx->deveye_slide];
+        info.x = ctx->deveye_x;
+        info.y = ctx->deveye_y;
+    }
+
+    return info;
 }

@@ -36,6 +36,13 @@
 /* FadeAwayArea constants */
 #define SFX_FADEAWAY_STRIDE 15 /* Pixel stride for fade-away grid */
 
+/* Devil eyes constants — match legacy stage.c values */
+#define SFX_DEVEYE_WIDTH 57
+#define SFX_DEVEYE_HEIGHT 16
+#define SFX_DEVEYE_FRAMES 6   /* Number of sprite frames */
+#define SFX_DEVEYE_SEQ_LEN 26 /* Length of blink sequence */
+#define SFX_DEVEYE_MARGIN 5   /* Margin from play area edge */
+
 /* =========================================================================
  * Effect mode enum — match legacy sfx.h defines
  * ========================================================================= */
@@ -103,6 +110,18 @@ typedef struct
     int color_index; /* Current color step (0..SFX_GLOW_STEPS-1) */
     int use_green;   /* 0 = red phase, 1 = green phase */
 } sfx_glow_state_t;
+
+/* =========================================================================
+ * Devil eyes render info — current animation frame and position
+ * ========================================================================= */
+
+typedef struct
+{
+    int frame_index; /* Sprite frame index (0..SFX_DEVEYE_FRAMES-1) */
+    int x;           /* Draw X (top-left corner, after centering) */
+    int y;           /* Draw Y (top-left corner, after centering) */
+    int active;      /* 1 = should draw, 0 = animation idle */
+} sfx_deveye_info_t;
 
 /* =========================================================================
  * Callback table — injected at creation time
@@ -254,5 +273,37 @@ void sfx_system_reset_glow(sfx_system_t *ctx);
  * Returns the number of steps (w / SFX_FADEAWAY_STRIDE + 1, approximately).
  */
 int sfx_system_fadeaway_steps(int w);
+
+/* =========================================================================
+ * Devil eyes blink animation
+ * ========================================================================= */
+
+/*
+ * Advance the devil eyes blink animation by one step.
+ *
+ * play_w: play area width (for positioning).
+ * play_h: play area height (for positioning).
+ *
+ * Returns render info with sprite frame index and position.
+ * When the 26-step sequence completes, active is set to 0 and
+ * the animation resets for the next trigger.
+ *
+ * Returns 1 if animation is still running, 0 if sequence complete.
+ */
+int sfx_system_update_deveyes(sfx_system_t *ctx, int play_w, int play_h);
+
+/*
+ * Get the current devil eyes render info.
+ *
+ * Returns frame index and position for the integration layer to draw.
+ */
+sfx_deveye_info_t sfx_system_get_deveye_info(const sfx_system_t *ctx);
+
+/*
+ * Start a new devil eyes blink sequence.
+ *
+ * Resets the animation to the beginning of the 26-step sequence.
+ */
+void sfx_system_start_deveyes(sfx_system_t *ctx);
 
 #endif /* SFX_SYSTEM_H */
