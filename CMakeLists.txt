@@ -551,6 +551,18 @@ target_include_directories(highscore_io PUBLIC
 )
 target_compile_options(highscore_io PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
 
+# --- Save game JSON I/O library --------------------------------------------
+#
+# Pure C module — no SDL2 or X11 dependency.  Reads and writes game state
+# as JSON files, with atomic writes.  Replaces the legacy binary
+# saveGameStruct format.
+
+add_library(savegame_io STATIC src/savegame_io.c)
+target_include_directories(savegame_io PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+target_compile_options(savegame_io PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+
 # --- Tests ------------------------------------------------------------------
 
 option(BUILD_TESTING "Build unit tests" ON)

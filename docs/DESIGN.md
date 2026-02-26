@@ -1879,3 +1879,42 @@ Key design choices:
 - 18 CMocka tests across 7 groups cover initialization, sorting,
   insert/ranking, write/read round-trips, edge cases, error
   handling, and null safety.
+
+### ADR-033: JSON-based save game I/O
+
+**Status:** Accepted
+**Date:** 2026-02-25
+**Bead:** xboing-1fr.2
+
+**Context:**
+Legacy `file.c` saves game state as a binary `saveGameStruct`
+(9 fields written with `fwrite`).  The format has the same issues
+as the high score binary format: struct padding, platform byte
+order, and version fragility.
+
+**Decision:**
+Create `savegame_io.c`/`savegame_io.h` that reads and writes game
+state as JSON files.
+
+Key design choices:
+
+1. **Same JSON pattern as highscore_io:** Minimal hand-written
+   parser for the specific 9-field schema.  Atomic writes via
+   temp file + `rename()`.
+
+2. **Level data out of scope:** Level block data continues to use
+   the existing `.data` file format.  This module handles only
+   the game state (score, level, lives, paddle, bullets, time).
+
+3. **File lifecycle helpers:** `exists()` and `delete()` support
+   the "one save slot" gameplay pattern.
+
+4. **Sensible defaults:** `init()` sets level=1, lives=3,
+   paddle_size=50, matching the new-game starting state.
+
+**Consequences:**
+
+- Save files are human-readable JSON.
+- Atomic writes prevent corruption on crash.
+- 13 CMocka tests across 6 groups cover initialization, round-trips,
+  file operations, error handling, edge cases, and null safety.
