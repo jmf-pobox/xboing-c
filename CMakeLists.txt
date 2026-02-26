@@ -467,6 +467,18 @@ target_include_directories(presents_system PUBLIC
 )
 target_compile_options(presents_system PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
 
+# --- Intro and instructions screen sequencer library -------------------------
+#
+# Pure C module — no SDL2 or X11 dependency.  Owns both the intro screen
+# (block descriptions + sparkle) and instructions screen (text + sparkle).
+# Static data tables for block descriptions and instruction text.
+
+add_library(intro_system STATIC src/intro_system.c)
+target_include_directories(intro_system PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+target_compile_options(intro_system PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+
 # --- Tests ------------------------------------------------------------------
 
 option(BUILD_TESTING "Build unit tests" ON)
