@@ -280,3 +280,11 @@ add_executable(test_paddle_system test_paddle_system.c)
 target_compile_options(test_paddle_system PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
 target_link_libraries(test_paddle_system PRIVATE paddle_system ${CMOCKA_LIBRARIES})
 add_test(NAME test_paddle_system COMMAND test_paddle_system)
+
+# Gun/bullet system tests (bead xboing-1ka.4)
+# Pure logic tests — no SDL2, X11, video, or audio driver needed.
+# Links against gun_system static library.
+add_executable(test_gun_system test_gun_system.c)
+target_compile_options(test_gun_system PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+target_link_libraries(test_gun_system PRIVATE gun_system ${CMOCKA_LIBRARIES})
+add_test(NAME test_gun_system COMMAND test_gun_system)

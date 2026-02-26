@@ -363,6 +363,18 @@ target_include_directories(paddle_system PUBLIC
 )
 target_compile_options(paddle_system PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
 
+# --- Gun/bullet system library ----------------------------------------------
+#
+# Pure C module — no SDL2 or X11 dependency.  Owns bullet and tink arrays,
+# ammo state, movement physics, and collision dispatch.  Side effects
+# communicated via injected callback table.
+
+add_library(gun_system STATIC src/gun_system.c)
+target_include_directories(gun_system PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+target_compile_options(gun_system PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+
 # --- Tests ------------------------------------------------------------------
 
 option(BUILD_TESTING "Build unit tests" ON)
