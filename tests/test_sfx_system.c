@@ -1,7 +1,7 @@
 /*
  * test_sfx_system.c — Tests for the pure C visual SFX state machine.
  *
- * 7 groups:
+ * 9 groups:
  *   1. Lifecycle (3 tests)
  *   2. Enable/disable (2 tests)
  *   3. Shake effect (4 tests)
@@ -9,6 +9,8 @@
  *   5. Blind and Shatter (3 tests)
  *   6. Static effect (2 tests)
  *   7. BorderGlow (3 tests)
+ *   8. Devil eyes (4 tests)
+ *   9. Null safety and utilities (2 tests)
  */
 
 #include <setjmp.h>
@@ -469,7 +471,91 @@ static void test_glow_reverses_at_peak(void **state)
 }
 
 /* =========================================================================
- * Group 8: Null safety and utilities
+ * Group 8: Devil eyes
+ * ========================================================================= */
+
+static void test_deveyes_26_step_sequence(void **state)
+{
+    (void)state;
+    sfx_system_t *ctx = sfx_system_create(NULL, NULL, NULL);
+
+    sfx_system_start_deveyes(ctx);
+
+    /* Drive the full 26-step sequence */
+    int running = 1;
+    int steps = 0;
+    while (running)
+    {
+        running = sfx_system_update_deveyes(ctx, 495, 580);
+        steps++;
+    }
+
+    /* Should take exactly 26 steps */
+    assert_int_equal(steps, SFX_DEVEYE_SEQ_LEN);
+
+    /* Animation should be idle now */
+    sfx_deveye_info_t info = sfx_system_get_deveye_info(ctx);
+    assert_int_equal(info.active, 0);
+
+    sfx_system_destroy(ctx);
+}
+
+static void test_deveyes_frame_sequence(void **state)
+{
+    (void)state;
+    sfx_system_t *ctx = sfx_system_create(NULL, NULL, NULL);
+
+    sfx_system_start_deveyes(ctx);
+
+    /* First update: slide advances to 1, get_info returns seq[1]=1 */
+    sfx_system_update_deveyes(ctx, 495, 580);
+    sfx_deveye_info_t info = sfx_system_get_deveye_info(ctx);
+    assert_int_equal(info.active, 1);
+    assert_int_equal(info.frame_index, 1); /* blinkslides[1] = 1 */
+
+    /* Second update: slide advances to 2, seq[2]=2 */
+    sfx_system_update_deveyes(ctx, 495, 580);
+    info = sfx_system_get_deveye_info(ctx);
+    assert_int_equal(info.frame_index, 2); /* blinkslides[2] = 2 */
+
+    sfx_system_destroy(ctx);
+}
+
+static void test_deveyes_position(void **state)
+{
+    (void)state;
+    sfx_system_t *ctx = sfx_system_create(NULL, NULL, NULL);
+
+    sfx_system_start_deveyes(ctx);
+    sfx_system_update_deveyes(ctx, 495, 580);
+
+    sfx_deveye_info_t info = sfx_system_get_deveye_info(ctx);
+    /* Legacy: devilx = 495 - 28 - 5 = 462, devily = 580 - 8 - 5 = 567
+     * Draw at: (462 - 28, 567 - 8) = (434, 559) */
+    assert_int_equal(info.x, 495 - SFX_DEVEYE_WIDTH / 2 - SFX_DEVEYE_MARGIN - SFX_DEVEYE_WIDTH / 2);
+    assert_int_equal(info.y,
+                     580 - SFX_DEVEYE_HEIGHT / 2 - SFX_DEVEYE_MARGIN - SFX_DEVEYE_HEIGHT / 2);
+
+    sfx_system_destroy(ctx);
+}
+
+static void test_deveyes_idle_when_not_started(void **state)
+{
+    (void)state;
+    sfx_system_t *ctx = sfx_system_create(NULL, NULL, NULL);
+
+    /* Without starting, update should return 0 */
+    int result = sfx_system_update_deveyes(ctx, 495, 580);
+    assert_int_equal(result, 0);
+
+    sfx_deveye_info_t info = sfx_system_get_deveye_info(ctx);
+    assert_int_equal(info.active, 0);
+
+    sfx_system_destroy(ctx);
+}
+
+/* =========================================================================
+ * Group 9: Null safety and utilities
  * ========================================================================= */
 
 static void test_null_safety(void **state)
@@ -488,6 +574,12 @@ static void test_null_safety(void **state)
     sfx_shake_pos_t pos = sfx_system_get_shake_pos(NULL);
     assert_int_equal(pos.x, SFX_WINDOW_X);
     assert_int_equal(pos.y, SFX_WINDOW_Y);
+
+    /* Devil eyes null safety */
+    sfx_system_start_deveyes(NULL);
+    assert_int_equal(sfx_system_update_deveyes(NULL, 495, 580), 0);
+    sfx_deveye_info_t dinfo = sfx_system_get_deveye_info(NULL);
+    assert_int_equal(dinfo.active, 0);
 }
 
 static void test_fadeaway_steps(void **state)
@@ -540,7 +632,13 @@ int main(void)
         cmocka_unit_test(test_glow_advances_on_interval),
         cmocka_unit_test(test_glow_reverses_at_peak),
 
-        /* Group 8: Null safety and utilities */
+        /* Group 8: Devil eyes */
+        cmocka_unit_test(test_deveyes_26_step_sequence),
+        cmocka_unit_test(test_deveyes_frame_sequence),
+        cmocka_unit_test(test_deveyes_position),
+        cmocka_unit_test(test_deveyes_idle_when_not_started),
+
+        /* Group 9: Null safety and utilities */
         cmocka_unit_test(test_null_safety),
         cmocka_unit_test(test_fadeaway_steps),
     };
