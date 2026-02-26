@@ -437,6 +437,12 @@ target_include_directories(bonus_system PUBLIC
 )
 target_compile_options(bonus_system PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
 
+add_library(sfx_system STATIC src/sfx_system.c)
+target_include_directories(sfx_system PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+target_compile_options(sfx_system PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+
 # --- Tests ------------------------------------------------------------------
 
 option(BUILD_TESTING "Build unit tests" ON)
