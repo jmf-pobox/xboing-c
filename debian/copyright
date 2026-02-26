@@ -2,6 +2,11 @@ Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: XBoing
 Upstream-Contact: Justin C. Kibell
 Source: https://github.com/jmf-pobox/xboing-c
+Comment:
+ XBoing was originally written by Justin C. Kibell between 1993 and 1996.
+ It is a blockout-style arcade game for the X Window System.
+ This modernized version preserves the original game mechanics and all
+ 80 levels while updating the build system and platform support.
 
 Files: *
 Copyright: 1993-1995 Justin C. Kibell
@@ -28,7 +33,18 @@ License: X11
  author has no obligation to provide maintenance, support, updates,
  enhancements, or modifications.
 
+Files: src/* include/* tests/*
+Copyright: 1993-1995 Justin C. Kibell
+           2026 Justin Freeman <jmf@pobox.com>
+License: X11
+ Same license as upstream.
+
 Files: debian/*
 Copyright: 2026 Justin Freeman <jmf@pobox.com>
 License: X11
  Same license as upstream.
+
+Files: assets/fonts/*
+Copyright: See individual font license files
+License: OFL-1.1 or Apache-2.0
+ See the LICENSE files in each font directory for specific terms.
