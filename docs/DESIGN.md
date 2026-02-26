@@ -1382,3 +1382,64 @@ Key design choices:
   via `get_display_score()` and `get_state()` queries.
 - 23 CMocka tests cover lifecycle, score computation, coin management,
   save trigger logic, full state machine sequences, and skip behavior.
+
+## ADR-023: Pure C visual SFX state machine
+
+**Status:** Accepted
+
+**Context:**
+Legacy `sfx.c` (384 lines) implements 5 visual effects (SHAKE, FADE,
+BLIND, SHATTER, STATIC), a BorderGlow ambient animation, and a
+FadeAwayArea utility.  Every function takes `Display *display, Window
+window`.  SHAKE calls `XMoveWindow()` to physically shift the play
+window.  FADE draws black grid lines via `XDrawLine()`.  BLIND and
+SHATTER use `XCopyArea()` from the off-screen buffer.  STATIC is an
+unimplemented stub (`/* Do somehting in here */`).
+
+Effects are globally gated by `useSfx` and `DoesBackingStore()`.
+State is stored in module-static and function-local static variables,
+creating hidden state that is never reset on reactivation.
+
+**Decision:**
+Create `sfx_system.c`/`sfx_system.h` as a pure C module using the
+opaque context pattern.
+
+Key design choices:
+
+1. **No rendering in the module:** The module computes coordinates,
+   timing, and tile order.  Query functions (`get_shake_pos`,
+   `get_fade_frame`, `get_shatter_tiles`, `get_blind_strips`) return
+   data for the integration layer to render.
+
+2. **Callback for window movement:** SHAKE's `XMoveWindow()` is replaced
+   by `on_move_window` callback.  `reset_effect()` always fires the
+   callback to restore the canonical position (35, 60).
+
+3. **Per-effect state in struct:** Function-local statics are replaced
+   by fields in the opaque context, initialized on `set_mode()`.  This
+   eliminates the dirty-state bug where interrupted effects leave stale
+   locals.
+
+4. **Injectable random function:** `sfx_rand_fn` parameter allows
+   deterministic testing of SHAKE offsets and SHATTER tile order.
+
+5. **STATIC preserved as stub:** The placeholder behavior (50-frame
+   timer with no drawing) is preserved exactly.
+
+6. **Synchronous effects preserved:** BLIND and SHATTER complete in a
+   single `update()` call returning 0, matching legacy behavior where
+   the `while` loop idiom at call sites runs exactly once.
+
+7. **BorderGlow as independent animation:** The glow cycles through
+   7-step red/green color ramps on a 40-frame interval, independent
+   of the effect mode.
+
+**Consequences:**
+
+- Eliminates all X11 dependency from visual effect management.
+- Effect state is explicitly initialized on activation, preventing
+  stale-state bugs from interrupted effects.
+- SHATTER and BLIND tile/strip data is generated on demand via query
+  functions, giving the integration layer full control over rendering.
+- 22 CMocka tests cover lifecycle, enable/disable, all 5 effect modes,
+  BorderGlow animation, null safety, and the FadeAwayArea utility.
