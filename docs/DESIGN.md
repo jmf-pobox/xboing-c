@@ -1499,3 +1499,58 @@ Key design choices:
   module-static or global variables.
 - 16 CMocka tests cover lifecycle, reset/path-check, walk animation,
   turn-at-midpoint, collision/death, and null safety.
+
+## ADR-025: Pure C presents/splash screen sequencer
+
+**Status:** Accepted
+
+**Context:**
+Legacy `presents.c` (700 lines) implements the startup animation
+sequence: Australian flag + earth, author credits ("Justin" / "Kibell"
+/ "Presents" bitmaps), stamping the letters X-B-O-I-N-G one at a time,
+a sparkle animation, typewriter-style welcome text (3 lines), and a
+curtain-wipe clear.  Every function takes `Display *display, Window
+window`.  State is stored in module-static and function-local static
+variables.  The WAIT state implements a frame-delay timer.
+
+The three typewriter text functions (DoSpecialText1/2/3) are
+copy-pasted code differing only in string content and y-offset.
+Function-local statics in DoLetters, DoSparkle, and DoClear create
+stale-state bugs on re-entry.
+
+**Decision:**
+Create `presents_system.c`/`presents_system.h` as a pure C sequencer
+module using the opaque context pattern.
+
+Key design choices:
+
+1. **Sequencer, not renderer:** The module advances state and timing.
+   Query functions (`get_flag_info`, `get_letter_info`, `get_ii_info`,
+   `get_sparkle_info`, `get_typewriter_info`, `get_wipe_info`) return
+   position/frame/text data for the integration layer to render.
+
+2. **WAIT state as generic timer:** `set_wait(target, frame)` replaces
+   legacy `SetPresentWait()`.  WAIT transitions to `wait_target` when
+   `current_frame >= wait_frame`.
+
+3. **Unified typewriter:** The three identical DoSpecialText functions
+   are replaced by a single `do_typewriter()` parameterized by line
+   index, next state, and delay.
+
+4. **Sound events as data:** `get_sound()` returns the sound name and
+   volume for the current frame, rather than calling audio functions.
+
+5. **Callbacks for external queries:** `get_nickname` and
+   `get_fullname` callbacks replace direct calls to `GetNickName()`
+   and `getUsersFullName()`.
+
+6. **All timing constants exposed:** Frame delays are `#define`
+   constants matching legacy values, enabling verification.
+
+**Consequences:**
+
+- Eliminates all X11 dependency from the presents sequence.
+- All sub-state (letter index, sparkle frame, typewriter progress,
+  wipe position) is owned by the opaque context.
+- 18 CMocka tests across 7 groups cover lifecycle, flag state, letter
+  stamping, sparkle, typewriter, curtain wipe, skip, and null safety.
