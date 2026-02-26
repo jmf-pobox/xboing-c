@@ -1016,3 +1016,51 @@ diagonal cross-product math:
   bounces at block junctions.
 - Block info catalog, geometry calculation, and grid queries are all pure C
   with zero platform dependencies.
+
+## ADR-017: Pure C paddle system
+
+**Status:** Accepted
+
+**Context:**
+
+The legacy `paddle.c` (346 lines) manages paddle position, size, and
+control flags.  Every function takes `Display *display, Window window`
+parameters for X11 rendering (pixmap clear/draw).  The actual logic is
+simple: keyboard velocity steps, mouse position mapping, wall clamping,
+reverse controls, and three-step size transitions.
+
+The `ball_system_env_t` already reads paddle state (`paddle_pos`,
+`paddle_dx`, `paddle_size`) from the environment struct.  We need a
+pure C module to own and compute these values.
+
+**Decision:**
+
+Create a `paddle_system` module (`src/paddle_system.c`,
+`include/paddle_system.h`) with opaque context pattern:
+
+1. **Position update** via `paddle_system_update(ctx, direction, mouse_x)`.
+   Keyboard mode adds/subtracts `PADDLE_VELOCITY` (10).  Mouse mode uses
+   the legacy formula: `pos = mouse_x - (main_width / 2) + half_width`.
+
+2. **Reverse controls** swap keyboard direction and mirror mouse X
+   (`play_width - mouse_x`), matching legacy `MovePaddle()` exactly.
+
+3. **Size transitions** via `change_size(ctx, shrink)`: HUGE to MEDIUM to
+   SMALL (or reverse), clamped at extremes.
+
+4. **Delta tracking:** mouse mode computes `dx = mouse_x - previous_mouse_x`
+   per frame.  Keyboard mode returns dx=0, matching legacy behavior where
+   `paddleDx` is only set for mouse control.
+
+5. **Render info snapshot** provides position, Y coordinate
+   (`play_height - DIST_BASE`), pixel width, and size type for the
+   integration layer to draw.
+
+**Consequences:**
+
+- Eliminates all X11 dependency from paddle logic.
+- The mouse position formula preserves the per-size offset from legacy
+  `MovePaddle()` (cursor-to-center offset varies by paddle width).
+- The module does not own sticky bat behavior (ball catching) — that
+  remains in `ball_system`.  The sticky flag is stored here as a
+  convenience for the render layer.
