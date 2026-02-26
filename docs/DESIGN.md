@@ -1790,3 +1790,43 @@ Key design choices:
 - Title and row sparkle animations are fully testable without X11.
 - 14 CMocka tests across 6 groups cover lifecycle, state flow,
   score table data, title sparkle, row sparkle, and null safety.
+
+### ADR-031: Pure C message display system
+
+**Status:** Accepted
+**Date:** 2026-02-25
+**Bead:** xboing-dm8.7
+
+**Context:**
+Legacy `mess.c` (160 lines) manages the single-line message bar in
+the play area.  It stores a message, optionally auto-clears after
+2000 frames, and reverts to the level name.  All rendering is via
+X11 `XClearWindow`, `XTextWidth`, and `DrawTextFast`.
+
+**Decision:**
+Create `message_system.c`/`message_system.h` as a pure data module.
+The integration layer reads the current text and renders it.
+
+Key design choices:
+
+1. **Data-only module:** No rendering.  The integration layer calls
+   `get_text()` and draws it however it likes.
+
+2. **Auto-clear with default:** `set(msg, auto_clear, frame)` stores
+   the message and schedules a revert after `CLEAR_DELAY=2000` frames.
+   The revert target is `set_default()` (the level name), matching
+   the legacy behavior.
+
+3. **Changed flag:** `text_changed()` and the return value of
+   `update()` report when the displayed text changes, so the
+   integration layer only re-renders when necessary.
+
+4. **Safe string handling:** Uses `strncpy` with explicit null
+   termination, matching `MESSAGE_MAX_LEN=1024` (legacy buffer size).
+
+**Consequences:**
+
+- Eliminates all X11 dependency from the message system.
+- Auto-clear timing is deterministic and testable.
+- 12 CMocka tests across 5 groups cover lifecycle, set/query,
+  auto-clear, default message, and null safety.
