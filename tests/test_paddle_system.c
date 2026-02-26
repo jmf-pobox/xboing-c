@@ -255,6 +255,26 @@ static void test_reverse_mouse_mirrors_x(void **state)
     paddle_system_destroy(ctx);
 }
 
+static void test_reverse_mouse_dx_uses_raw_coordinates(void **state)
+{
+    (void)state;
+    paddle_system_t *ctx = paddle_system_create(PLAY_WIDTH, PLAY_HEIGHT, MAIN_WIDTH, NULL);
+    paddle_system_set_reverse(ctx, 1);
+
+    /* First mouse update — establishes initial raw mouse position */
+    paddle_system_update(ctx, PADDLE_DIR_NONE, 100);
+    assert_int_equal(paddle_system_get_dx(ctx), 0);
+
+    /* Second update: mouse moves from 100 to 120.
+     * Legacy behavior: dx = x - oldx is computed from RAW mouse position
+     * in main.c (line 207) BEFORE MovePaddle() applies the reverse.
+     * So dx should be +20 even though position is mirrored. */
+    paddle_system_update(ctx, PADDLE_DIR_NONE, 120);
+    assert_int_equal(paddle_system_get_dx(ctx), 20);
+
+    paddle_system_destroy(ctx);
+}
+
 static void test_toggle_reverse(void **state)
 {
     (void)state;
@@ -554,6 +574,7 @@ int main(void)
         cmocka_unit_test(test_reverse_keyboard_left_moves_right),
         cmocka_unit_test(test_reverse_keyboard_right_moves_left),
         cmocka_unit_test(test_reverse_mouse_mirrors_x),
+        cmocka_unit_test(test_reverse_mouse_dx_uses_raw_coordinates),
         cmocka_unit_test(test_toggle_reverse),
 
         /* Group 5: Size changes */

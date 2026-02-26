@@ -88,7 +88,7 @@ paddle_system_t *paddle_system_create(int play_width, int play_height, int main_
                                       paddle_system_status_t *status)
 {
     paddle_system_t *ctx = calloc(1, sizeof(*ctx));
-    if (!ctx)
+    if (ctx == NULL)
     {
         if (status)
         {
@@ -130,14 +130,22 @@ void paddle_system_update(paddle_system_t *ctx, int direction, int mouse_x)
 {
     int half;
     int old_pos;
+    int raw_mouse_x;
 
-    if (!ctx)
+    if (ctx == NULL)
     {
         return;
     }
 
     old_pos = ctx->pos;
     half = half_width_for_size(ctx->size_type);
+
+    /*
+     * Save raw mouse position BEFORE reverse transformation.
+     * Legacy computes paddleDx = x - oldx from the raw mouse position
+     * in main.c (line 207), before MovePaddle() applies the reverse.
+     */
+    raw_mouse_x = mouse_x;
 
     /*
      * Step 1: Apply direction (keyboard velocity).
@@ -204,22 +212,24 @@ void paddle_system_update(paddle_system_t *ctx, int direction, int mouse_x)
     /*
      * Step 4: Compute dx and motion state.
      *
-     * Mouse mode: dx = mouse_x - old_mouse_x (matches main.c paddleDx logic).
+     * Mouse mode: dx = raw_mouse_x - old_mouse_x.  Uses the RAW (pre-reverse)
+     * mouse position, matching legacy main.c:207 where paddleDx = x - oldx
+     * is computed before MovePaddle() applies the reverse transformation.
      * Keyboard mode: dx = 0 (legacy does not set paddleDx for keyboard).
      *
      * Motion flag: nonzero if position changed.
      */
-    if (mouse_x > 0)
+    if (raw_mouse_x > 0)
     {
         if (ctx->old_mouse_x > 0)
         {
-            ctx->dx = mouse_x - ctx->old_mouse_x;
+            ctx->dx = raw_mouse_x - ctx->old_mouse_x;
         }
         else
         {
             ctx->dx = 0;
         }
-        ctx->old_mouse_x = mouse_x;
+        ctx->old_mouse_x = raw_mouse_x;
     }
     else
     {
@@ -236,7 +246,7 @@ void paddle_system_update(paddle_system_t *ctx, int direction, int mouse_x)
 
 void paddle_system_reset(paddle_system_t *ctx)
 {
-    if (!ctx)
+    if (ctx == NULL)
     {
         return;
     }
@@ -249,7 +259,7 @@ void paddle_system_reset(paddle_system_t *ctx)
 
 void paddle_system_change_size(paddle_system_t *ctx, int shrink)
 {
-    if (!ctx)
+    if (ctx == NULL)
     {
         return;
     }
@@ -282,17 +292,27 @@ void paddle_system_change_size(paddle_system_t *ctx, int shrink)
 
 void paddle_system_set_size(paddle_system_t *ctx, int size_type)
 {
-    if (!ctx)
+    if (ctx == NULL)
     {
         return;
     }
 
-    ctx->size_type = size_type;
+    switch (size_type)
+    {
+        case PADDLE_SIZE_SMALL:
+        case PADDLE_SIZE_MEDIUM:
+        case PADDLE_SIZE_HUGE:
+            ctx->size_type = size_type;
+            break;
+        default:
+            /* Ignore invalid size_type values. */
+            break;
+    }
 }
 
 void paddle_system_set_reverse(paddle_system_t *ctx, int on)
 {
-    if (!ctx)
+    if (ctx == NULL)
     {
         return;
     }
@@ -302,7 +322,7 @@ void paddle_system_set_reverse(paddle_system_t *ctx, int on)
 
 void paddle_system_toggle_reverse(paddle_system_t *ctx)
 {
-    if (!ctx)
+    if (ctx == NULL)
     {
         return;
     }
@@ -312,7 +332,7 @@ void paddle_system_toggle_reverse(paddle_system_t *ctx)
 
 void paddle_system_set_sticky(paddle_system_t *ctx, int on)
 {
-    if (!ctx)
+    if (ctx == NULL)
     {
         return;
     }
@@ -397,7 +417,7 @@ int paddle_system_get_sticky(const paddle_system_t *ctx)
 paddle_system_status_t paddle_system_get_render_info(const paddle_system_t *ctx,
                                                      paddle_system_render_info_t *info)
 {
-    if (!ctx || !info)
+    if (ctx == NULL || info == NULL)
     {
         return PADDLE_SYS_ERR_NULL_ARG;
     }
