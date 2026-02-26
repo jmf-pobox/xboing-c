@@ -1918,3 +1918,49 @@ Key design choices:
 - Atomic writes prevent corruption on crash.
 - 13 CMocka tests across 6 groups cover initialization, round-trips,
   file operations, error handling, edge cases, and null safety.
+
+## ADR-034: TOML-based user preferences file
+
+**Status:** Accepted
+
+**Context:**
+Legacy XBoing has no persistent user preferences.  All settings
+(speed, control mode, volume, nickname, SFX) are set via command-line
+flags on every launch and lost when the program exits.  Compile-time
+defines control asset paths but not user preferences.
+
+Users expect a config file at `XDG_CONFIG_HOME/xboing/config.toml`
+(typically `~/.config/xboing/config.toml`) that persists preferences
+across sessions, with CLI flags overriding config values at startup.
+
+**Decision:**
+Create `config_io.c`/`config_io.h` that reads and writes user
+preferences as a minimal TOML subset (flat key=value pairs).
+
+Key design choices:
+
+1. **Minimal TOML subset:** Only flat key=value pairs with integer,
+   boolean, and basic string types.  No tables, arrays, or datetime.
+   Sufficient for 7 preference fields; avoids a TOML library dependency.
+
+2. **Forward-compatible parsing:** Unknown keys are silently ignored.
+   Out-of-range values leave defaults in place.  Empty and
+   comment-only files are valid (all defaults apply).
+
+3. **Same atomic write pattern:** Temp file + `rename()` consistent
+   with `highscore_io` and `savegame_io`.
+
+4. **CLI override by design:** `config_io_read()` populates defaults
+   first; the integration layer then applies CLI overrides on top.
+
+5. **Matches `sdl2_cli_config_t` fields:** speed, start_level,
+   control (keys/mouse), sfx, sound, max_volume, nickname.  Debug
+   and grab are runtime-only flags, not persisted.
+
+**Consequences:**
+
+- User preferences survive across sessions without CLI flags.
+- Config file is human-readable and hand-editable TOML.
+- 17 CMocka tests across 7 groups cover initialization, round-trips,
+  TOML parsing, file operations, error handling, edge cases, and
+  null safety.
