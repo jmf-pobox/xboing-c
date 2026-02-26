@@ -1253,3 +1253,70 @@ Key design choices:
   characterization coverage of the actual game data.
 - `SaveLevelDataFile()` (the reverse mapping) is not yet ported —
   it belongs to the editor/save-game subsystem.
+
+## ADR-021: Pure C special/power-up system
+
+**Status:** Accepted
+
+**Context:**
+Legacy `special.c` (253 lines) manages 7 boolean special flags (sticky,
+saving, fastGun, noWalls, killer, x2, x4) plus rendering for an 8th
+(reverse, owned by `paddle.c`).  Every public function takes `Display *`
+as its first argument.  `ToggleWallsOn()` directly calls
+`XSetWindowBorder()` to change the play area border color.
+`DrawSpecials()` renders all 8 labels in a 4x2 grid using
+`DrawShadowText()` with X11 font metrics.  `RandomDrawSpecials()` is
+attract-mode only, randomizing all flags for visual effect.
+
+The 7 specials are consumed by 5 subsystems (ball, paddle, gun, score,
+file) via extern globals — tight coupling that prevents testing and
+complicates the SDL2 migration.
+
+**Decision:**
+Create `special_system.c`/`special_system.h` as a pure C module using
+the opaque context pattern established by all prior game systems.
+
+Key design choices:
+
+1. **Callback for wall state change:** The single X11 side effect
+   (`XSetWindowBorder`) is replaced by an `on_wall_state_changed`
+   callback.  The integration layer translates this to whatever border
+   visual the SDL2 renderer uses.
+
+2. **No rendering in the module:** `DrawSpecials()` is eliminated.
+   Instead, `special_system_get_labels()` returns an array of
+   `special_label_info_t` structs with label text, column X offset,
+   row number, and active flag.  The integration layer renders using
+   `sdl2_font` + `sdl2_renderer`.
+
+3. **Reverse injected, not owned:** The reverse special is owned by
+   the paddle system.  The special system accepts `reverse_on` as a
+   parameter to `get_state()`, `get_labels()`, and returns it in the
+   randomized state from `randomize()`.  It never stores or toggles
+   the reverse flag internally.
+
+4. **Mutual exclusion preserved:** Setting x2 deactivates x4 and vice
+   versa, matching `blocks.c:1603-1613` behavior.
+
+5. **Saving persistence preserved:** `special_system_turn_off()` clears
+   all specials except saving, matching the intentionally commented-out
+   `ToggleSaving` in legacy `TurnSpecialsOff()`.
+
+6. **Attract-mode randomization:** `special_system_randomize()` accepts
+   an injectable `rand_fn` for deterministic testing, with fallback to
+   `stdlib rand()`.  Uses `(rand() % 100) > 50` matching legacy 49%
+   activation probability.
+
+**Consequences:**
+
+- Eliminates all X11 dependency from special/power-up state management.
+- All 7 boolean flags are encapsulated in the opaque context —
+  consumers read state via `special_system_is_active()` instead of
+  extern globals.
+- The wall border side effect is cleanly abstracted — `turn_off()`
+  correctly fires the callback only when walls were actually off.
+- Panel rendering geometry is exported as constants for the
+  integration layer but no rendering logic exists in the module.
+- 23 CMocka tests cover lifecycle, individual toggles, mutual
+  exclusion, turn-off semantics, state queries, labels, and
+  attract-mode randomization.

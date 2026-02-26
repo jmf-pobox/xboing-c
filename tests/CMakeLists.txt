@@ -305,3 +305,11 @@ target_compile_definitions(test_level_system PRIVATE
 target_compile_options(test_level_system PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
 target_link_libraries(test_level_system PRIVATE level_system ${CMOCKA_LIBRARIES})
 add_test(NAME test_level_system COMMAND test_level_system)
+
+# Special/power-up system tests (bead xboing-qf4.1)
+# Pure logic tests — no SDL2, X11, video, or audio driver needed.
+# Links against special_system static library.
+add_executable(test_special_system test_special_system.c)
+target_compile_options(test_special_system PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+target_link_libraries(test_special_system PRIVATE special_system ${CMOCKA_LIBRARIES})
+add_test(NAME test_special_system COMMAND test_special_system)

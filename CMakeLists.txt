@@ -413,6 +413,18 @@ target_include_directories(level_system PUBLIC
 )
 target_compile_options(level_system PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
 
+# --- Special/power-up system library ----------------------------------------
+#
+# Pure C module — no SDL2 or X11 dependency.  Owns 7 boolean special flags
+# (sticky, saving, fastGun, noWalls, killer, x2, x4) and their toggle logic.
+# Side effects communicated via injected callback table.
+
+add_library(special_system STATIC src/special_system.c)
+target_include_directories(special_system PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+target_compile_options(special_system PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+
 # --- Tests ------------------------------------------------------------------
 
 option(BUILD_TESTING "Build unit tests" ON)
