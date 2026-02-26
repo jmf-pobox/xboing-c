@@ -289,8 +289,15 @@ special_system_state_t special_system_randomize(special_system_t *ctx, int (*ran
 
     int (*get_rand)(void) = rand_fn ? rand_fn : rand;
 
-    /* Each special gets 50/50 chance, matching legacy RandomDrawSpecials().
-     * Legacy uses (rand() % 100) > 50, which gives 49% chance of True. */
+    /* Each special has ~49% chance of activation, matching legacy
+     * RandomDrawSpecials() which uses (rand() % 100) > 50.
+     *
+     * Attract-mode only: x2/x4 mutual exclusion is NOT enforced
+     * (matching legacy — both can be "active" simultaneously since
+     * no game logic acts on these values during attract screens).
+     *
+     * Callbacks (on_wall_state_changed) are NOT fired — state changes
+     * are purely cosmetic for the attract-mode panel animation. */
     ctx->sticky_bat = (get_rand() % 100) > 50 ? 1 : 0;
     ctx->saving = (get_rand() % 100) > 50 ? 1 : 0;
     ctx->fast_gun = (get_rand() % 100) > 50 ? 1 : 0;

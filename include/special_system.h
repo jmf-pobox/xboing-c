@@ -165,9 +165,15 @@ void special_system_get_labels(const special_system_t *ctx, int reverse_on,
 /*
  * Randomize all special states for attract-mode display.
  *
- * Each special gets a 50/50 chance of being active.
+ * Each special has a ~49% chance of being active, matching legacy
+ * RandomDrawSpecials() which uses (rand() % 100) > 50.
+ *
+ * Attract-mode only: x2/x4 mutual exclusion is NOT enforced (matching
+ * legacy behavior — no game logic runs during attract screens).
+ * Callbacks (on_wall_state_changed) are NOT fired — state changes are
+ * purely cosmetic for the attract-mode panel animation.
+ *
  * Returns the randomized state snapshot (includes reverse_on).
- * The caller provides a random seed source via the rand_fn callback.
  *
  * rand_fn: returns a random int (e.g., wraps rand()).
  *          If NULL, uses stdlib rand().
