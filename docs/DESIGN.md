@@ -1443,3 +1443,59 @@ Key design choices:
   functions, giving the integration layer full control over rendering.
 - 22 CMocka tests cover lifecycle, enable/disable, all 5 effect modes,
   BorderGlow animation, null safety, and the FadeAwayArea utility.
+
+## ADR-024: Pure C EyeDude animated character system
+
+**Status:** Accepted
+
+**Context:**
+Legacy `eyedude.c` (396 lines) implements an animated character that
+walks across the top row of the play area.  It has 6 walk animation
+frames per direction, random direction and turn-at-midpoint behavior,
+collision detection against the ball, and awards a 10000-point bonus
+when hit.  Every function takes `Display *display, Window window`
+parameters and directly calls `XCopyArea()` for rendering and `XPM`
+for pixmap loading.
+
+State is stored in module-static variables (mode, direction, x/y
+position, animation frame, velocity increment, turn flag).  The
+character is triggered by external game events via `HandleEyeDudeMode()`
+with mode constants (`EYEDUDE_RESET`, `EYEDUDE_WALK`, `EYEDUDE_DIE`).
+
+**Decision:**
+Create `eyedude_system.c`/`eyedude_system.h` as a pure C module using
+the opaque context pattern.
+
+Key design choices:
+
+1. **State machine with 6 states:** NONE, RESET, WAIT, WALK, TURN, DIE
+   match the legacy mode constants.  RESET initializes direction and
+   position, WALK advances animation, DIE awards bonus and resets.
+
+2. **Callback table for side effects:** `is_path_clear` (query),
+   `on_score`, `on_sound`, `on_message` replace direct calls to
+   other legacy modules.
+
+3. **Injectable random function:** `eyedude_rand_fn` parameter allows
+   deterministic testing of direction selection and turn probability.
+
+4. **No rendering in the module:** `get_render_info()` returns position,
+   animation frame index, direction, and visibility for the integration
+   layer to draw.
+
+5. **AABB collision detection:** `check_collision()` implements the same
+   axis-aligned bounding box overlap test as legacy
+   `CheckBallEyeDudeCollision()`, using half-width/half-height center
+   coordinates.
+
+6. **Constants match legacy exactly:** WIDTH=32, HEIGHT=32,
+   FRAME_RATE=30, WALK_SPEED=5, HIT_BONUS=10000, WALK_FRAMES=6,
+   TURN_CHANCE=30%.
+
+**Consequences:**
+
+- Eliminates all X11 dependency from EyeDude character management.
+- Character state is explicitly owned by the opaque context, with no
+  module-static or global variables.
+- 16 CMocka tests cover lifecycle, reset/path-check, walk animation,
+  turn-at-midpoint, collision/death, and null safety.

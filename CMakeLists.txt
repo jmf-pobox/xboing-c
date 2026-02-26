@@ -443,6 +443,18 @@ target_include_directories(sfx_system PUBLIC
 )
 target_compile_options(sfx_system PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
 
+# --- EyeDude animated character system library -------------------------------
+#
+# Pure C module — no SDL2 or X11 dependency.  Owns the EyeDude state machine
+# (walk, turn, die), collision detection, and render info queries.
+# Side effects communicated via injected callback table.
+
+add_library(eyedude_system STATIC src/eyedude_system.c)
+target_include_directories(eyedude_system PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+target_compile_options(eyedude_system PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+
 # --- Tests ------------------------------------------------------------------
 
 option(BUILD_TESTING "Build unit tests" ON)
