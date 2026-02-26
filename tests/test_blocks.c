@@ -36,9 +36,9 @@
  * ========================================================================= */
 
 /* error.c */
-void ErrorMessage(char *message) { (void)message; }
-void NormalMessage(char *message) { (void)message; }
-void HandleXPMError(Display *display, int ErrorStatus, char *tag)
+void ErrorMessage(const char *message) { (void)message; }
+void NormalMessage(const char *message) { (void)message; }
+void HandleXPMError(Display *display, int ErrorStatus, const char *tag)
 { (void)display; (void)ErrorStatus; (void)tag; }
 
 /* level.c globals */
@@ -247,7 +247,7 @@ static void test_hitpoints_ammo_blocks(void **state)
 static void test_hitpoints_special_blocks(void **state)
 {
     (void)state;
-    int specials[] = {
+    const int specials[] = {
         TIMER_BLK, HYPERSPACE_BLK, MGUN_BLK, WALLOFF_BLK,
         REVERSE_BLK, MULTIBALL_BLK, STICKY_BLK,
         PAD_SHRINK_BLK, PAD_EXPAND_BLK, EXTRABALL_BLK
@@ -413,7 +413,7 @@ static void test_still_active_empty_grid(void **state)
 static void test_still_active_color_blocks(void **state)
 {
     (void)state;
-    int color_types[] = {
+    const int color_types[] = {
         RED_BLK, BLUE_BLK, GREEN_BLK, TAN_BLK, YELLOW_BLK, PURPLE_BLK
     };
     for (int i = 0; i < 6; i++)
@@ -442,7 +442,7 @@ static void test_still_active_counter_drop(void **state)
 static void test_still_active_non_required_blocks(void **state)
 {
     (void)state;
-    int non_required[] = {
+    const int non_required[] = {
         BLACK_BLK, BULLET_BLK, ROAMER_BLK, BOMB_BLK, TIMER_BLK,
         HYPERSPACE_BLK, STICKY_BLK, MULTIBALL_BLK, MAXAMMO_BLK,
         PAD_SHRINK_BLK, PAD_EXPAND_BLK, REVERSE_BLK, MGUN_BLK,

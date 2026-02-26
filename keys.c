@@ -202,7 +202,6 @@ static void DoText(Display *display, Window window)
 
     snprintf(string, sizeof(string), "%s", "<w> = Set Starting level");
     DrawShadowText(display, window, textFont, string, x, y, yellow);
-    y += textFont->ascent + GAP;
 
     y = 250;
     x = 280;

@@ -1964,3 +1964,54 @@ Key design choices:
 - 17 CMocka tests across 7 groups cover initialization, round-trips,
   TOML parsing, file operations, error handling, edge cases, and
   null safety.
+
+## ADR-035: cppcheck pass across entire codebase
+
+**Status:** Accepted
+
+**Context:**
+
+cppcheck with `--enable=warning,style,performance,portability` reported
+143+ findings across 29 legacy `.c` files, 9 test files, and 33
+modernized `src/` files. Findings ranged from genuine bugs (missing
+return statements, resource leaks, uninitialized reads, null-pointer
+dereferences) to style improvements (const correctness, dead code,
+shadow variables) and noise (C89-style variable declarations at
+function tops).
+
+**Decision:**
+
+1. **Fix all genuine bugs:** `missingReturn` (2), `resourceLeak` (1),
+   `legacyUninitvar` (1), `nullPointerRedundantCheck` (2),
+   `charLiteralWithCharPtrCompare` (2).
+
+2. **Fix all style issues that improve code quality:** `const`
+   qualifiers on 48 pointers (parameters and locals),
+   `unreadVariable` (12), `redundantAssignment` (6),
+   `unusedVariable` (2), `shadowVariable` (3), `duplicateBreak` (1).
+
+3. **Suppress intentional patterns with inline comments:**
+   `knownConditionTrueFalse` (6 defensive bounds checks in ball.c),
+   `nullPointerRedundantCheck` (2 after `ShutDown` which calls `exit`),
+   callback signatures that cannot take `const` due to API contracts.
+
+4. **Suppress `variableScope` globally for legacy files:** 66
+   findings are all C89 top-of-function declarations. Refactoring
+   these is high-risk, low-value churn in code that will be replaced.
+
+5. **Promote legacy cppcheck CI step to strict:** Changed from
+   informational (`|| true`) to `--error-exitcode=1`. Added test
+   files as a third strict cppcheck step.
+
+**Consequences:**
+
+- All three cppcheck CI steps (modernized, legacy, tests) now enforce
+  zero warnings with `--error-exitcode=1`.
+- Genuine bugs fixed: 2 missing returns, 1 file handle leak,
+  1 uninitialized read, 2 pointer-vs-char comparisons.
+- 48 pointer parameters/variables gained `const` qualifiers, improving
+  API contracts and catching accidental mutations at compile time.
+- Header files updated in lockstep with function signature changes
+  (10 headers, plus test stubs).
+- `variableScope` suppressed globally for legacy files only;
+  modernized code in `src/` has no suppressions for this category.

@@ -31,7 +31,7 @@ static sdl2_renderer_t *create_renderer(void)
  * Create a font context using default config and the test renderer.
  * Returns NULL if either renderer or font creation fails.
  */
-static sdl2_font_t *create_font_ctx(sdl2_renderer_t *rctx)
+static sdl2_font_t *create_font_ctx(const sdl2_renderer_t *rctx)
 {
     sdl2_font_config_t cfg = sdl2_font_config_defaults();
     cfg.renderer = sdl2_renderer_get(rctx);

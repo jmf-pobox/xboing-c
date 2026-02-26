@@ -104,12 +104,12 @@ void ResetHighScore(int type);
 int ReadHighScoreTable(int type);
 int WriteHighScoreTable(int type);
 int CheckAndAddScoreToHighScore(u_long score, u_long level, time_t gameTime, int type,
-                                char *message);
+                                const char *message);
 int GetHighScoreRanking(u_long score);
 void CommandlineHighscorePrint(void);
-void SetNickName(char *nick);
+void SetNickName(const char *nick);
 char *GetNickName(void);
-void SetBoingMasterText(char *message);
+void SetBoingMasterText(const char *message);
 
 extern enum HighScoreStates HighScoreState;
 

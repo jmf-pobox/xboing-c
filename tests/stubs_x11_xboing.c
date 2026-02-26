@@ -145,7 +145,7 @@ char *GetHomeDir(void) { return stub_homedir; }
  * audio.c stubs
  * ========================================================================= */
 
-void playSoundFile(char *name, int volume)
+void playSoundFile(const char *name, int volume)
 {
     (void)name; (void)volume;
 }
@@ -181,7 +181,7 @@ void changeSfxMode(int m) { (void)m; }
  * mess.c stubs
  * ========================================================================= */
 
-void SetCurrentMessage(Display *d, Window w, char *msg, int important)
+void SetCurrentMessage(Display *d, Window w, const char *msg, int important)
 {
     (void)d; (void)w; (void)msg; (void)important;
 }
@@ -290,9 +290,9 @@ int CheckBallEyeDudeCollision(Display *d, Window w, int i)
 int GetHighScoreCount(void) { return 0; }
 char *GetHighScoreName(int i) { (void)i; return ""; }
 int GetHighScoreRanking(u_long s) { (void)s; return -1; }
-int CheckAndAddScoreToHighScore(u_long s, u_long l, time_t t, char *n)
+int CheckAndAddScoreToHighScore(u_long s, u_long l, time_t t, int type, const char *n)
 {
-    (void)s; (void)l; (void)t; (void)n;
+    (void)s; (void)l; (void)t; (void)type; (void)n;
     return 0;
 }
 void ResetHighScore(int type) { (void)type; }
@@ -310,7 +310,7 @@ void DrawStageBackground(Display *d, Window w, int stageType, int clear)
  * init.c stubs
  * ========================================================================= */
 
-void ShutDown(Display *d, int exitCode, char *message)
+void ShutDown(Display *d, int exitCode, const char *message)
 {
     (void)d; (void)exitCode; (void)message;
 }
@@ -325,10 +325,10 @@ void SetTiltsZero(void) {}
  * dialogue.c stubs
  * ========================================================================= */
 
-char *UserInputDialogueMessage(Display *d, char *message, int type,
-                               char *entryMessage)
+char *UserInputDialogueMessage(Display *d, const char *message, int type,
+                               int entryValidation)
 {
-    (void)d; (void)message; (void)type; (void)entryMessage;
+    (void)d; (void)message; (void)type; (void)entryValidation;
     return "";
 }
 

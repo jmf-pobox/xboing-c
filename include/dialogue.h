@@ -86,7 +86,7 @@ enum DialogueStates
 
 void ProcessDialogue(Display *display);
 void handleDialogueKeys(Display *display, XEvent event);
-char *UserInputDialogueMessage(Display *display, char *message, int type, int entryValidation);
+char *UserInputDialogueMessage(Display *display, const char *message, int type, int entryValidation);
 void FreeDialoguePixmaps(Display *display);
 void InitialiseDialoguePixmaps(Display *display, Window window, Colormap colormap);
 

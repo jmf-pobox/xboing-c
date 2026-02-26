@@ -584,7 +584,7 @@ static int CheckForBulletCollision(Display *display, Window window, int x, int y
 {
     /* Check for bullet to block collision */
     int row, col;
-    struct aBlock *blockP;
+    const struct aBlock *blockP;
 
     /* Get the row and col for block where bullet is */
     X2COL(col, x);
@@ -621,7 +621,7 @@ static int ResetBulletStart(Display *display, Window window)
         size = GetPaddleSize();
 
         /* Shoot 2 bullets - dual fire!!!!! Power */
-        status = StartABullet(display, window, paddlePos - (size / 3));
+        (void)StartABullet(display, window, paddlePos - (size / 3));
         status = StartABullet(display, window, paddlePos + (size / 3));
     }
     else

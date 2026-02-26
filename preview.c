@@ -109,7 +109,7 @@ static void DoLoadLevel(Display *display, Window window)
     int lnum = 1;
     char levelPath[1024];
     char str2[80];
-    char *str;
+    const char *str;
     static int bgrnd = 1;
 
     bgrnd++;

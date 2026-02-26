@@ -128,14 +128,14 @@ static void test_create_destroy(void **state)
 
 static void test_initial_mode_is_none(void **state)
 {
-    test_state_t *ts = (test_state_t *)*state;
+    const test_state_t *ts = (const test_state_t *)*state;
     assert_int_equal(sdl2_state_current(ts->ctx), SDL2ST_NONE);
     assert_int_equal(sdl2_state_previous(ts->ctx), SDL2ST_NONE);
 }
 
 static void test_initial_frame_is_zero(void **state)
 {
-    test_state_t *ts = (test_state_t *)*state;
+    const test_state_t *ts = (const test_state_t *)*state;
     assert_int_equal(sdl2_state_frame(ts->ctx), 0);
 }
 

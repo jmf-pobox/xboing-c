@@ -68,7 +68,7 @@
 
 int	 SetUpAudioSystem(Display *display);
 void FreeAudioSystem(void);
-void playSoundFile(char *filename, int volume);
+void playSoundFile(const char *filename, int volume);
 void audioDeviceEvents(void);
 void SetMaximumVolume(int Volume);
 int GetMaximumVolume(void);

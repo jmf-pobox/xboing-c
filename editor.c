@@ -155,7 +155,7 @@ static void DrawEditorGrid(Display *display, Window window)
 static void DoLoadLevel(Display *display, Window window)
 {
     char levelPath[1024];
-    char *str;
+    const char *str;
 
     /* Resize the main window to hold the editor window of blocks */
     ObtainWindowWidthHeight(display, mainWindow, &oldWidth, &oldHeight);
@@ -326,17 +326,17 @@ static void SetupBlockEditorInfo(int x, int y, int w, int h, int type, int i, in
 static void SetupBlockWindow(Display *display, Window window)
 {
     int x, y, x1, y1, i, j, k;
-    int rowHeight = (PLAY_HEIGHT / MAX_ROW);
+    int editorRowHeight = (PLAY_HEIGHT / MAX_ROW);
 
     /* Draw the first column of blocks */
     for (i = 0, y1 = 0; i < (MAX_ROW) && i < MAX_STATIC_BLOCKS; i++)
     {
         /* Calculate the centered position for the block in this column */
         x = (EDITOR_TOOL_WIDTH / 4) - (BlockInfo[i].width / 2);
-        y = y1 + ((rowHeight / 2) - (BlockInfo[i].height / 2));
+        y = y1 + ((editorRowHeight / 2) - (BlockInfo[i].height / 2));
         DrawTheBlock(display, window, x, y, BlockInfo[i].blockType, 0, 0, 0);
         SetupBlockEditorInfo(x, y, BlockInfo[i].width, BlockInfo[i].height, i, i, 0);
-        y1 += rowHeight;
+        y1 += editorRowHeight;
     }
 
     x1 = EDITOR_TOOL_WIDTH / 2;
@@ -346,10 +346,10 @@ static void SetupBlockWindow(Display *display, Window window)
     {
         /* Calculate the centered position for the block in this column */
         x = x1 + (EDITOR_TOOL_WIDTH / 4) - (BlockInfo[j].width / 2);
-        y = y1 + ((rowHeight / 2) - (BlockInfo[j].height / 2));
+        y = y1 + ((editorRowHeight / 2) - (BlockInfo[j].height / 2));
         DrawTheBlock(display, window, x, y, BlockInfo[j].blockType, 0, 0, 0);
         SetupBlockEditorInfo(x, y, BlockInfo[j].width, BlockInfo[j].height, j, j, 0);
-        y1 += rowHeight;
+        y1 += editorRowHeight;
     }
 
     /* Add the counter blocks 1 - 5 */
@@ -357,11 +357,11 @@ static void SetupBlockWindow(Display *display, Window window)
     {
         /* Calculate the centered position for the block in this column */
         x = x1 + (EDITOR_TOOL_WIDTH / 4) - (BlockInfo[COUNTER_BLK].width / 2);
-        y = y1 + ((rowHeight / 2) - (BlockInfo[COUNTER_BLK].height / 2));
+        y = y1 + ((editorRowHeight / 2) - (BlockInfo[COUNTER_BLK].height / 2));
         DrawTheBlock(display, window, x, y, COUNTER_BLK, j, 0, 0);
         SetupBlockEditorInfo(x, y, BlockInfo[COUNTER_BLK].width, BlockInfo[COUNTER_BLK].height,
                              COUNTER_BLK, k, j);
-        y1 += rowHeight;
+        y1 += editorRowHeight;
     }
 }
 
@@ -819,7 +819,7 @@ static void LoadALevel(Display *display)
 
     char str[80];
     char levelPath[1024];
-    char *str2;
+    const char *str2;
     int num;
 
     snprintf(str, sizeof(str), "Level range is [1-%d]", MAX_NUM_LEVELS);
@@ -874,7 +874,7 @@ static void SaveALevel(Display *display)
 {
     char str[80];
     char levelPath[1024];
-    char *str2;
+    const char *str2;
     int num;
 
     snprintf(str, sizeof(str), "Level range is [1-%d]", MAX_NUM_LEVELS);

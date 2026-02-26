@@ -80,7 +80,7 @@ static int stub_check_block_hit(int bx, int by, int *out_row, int *out_col, void
 {
     (void)bx;
     (void)by;
-    stub_state_t *s = ud;
+    const stub_state_t *s = ud;
     if (s->block_hit_return)
     {
         *out_row = s->block_hit_out_row;
@@ -122,7 +122,7 @@ static int stub_check_eyedude_hit(int bx, int by, void *ud)
 {
     (void)bx;
     (void)by;
-    stub_state_t *s = ud;
+    const stub_state_t *s = ud;
     return s->eyedude_hit_return;
 }
 
@@ -142,7 +142,7 @@ static void stub_on_sound(const char *name, void *ud)
 
 static int stub_is_ball_waiting(void *ud)
 {
-    stub_state_t *s = ud;
+    const stub_state_t *s = ud;
     return s->ball_waiting_return;
 }
 
@@ -489,6 +489,7 @@ static void test_fast_gun_one_slot_free(void **state)
 
     /* Reset stubs, try fast-gun shot with only 1 free slot */
     s.ball_hit_return = -1;
+    // cppcheck-suppress redundantAssignment
     s.ball_hit_max = 0;
     s.ball_hit_check_count = 0;
     s.sound_count = 0;

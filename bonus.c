@@ -720,7 +720,7 @@ void ComputeAndAddBonusScore(void)
      * space and go to the next screen without delay. Cool.
      */
     int secs = 0;
-    int theLevel = 0;
+    int theLevel;
 
     DEBUG("computing and adding bonus score.")
 

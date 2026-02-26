@@ -238,7 +238,7 @@ int ColourNameToPixel(Display *display, Colormap colormap, char *colourName)
 
 char *getUsersFullName(void)
 {
-    struct passwd *pass;
+    const struct passwd *pass;
     char *comma;
     char *cp1, *cp2;
     static char fullname[80];
@@ -290,7 +290,7 @@ char *getUsersFullName(void)
 char *GetHomeDir(void)
 {
     int uid;
-    struct passwd *pw;
+    const struct passwd *pw;
     register char *ptr;
     static char dest[MAXPATHLEN];
 
@@ -349,6 +349,8 @@ int ObtainWindowWidthHeight(Display *display, Window window, int *width, int *he
 
     *width = attributes.width;
     *height = attributes.height;
+
+    return True;
 }
 
 int ObtainMousePosition(Display *display, Window window, int *x, int *y)
@@ -371,7 +373,7 @@ int ObtainMousePosition(Display *display, Window window, int *x, int *y)
     return False;
 }
 
-int YesNoDialogue(Display *display, char *message)
+int YesNoDialogue(Display *display, const char *message)
 {
     char str[80];
 
@@ -462,7 +464,9 @@ void Draw4PointCurve(Display *display, Window window, XPoint *p, int num_steps)
 
     ptIndex = 0;
 
+    /* cppcheck-suppress nullPointerRedundantCheck */
     pts[ptIndex].x = p[0].x;
+    /* cppcheck-suppress nullPointerRedundantCheck */
     pts[ptIndex].y = p[0].y;
 
     for (t = incr; t <= 1.01; t += incr)

@@ -306,13 +306,12 @@ static void test_turn_at_midpoint(void **state)
 
     /* Walk left until reaching midpoint (x <= 247) */
     int frame = 0;
-    eyedude_render_info_t info;
     int turned = 0;
     for (int i = 0; i < 200; i++)
     {
         frame += EYEDUDE_FRAME_RATE;
         eyedude_system_update(ctx, frame, 495);
-        info = eyedude_system_get_render_info(ctx);
+        eyedude_render_info_t info = eyedude_system_get_render_info(ctx);
         if (info.dir == EYEDUDE_DIR_RIGHT)
         {
             turned = 1;
@@ -339,13 +338,12 @@ static void test_no_turn_when_chance_high(void **state)
 
     /* Walk left past midpoint — should NOT turn */
     int frame = 0;
-    eyedude_render_info_t info;
     int turned = 0;
     for (int i = 0; i < 200; i++)
     {
         frame += EYEDUDE_FRAME_RATE;
         eyedude_system_update(ctx, frame, 495);
-        info = eyedude_system_get_render_info(ctx);
+        eyedude_render_info_t info = eyedude_system_get_render_info(ctx);
         if (info.dir == EYEDUDE_DIR_RIGHT)
         {
             turned = 1;

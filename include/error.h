@@ -64,9 +64,9 @@
  *  Function prototypes:
  */
 
-void HandleXPMError(Display *display, int ErrorStatus, char *tag);
-void ErrorMessage(char *message);
-void WarningMessage(char *message);
-void NormalMessage(char *message);
+void HandleXPMError(Display *display, int ErrorStatus, const char *tag);
+void ErrorMessage(const char *message);
+void WarningMessage(const char *message);
+void NormalMessage(const char *message);
 
 #endif

@@ -134,7 +134,7 @@ void FreeDialoguePixmaps(Display *display)
         XFreePixmap(display, textM);
 }
 
-char *UserInputDialogueMessage(Display *display, char *message, int type, int entryValidation)
+char *UserInputDialogueMessage(Display *display, const char *message, int type, int entryValidation)
 {
     /* Change the message for the dialogue */
     snprintf(theMessage, sizeof(theMessage), "%s", message);
@@ -243,7 +243,7 @@ static void redrawCurrentInput(Display *display)
                     32, False);
 }
 
-static void validateDialogueKeys(Display *display, KeySym keysym, char *str)
+static void validateDialogueKeys(Display *display, KeySym keysym, const char *str)
 {
     /* Check the type of keyboard input needed */
     switch (validation)
@@ -353,8 +353,6 @@ static void handleDialogueEventLoop(Display *display)
 {
     XEvent event;
     int pending;
-
-    pending = 0;
 
     ProcessDialogue(display);
     XFlush(display);

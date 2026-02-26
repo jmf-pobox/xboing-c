@@ -266,16 +266,19 @@ static void test_level_wrap_formula(void **state)
 
     /* level 80: 80 % 80 = 0, adjusted to 80 */
     int nl = 80 % MAX;
+    // cppcheck-suppress knownConditionTrueFalse
     if (nl == 0) nl = MAX;
     assert_int_equal(nl, 80);
 
     /* level 81: 81 % 80 = 1 */
     nl = 81 % MAX;
+    // cppcheck-suppress knownConditionTrueFalse
     if (nl == 0) nl = MAX;
     assert_int_equal(nl, 1);
 
     /* level 160: 160 % 80 = 0, adjusted to 80 */
     nl = 160 % MAX;
+    // cppcheck-suppress knownConditionTrueFalse
     if (nl == 0) nl = MAX;
     assert_int_equal(nl, 80);
 }

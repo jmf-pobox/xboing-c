@@ -122,7 +122,7 @@ static void DoBlocks(Display *display, Window window)
     int y = 120;
     int x = 40;
     char levelPath[1024];
-    char *str;
+    const char *str;
 
     /* Be very friendly */
     SetCurrentMessage(display, messWindow, "Demonstration", False);
@@ -169,8 +169,6 @@ static void DoBlocks(Display *display, Window window)
     x -= 18;
     y -= 18;
     DrawTheBall(display, window, x, y, 3);
-    x -= 18;
-    y -= 18;
 
     /* Draw a half distintegrated block */
     COL2X(x, 2);
