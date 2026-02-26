@@ -115,7 +115,7 @@ void DrawMessage(Display *display, Window window, char *message, int clear, int 
 void SetCurrentMessage(Display *display, Window window, char *newMessage, int clear)
 {
     /* Draw out new message */
-    strcpy(currentMessage, newMessage);
+    snprintf(currentMessage, sizeof(currentMessage), "%s", newMessage);
     newMessageStart = True;
 
     if (clear)
@@ -142,12 +142,12 @@ void DisplayCurrentMessage(Display *display, Window window)
     {
         /* Effectively erases message */
         if (mode == MODE_GAME || mode == MODE_EDIT)
-            strcpy(str2, GetLevelName());
+            snprintf(str2, sizeof(str2), "%s", GetLevelName());
 
         if (str2[0] != '\0')
         {
             /* Set the message to the name of the level */
-            sprintf(str, "- %s -", str2);
+            snprintf(str, sizeof(str), "- %s -", str2);
             SetCurrentMessage(display, window, str, False);
         }
         else

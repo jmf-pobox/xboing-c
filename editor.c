@@ -184,9 +184,9 @@ static void DoLoadLevel(Display *display, Window window)
 
     /* Construct the Edit level filename */
     if ((str = getenv("XBOING_LEVELS_DIR")) != NULL)
-        sprintf(levelPath, "%s/editor.data", str);
+        snprintf(levelPath, sizeof(levelPath), "%s/editor.data", str);
     else
-        sprintf(levelPath, "%s/editor.data", LEVEL_INSTALL_DIR);
+        snprintf(levelPath, sizeof(levelPath), "%s/editor.data", LEVEL_INSTALL_DIR);
 
     /* Read in a Edit level */
     if (ReadNextLevel(display, window, levelPath, True) == False)
@@ -574,7 +574,7 @@ static void SetupPlayTest(Display *display)
 {
     EditState = EDIT_TEST;
 
-    strcpy(tempName, tempnam("/tmp", "xboing-"));
+    snprintf(tempName, sizeof(tempName), "%s", tempnam("/tmp", "xboing-"));
     if (SaveLevelDataFile(display, tempName) == False)
         ShutDown(display, 1, "Sorry, cannot save test play level.");
 
@@ -822,13 +822,13 @@ static void LoadALevel(Display *display)
     char *str2;
     int num;
 
-    sprintf(str, "Level range is [1-%d]", MAX_NUM_LEVELS);
+    snprintf(str, sizeof(str), "Level range is [1-%d]", MAX_NUM_LEVELS);
     SetCurrentMessage(display, messWindow, str, False);
 
     str[0] = '\0';
 
     /* Obtain a string from the user. Should contain NULL or numbers */
-    strcpy(str, UserInputDialogueMessage(display, "Input load level number please.", TEXT_ICON,
+    snprintf(str, sizeof(str), "%s", UserInputDialogueMessage(display, "Input load level number please.", TEXT_ICON,
                                          NUMERIC_ENTRY_ONLY));
 
     /* Nothing input so just return */
@@ -841,9 +841,9 @@ static void LoadALevel(Display *display)
     {
         /* Construct the Edit level filename */
         if ((str2 = getenv("XBOING_LEVELS_DIR")) != NULL)
-            sprintf(levelPath, "%s/level%02ld.data", str2, (u_long)num);
+            snprintf(levelPath, sizeof(levelPath), "%s/level%02ld.data", str2, (u_long)num);
         else
-            sprintf(levelPath, "%s/level%02ld.data", LEVEL_INSTALL_DIR, (u_long)num);
+            snprintf(levelPath, sizeof(levelPath), "%s/level%02ld.data", LEVEL_INSTALL_DIR, (u_long)num);
 
         /* Read in a Edit level */
         if (ReadNextLevel(display, playWindow, levelPath, False) == False)
@@ -857,7 +857,7 @@ static void LoadALevel(Display *display)
         RedrawEditorArea(display, playWindow);
 
         /* Ok now load level number */
-        sprintf(str, "Editing level %d", num);
+        snprintf(str, sizeof(str), "Editing level %d", num);
         SetCurrentMessage(display, messWindow, str, False);
 
         modified = False;
@@ -865,7 +865,7 @@ static void LoadALevel(Display *display)
     else
     {
         /* Value out of range so let them know the range. */
-        sprintf(str, "Invalid - level range [1-%d]", MAX_NUM_LEVELS);
+        snprintf(str, sizeof(str), "Invalid - level range [1-%d]", MAX_NUM_LEVELS);
         SetCurrentMessage(display, messWindow, str, True);
     }
 }
@@ -877,13 +877,13 @@ static void SaveALevel(Display *display)
     char *str2;
     int num;
 
-    sprintf(str, "Level range is [1-%d]", MAX_NUM_LEVELS);
+    snprintf(str, sizeof(str), "Level range is [1-%d]", MAX_NUM_LEVELS);
     SetCurrentMessage(display, messWindow, str, False);
 
     str[0] = '\0';
 
     /* Obtain a string from the user. Should contain NULL or numbers */
-    strcpy(str, UserInputDialogueMessage(display, "Input save level number please.", TEXT_ICON,
+    snprintf(str, sizeof(str), "%s", UserInputDialogueMessage(display, "Input save level number please.", TEXT_ICON,
                                          NUMERIC_ENTRY_ONLY));
 
     /* Nothing input so just return */
@@ -896,15 +896,15 @@ static void SaveALevel(Display *display)
     {
         /* Construct the Edit level filename */
         if ((str2 = getenv("XBOING_LEVELS_DIR")) != NULL)
-            sprintf(levelPath, "%s/level%02ld.data", str2, (u_long)num);
+            snprintf(levelPath, sizeof(levelPath), "%s/level%02ld.data", str2, (u_long)num);
         else
-            sprintf(levelPath, "%s/level%02ld.data", LEVEL_INSTALL_DIR, (u_long)num);
+            snprintf(levelPath, sizeof(levelPath), "%s/level%02ld.data", LEVEL_INSTALL_DIR, (u_long)num);
 
         if (SaveLevelDataFile(display, levelPath) == False)
             ShutDown(display, 1, "Sorry, unable to save level.");
 
         /* Ok now load level number */
-        sprintf(str, "Level %d saved.", num);
+        snprintf(str, sizeof(str), "Level %d saved.", num);
         SetCurrentMessage(display, messWindow, str, False);
 
         modified = False;
@@ -912,7 +912,7 @@ static void SaveALevel(Display *display)
     else
     {
         /* Value out of range so let them know the range. */
-        sprintf(str, "Invalid - level range [1-%d]", MAX_NUM_LEVELS);
+        snprintf(str, sizeof(str), "Invalid - level range [1-%d]", MAX_NUM_LEVELS);
         SetCurrentMessage(display, messWindow, str, True);
     }
 }
@@ -925,7 +925,7 @@ static void SetTimeForLevel(Display *display)
     str[0] = '\0';
 
     /* Obtain a string from the user. Should contain NULL or numbers */
-    strcpy(str, UserInputDialogueMessage(display, "Input game time in seconds.", TEXT_ICON,
+    snprintf(str, sizeof(str), "%s", UserInputDialogueMessage(display, "Input game time in seconds.", TEXT_ICON,
                                          NUMERIC_ENTRY_ONLY));
 
     /* Nothing input so just return */
@@ -942,7 +942,7 @@ static void SetTimeForLevel(Display *display)
     }
     else
     {
-        sprintf(str, "Invalid - time range [1-%d]", 3600);
+        snprintf(str, sizeof(str), "Invalid - time range [1-%d]", 3600);
         SetCurrentMessage(display, messWindow, str, True);
     }
 }
@@ -951,13 +951,13 @@ static void SetNameForLevel(Display *display)
 {
     char str[80];
 
-    sprintf(str, "Name: %s", levelTitle);
+    snprintf(str, sizeof(str), "Name: %s", levelTitle);
     SetCurrentMessage(display, messWindow, str, False);
 
     str[0] = '\0';
 
     /* Obtain a string from the user. Should contain NULL or letters */
-    strcpy(str, UserInputDialogueMessage(display, "Input new name for level please.", TEXT_ICON,
+    snprintf(str, sizeof(str), "%s", UserInputDialogueMessage(display, "Input new name for level please.", TEXT_ICON,
                                          TEXT_ENTRY_ONLY));
 
     /* Nothing input so just return */
@@ -970,7 +970,7 @@ static void SetNameForLevel(Display *display)
         return;
     }
 
-    strcpy(levelTitle, str);
+    snprintf(levelTitle, sizeof(levelTitle), "%s", str);
     SetCurrentMessage(display, messWindow, "Level name adjusted", True);
     modified = True;
 }

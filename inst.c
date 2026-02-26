@@ -148,7 +148,7 @@ static void DoText(Display *display, Window window)
         /* If the text is not null then print it */
         if (instructionText[i] != '\0')
         {
-            strcpy(string, instructionText[i]);
+            snprintf(string, sizeof(string), "%s", instructionText[i]);
             DrawShadowCentredText(display, window, dataFont, string, y,
                                   j % 2 ? greens[0] : greens[2], PLAY_WIDTH);
             y += dataFont->ascent + GAP;
@@ -161,7 +161,7 @@ static void DoText(Display *display, Window window)
     y += dataFont->ascent + GAP / 2;
 
     /* Draw the standard message */
-    strcpy(string, "Insert coin to start the game");
+    snprintf(string, sizeof(string), "%s", "Insert coin to start the game");
     DrawShadowCentredText(display, window, textFont, string, PLAY_HEIGHT - 40, tann, PLAY_WIDTH);
 }
 

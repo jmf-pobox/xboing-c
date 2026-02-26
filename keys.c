@@ -164,93 +164,93 @@ static void DoText(Display *display, Window window)
     y = 250;
     x = 30;
 
-    strcpy(string, "<s> = Sfx On/Off");
+    snprintf(string, sizeof(string), "%s", "<s> = Sfx On/Off");
     DrawShadowText(display, window, textFont, string, x, y, yellow);
     y += textFont->ascent + GAP;
 
-    strcpy(string, "<P> = Pause/Resume");
+    snprintf(string, sizeof(string), "%s", "<P> = Pause/Resume");
     DrawShadowText(display, window, textFont, string, x, y, yellow);
     y += textFont->ascent + GAP;
 
-    strcpy(string, "<I> = Iconify Quickly");
+    snprintf(string, sizeof(string), "%s", "<I> = Iconify Quickly");
     DrawShadowText(display, window, textFont, string, x, y, yellow);
     y += textFont->ascent + GAP;
 
-    strcpy(string, "<h> = Roll of Honour");
+    snprintf(string, sizeof(string), "%s", "<h> = Roll of Honour");
     DrawShadowText(display, window, textFont, string, x, y, yellow);
     y += textFont->ascent + GAP;
 
-    strcpy(string, "<H> = Personal scores");
+    snprintf(string, sizeof(string), "%s", "<H> = Personal scores");
     DrawShadowText(display, window, textFont, string, x, y, yellow);
     y += textFont->ascent + GAP;
 
-    strcpy(string, "<d> = Kill Ball");
+    snprintf(string, sizeof(string), "%s", "<d> = Kill Ball");
     DrawShadowText(display, window, textFont, string, x, y, yellow);
     y += textFont->ascent + GAP;
 
-    strcpy(string, "<q> = Quit XBoing");
+    snprintf(string, sizeof(string), "%s", "<q> = Quit XBoing");
     DrawShadowText(display, window, textFont, string, x, y, yellow);
     y += textFont->ascent + GAP;
 
-    strcpy(string, "<+/-> = Inc/Dec Volume");
+    snprintf(string, sizeof(string), "%s", "<+/-> = Inc/Dec Volume");
     DrawShadowText(display, window, textFont, string, x, y, yellow);
     y += textFont->ascent + GAP;
 
-    strcpy(string, "<z/x> = Save/Load game");
+    snprintf(string, sizeof(string), "%s", "<z/x> = Save/Load game");
     DrawShadowText(display, window, textFont, string, x, y, yellow);
     y += textFont->ascent + GAP;
 
-    strcpy(string, "<w> = Set Starting level");
+    snprintf(string, sizeof(string), "%s", "<w> = Set Starting level");
     DrawShadowText(display, window, textFont, string, x, y, yellow);
     y += textFont->ascent + GAP;
 
     y = 250;
     x = 280;
 
-    strcpy(string, "<j> = Paddle left");
+    snprintf(string, sizeof(string), "%s", "<j> = Paddle left");
     DrawShadowText(display, window, textFont, string, x, y, yellow);
     y += textFont->ascent + GAP;
 
-    strcpy(string, "<k> = Shoot");
+    snprintf(string, sizeof(string), "%s", "<k> = Shoot");
     DrawShadowText(display, window, textFont, string, x, y, yellow);
     y += textFont->ascent + GAP;
 
-    strcpy(string, "<l> = Paddle right");
+    snprintf(string, sizeof(string), "%s", "<l> = Paddle right");
     DrawShadowText(display, window, textFont, string, x, y, yellow);
     y += textFont->ascent + GAP;
 
-    strcpy(string, "<a> = Audio On/Off");
+    snprintf(string, sizeof(string), "%s", "<a> = Audio On/Off");
     DrawShadowText(display, window, textFont, string, x, y, yellow);
     y += textFont->ascent + GAP;
 
-    strcpy(string, "<c> = Cycle intros");
+    snprintf(string, sizeof(string), "%s", "<c> = Cycle intros");
     DrawShadowText(display, window, textFont, string, x, y, yellow);
     y += textFont->ascent + GAP;
 
-    strcpy(string, "<g> = Toggle control");
+    snprintf(string, sizeof(string), "%s", "<g> = Toggle control");
     DrawShadowText(display, window, textFont, string, x, y, yellow);
     y += textFont->ascent + GAP;
 
-    strcpy(string, "<1-9> = Game speed");
+    snprintf(string, sizeof(string), "%s", "<1-9> = Game speed");
     DrawShadowText(display, window, textFont, string, x, y, yellow);
     y += textFont->ascent + GAP;
 
-    strcpy(string, "<t> = Tilt board");
+    snprintf(string, sizeof(string), "%s", "<t> = Tilt board");
     DrawShadowText(display, window, textFont, string, x, y, yellow);
     y += textFont->ascent + GAP;
 
-    strcpy(string, "<e> = Level Editor");
+    snprintf(string, sizeof(string), "%s", "<e> = Level Editor");
     DrawShadowText(display, window, textFont, string, x, y, yellow);
     y += textFont->ascent + GAP;
 
-    strcpy(string, "<?> = spare");
+    snprintf(string, sizeof(string), "%s", "<?> = spare");
     DrawShadowText(display, window, textFont, string, x, y, yellow);
     y += textFont->ascent + GAP * 2;
 
     DrawLine(display, window, 32, y + 2, PLAY_WIDTH - 28, y + 2, black, 3);
     DrawLine(display, window, 30, y, PLAY_WIDTH - 30, y, white, 3);
 
-    strcpy(string, "Insert coin to start the game");
+    snprintf(string, sizeof(string), "%s", "Insert coin to start the game");
     DrawShadowCentredText(display, window, textFont, string, PLAY_HEIGHT - 30, tann, PLAY_WIDTH);
 }
 

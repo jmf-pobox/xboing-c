@@ -136,15 +136,15 @@ int SetUpAudioSystem(Display *display)
 	
 		/* Must be a sound file name */
  		if (str != NULL)
-			sprintf(soundfile, "%s/%s.au", str, string);
+			snprintf(soundfile, sizeof(soundfile), "%s/%s.au", str, string);
 		else
-			sprintf(soundfile, "%s/%s.au", SOUNDS_DIR, string);
+			snprintf(soundfile, sizeof(soundfile), "%s/%s.au", SOUNDS_DIR, string);
 
 		/* Open the sound file for reading */
 		if ((ifd = open(soundfile, O_RDONLY, 0)) < 0) 
 		{
 			/* Issue an error about not opening sound file */
-			sprintf(errorString, "Unable to open sound file %s.", soundfile);
+			snprintf(errorString, sizeof(errorString), "Unable to open sound file %s.", soundfile);
                         WarningMessage(errorString);
 
                 }
@@ -165,7 +165,7 @@ int SetUpAudioSystem(Display *display)
                 if (cnt < 0) 
                 {
                         /* Some error - while reading - notify user */
-                        sprintf(errorString, "Problem while reading soundfile %s", soundfile);
+                        snprintf(errorString, sizeof(errorString), "Problem while reading soundfile %s", soundfile);
 
                         WarningMessage(errorString);
                 }
@@ -174,7 +174,7 @@ int SetUpAudioSystem(Display *display)
  		/* Flush any audio activity */
  		if (ioctl(Audio_fd, SNDCTL_DSP_SYNC, 0) < 0)
   		     {
-  			     sprintf(errorString, "Unable to flush audio device.");
+  			     snprintf(errorString, sizeof(errorString), "Unable to flush audio device.");
   			     WarningMessage(errorString);
   		     }
                 /* Close the sound file */
@@ -189,7 +189,7 @@ void FreeAudioSystem(void)
 {
 	char exit_command[256];
         
-    strcpy(exit_command,"EXIT");
+    snprintf(exit_command, sizeof(exit_command), "%s", "EXIT");
 
 	/* Close the audio device */
  	if (write(snd_pipes[1],"EXIT",256) < 0)
@@ -216,7 +216,7 @@ void playSoundFile(char *filename, int volume)
 {
 	char snd_file[256];
 
-    strcpy(snd_file,filename);
+    snprintf(snd_file, sizeof(snd_file), "%s", filename);
  	if (write(snd_pipes[1],snd_file,256) < 0)
 		ErrorMessage("Cannot write to audio device.");
 }

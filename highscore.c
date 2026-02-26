@@ -148,7 +148,7 @@ void SetNickName(char *nick)
 void SetBoingMasterText(char *message)
 {
     /* Change the boing masters text */
-    strcpy(scoresHeader.masterText, message);
+    snprintf(scoresHeader.masterText, sizeof(scoresHeader.masterText), "%s", message);
 }
 
 char *GetNickName(void)
@@ -193,7 +193,7 @@ static void DoTitle(Display *display, Window window)
                 PLAY_HEIGHT / 2 - 160, 400, 400, False);
 
     /* Let the dudes know how to start the game */
-    strcpy(string, "Insert coin to start the game");
+    snprintf(string, sizeof(string), "%s", "Insert coin to start the game");
     DrawShadowCentredText(display, window, textFont, string, PLAY_HEIGHT - 40, tann, PLAY_WIDTH);
 
     /* Set the message window to have the other display toggle key */
@@ -226,17 +226,17 @@ static void DoHighScores(Display *display, Window window)
         InitialiseHighScores();
 
     /* Draw the boing master at top of the list */
-    strcpy(string, "Boing Master");
+    snprintf(string, sizeof(string), "%s", "Boing Master");
     DrawShadowCentredText(display, window, textFont, string, ym, red, PLAY_WIDTH);
     ym += textFont->ascent + GAP;
 
     /* Render the boing master's name */
-    strcpy(string, highScores[0].name);
+    snprintf(string, sizeof(string), "%s", highScores[0].name);
     DrawShadowCentredText(display, window, titleFont, string, ym, yellow, PLAY_WIDTH);
     ym += textFont->ascent + GAP;
 
     /* Render the boing master's words of wisdom */
-    strcpy(string, scoresHeader.masterText);
+    snprintf(string, sizeof(string), "%s", scoresHeader.masterText);
     DrawShadowCentredText(display, window, dataFont, string, ym, green, PLAY_WIDTH);
     ym += textFont->ascent + GAP * 2;
 
@@ -246,39 +246,39 @@ static void DoHighScores(Display *display, Window window)
 
     /* Explain that this is the roll of honour */
     if (scoreType == GLOBAL)
-        strcpy(string, "- The Roll of Honour -");
+        snprintf(string, sizeof(string), "%s", "- The Roll of Honour -");
     else
-        strcpy(string, "- Personal Best -");
+        snprintf(string, sizeof(string), "%s", "- Personal Best -");
     DrawShadowCentredText(display, window, textFont, string, ym, red, PLAY_WIDTH);
     ym += textFont->ascent + GAP;
 
     /* Draw the titles for the highscore table */
-    strcpy(string, "#");
+    snprintf(string, sizeof(string), "%s", "#");
     len = strlen(string);
     DrawText(display, window, xr + 2, y + 2, textFont, black, string, len);
     DrawText(display, window, xr, y, textFont, yellow, string, len);
 
-    strcpy(string, "Score");
+    snprintf(string, sizeof(string), "%s", "Score");
     len = strlen(string);
     DrawText(display, window, xs + 2, y + 2, textFont, black, string, len);
     DrawText(display, window, xs, y, textFont, yellow, string, len);
 
-    strcpy(string, "L");
+    snprintf(string, sizeof(string), "%s", "L");
     len = strlen(string);
     DrawText(display, window, xl + 2, y + 2, textFont, black, string, len);
     DrawText(display, window, xl, y, textFont, yellow, string, len);
 
-    strcpy(string, "Time");
+    snprintf(string, sizeof(string), "%s", "Time");
     len = strlen(string);
     DrawText(display, window, xt + 2, y + 2, textFont, black, string, len);
     DrawText(display, window, xt, y, textFont, yellow, string, len);
 
-    strcpy(string, "Date");
+    snprintf(string, sizeof(string), "%s", "Date");
     len = strlen(string);
     DrawText(display, window, xg + 2, y + 2, textFont, black, string, len);
     DrawText(display, window, xg, y, textFont, yellow, string, len);
 
-    strcpy(string, "Player");
+    snprintf(string, sizeof(string), "%s", "Player");
     len = strlen(string);
     DrawText(display, window, xn + 2, y + 2, textFont, black, string, len);
     DrawText(display, window, xn, y, textFont, yellow, string, len);
@@ -297,25 +297,25 @@ static void DoHighScores(Display *display, Window window)
         if (ntohl(highScores[i].score) > (u_long)0)
         {
             /* Draw the rank */
-            sprintf(string, "%d", i + 1);
+            snprintf(string, sizeof(string), "%d", i + 1);
             if (ntohl(highScores[i].score) != score)
                 DrawShadowText(display, window, textFont, string, xr, y, tann);
             else
                 DrawShadowText(display, window, textFont, string, xr, y, green);
 
             /* Draw the score */
-            sprintf(string, "%ld", ntohl(highScores[i].score));
+            snprintf(string, sizeof(string), "%ld", ntohl(highScores[i].score));
             if (ntohl(highScores[i].score) != score)
                 DrawShadowText(display, window, textFont, string, xs, y, red);
             else
                 DrawShadowText(display, window, textFont, string, xs, y, green);
 
             /* Write out the level reached */
-            sprintf(string, "%ld", ntohl(highScores[i].level));
+            snprintf(string, sizeof(string), "%ld", ntohl(highScores[i].level));
             DrawShadowText(display, window, textFont, string, xl, y, green);
 
             /* Game duration in minutes and seconds */
-            sprintf(string, "%ld'%ld'%ld\"", ntohl(highScores[i].gameTime) / 3600,
+            snprintf(string, sizeof(string), "%ld'%ld'%ld\"", ntohl(highScores[i].gameTime) / 3600,
                     ntohl(highScores[i].gameTime) / 60, ntohl(highScores[i].gameTime) % 60);
 
             if (ntohl(highScores[i].score) != score)
@@ -333,7 +333,7 @@ static void DoHighScores(Display *display, Window window)
                 DrawShadowText(display, window, textFont, string, xg, y, green);
 
             /* Name of the boing master */
-            strcpy(string, highScores[i].name);
+            snprintf(string, sizeof(string), "%s", highScores[i].name);
             plen = XTextWidth(textFont, string, len);
 
             /* Only use the first name if too big for screen */
@@ -342,7 +342,7 @@ static void DoHighScores(Display *display, Window window)
                 /* Find the first space and null terminate there */
                 p = strchr(string, ' ');
                 *p = '\0';
-                strcpy(string2, string);
+                snprintf(string2, sizeof(string2), "%s", string);
 
                 /* Draw a much smaller version of your name */
                 if (ntohl(highScores[i].score) != score)
@@ -362,11 +362,11 @@ static void DoHighScores(Display *display, Window window)
         else
         {
             /* This bit is for when the table entry is blank */
-            sprintf(string, "%d", i + 1);
+            snprintf(string, sizeof(string), "%d", i + 1);
             DrawShadowText(display, window, textFont, string, xr, y, tann);
 
             /* Draw dashes for blank entries */
-            strcpy(string, "--");
+            snprintf(string, sizeof(string), "%s", "--");
             DrawShadowText(display, window, textFont, string, xs, y, red);
             DrawShadowText(display, window, textFont, string, xl, y, green);
             DrawShadowText(display, window, textFont, string, xt, y, tann);
@@ -656,7 +656,7 @@ static void ShiftScoresDown(int j, u_long score, u_long level, time_t gameTime, 
         highScores[i].time = highScores[i - 1].time;
         highScores[i].gameTime = highScores[i - 1].gameTime;
         highScores[i].userId = highScores[i - 1].userId;
-        strcpy(highScores[i].name, highScores[i - 1].name);
+        snprintf(highScores[i].name, sizeof(highScores[i].name), "%s", highScores[i - 1].name);
     }
 
     /* Add our new high score to the high score table */
@@ -665,7 +665,7 @@ static void ShiftScoresDown(int j, u_long score, u_long level, time_t gameTime, 
     highScores[j].gameTime = htonl(gameTime);
     highScores[j].userId = htonl(getuid());
     highScores[j].time = htonl(time(NULL));
-    strcpy(highScores[j].name, name);
+    snprintf(highScores[j].name, sizeof(highScores[j].name), "%s", name);
 }
 
 static void DeleteScore(int j)
@@ -682,7 +682,7 @@ static void DeleteScore(int j)
         highScores[i].time = highScores[i + 1].time;
         highScores[i].gameTime = highScores[i + 1].gameTime;
         highScores[i].userId = highScores[i + 1].userId;
-        strcpy(highScores[i].name, highScores[i + 1].name);
+        snprintf(highScores[i].name, sizeof(highScores[i].name), "%s", highScores[i + 1].name);
     }
 
     highScores[i].score = htonl((u_long)0);
@@ -690,7 +690,7 @@ static void DeleteScore(int j)
     highScores[i].gameTime = htonl(0);
     highScores[i].userId = htonl(getuid());
     highScores[i].time = htonl(time(NULL));
-    strcpy(highScores[i].name, "To be announced!");
+    snprintf(highScores[i].name, sizeof(highScores[i].name), "%s", "To be announced!");
 }
 
 int CheckAndAddScoreToHighScore(u_long score, u_long level, time_t gameTime, int type,
@@ -710,9 +710,9 @@ int CheckAndAddScoreToHighScore(u_long score, u_long level, time_t gameTime, int
 
     /* Speed up by obtaining users name */
     if (nickName[0] != '\0')
-        strcpy(name, nickName);
+        snprintf(name, sizeof(name), "%s", nickName);
     else
-        strcpy(name, getUsersFullName());
+        snprintf(name, sizeof(name), "%s", getUsersFullName());
 
     if (type == GLOBAL)
     {
@@ -815,19 +815,19 @@ static void SortHighScores(void)
                 tempHighScore.level = highScores[j - 1].level;
                 tempHighScore.gameTime = highScores[j - 1].gameTime;
                 tempHighScore.userId = highScores[j - 1].userId;
-                strcpy(tempHighScore.name, highScores[j - 1].name);
+                snprintf(tempHighScore.name, sizeof(tempHighScore.name), "%s", highScores[j - 1].name);
 
                 highScores[j - 1].score = highScores[j].score;
                 highScores[j - 1].level = highScores[j].level;
                 highScores[j - 1].gameTime = highScores[j].gameTime;
                 highScores[j - 1].userId = highScores[j].userId;
-                strcpy(highScores[j - 1].name, highScores[j].name);
+                snprintf(highScores[j - 1].name, sizeof(highScores[j - 1].name), "%s", highScores[j].name);
 
                 highScores[j].score = tempHighScore.score;
                 highScores[j].level = tempHighScore.level;
                 highScores[j].gameTime = tempHighScore.gameTime;
                 highScores[j].userId = tempHighScore.userId;
-                strcpy(highScores[j].name, tempHighScore.name);
+                snprintf(highScores[j].name, sizeof(highScores[j].name), "%s", tempHighScore.name);
             }
         }
     }
@@ -850,7 +850,7 @@ static void InitialiseHighScores(void)
         highScores[i].gameTime = htonl(0);
         highScores[i].userId = htonl(0);
         highScores[i].time = htonl(time(NULL));
-        strcpy(highScores[i].name, "To be announced!");
+        snprintf(highScores[i].name, sizeof(highScores[i].name), "%s", "To be announced!");
     }
 }
 
@@ -867,12 +867,12 @@ int ReadHighScoreTable(int type)
     {
         /* Use the environment variable if it exists */
         if ((str = getenv("XBOING_SCORE_FILE")) != NULL)
-            strcpy(filename, str);
+            snprintf(filename, sizeof(filename), "%s", str);
         else
-            strcpy(filename, HIGH_SCORE_FILE);
+            snprintf(filename, sizeof(filename), "%s", HIGH_SCORE_FILE);
     }
     else
-        sprintf(filename, "%s/.xboing-scores", GetHomeDir());
+        snprintf(filename, sizeof(filename), "%s/.xboing-scores", GetHomeDir());
 
     /* Open the high score file */
     if ((hsfp = fopen(filename, "r")) == NULL)
@@ -933,12 +933,12 @@ int WriteHighScoreTable(int type)
     {
         /* Use the environment variable if it exists */
         if ((str = getenv("XBOING_SCORE_FILE")) != NULL)
-            strcpy(filename, str);
+            snprintf(filename, sizeof(filename), "%s", str);
         else
-            strcpy(filename, HIGH_SCORE_FILE);
+            snprintf(filename, sizeof(filename), "%s", HIGH_SCORE_FILE);
     }
     else
-        sprintf(filename, "%s/.xboing-scores", GetHomeDir());
+        snprintf(filename, sizeof(filename), "%s/.xboing-scores", GetHomeDir());
 
     /* Open the high score file */
     if ((hsfp = fopen(filename, "w+")) == NULL)
@@ -1035,9 +1035,9 @@ static int LockUnlock(int cmd)
 
     /* Use the environment variable if it exists */
     if ((str = getenv("XBOING_SCORE_FILE")) != NULL)
-        strcpy(filename, str);
+        snprintf(filename, sizeof(filename), "%s", str);
     else
-        strcpy(filename, HIGH_SCORE_FILE);
+        snprintf(filename, sizeof(filename), "%s", HIGH_SCORE_FILE);
 
     /* Open the highscore file for both read & write */
     if (cmd == LOCK_FILE)

@@ -224,7 +224,7 @@ static void InitialiseFonts(Display *display)
     /* Font used for titles */
     if (!(titleFont = XLoadQueryFont(display, TITLE_FONT)))
     {
-        sprintf(str, "Cannot open the title font <%s>\nUsing default called fixed.", TITLE_FONT);
+        snprintf(str, sizeof(str), "Cannot open the title font <%s>\nUsing default called fixed.", TITLE_FONT);
         WarningMessage(str);
         titleFont = XLoadQueryFont(display, "fixed");
     }
@@ -232,7 +232,7 @@ static void InitialiseFonts(Display *display)
     /* Very small font used for copyright message etc. */
     if (!(copyFont = XLoadQueryFont(display, COPY_FONT)))
     {
-        sprintf(str, "Cannot open the copyright font <%s>\nUsing default called fixed.", COPY_FONT);
+        snprintf(str, sizeof(str), "Cannot open the copyright font <%s>\nUsing default called fixed.", COPY_FONT);
         WarningMessage(str);
         copyFont = XLoadQueryFont(display, "fixed");
     }
@@ -240,7 +240,7 @@ static void InitialiseFonts(Display *display)
     /* Font used for general text everywhere */
     if (!(textFont = XLoadQueryFont(display, TEXT_FONT)))
     {
-        sprintf(str, "Cannot open the text font <%s>\nUsing default called fixed.", TEXT_FONT);
+        snprintf(str, sizeof(str), "Cannot open the text font <%s>\nUsing default called fixed.", TEXT_FONT);
         WarningMessage(str);
         textFont = XLoadQueryFont(display, "fixed");
     }
@@ -248,7 +248,7 @@ static void InitialiseFonts(Display *display)
     /* Font used for data text in intro */
     if (!(dataFont = XLoadQueryFont(display, DATA_FONT)))
     {
-        sprintf(str, "Cannot open the data font <%s>\nUsing default called fixed.", DATA_FONT);
+        snprintf(str, sizeof(str), "Cannot open the data font <%s>\nUsing default called fixed.", DATA_FONT);
         WarningMessage(str);
         dataFont = XLoadQueryFont(display, "fixed");
     }
@@ -343,7 +343,7 @@ static int ErrorHandler(Display *display, XErrorEvent *err)
 
     /* Obtain the error message from the server */
     XGetErrorText(display, err->error_code, msg, 80);
-    sprintf(string, "Xlib Error: %s", msg);
+    snprintf(string, sizeof(string), "Xlib Error: %s", msg);
 
     /* Close down the system */
     ShutDown(display, 1, string);
@@ -361,7 +361,7 @@ static void HandleDisplayErrors(char *displayName)
         WarningMessage("Your X Window system display variable is not set.");
     else
     {
-        sprintf(string, "Cannot connect to display called <%s>.", displayName);
+        snprintf(string, sizeof(string), "Cannot connect to display called <%s>.", displayName);
         WarningMessage(string);
     }
 }
@@ -660,7 +660,7 @@ static void ParseCommandLine(char **argv, int argc)
                     SetStartingLevel(l);
                 else
                 {
-                    sprintf(str, "The starting level range is [1-%d]", MAX_NUM_LEVELS);
+                    snprintf(str, sizeof(str), "The starting level range is [1-%d]", MAX_NUM_LEVELS);
                     WarningMessage(str);
                     PrintUsage();
                 }
@@ -866,7 +866,7 @@ Display *InitialiseGame(char **argv, int argc)
     DEBUG("Colourmap created.")
 
     /* Be polite and let them know we are waiting */
-    sprintf(str, "Please wait %s, initialising xboing ...", getUsersFullName());
+    snprintf(str, sizeof(str), "Please wait %s, initialising xboing ...", getUsersFullName());
     NormalMessage(str);
 
     /* Initialise the audio system if possible */

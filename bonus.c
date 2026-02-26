@@ -232,11 +232,11 @@ void DrawTitleText(Display *display, Window window)
     SetCurrentMessage(display, messWindow, "- Bonus Tally -", True);
 
     /* Indicate which level the bonus is for */
-    sprintf(string, "- Level %ld -", level);
+    snprintf(string, sizeof(string), "- Level %ld -", level);
     DrawShadowCentredText(display, window, titleFont, string, ypos, red, TOTAL_WIDTH);
     ypos += (titleFont->ascent + GAP);
 
-    strcpy(string, "Press space for next level");
+    snprintf(string, sizeof(string), "%s", "Press space for next level");
     DrawShadowCentredText(display, window, textFont, string, PLAY_HEIGHT - 12, tann, TOTAL_WIDTH);
 
     /* Adjust the level so that the starting level is taken into account */
@@ -267,7 +267,7 @@ static void DoScore(Display *display, Window window)
     SetGameSpeed(SLOW_SPEED);
 
     /* Nice message rewarding you for your efforts */
-    strcpy(string, "Congratulations on finishing this level.");
+    snprintf(string, sizeof(string), "%s", "Congratulations on finishing this level.");
     DrawShadowCentredText(display, window, textFont, string, ypos, white, TOTAL_WIDTH);
     XFlush(display);
 
@@ -291,7 +291,7 @@ static void DoBonuses(Display *display, Window window)
         if (noSound == False)
             playSoundFile("Doh4", 80);
 
-        strcpy(string, "Bonus coins void - Timer ran out!");
+        snprintf(string, sizeof(string), "%s", "Bonus coins void - Timer ran out!");
         DrawShadowCentredText(display, window, textFont, string, ypos, blue, TOTAL_WIDTH);
 
         SetGameSpeed(SLOW_SPEED);
@@ -315,7 +315,7 @@ static void DoBonuses(Display *display, Window window)
                 playSoundFile("Doh1", 80);
 
             /* No bonus coins - so tell user */
-            strcpy(string, "Sorry, no bonus coins collected.");
+            snprintf(string, sizeof(string), "%s", "Sorry, no bonus coins collected.");
             DrawShadowCentredText(display, window, textFont, string, ypos, blue, TOTAL_WIDTH);
 
             SetGameSpeed(SLOW_SPEED);
@@ -334,7 +334,7 @@ static void DoBonuses(Display *display, Window window)
                 playSoundFile("supbons", 80);
 
             /* More than 10 coins collected - super bonus reward */
-            sprintf(string, "Super Bonus - %ld", ComputeScore(SUPER_BONUS_SCORE));
+            snprintf(string, sizeof(string), "Super Bonus - %ld", ComputeScore(SUPER_BONUS_SCORE));
             DrawShadowCentredText(display, window, titleFont, string, ypos, blue, TOTAL_WIDTH);
 
             /* Update the score with more points */
@@ -403,7 +403,7 @@ static void DoLevel(Display *display, Window window)
         theLevel = (int)level - GetStartingLevel() + 1;
 
         /* Draw level bonus text */
-        sprintf(string, "Level bonus - level %d x %ld = %ld points", theLevel,
+        snprintf(string, sizeof(string), "Level bonus - level %d x %ld = %ld points", theLevel,
                 ComputeScore(LEVEL_SCORE), theLevel * ComputeScore(LEVEL_SCORE));
         DrawShadowCentredText(display, window, textFont, string, ypos, yellow, TOTAL_WIDTH);
 
@@ -413,7 +413,7 @@ static void DoLevel(Display *display, Window window)
     }
     else
     {
-        strcpy(string, "No level bonus - Timer ran out.");
+        snprintf(string, sizeof(string), "%s", "No level bonus - Timer ran out.");
         DrawShadowCentredText(display, window, textFont, string, ypos, yellow, TOTAL_WIDTH);
 
         /* Play the sound for the super bonus */
@@ -442,7 +442,7 @@ static void DoBullets(Display *display, Window window)
         if (GetNumberBullets() == 0)
         {
             /* No bullets - say so */
-            strcpy(string, "You have used all your bullets. No bonus!");
+            snprintf(string, sizeof(string), "%s", "You have used all your bullets. No bonus!");
             DrawShadowCentredText(display, window, textFont, string, ypos, blue, TOTAL_WIDTH);
 
             /* Play the sound for the super bonus */
@@ -501,7 +501,7 @@ static void DoTimeBonus(Display *display, Window window)
     if (secs > 0)
     {
         /* Draw time bonus text */
-        sprintf(string, "Time bonus - %d seconds x %ld = %ld points", secs,
+        snprintf(string, sizeof(string), "Time bonus - %d seconds x %ld = %ld points", secs,
                 ComputeScore(TIME_BONUS), secs * ComputeScore(TIME_BONUS));
         DrawShadowCentredText(display, window, textFont, string, ypos, yellow, TOTAL_WIDTH);
 
@@ -512,7 +512,7 @@ static void DoTimeBonus(Display *display, Window window)
     else
     {
         /* Draw no time bonus text */
-        strcpy(string, "No time bonus - not quick enough!");
+        snprintf(string, sizeof(string), "%s", "No time bonus - not quick enough!");
         DrawShadowCentredText(display, window, textFont, string, ypos, yellow, TOTAL_WIDTH);
 
         /* Play the sound for the super bonus */
@@ -539,20 +539,20 @@ static void DoHighScore(Display *display, Window window)
     {
         /* Special case for first place */
         if (myrank == 1)
-            sprintf(string, "You are ranked 1st. Well done!");
+            snprintf(string, sizeof(string), "You are ranked 1st. Well done!");
         else
         {
             /* Add the correct grammer for the sentence */
             switch (myrank)
             {
                 case 1:
-                    strcpy(str, "st");
+                    snprintf(str, sizeof(str), "%s", "st");
                     break;
                 case 2:
-                    strcpy(str, "nd");
+                    snprintf(str, sizeof(str), "%s", "nd");
                     break;
                 case 3:
-                    strcpy(str, "rd");
+                    snprintf(str, sizeof(str), "%s", "rd");
                     break;
 
                 case 4:
@@ -562,21 +562,21 @@ static void DoHighScore(Display *display, Window window)
                 case 8:
                 case 9:
                 case 10:
-                    strcpy(str, "th");
+                    snprintf(str, sizeof(str), "%s", "th");
                     break;
 
                 default:
-                    strcpy(str, "");
+                    snprintf(str, sizeof(str), "%s", "");
                     break;
             }
 
             /* Construct beautiful sentence */
-            sprintf(string, "You are currently ranked %d%s.", myrank, str);
+            snprintf(string, sizeof(string), "You are currently ranked %d%s.", myrank, str);
         }
     }
     else
         /* What a loser ;-) */
-        strcpy(string, "Keep on trying!");
+        snprintf(string, sizeof(string), "%s", "Keep on trying!");
 
     /* Draw the text for the game ranking */
     DrawShadowCentredText(display, window, textFont, string, ypos, red, TOTAL_WIDTH);
@@ -592,7 +592,7 @@ static void DoEndText(Display *display, Window window)
     SetGameSpeed(SLOW_SPEED);
 
     /* Finishing sentence - so you know what level to do */
-    sprintf(string, "Prepare for level %ld", level + 1);
+    snprintf(string, sizeof(string), "Prepare for level %ld", level + 1);
     DrawShadowCentredText(display, window, textFont, string, ypos, yellow, TOTAL_WIDTH);
     XFlush(display);
 

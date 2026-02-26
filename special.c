@@ -156,7 +156,7 @@ void DrawSpecials(Display *display)
     /* Clear the special window */
     /*XClearWindow(display, specialWindow);*/
 
-    strcpy(string, "Reverse");
+    snprintf(string, sizeof(string), "%s", "Reverse");
     if (reverseOn == True)
         DrawShadowText(display, specialWindow, copyFont, string, x, y, yellow);
     else
@@ -164,7 +164,7 @@ void DrawSpecials(Display *display)
 
     y += copyFont->ascent + GAP;
 
-    strcpy(string, "Sticky");
+    snprintf(string, sizeof(string), "%s", "Sticky");
     if (stickyBat == True)
         DrawShadowText(display, specialWindow, copyFont, string, x, y, yellow);
     else
@@ -173,7 +173,7 @@ void DrawSpecials(Display *display)
     x = 55;
     y = 3;
 
-    strcpy(string, "Save");
+    snprintf(string, sizeof(string), "%s", "Save");
     if (saving == True)
         DrawShadowText(display, specialWindow, copyFont, string, x, y, yellow);
     else
@@ -181,7 +181,7 @@ void DrawSpecials(Display *display)
 
     y += copyFont->ascent + GAP;
 
-    strcpy(string, "FastGun");
+    snprintf(string, sizeof(string), "%s", "FastGun");
     if (fastGun == True)
         DrawShadowText(display, specialWindow, copyFont, string, x, y, yellow);
     else
@@ -190,7 +190,7 @@ void DrawSpecials(Display *display)
     x = 110;
     y = 3;
 
-    strcpy(string, "NoWall");
+    snprintf(string, sizeof(string), "%s", "NoWall");
     if (noWalls == True)
         DrawShadowText(display, specialWindow, copyFont, string, x, y, yellow);
     else
@@ -198,7 +198,7 @@ void DrawSpecials(Display *display)
 
     y += copyFont->ascent + GAP;
 
-    strcpy(string, "Killer");
+    snprintf(string, sizeof(string), "%s", "Killer");
     if (Killer == True)
         DrawShadowText(display, specialWindow, copyFont, string, x, y, yellow);
     else
@@ -207,7 +207,7 @@ void DrawSpecials(Display *display)
     x = 155;
     y = 3;
 
-    strcpy(string, "x2");
+    snprintf(string, sizeof(string), "%s", "x2");
     if (x2Bonus == True)
         DrawShadowText(display, specialWindow, copyFont, string, x, y, yellow);
     else
@@ -215,7 +215,7 @@ void DrawSpecials(Display *display)
 
     y += copyFont->ascent + GAP;
 
-    strcpy(string, "x4");
+    snprintf(string, sizeof(string), "%s", "x4");
     if (x4Bonus == True)
         DrawShadowText(display, specialWindow, copyFont, string, x, y, yellow);
     else

@@ -289,7 +289,7 @@ void CreateAllWindows(Display *display, Colormap colormap, char **argv, int argc
     DEBUG("Creating windows finished.");
 
     /* Set window manager properties */
-    sprintf(title, "XBoing V%d.%d", VERSION, REVNUM + buildNum);
+    snprintf(title, sizeof(title), "XBoing V%d.%d", VERSION, REVNUM + buildNum);
 
     if (XStringListToTextProperty(&window_Name, 1, &windowName) == 0)
         ShutDown(display, 1, "Cannot create window name resource.");
@@ -486,7 +486,7 @@ void DrawStageBackground(Display *display, Window window, int stageType, int cle
 
     if (debug == True)
     {
-        sprintf(type, "Changing background to type %d.", stageType);
+        snprintf(type, sizeof(type), "Changing background to type %d.", stageType);
         DEBUG(type);
     }
 
