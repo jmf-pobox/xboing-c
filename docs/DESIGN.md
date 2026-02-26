@@ -1702,3 +1702,47 @@ Key design choices:
 - Shared sparkle and state machine eliminate code duplication.
 - 16 CMocka tests across 7 groups cover lifecycle, both state flows,
   data tables, sparkle/specials, blink, and null safety.
+
+### ADR-029: Pure C modal input dialogue system
+
+**Status:** Accepted
+**Date:** 2026-02-25
+**Bead:** xboing-dm8.5
+
+**Context:**
+Legacy `dialogue.c` (399 lines) implements a modal text input dialog
+with X11 event loop, XPM icon pixmaps, font metrics for text width
+checking, and keysym-based character validation.  It has 4 validation
+modes and runs its own blocking event loop inside the game.
+
+**Decision:**
+Create `dialogue_system.c`/`dialogue_system.h` as a non-blocking
+input component that the integration layer drives frame-by-frame.
+
+Key design choices:
+
+1. **Non-blocking design:** Legacy runs its own X11 event loop.  The
+   pure C module exposes `key_input()` for the integration layer to
+   feed key events, and `update()` to advance state.
+
+2. **ASCII validation:** Validation uses ASCII ranges matching the
+   X11 keysym ranges (keysyms equal ASCII for printable characters).
+   TEXT: space-z, NUMERIC: 0-9, ALL: space-tilde, YES_NO: yYnN.
+
+3. **Configurable max chars:** `set_max_chars()` replaces the legacy
+   `XTextWidth()` pixel check.  Integration layer converts pixel
+   budget to character count based on its font metrics.
+
+4. **Cancel vs submit tracking:** `was_cancelled()` reports whether
+   the dialogue was dismissed via Escape (cancel) or Return (submit).
+
+5. **Sound events per key:** "click" on valid char, "tone" on buffer
+   full, "key" on backspace, matching legacy behavior.
+
+**Consequences:**
+
+- Eliminates all X11 dependency from the dialogue system.
+- Non-blocking design integrates with the frame-driven game loop.
+- Character validation is unit-testable without X11 keysyms.
+- 16 CMocka tests across 7 groups cover lifecycle, state flow,
+  all 4 validation modes, backspace/overflow, and null safety.

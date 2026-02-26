@@ -369,3 +369,11 @@ add_executable(test_keys_system test_keys_system.c)
 target_compile_options(test_keys_system PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
 target_link_libraries(test_keys_system PRIVATE keys_system ${CMOCKA_LIBRARIES})
 add_test(NAME test_keys_system COMMAND test_keys_system)
+
+# Modal input dialogue system tests (bead xboing-dm8.5)
+# Pure logic tests — no SDL2, X11, video, or audio driver needed.
+# Links against dialogue_system static library.
+add_executable(test_dialogue_system test_dialogue_system.c)
+target_compile_options(test_dialogue_system PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+target_link_libraries(test_dialogue_system PRIVATE dialogue_system ${CMOCKA_LIBRARIES})
+add_test(NAME test_dialogue_system COMMAND test_dialogue_system)
