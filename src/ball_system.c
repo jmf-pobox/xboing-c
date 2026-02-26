@@ -4,13 +4,14 @@
  * See include/ball_system.h for API documentation.
  * See ADR-015 in docs/DESIGN.md for design rationale.
  *
- * PR 1: lifecycle, ball management, queries, render info, guide info.
- * PR 2: state machine dispatch, wall/paddle collision.
- * PR 3: block collision, ball-to-ball collision, multiball.
+ * Lifecycle, ball management, queries, render info, guide info.
+ * State machine dispatch, wall/paddle collision.
+ * Block collision, ball-to-ball collision, multiball.
  */
 
 #include "ball_system.h"
 #include "ball_math.h"
+#include "block_types.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -49,6 +50,8 @@ static void animate_ball_create(ball_system_t *ctx, const ball_system_env_t *env
 static void do_ball_wait(ball_system_t *ctx, const ball_system_env_t *env, int i);
 static void randomise_velocity(ball_system_t *ctx, const ball_system_env_t *env, int i);
 static void update_guide(ball_system_t *ctx, const ball_system_env_t *env);
+static int check_for_collision(ball_system_t *ctx, int x, int y, int *r, int *c, int ball_index);
+static void teleport_ball(ball_system_t *ctx, const ball_system_env_t *env, int i);
 
 /* =========================================================================
  * Public API — Lifecycle
@@ -415,8 +418,9 @@ static void update_a_ball(ball_system_t *ctx, const ball_system_env_t *env, int 
 {
     /*
      * Main physics update for a single ball.
-     * Handles wall collision, paddle collision, speed normalization.
-     * Block collision and ball-to-ball are deferred to PR 3 via callbacks.
+     * Handles wall collision, paddle collision, speed normalization,
+     * block collision (via check_region/on_block_hit callbacks),
+     * and ball-to-ball collision (via ball_math).
      * Matches UpdateABall() in ball.c:1023-1346.
      */
 
@@ -556,7 +560,114 @@ static void update_a_ball(ball_system_t *ctx, const ball_system_env_t *env, int 
         b->slide = 0;
     }
 
-    /* Block collision and ball-to-ball handled via callbacks in PR 3 */
+    /* ---- Block collision ray-march (ball.c:1209-1312) ---- */
+    if (b->ballState != BALL_DIE && env->col_width > 0 && env->row_height > 0)
+    {
+        int col = ball_math_x_to_col(b->ballx, env->col_width);
+        int row = ball_math_y_to_row(b->bally, env->row_height);
+
+        float x_f = (float)b->oldx;
+        float y_f = (float)b->oldy;
+
+        int cx = b->dx > 0 ? 1 : -1;
+        int cy = b->dy > 0 ? 1 : -1;
+
+        float incx, incy;
+        int step;
+
+        if (abs(b->dx) == abs(b->dy))
+        {
+            incx = (float)cx;
+            incy = (float)cy;
+            step = abs(b->dx);
+        }
+        else if (abs(b->dx) > abs(b->dy))
+        {
+            incx = (float)cx;
+            incy = ((float)abs(b->dy) / (float)abs(b->dx)) * (float)cy;
+            step = abs(b->dx);
+        }
+        else
+        {
+            incy = (float)cy;
+            incx = ((float)abs(b->dx) / (float)abs(b->dy)) * (float)cx;
+            step = abs(b->dy);
+        }
+
+        for (int j = 0; j < step; j++)
+        {
+            int ret = check_for_collision(ctx, (int)x_f, (int)y_f, &row, &col, i);
+            if (ret != BALL_REGION_NONE)
+            {
+                /* Delegate block handling to callback */
+                if (ctx->callbacks.on_block_hit != NULL)
+                {
+                    if (ctx->callbacks.on_block_hit(row, col, i, ctx->user_data) != 0)
+                    {
+                        /* Callback says ball should NOT bounce (killer, teleport, etc.) */
+                        return;
+                    }
+                }
+
+                int ddx = 0;
+                int ddy = 0;
+                int r = (rand() >> 16) % 4;
+
+                switch (ret)
+                {
+                    case BALL_REGION_LEFT:
+                        ddx = -r / 4;
+                        b->dx = -(abs(b->dx));
+                        break;
+                    case BALL_REGION_RIGHT:
+                        ddx = r / 4;
+                        b->dx = abs(b->dx);
+                        break;
+                    case BALL_REGION_TOP:
+                        ddy = -r / 4;
+                        b->dy = -(abs(b->dy));
+                        break;
+                    case BALL_REGION_BOTTOM:
+                        ddy = r / 4;
+                        b->dy = abs(b->dy);
+                        break;
+                }
+
+                b->ballx = (int)x_f + b->dx + ddx + 1 - rand() % 3;
+                b->bally = (int)y_f + b->dy + ddy + 1 - rand() % 3;
+
+                break;
+            }
+
+            x_f += incx;
+            y_f += incy;
+        }
+    }
+
+    /* ---- Ball-to-ball collision (ball.c:1317-1345) ---- */
+    if (b->ballState != BALL_DIE)
+    {
+        for (int t = 0; t < MAX_BALLS; t++)
+        {
+            if (t == i)
+            {
+                continue;
+            }
+            if (ctx->balls[t].ballState == BALL_ACTIVE)
+            {
+                float dummy;
+                if (ball_math_will_collide(b, &ctx->balls[t], &dummy, ctx->machine_eps))
+                {
+                    ball_math_collide(b, &ctx->balls[t]);
+
+                    if (ctx->callbacks.on_sound != NULL)
+                    {
+                        ctx->callbacks.on_sound("ball2ball", ctx->user_data);
+                    }
+                }
+            }
+        }
+    }
 }
 
 static int ball_hit_paddle(const ball_system_env_t *env, const BALL *b, int *hit_pos, int *hx,
@@ -745,6 +856,175 @@ static void update_guide(ball_system_t *ctx, const ball_system_env_t *env)
         ctx->guide_pos = 0;
         ctx->guide_inc = 1;
     }
+}
+
+/* =========================================================================
+ * Static helpers — block collision
+ * ========================================================================= */
+
+static int check_for_collision(ball_system_t *ctx, int x, int y, int *r, int *c, int ball_index)
+{
+    /*
+     * Check each adjoining block and see if the ball has hit any region in it.
+     * Returns the hit region or BALL_REGION_NONE.
+     * Matches CheckForCollision() in ball.c:1457-1506.
+     *
+     * NOTE: The legacy code at ball.c:1494-1498 has a bug: the last else-if
+     * (row-1, col+1) returns REGION_NONE even on a hit, and sets r,c to
+     * (row-1, col+1) before returning NONE. We preserve this behavior.
+     */
+
+    int ret, row, col;
+
+    if (ctx->callbacks.check_region == NULL)
+    {
+        return BALL_REGION_NONE;
+    }
+
+    row = *r;
+    col = *c;
+
+    /* Check cell and 8 neighbors */
+    if ((ret = ctx->callbacks.check_region(row, col, x, y, 0, ctx->user_data)) != BALL_REGION_NONE)
+        ; /* hit in center cell */
+    else if ((ret = ctx->callbacks.check_region(row + 1, col, x, y, 0, ctx->user_data)) !=
+             BALL_REGION_NONE)
+        row++;
+    else if ((ret = ctx->callbacks.check_region(row - 1, col, x, y, 0, ctx->user_data)) !=
+             BALL_REGION_NONE)
+        row--;
+    else if ((ret = ctx->callbacks.check_region(row, col + 1, x, y, 0, ctx->user_data)) !=
+             BALL_REGION_NONE)
+        col++;
+    else if ((ret = ctx->callbacks.check_region(row, col - 1, x, y, 0, ctx->user_data)) !=
+             BALL_REGION_NONE)
+        col--;
+    else if ((ret = ctx->callbacks.check_region(row + 1, col + 1, x, y, 0, ctx->user_data)) !=
+             BALL_REGION_NONE)
+    {
+        row++;
+        col++;
+    }
+    else if ((ret = ctx->callbacks.check_region(row - 1, col - 1, x, y, 0, ctx->user_data)) !=
+             BALL_REGION_NONE)
+    {
+        row--;
+        col--;
+    }
+    else if ((ret = ctx->callbacks.check_region(row + 1, col - 1, x, y, 0, ctx->user_data)) !=
+             BALL_REGION_NONE)
+    {
+        row++;
+        col--;
+    }
+    else if ((ret = ctx->callbacks.check_region(row - 1, col + 1, x, y, 0, ctx->user_data)) !=
+             BALL_REGION_NONE)
+    {
+        /* Legacy bug: ball.c:1494-1498 sets r/c but returns REGION_NONE */
+        *r = row - 1;
+        *c = col + 1;
+        return BALL_REGION_NONE;
+    }
+
+    (void)ball_index;
+
+    *r = row;
+    *c = col;
+    return ret;
+}
+
+static void teleport_ball(ball_system_t *ctx, const ball_system_env_t *env, int i)
+{
+    /*
+     * Teleport ball to a random empty cell.
+     * Matches TeleportBall() in ball.c:509-638.
+     * Uses cell_available callback instead of direct block access.
+     */
+
+    if (ctx->callbacks.cell_available == NULL || env->col_width <= 0 || env->row_height <= 0)
+    {
+        return;
+    }
+
+    int count = 0;
+    while (count <= 20)
+    {
+        count++;
+
+        /* Legacy ball.c:529-530 uses +1, skipping row 0 and col 0.
+         * Column MAX_COL is rejected by the bounds check below. */
+        int r = (rand() % (MAX_ROW - 6)) + 1;
+        int c = (rand() % MAX_COL) + 1;
+
+        if (r < 0 || r >= MAX_ROW)
+        {
+            continue;
+        }
+        if (c < 0 || c >= MAX_COL)
+        {
+            continue;
+        }
+
+        if (ctx->callbacks.cell_available(r, c, ctx->user_data))
+        {
+            ctx->balls[i].ballx = c * env->col_width;
+            ctx->balls[i].bally = r * env->row_height;
+            ctx->balls[i].oldx = ctx->balls[i].ballx;
+            ctx->balls[i].oldy = ctx->balls[i].bally;
+            ctx->balls[i].lastPaddleHitFrame = env->frame + PADDLE_BALL_FRAME_TILT;
+            return;
+        }
+    }
+
+    /* Give up — reset ball to paddle position */
+    ctx->balls[i].ballx = env->paddle_pos;
+    ctx->balls[i].bally = env->play_height - DIST_BALL_OF_PADDLE;
+    ctx->balls[i].oldx = ctx->balls[i].ballx;
+    ctx->balls[i].oldy = ctx->balls[i].bally;
+}
+
+/* =========================================================================
+ * Public API — Multiball
+ * ========================================================================= */
+
+int ball_system_split(ball_system_t *ctx, const ball_system_env_t *env)
+{
+    /*
+     * Split a ball in two. Adds a new ball, sets it ACTIVE, teleports it
+     * to a random cell, and randomizes its velocity.
+     * Matches SplitBallInTwo() in ball.c:640-661.
+     */
+
+    if (ctx == NULL || env == NULL)
+    {
+        return -1;
+    }
+
+    int j = ball_system_add(ctx, env, 0, 0, 3, 3, NULL);
+    if (j >= 0)
+    {
+        ctx->balls[j].ballState = BALL_ACTIVE;
+        teleport_ball(ctx, env, j);
+        randomise_velocity(ctx, env, j);
+
+        if (ctx->callbacks.on_event != NULL)
+        {
+            ctx->callbacks.on_event(BALL_EVT_SPLIT, j, ctx->user_data);
+        }
+        if (ctx->callbacks.on_message != NULL)
+        {
+            ctx->callbacks.on_message("Another ball!", ctx->user_data);
+        }
+    }
+    else
+    {
+        if (ctx->callbacks.on_message != NULL)
+        {
+            ctx->callbacks.on_message("Cannot add ball!", ctx->user_data);
+        }
+    }
+
+    return j;
 }
 
 /* =========================================================================
