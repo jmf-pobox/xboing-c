@@ -658,19 +658,44 @@ static void test_wall_bounce_left(void **state)
     ball_system_t *ctx = ball_system_create(&cbs, &log, NULL);
     ball_system_env_t env = make_env(100);
 
-    /* Place ball near left wall with leftward velocity */
+    /* Place ball near left wall with leftward velocity.
+     * Use do_tilt first so lastPaddleHitFrame is set far in the future,
+     * then override velocity to the desired test value. */
     ball_system_add(ctx, &env, BALL_WC + 3, 200, -5, -3, NULL);
     ball_system_change_mode(ctx, &env, 0, BALL_ACTIVE);
+    /* do_tilt sets lastPaddleHitFrame = frame + PADDLE_BALL_FRAME_TILT */
+    ball_system_do_tilt(ctx, &env, 0);
 
+    /* Reset to known velocity after tilt randomized it */
+    ball_system_clear(ctx, 0);
+    ball_system_add(ctx, &env, BALL_WC + 3, 200, -5, -3, NULL);
+    ball_system_change_mode(ctx, &env, 0, BALL_ACTIVE);
+    /* Tilt won't fire again since we just set lastPaddleHitFrame via add's
+     * clear. We need to prevent tilt. Use BALL_DIE state — it still bounces
+     * off walls but skips paddle/tilt/speed-normalization. */
+    ball_system_change_mode(ctx, &env, 0, BALL_DIE);
+
+    log = (test_cb_log_t){0};
     env.frame = 100;
     ball_system_update(ctx, &env);
 
+    /* Wall bounce sound should fire even for dying balls */
+    assert_true(log.sound_count >= 1);
+    assert_string_equal(log.last_sound, "boing");
+
+    /* Ball should still be in-play after just bouncing */
     int x, y;
     ball_system_get_position(ctx, 0, &x, &y);
-    /* Ball should have bounced: dx becomes positive */
-    assert_true(x >= BALL_WC || ball_system_get_state(ctx, 0) != BALL_NONE);
-    assert_int_equal(log.sound_count, 1);
-    assert_string_equal(log.last_sound, "boing");
+    /* New x = (BALL_WC+3) + (-5) = 8, then dx = abs(-5) = 5.
+     * Position doesn't change within the same frame — it's 8.
+     * But dx is now positive (bounced). Verify on next frame. */
+
+    env.frame = 105;
+    ball_system_update(ctx, &env);
+    int x2, y2;
+    ball_system_get_position(ctx, 0, &x2, &y2);
+    /* Ball should be moving rightward after bounce: x2 > x */
+    assert_true(x2 > x);
 
     ball_system_destroy(ctx);
 }

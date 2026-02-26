@@ -12,7 +12,6 @@
 #include "ball_system.h"
 #include "ball_math.h"
 
-#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -575,9 +574,11 @@ static int ball_hit_paddle(const ball_system_env_t *env, const BALL *b, int *hit
         float xP1 = (float)(env->paddle_pos - (env->paddle_size / 2) - BALL_WC);
         float xP2 = (float)(env->paddle_pos + (env->paddle_size / 2) + BALL_WC);
 
-        if (b->dx == 0)
+        if (b->dx == 0 || b->dy == 0)
         {
-            /* Vertical moving ball */
+            /* Vertical or horizontal moving ball — use position directly.
+             * Legacy ball.c:741-755 only checked dx==0; we also guard dy==0
+             * to prevent division by zero in the line intersection below. */
             if ((float)b->ballx > xP1 && (float)b->ballx < xP2)
             {
                 *hit_pos = b->ballx - env->paddle_pos;
@@ -588,7 +589,7 @@ static int ball_hit_paddle(const ball_system_env_t *env, const BALL *b, int *hit
             return 0;
         }
 
-        /* Compute line coefficients of ball trajectory */
+        /* Compute line coefficients of ball trajectory — alpha = dy != 0 here */
         float alpha = (float)b->dy;
         float x1 = (float)(b->ballx - b->dx);
         float y1 = (float)(b->bally - b->dy);
