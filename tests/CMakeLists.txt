@@ -288,3 +288,11 @@ add_executable(test_gun_system test_gun_system.c)
 target_compile_options(test_gun_system PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
 target_link_libraries(test_gun_system PRIVATE gun_system ${CMOCKA_LIBRARIES})
 add_test(NAME test_gun_system COMMAND test_gun_system)
+
+# Score display system tests (bead xboing-1ka.5)
+# Pure logic tests — no SDL2, X11, video, or audio driver needed.
+# Links against score_system static library (includes score_logic.c).
+add_executable(test_score_system test_score_system.c)
+target_compile_options(test_score_system PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+target_link_libraries(test_score_system PRIVATE score_system ${CMOCKA_LIBRARIES})
+add_test(NAME test_score_system COMMAND test_score_system)

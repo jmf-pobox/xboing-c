@@ -375,6 +375,18 @@ target_include_directories(gun_system PUBLIC
 )
 target_compile_options(gun_system PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
 
+# --- Score display system library -------------------------------------------
+#
+# Pure C module — no SDL2 or X11 dependency.  Owns the game score value,
+# multiplier application, extra life tracking, and digit layout computation
+# for rendering.  Links score_logic.c for arithmetic functions.
+
+add_library(score_system STATIC src/score_system.c src/score_logic.c)
+target_include_directories(score_system PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+target_compile_options(score_system PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+
 # --- Tests ------------------------------------------------------------------
 
 option(BUILD_TESTING "Build unit tests" ON)

@@ -1122,3 +1122,68 @@ Key design choices:
   shooting while the ball sits on the paddle.
 - Render info queries (`get_bullet_info`, `get_tink_info`) provide
   position data for the integration layer to draw bullet/tink sprites.
+
+### ADR-019: Pure C score display system
+
+**Status:** Accepted
+**Date:** 2026-02-25
+**Bead:** xboing-1ka.5
+
+**Context:**
+
+`score.c` (234 lines) owns the game score value, multiplier application
+(x2/x4 bonus), extra life threshold tracking (every 100k points), and
+right-aligned digit rendering into a 224x42 pixel window.  It reads
+global `x2Bonus`/`x4Bonus` flags and `score`, calls `DrawOutNumber()`
+for rendering, and directly references X11 Display/Window types.
+
+Four pure arithmetic functions are already extracted to `score_logic.c`
+(96 lines, 16 characterization tests): `score_apply_multiplier`,
+`score_extra_life_threshold`, `score_compute_bonus`, and
+`score_block_hit_points`.
+
+**Decision:**
+
+Create `score_system` as a pure C module using the opaque context and
+callback injection patterns established by the other system modules.
+
+Key design choices:
+
+1. **Reuses score_logic.c:** Multiplier application and extra life
+   threshold calculation delegate to the already-extracted and tested
+   functions.  No duplication of arithmetic.
+
+2. **Callback table (2 pointers):** `on_score_changed` notifies the
+   integration layer to redraw; `on_extra_life` notifies when a life
+   threshold is crossed.  Far simpler than the 8-callback gun system
+   because score has no collision dispatch.
+
+3. **Environment struct:** `score_system_env_t` carries `x2_active` and
+   `x4_active` flags, passed to `score_system_add()`.  The module never
+   caches these values.
+
+4. **Digit layout as pure function:** `score_system_get_digit_layout()`
+   is a static utility that takes a score value (not a context) and
+   returns a `score_system_digit_layout_t` with digit values and pixel
+   positions.  This matches legacy `DrawOutNumber()`'s right-aligned
+   rendering: rightmost digit at x=192 (224-32), stride 32px left per
+   digit, max 7 digits (9,999,999).
+
+5. **Extra life tracking:** `score_system_set()` resets the threshold
+   index without awarding lives (matching legacy `SetTheScore`).
+   `score_system_add()` and `score_system_add_raw()` check for threshold
+   crossings and fire `on_extra_life` callbacks.
+
+6. **x2 wins over x4:** When both multipliers are active, x2 takes
+   precedence (legacy if/else-if bug preserved via `score_apply_multiplier`).
+
+**Consequences:**
+
+- Eliminates all X11 dependency from score management.
+- `score_logic.c` is now linked by both `block_system` (for hit points)
+  and `score_system` (for multiplier and threshold).  Each library links
+  its own copy; no shared library needed at this scale.
+- The digit layout function enables the SDL2 integration layer to render
+  score digits without reimplementing the right-alignment math.
+- `add_raw()` supports bonus score commits where the multiplier was
+  already applied by the caller.
