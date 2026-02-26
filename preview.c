@@ -122,19 +122,19 @@ static void DoLoadLevel(Display *display, Window window)
 
     /* Construct the Preview level filename */
     if ((str = getenv("XBOING_LEVELS_DIR")) != NULL)
-        sprintf(levelPath, "%s/level%02d.data", str, lnum);
+        snprintf(levelPath, sizeof(levelPath), "%s/level%02d.data", str, lnum);
     else
-        sprintf(levelPath, "%s/level%02d.data", LEVEL_INSTALL_DIR, lnum);
+        snprintf(levelPath, sizeof(levelPath), "%s/level%02d.data", LEVEL_INSTALL_DIR, lnum);
 
     /* Read in a Preview level */
     if (ReadNextLevel(display, window, levelPath, True) == False)
         ShutDown(display, 1, "Sorry, invalid level specified.");
 
-    sprintf(str2, "- %s -", GetLevelName());
+    snprintf(str2, sizeof(str2), "- %s -", GetLevelName());
     DrawShadowCentredText(display, window, titleFont, str2, PLAY_HEIGHT - 80, red, PLAY_WIDTH);
 
     /* Be very friendly */
-    sprintf(str2, "Preview of level %d", lnum);
+    snprintf(str2, sizeof(str2), "Preview of level %d", lnum);
     SetCurrentMessage(display, messWindow, str2, False);
 
     DisplayLevelInfo(display, levelWindow, (u_long)lnum);
@@ -147,7 +147,7 @@ static void DoText(Display *display, Window window)
 
     y = PLAY_HEIGHT - 27;
 
-    strcpy(string, "Insert coin to start the game");
+    snprintf(string, sizeof(string), "%s", "Insert coin to start the game");
     DrawShadowCentredText(display, window, textFont, string, y, tann, PLAY_WIDTH);
 
     if (noSound == False)

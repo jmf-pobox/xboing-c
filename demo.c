@@ -129,9 +129,9 @@ static void DoBlocks(Display *display, Window window)
 
     /* Construct the demo level filename */
     if ((str = getenv("XBOING_LEVELS_DIR")) != NULL)
-        sprintf(levelPath, "%s/demo.data", str);
+        snprintf(levelPath, sizeof(levelPath), "%s/demo.data", str);
     else
-        sprintf(levelPath, "%s/demo.data", LEVEL_INSTALL_DIR);
+        snprintf(levelPath, sizeof(levelPath), "%s/demo.data", LEVEL_INSTALL_DIR);
 
     /* Read in a demo level */
     if (ReadNextLevel(display, window, levelPath, True) == False)
@@ -240,7 +240,7 @@ static void DoText(Display *display, Window window)
 
     y = PLAY_HEIGHT - 27;
 
-    strcpy(string, "Insert coin to start the game");
+    snprintf(string, sizeof(string), "%s", "Insert coin to start the game");
     DrawShadowCentredText(display, window, textFont, string, y, tann, PLAY_WIDTH);
 
     startFrame = frame + 10;

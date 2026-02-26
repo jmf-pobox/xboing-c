@@ -270,7 +270,7 @@ char *getUsersFullName(void)
         else
         {
             /* A ha. Now copy the users name to be in place of '&' */
-            strcpy(cp2, pass->pw_name);
+            snprintf(cp2, sizeof(cp2), "%s", pass->pw_name);
 
             /* Convert the first letter to uppercase. */
             if (islower(*cp2))
@@ -300,7 +300,7 @@ char *GetHomeDir(void)
      */
 
     if ((ptr = getenv("HOME")) != NULL)
-        (void)strcpy(dest, ptr);
+        snprintf(dest, sizeof(dest), "%s", ptr);
     else
     {
         /* HOME variable is not present so get USER var */
@@ -314,7 +314,7 @@ char *GetHomeDir(void)
         }
 
         if (pw)
-            (void)strcpy(dest, pw->pw_dir);
+            snprintf(dest, sizeof(dest), "%s", pw->pw_dir);
         else
             *dest = '\0';
     }
@@ -378,7 +378,7 @@ int YesNoDialogue(Display *display, char *message)
     str[0] = '\0';
 
     /* Obtain a string from the user. Should contain NULL or numbers */
-    strcpy(str, UserInputDialogueMessage(display, message, TEXT_ICON, YES_NO_ENTRY));
+    snprintf(str, sizeof(str), "%s", UserInputDialogueMessage(display, message, TEXT_ICON, YES_NO_ENTRY));
 
     /* Nothing input so just return */
     if (str[0] == '\0')

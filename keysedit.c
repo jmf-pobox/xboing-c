@@ -136,7 +136,7 @@ static void DoText(Display *display, Window window)
         /* If the text is not null then print it */
         if (infoText[i] != '\0')
         {
-            strcpy(string, infoText[i]);
+            snprintf(string, sizeof(string), "%s", infoText[i]);
             DrawShadowCentredText(display, window, dataFont, string, y,
                                   j % 2 ? greens[0] : greens[2], PLAY_WIDTH);
             y += dataFont->ascent + GAP;
@@ -151,46 +151,46 @@ static void DoText(Display *display, Window window)
     y1 = y;
     x = 30;
 
-    strcpy(string, "<r> = Redraw level");
+    snprintf(string, sizeof(string), "%s", "<r> = Redraw level");
     DrawShadowText(display, window, textFont, string, x, y, yellow);
     y += textFont->ascent + GAP;
 
-    strcpy(string, "<c> = Clear Level");
+    snprintf(string, sizeof(string), "%s", "<c> = Clear Level");
     DrawShadowText(display, window, textFont, string, x, y, yellow);
     y += textFont->ascent + GAP;
 
-    strcpy(string, "<q> = Quit editor");
+    snprintf(string, sizeof(string), "%s", "<q> = Quit editor");
     DrawShadowText(display, window, textFont, string, x, y, yellow);
     y += textFont->ascent + GAP;
 
-    strcpy(string, "<h/v> = Flip horz/vert");
+    snprintf(string, sizeof(string), "%s", "<h/v> = Flip horz/vert");
     DrawShadowText(display, window, textFont, string, x, y, yellow);
     y += textFont->ascent + GAP;
 
-    strcpy(string, "<H/V> = Scroll horz/vert");
+    snprintf(string, sizeof(string), "%s", "<H/V> = Scroll horz/vert");
     DrawShadowText(display, window, textFont, string, x, y, yellow);
     y += textFont->ascent + GAP;
 
     y = y1;
     x = 270;
 
-    strcpy(string, "<s> = Save level");
+    snprintf(string, sizeof(string), "%s", "<s> = Save level");
     DrawShadowText(display, window, textFont, string, x, y, yellow);
     y += textFont->ascent + GAP;
 
-    strcpy(string, "<l> = load level");
+    snprintf(string, sizeof(string), "%s", "<l> = load level");
     DrawShadowText(display, window, textFont, string, x, y, yellow);
     y += textFont->ascent + GAP;
 
-    strcpy(string, "<t> = Set time limit");
+    snprintf(string, sizeof(string), "%s", "<t> = Set time limit");
     DrawShadowText(display, window, textFont, string, x, y, yellow);
     y += textFont->ascent + GAP;
 
-    strcpy(string, "<n> = Change level name");
+    snprintf(string, sizeof(string), "%s", "<n> = Change level name");
     DrawShadowText(display, window, textFont, string, x, y, yellow);
     y += textFont->ascent + GAP;
 
-    strcpy(string, "<p> = Play test");
+    snprintf(string, sizeof(string), "%s", "<p> = Play test");
     DrawShadowText(display, window, textFont, string, x, y, yellow);
     y += textFont->ascent + GAP;
 
@@ -199,7 +199,7 @@ static void DoText(Display *display, Window window)
     DrawLine(display, window, 32, y + 2, PLAY_WIDTH - 28, y + 2, black, 3);
     DrawLine(display, window, 30, y, PLAY_WIDTH - 30, y, white, 3);
 
-    strcpy(string, "Insert coin to start the game");
+    snprintf(string, sizeof(string), "%s", "Insert coin to start the game");
     DrawShadowCentredText(display, window, textFont, string, PLAY_HEIGHT - 30, tann, PLAY_WIDTH);
 }
 

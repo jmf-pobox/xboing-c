@@ -303,7 +303,7 @@ static void DoText(Display *display, Window window)
 
     y = PLAY_HEIGHT - 27;
 
-    strcpy(string, "Insert coin to start the game");
+    snprintf(string, sizeof(string), "%s", "Insert coin to start the game");
     DrawShadowCentredText(display, window, textFont, string, y, tann, PLAY_WIDTH);
 }
 

@@ -456,8 +456,8 @@ static void handleGameKeys(Display *display, KeySym keysym)
                     DoBoardTilt(display, temp);
                     UserTilts++;
 
-                    sprintf(astr, "You have %d %s left!", MAX_TILTS - UserTilts,
-                            (MAX_TILTS - UserTilts) == 1 ? "tilt" : "tilts");
+                    snprintf(astr, sizeof(astr), "You have %d %s left!", MAX_TILTS - UserTilts,
+                             (MAX_TILTS - UserTilts) == 1 ? "tilt" : "tilts");
                     SetCurrentMessage(display, messWindow, astr, True);
                 }
                 else
@@ -823,7 +823,7 @@ static void handleMiscKeys(Display *display, KeySym keysym)
                 if (vol < 100)
                     vol++;
                 SetMaximumVolume(vol);
-                sprintf(str, "Maximum volume: %d%%", vol);
+                snprintf(str, sizeof(str), "Maximum volume: %d%%", vol);
                 SetCurrentMessage(display, messWindow, str, True);
             }
             break;
@@ -836,7 +836,7 @@ static void handleMiscKeys(Display *display, KeySym keysym)
                 if (vol > 0)
                     vol--;
                 SetMaximumVolume(vol);
-                sprintf(str, "Maximum volume: %d%%", vol);
+                snprintf(str, sizeof(str), "Maximum volume: %d%%", vol);
                 SetCurrentMessage(display, messWindow, str, True);
             }
             break;

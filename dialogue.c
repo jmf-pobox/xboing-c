@@ -137,7 +137,7 @@ void FreeDialoguePixmaps(Display *display)
 char *UserInputDialogueMessage(Display *display, char *message, int type, int entryValidation)
 {
     /* Change the message for the dialogue */
-    strcpy(theMessage, message);
+    snprintf(theMessage, sizeof(theMessage), "%s", message);
 
     dialogueState = DIALOGUE_MAP;
     oldMode = mode;
@@ -146,7 +146,7 @@ char *UserInputDialogueMessage(Display *display, char *message, int type, int en
     mode = MODE_DIALOGUE;
 
     /* Null the current input string */
-    strcpy(currentInput, "");
+    snprintf(currentInput, sizeof(currentInput), "%s", "");
 
     handleDialogueEventLoop(display);
 

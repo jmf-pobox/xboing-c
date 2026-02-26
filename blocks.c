@@ -1581,9 +1581,9 @@ void ExplodeBlocksPending(Display *display, Window window)
                                 IncNumberBonus();
 
                                 if (GetNumberBonus() <= MAX_BONUS)
-                                    sprintf(str, "- Bonus #%d -", GetNumberBonus());
+                                    snprintf(str, sizeof(str), "- Bonus #%d -", GetNumberBonus());
                                 else
-                                    sprintf(str, "<<< Super Bonus >>>");
+                                    snprintf(str, sizeof(str), "<<< Super Bonus >>>");
 
                                 SetCurrentMessage(display, messWindow, str, True);
                                 bonusBlock = False;
@@ -1684,7 +1684,7 @@ void DrawTheBlock(Display *display, Window window, int x, int y, int blockType, 
 
         case RANDOM_BLK: /* Draw a red block shape for random */
             RenderShape(display, window, redblock, redblockM, x, y, 40, 20, False);
-            strcpy(tmp, "- R -");
+            snprintf(tmp, sizeof(tmp), "%s", "- R -");
             len = strlen(tmp);
             w = XTextWidth(dataFont, tmp, len);
             h = dataFont->ascent + dataFont->descent;
@@ -1711,7 +1711,7 @@ void DrawTheBlock(Display *display, Window window, int x, int y, int blockType, 
 
         case DROP_BLK: /* Draw a drop block same as green block */
             RenderShape(display, window, greenblock, greenblockM, x, y, 40, 20, False);
-            sprintf(tmp, "%d", blockP->hitPoints);
+            snprintf(tmp, sizeof(tmp), "%d", blockP->hitPoints);
             len = strlen(tmp);
             w = XTextWidth(dataFont, tmp, len);
             h = dataFont->ascent + dataFont->descent;

@@ -228,7 +228,7 @@ void DoPresentFlag(Display *display, Window window)
     y = MAIN_HEIGHT + PLAY_HEIGHT - 20;
 
     /* Construct a copyright message leaving space for the copyright circle */
-    sprintf(string, "  %s", c_string);
+    snprintf(string, sizeof(string), "  %s", c_string);
     string[0] = 0xa9; /* Copyright circle */
     DrawShadowCentredText(display, window, copyFont, string, y, white, PLAY_WIDTH + MAIN_WIDTH);
 
@@ -403,9 +403,9 @@ static void DoSpecialText1(Display *display, Window window)
         /* Do this section on the first entry */
 
         if (GetNickName() != NULL)
-            sprintf(wisdom, "Welcome %s, prepare for battle.", GetNickName());
+            snprintf(wisdom, sizeof(wisdom), "Welcome %s, prepare for battle.", GetNickName());
         else
-            sprintf(wisdom, "Welcome %s, prepare for battle.", getUsersFullName());
+            snprintf(wisdom, sizeof(wisdom), "Welcome %s, prepare for battle.", getUsersFullName());
 
         i = 1;
         y = 550;
@@ -441,7 +441,7 @@ static void DoSpecialText2(Display *display, Window window)
     {
         /* Do this section on the first entry */
 
-        strcpy(wisdom2, "The future of the planet Earth is in your hands!");
+        snprintf(wisdom2, sizeof(wisdom2), "%s", "The future of the planet Earth is in your hands!");
         i = 1;
         y = 550 + dataFont->ascent + dataFont->descent + 5;
         len = strlen(wisdom2);
@@ -476,7 +476,7 @@ static void DoSpecialText3(Display *display, Window window)
     {
         /* Do this section on the first entry */
 
-        strcpy(wisdom3, "More instructions will follow within game zone - out.");
+        snprintf(wisdom3, sizeof(wisdom3), "%s", "More instructions will follow within game zone - out.");
         i = 1;
         y = 550 + (dataFont->ascent + dataFont->descent + 5) * 2;
         len = strlen(wisdom3);

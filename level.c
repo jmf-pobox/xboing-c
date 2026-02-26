@@ -182,7 +182,7 @@ static void DrawLevelTimeBonus(Display *display, Window window, int timebonus)
     seconds = timebonus % 60;
 
     /* Construct a string with the time bonus and draw it */
-    sprintf(str, "%02d:%02d", minutes, seconds);
+    snprintf(str, sizeof(str), "%02d:%02d", minutes, seconds);
     len = strlen(str);
 
     /* Draw the text now thanks  - using title font for big numbers */
@@ -252,13 +252,13 @@ void ChangeStartingLevel(Display *display)
     char str[80];
     int num;
 
-    sprintf(str, "Level range is [1-%d]", MAX_NUM_LEVELS);
+    snprintf(str, sizeof(str), "Level range is [1-%d]", MAX_NUM_LEVELS);
     SetCurrentMessage(display, messWindow, str, False);
 
     str[0] = '\0';
 
     /* Obtain a string from the user. Should contain NULL or numbers */
-    strcpy(str, UserInputDialogueMessage(display, "Input game starting level number.", TEXT_ICON,
+    snprintf(str, sizeof(str), "%s", UserInputDialogueMessage(display, "Input game starting level number.", TEXT_ICON,
                                          NUMERIC_ENTRY_ONLY));
 
     /* Nothing input so just return */
@@ -271,13 +271,13 @@ void ChangeStartingLevel(Display *display)
     {
         /* Ok now set the new starting level number */
         SetStartingLevel(num);
-        sprintf(str, "Starting level set to %d", num);
+        snprintf(str, sizeof(str), "Starting level set to %d", num);
         SetCurrentMessage(display, messWindow, str, True);
     }
     else
     {
         /* Value out of range so let them know the range. */
-        sprintf(str, "Invalid - level range [1-%d]", MAX_NUM_LEVELS);
+        snprintf(str, sizeof(str), "Invalid - level range [1-%d]", MAX_NUM_LEVELS);
         SetCurrentMessage(display, messWindow, str, True);
     }
 }
@@ -437,7 +437,7 @@ void UpdateHighScores(Display *display)
             playSoundFile("youagod", 99);
 
         /* Ask them for some words of wisdom */
-        strcpy(message, UserInputDialogueMessage(display, "Words of wisdom Boing Master?",
+        snprintf(message, sizeof(message), "%s", UserInputDialogueMessage(display, "Words of wisdom Boing Master?",
                                                  TEXT_ICON, TEXT_ENTRY_ONLY));
     }
 
