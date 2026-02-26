@@ -1163,9 +1163,10 @@ Key design choices:
    caches these values.
 
 4. **Digit layout as pure function:** `score_system_get_digit_layout()`
-   is a static utility that takes a score value (not a context) and
-   returns a `score_system_digit_layout_t` with digit values and pixel
-   positions.  This matches legacy `DrawOutNumber()`'s right-aligned
+   is a stateless utility function in the public API that takes a score
+   value (not a context) and returns a `score_system_digit_layout_t`
+   with digit values and pixel positions.  This matches legacy
+   `DrawOutNumber()`'s right-aligned
    rendering: rightmost digit at x=192 (224-32), stride 32px left per
    digit, max 7 digits (9,999,999).
 
@@ -1180,9 +1181,10 @@ Key design choices:
 **Consequences:**
 
 - Eliminates all X11 dependency from score management.
-- `score_logic.c` is now linked by both `block_system` (for hit points)
-  and `score_system` (for multiplier and threshold).  Each library links
-  its own copy; no shared library needed at this scale.
+- `score_logic.c` is now built as a dedicated `score_logic` static
+  library that is linked by both `block_system` (for hit points) and
+  `score_system` (for multiplier and threshold), ensuring a single copy
+  of the translation unit and avoiding duplicate-symbol issues.
 - The digit layout function enables the SDL2 integration layer to render
   score digits without reimplementing the right-alignment math.
 - `add_raw()` supports bonus score commits where the multiplier was

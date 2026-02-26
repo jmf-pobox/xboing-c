@@ -31,13 +31,10 @@ target_link_libraries(test_ball_math PRIVATE ${CMOCKA_LIBRARIES} m)
 add_test(NAME test_ball_math COMMAND test_ball_math)
 
 # Scoring characterization tests (bead n9e.2)
-# Links score_logic.c directly — no X11, no game binary.
-add_executable(test_score test_score.c ${CMAKE_SOURCE_DIR}/src/score_logic.c)
-target_include_directories(test_score PRIVATE
-    ${CMAKE_SOURCE_DIR}/include
-)
+# Links score_logic library — no X11, no game binary.
+add_executable(test_score test_score.c)
 target_compile_options(test_score PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
-target_link_libraries(test_score PRIVATE ${CMOCKA_LIBRARIES})
+target_link_libraries(test_score PRIVATE score_logic ${CMOCKA_LIBRARIES})
 add_test(NAME test_score COMMAND test_score)
 
 # Level parsing characterization tests (bead n9e.3)

@@ -68,7 +68,7 @@ typedef struct
 
 typedef struct
 {
-    int count;                         /* Number of digits (0 for score==0 → render "0") */
+    int count;                         /* Number of digits (1 for score==0) */
     int digits[SCORE_MAX_DIGITS];      /* Digit values, most-significant first */
     int x_positions[SCORE_MAX_DIGITS]; /* X pixel offset for each digit */
     int y;                             /* Y pixel offset (always 0) */

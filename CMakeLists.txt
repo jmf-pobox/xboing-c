@@ -340,17 +340,30 @@ target_include_directories(ball_system PUBLIC
 target_compile_options(ball_system PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
 target_link_libraries(ball_system PUBLIC m)
 
+# --- Score arithmetic library ------------------------------------------------
+#
+# Pure C module — no SDL2 or X11 dependency.  Provides multiplier application,
+# extra life threshold calculation, bonus scoring, and block hit point lookup.
+# Shared by block_system (hit points) and score_system (multiplier/threshold).
+
+add_library(score_logic STATIC src/score_logic.c)
+target_include_directories(score_logic PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+target_compile_options(score_logic PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+
 # --- Block grid system library -----------------------------------------------
 #
 # Pure C module — no SDL2 or X11 dependency.  Owns the 18x9 block grid,
 # collision geometry (pure C diagonal cross-product collision replacing X11 Regions), block info
-# catalog, and grid queries.  Links score_logic.c for hit point calculation.
+# catalog, and grid queries.  Links score_logic for hit point calculation.
 
-add_library(block_system STATIC src/block_system.c src/score_logic.c)
+add_library(block_system STATIC src/block_system.c)
 target_include_directories(block_system PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 target_compile_options(block_system PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+target_link_libraries(block_system PUBLIC score_logic)
 
 # --- Paddle system library --------------------------------------------------
 #
@@ -379,13 +392,14 @@ target_compile_options(gun_system PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
 #
 # Pure C module — no SDL2 or X11 dependency.  Owns the game score value,
 # multiplier application, extra life tracking, and digit layout computation
-# for rendering.  Links score_logic.c for arithmetic functions.
+# for rendering.  Links score_logic for arithmetic functions.
 
-add_library(score_system STATIC src/score_system.c src/score_logic.c)
+add_library(score_system STATIC src/score_system.c)
 target_include_directories(score_system PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 target_compile_options(score_system PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+target_link_libraries(score_system PUBLIC score_logic)
 
 # --- Tests ------------------------------------------------------------------
 
