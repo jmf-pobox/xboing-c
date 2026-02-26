@@ -951,6 +951,8 @@ static void teleport_ball(ball_system_t *ctx, const ball_system_env_t *env, int 
     {
         count++;
 
+        /* Legacy ball.c:529-530 uses +1, skipping row 0 and col 0.
+         * Column MAX_COL is rejected by the bounds check below. */
         int r = (rand() % (MAX_ROW - 6)) + 1;
         int c = (rand() % MAX_COL) + 1;
 
@@ -999,7 +1001,7 @@ int ball_system_split(ball_system_t *ctx, const ball_system_env_t *env)
     }
 
     int j = ball_system_add(ctx, env, 0, 0, 3, 3, NULL);
-    if (j > 0)
+    if (j >= 0)
     {
         ctx->balls[j].ballState = BALL_ACTIVE;
         teleport_ball(ctx, env, j);

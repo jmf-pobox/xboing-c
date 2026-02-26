@@ -1351,7 +1351,7 @@ static void test_split_teleports_ball(void **state)
 
     /* Split should add a second ball and teleport it */
     int j = ball_system_split(ctx, &env);
-    assert_true(j > 0);
+    assert_true(j >= 0);
     assert_int_equal(ball_system_get_state(ctx, j), BALL_ACTIVE);
 
     /* Verify the ball was teleported (cell_available was called) */
@@ -1374,7 +1374,7 @@ static void test_split_adds_ball(void **state)
 
     /* Split should add a second ball */
     int j = ball_system_split(ctx, &env);
-    assert_true(j > 0);
+    assert_true(j >= 0);
 
     /* New ball should be ACTIVE */
     assert_int_equal(ball_system_get_state(ctx, j), BALL_ACTIVE);
@@ -1396,7 +1396,7 @@ static void test_split_adds_ball(void **state)
     ball_system_destroy(ctx);
 }
 
-/* TC-50: Split when all slots full shows failure message. */
+/* TC-51: Split when all slots full shows failure message. */
 static void test_split_full_shows_message(void **state)
 {
     (void)state;
