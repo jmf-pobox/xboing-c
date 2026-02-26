@@ -1746,3 +1746,47 @@ Key design choices:
 - Character validation is unit-testable without X11 keysyms.
 - 16 CMocka tests across 7 groups cover lifecycle, state flow,
   all 4 validation modes, backspace/overflow, and null safety.
+
+### ADR-030: Pure C high score display sequencer
+
+**Status:** Accepted
+**Date:** 2026-02-25
+**Bead:** xboing-dm8.6
+
+**Context:**
+Legacy `highscore.c` (1068 lines) combines score file I/O with
+display sequencing.  The display portion uses X11 pixmap rendering,
+XPM sparkle animations, region-based text layout, and 30+ direct
+X11 draw calls.  File I/O is tracked separately under xboing-1fr.
+
+**Decision:**
+Create `highscore_system.c`/`highscore_system.h` covering only the
+display sequencer — the animation state machine that drives the high
+score screen presentation.
+
+Key design choices:
+
+1. **Display only:** File I/O (read/write/lock) is out of scope.
+   Score data is injected via `set_table()` with a structured table
+   containing master name/text and up to 10 scored entries.
+
+2. **Two sparkle subsystems:** Title sparkle (two stars flanking
+   the title with fast/slow delay alternation) and row sparkle
+   (walks down score rows, skips empty entries, wraps around).
+
+3. **Score type enum:** GLOBAL vs PERSONAL distinguishes the two
+   high score screens.  The `on_finished` callback reports which
+   type completed so the integration layer can transition correctly.
+
+4. **Current score highlight:** `set_current_score()` allows the
+   integration layer to highlight the player's score in the table.
+
+5. **Standard 4000-frame timing:** Matches the other screen
+   sequencers (keys, demo, presents, intro).
+
+**Consequences:**
+
+- Cleanly separates display sequencing from file I/O concerns.
+- Title and row sparkle animations are fully testable without X11.
+- 14 CMocka tests across 6 groups cover lifecycle, state flow,
+  score table data, title sparkle, row sparkle, and null safety.
