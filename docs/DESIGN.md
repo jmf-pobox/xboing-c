@@ -1830,3 +1830,52 @@ Key design choices:
 - Auto-clear timing is deterministic and testable.
 - 12 CMocka tests across 5 groups cover lifecycle, set/query,
   auto-clear, default message, and null safety.
+
+### ADR-032: JSON-based high score file I/O
+
+**Status:** Accepted
+**Date:** 2026-02-25
+**Bead:** xboing-1fr.1
+
+**Context:**
+Legacy `highscore.c` stores scores in a binary format: a header
+struct (`version` + `masterText[80]`) followed by 10 entry structs
+with all fields in network byte order (`htonl`/`ntohl`).  File
+locking uses `lockf`/`flock`.  The binary format is fragile
+(struct padding, byte order, version coupling).
+
+**Decision:**
+Create `highscore_io.c`/`highscore_io.h` that reads and writes
+high score tables as JSON files.
+
+Key design choices:
+
+1. **JSON format:** Human-readable, no byte order issues, resilient
+   to struct layout changes.  Minimal hand-written parser for the
+   specific schema (not a general JSON library).
+
+2. **Atomic writes:** Write to `.tmp` file, then `rename()`.  No
+   file locking needed — `rename()` is atomic on POSIX.
+
+3. **Reuses `highscore_table_t`:** The in-memory representation is
+   the same struct used by `highscore_system.h` for display.  The
+   I/O module reads/writes this struct to/from JSON.
+
+4. **Score management:** `highscore_io_insert()` handles sorted
+   insertion with shift-down, and `highscore_io_sort()` provides
+   bubble sort (adequate for 10 entries).
+
+5. **Parent directory creation:** `highscore_io_write()` creates
+   parent directories if needed, supporting XDG data paths.
+
+6. **JSON escaping:** Handles `\`, `"`, and control characters
+   in names (quotes in player names are preserved).
+
+**Consequences:**
+
+- Eliminates all `htonl`/`ntohl`/`flock` dependencies.
+- Score files are human-readable and editable.
+- Round-trip fidelity verified including special characters.
+- 18 CMocka tests across 7 groups cover initialization, sorting,
+  insert/ranking, write/read round-trips, edge cases, error
+  handling, and null safety.
