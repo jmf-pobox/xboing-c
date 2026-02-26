@@ -401,3 +401,11 @@ add_executable(test_highscore_io test_highscore_io.c)
 target_compile_options(test_highscore_io PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
 target_link_libraries(test_highscore_io PRIVATE highscore_io ${CMOCKA_LIBRARIES})
 add_test(NAME test_highscore_io COMMAND test_highscore_io)
+
+# Save game JSON I/O tests (bead xboing-1fr.2)
+# Tests JSON read/write round-trips, file operations, error handling.
+# Links against savegame_io static library.
+add_executable(test_savegame_io test_savegame_io.c)
+target_compile_options(test_savegame_io PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+target_link_libraries(test_savegame_io PRIVATE savegame_io ${CMOCKA_LIBRARIES})
+add_test(NAME test_savegame_io COMMAND test_savegame_io)
