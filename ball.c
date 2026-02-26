@@ -285,7 +285,7 @@ void InitialiseBall(Display *display, Window window, Colormap colormap)
     /* Free the xpm pixmap attributes */
     XpmFreeAttributes(&attributes);
 
-    MACHINE_EPS = sqrt(MINFLOAT);
+    MACHINE_EPS = sqrtf(MINFLOAT);
 
     /* Make sure that all the balls are initialised */
     ClearAllBalls();
@@ -628,10 +628,8 @@ static void TeleportBall(Display *display, Window window, int i)
 
             return;
         }
-        else
-        {
-            DEBUG("Looping in teleport function.");
-        }
+
+        DEBUG("Looping in teleport function.");
     }
 
     /* Ok - give up add erase ball and start it from paddle!! */
@@ -754,35 +752,33 @@ static int BallHitPaddle(Display *display, Window window, int *hit, int i, int *
 
                 return True;
             }
-            else
-                return False;
+
+            return False;
         }
-        else
+
+        /* compute the line coefficients of the ball */
+
+        alpha = (float)balls[i].dy;
+        x1 = (float)(balls[i].ballx - balls[i].dx);
+        y1 = (float)(balls[i].bally - balls[i].dy);
+        x2 = (float)(balls[i].ballx);
+        y2 = (float)(balls[i].bally);
+        beta = ((y1 + y2) - alpha * (x1 + x2)) / 2.0;
+
+        yH = (float)paddleLine;
+        xH = (yH - beta) / alpha;
+
+        if ((xH > xP1) && (xH < xP2))
         {
-            /* compute the line coefficients of the ball */
+            /* the ball hit the paddle */
+            *hit = (int)(xH + 0.5) - paddlePos;
+            *x = (int)(xH + 0.5);
+            *y = paddleLine - BALL_HC;
 
-            alpha = (float)balls[i].dy;
-            x1 = (float)(balls[i].ballx - balls[i].dx);
-            y1 = (float)(balls[i].bally - balls[i].dy);
-            x2 = (float)(balls[i].ballx);
-            y2 = (float)(balls[i].bally);
-            beta = ((y1 + y2) - alpha * (x1 + x2)) / 2.0;
-
-            yH = (float)paddleLine;
-            xH = (yH - beta) / alpha;
-
-            if ((xH > xP1) && (xH < xP2))
-            {
-                /* the ball hit the paddle */
-                *hit = (int)(xH + 0.5) - paddlePos;
-                *x = (int)(xH + 0.5);
-                *y = paddleLine - BALL_HC;
-
-                return True;
-            }
-            else
-                return False;
+            return True;
         }
+
+        return False;
     }
 
     /* We didn't hit the paddle */
@@ -1108,19 +1104,19 @@ static void UpdateABall(Display *display, Window window, int i)
             Vy = (float)balls[i].dy;
 
             /* speed intensity of the ball */
-            Vs = sqrt(Vx * Vx + Vy * Vy);
+            Vs = sqrtf(Vx * Vx + Vy * Vy);
 
-            alpha = atan(Vx / -Vy);
+            alpha = atanf(Vx / -Vy);
 
             padSize = (float)(GetPaddleSize() + BALL_WC);
             Vx = (float)hitPos;
             Vy = (float)padSize / 1.0;
 
-            beta = atan(Vx / Vy);
+            beta = atanf(Vx / Vy);
             gamma = 2.0 * beta - alpha;
 
-            Vx = Vs * sin(gamma);
-            Vy = -Vs * cos(gamma);
+            Vx = Vs * sinf(gamma);
+            Vy = -Vs * cosf(gamma);
 
             /* take in account the horizontal speed of the paddle:
              * vectorial summ
@@ -1171,9 +1167,9 @@ static void UpdateABall(Display *display, Window window, int i)
 
         Vx = (float)balls[i].dx;
         Vy = (float)balls[i].dy;
-        Vs = sqrt(Vx * Vx + Vy * Vy);
+        Vs = sqrtf(Vx * Vx + Vy * Vy);
 
-        alpha = sqrt((float)MAX_X_VEL * (float)MAX_X_VEL + (float)MAX_Y_VEL * (float)MAX_Y_VEL);
+        alpha = sqrtf((float)MAX_X_VEL * (float)MAX_X_VEL + (float)MAX_Y_VEL * (float)MAX_Y_VEL);
         alpha /= 9.0; /* number of speed level */
         alpha *= (float)speedLevel;
         if (Vs == 0.0)
@@ -1300,6 +1296,9 @@ static void UpdateABall(Display *display, Window window, int i)
                     ddx = -r;
                     balls[i].dx = -(abs(balls[i].dx));
                     balls[i].dy = -(abs(balls[i].dy));
+                    break;
+
+                default:
                     break;
             }
 
@@ -1546,7 +1545,7 @@ static int WhenBallsCollide(const BALL *ball1, const BALL *ball2, float *time)
 
     if (tmp2 >= 0.0 && v2 > MACHINE_EPS)
     {
-        tmp2 = sqrt(tmp2) / v2;
+        tmp2 = sqrtf(tmp2) / v2;
         tmp1 = -((p.x * v.x) + (p.y * v.y)) / v2;
 
         t1 = tmp1 - tmp2;
@@ -1593,7 +1592,7 @@ static void Ball2BallCollision(BALL *ball1, BALL *ball2)
      * p is the direction between the 2 balls centers, and will
      * have the langth of ball1->radius + ball2->radius
      */
-    plen = sqrt(SQR(p.x) + SQR(p.y));
+    plen = sqrtf(SQR(p.x) + SQR(p.y));
     p.x /= plen;
     p.y /= plen;
 
@@ -1745,6 +1744,9 @@ static void ChangeBallDirectionToGuide(int i)
         case 10:
             dx = 5;
             dy = -1;
+            break;
+
+        default:
             break;
     }
 

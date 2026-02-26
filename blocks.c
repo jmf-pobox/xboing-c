@@ -957,6 +957,9 @@ void ExplodeBlockType(Display *display, Window window, int x, int y, int row, in
                     XClearArea(display, window, blockP->x, y1, blockP->width, h, False);
                     XClearArea(display, window, blockP->x, y2 - h, blockP->width, h, False);
                     break;
+
+                default:
+                    break;
             }
             break;
 
@@ -1152,6 +1155,9 @@ int GetRandomType(int blankBlock)
                 return NONE_BLK;
             else
                 return YELLOW_BLK;
+
+        default:
+            break;
     }
 
     /* Shouldn't get here but it stops warnings on compiler */
@@ -1387,6 +1393,9 @@ void HandlePendingAnimations(Display *display, Window window)
                                     r1 = 1;
                                     c1 = 0;
                                     break;
+
+                                default:
+                                    break;
                             }
 
                             /* check if we can move the roamer to next block */
@@ -1409,6 +1418,9 @@ void HandlePendingAnimations(Display *display, Window window)
                                 blockP->lastFrame = frame + (rand() % ROAM_DELAY) + 300;
                             }
                         }
+                        break;
+
+                    default:
                         break;
                 }
 
@@ -1515,6 +1527,9 @@ void ExplodeBlocksPending(Display *display, Window window)
 
                         case 4: /* Last frame of animation  - clear */
                             XClearArea(display, window, x, y, blockP->width, blockP->height, False);
+                            break;
+
+                        default:
                             break;
                     }
 
@@ -1783,6 +1798,9 @@ void DrawTheBlock(Display *display, Window window, int x, int y, int blockType, 
 
         case WALLOFF_BLK: /* Draw the wall off block */
             RenderShape(display, window, walloffblock, walloffblockM, x, y, 27, 23, False);
+            break;
+
+        default:
             break;
     }
 }

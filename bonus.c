@@ -408,7 +408,7 @@ static void DoLevel(Display *display, Window window)
         DrawShadowCentredText(display, window, textFont, string, ypos, yellow, TOTAL_WIDTH);
 
         /* Increment the score by the value of the level bonus */
-        bonusScore += ComputeScore((LEVEL_SCORE * theLevel));
+        bonusScore += ComputeScore((u_long)LEVEL_SCORE * (u_long)theLevel);
         DisplayScore(display, scoreWindow, bonusScore);
     }
     else
@@ -506,7 +506,7 @@ static void DoTimeBonus(Display *display, Window window)
         DrawShadowCentredText(display, window, textFont, string, ypos, yellow, TOTAL_WIDTH);
 
         /* Increment the score by the value of the time bonus */
-        bonusScore += ComputeScore(TIME_BONUS * secs);
+        bonusScore += ComputeScore((u_long)TIME_BONUS * (u_long)secs);
         DisplayScore(display, scoreWindow, bonusScore);
     }
     else
@@ -736,7 +736,7 @@ void ComputeAndAddBonusScore(void)
         else
         {
             /* Less than MAX_BONUS so work out bonus score */
-            AddToScore((u_long)(numBonus * BONUS_COIN_SCORE));
+            AddToScore((u_long)numBonus * (u_long)BONUS_COIN_SCORE);
         }
 
         /* Adjust the level so that the starting level is taken into account */
@@ -748,7 +748,7 @@ void ComputeAndAddBonusScore(void)
 
     /* Increment the score by the value of the bullet bonus */
     if (GetNumberBullets() != 0)
-        AddToScore((u_long)(GetNumberBullets() * BULLET_SCORE));
+        AddToScore((u_long)GetNumberBullets() * (u_long)BULLET_SCORE);
 
     /* Get the number of seconds left on the clock */
     secs = GetLevelTimeBonus();

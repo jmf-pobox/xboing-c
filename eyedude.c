@@ -211,6 +211,9 @@ static void DrawTheEyeDude(Display *display, Window window, int x, int y, int sl
             RenderShape(display, window, eyesDead, eyesDeadM, x - EYEDUDE_WC, y - EYEDUDE_HC,
                         EYEDUDE_WIDTH, EYEDUDE_HEIGHT, False);
             break;
+
+        default:
+            break;
     }
 }
 
@@ -231,8 +234,8 @@ int CheckBallEyeDudeCollision(Display *display, Window window, int j)
     if (((x + EYEDUDE_WC) >= (ballX - BALL_WC)) && ((x - EYEDUDE_WC) <= (ballX + BALL_WC)) &&
         ((y + EYEDUDE_HC) >= (ballY - BALL_HC)) && ((y - EYEDUDE_HC) <= (ballY + BALL_HC)))
         return True;
-    else
-        return False;
+
+    return False;
 }
 
 static void ResetEyeDude(Display *display, Window window)
@@ -343,6 +346,9 @@ static void HandleEyeDudeWalk(Display *display, Window window)
                 if (x > (PLAY_WIDTH + EYEDUDE_WC))
                     ChangeEyeDudeMode(EYEDUDE_NONE);
                 inc = 5;
+                break;
+
+            default:
                 break;
         }
 

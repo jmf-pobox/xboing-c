@@ -297,6 +297,9 @@ void HandleEditorToolBar(Display *display, XEvent event, int Down)
                     SetCurrentSymbol(display, i);
                 }
                 break;
+
+            default:
+                break;
         }
     }
 }
@@ -454,6 +457,7 @@ void HandleButtonMotion(Display *display, XEvent event)
             break;
 
         case ED_NOP:
+        default:
             break;
     }
 }
@@ -476,6 +480,10 @@ void HandleEditorMouseButtons(Display *display, XEvent event, int Down)
                 case Button3:
                     if (ActivateWaitingBall(display, playWindow) == False)
                         shootBullet(display, playWindow);
+                    break;
+
+                default:
+                    break;
             }
         }
 
@@ -547,6 +555,9 @@ void HandleEditorMouseButtons(Display *display, XEvent event, int Down)
 
                 drawAction = ED_NOP;
                 break;
+
+            default:
+                break;
         }
     }
     else
@@ -565,6 +576,9 @@ void HandleEditorMouseButtons(Display *display, XEvent event, int Down)
 
             case Button3:
                 drawAction = ED_NOP;
+                break;
+
+            default:
                 break;
         }
     }

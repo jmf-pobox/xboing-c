@@ -201,16 +201,9 @@ static void do_finish(demo_system_t *ctx)
 {
     ctx->finished = 1;
 
-    if (ctx->screen_mode == DEMO_MODE_DEMO)
-    {
-        ctx->sound.name = "whizzo";
-        ctx->sound.volume = 50;
-    }
-    else
-    {
-        ctx->sound.name = "whizzo";
-        ctx->sound.volume = 50;
-    }
+    /* Same sound for both demo and preview modes (legacy behavior). */
+    ctx->sound.name = "whizzo";
+    ctx->sound.volume = 50;
 
     if (ctx->callbacks.on_finished)
     {

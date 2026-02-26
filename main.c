@@ -154,7 +154,7 @@ void SetGameSpeed(int delay)
 {
     /* This is the speed used in the sleeping routine */
     if (delay >= 0)
-        speed = (long)(delay * userDelay);
+        speed = (long)delay * (long)userDelay;
 }
 
 static KeySym GetKeySym(XEvent event)
@@ -364,6 +364,9 @@ void handleMouseButtons(Display *display, XEvent event, int Down)
                 if (mode == MODE_GAME)
                     if (ActivateWaitingBall(display, playWindow) == False)
                         shootBullet(display, playWindow);
+                break;
+
+            default:
                 break;
         }
     }
@@ -911,6 +914,9 @@ void handleKeyPress(Display *display, KeySym keysym, XEvent event, int Pressed)
 
             case MODE_NONE:
                 break;
+
+            default:
+                break;
         }
     }
 }
@@ -1098,6 +1104,9 @@ static void handleGameMode(Display *display)
                             SetExplodeAllType(display, playWindow, GREEN_BLK);
                             DEBUG("Attempting Adding a special dynamite block.")
                             break;
+
+                        default:
+                            break;
                     }
                     break;
 
@@ -1219,6 +1228,9 @@ static void handleGameStates(Display *display)
             break;
 
         case MODE_PAUSE:
+            break;
+
+        default:
             break;
     }
 

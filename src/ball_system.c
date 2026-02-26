@@ -85,7 +85,7 @@ ball_system_t *ball_system_create(const ball_system_callbacks_t *callbacks, void
     {
         ctx->balls[i].active = 0;
         ctx->balls[i].ballState = BALL_CREATE;
-        ctx->balls[i].radius = BALL_WC;
+        ctx->balls[i].radius = (float)BALL_WIDTH / 2.0f;
         ctx->balls[i].mass = MIN_BALL_MASS;
         ctx->balls[i].waitMode = BALL_NONE;
         ctx->balls[i].newMode = BALL_NONE;
@@ -179,7 +179,7 @@ ball_system_status_t ball_system_clear(ball_system_t *ctx, int index)
     b->dx = 0;
     b->dy = 0;
     b->slide = 0;
-    b->radius = BALL_WC;
+    b->radius = (float)BALL_WIDTH / 2.0f;
     b->mass = MIN_BALL_MASS;
     b->ballState = BALL_CREATE;
 
@@ -631,6 +631,8 @@ static void update_a_ball(ball_system_t *ctx, const ball_system_env_t *env, int 
                         ddy = r / 4;
                         b->dy = abs(b->dy);
                         break;
+                    default:
+                        break;
                 }
 
                 b->ballx = (int)x_f + b->dx + ddx + 1 - rand() % 3;
@@ -682,8 +684,10 @@ static int ball_hit_paddle(const ball_system_env_t *env, const BALL *b, int *hit
 
     if (b->bally + BALL_HC > paddle_line)
     {
-        float xP1 = (float)(env->paddle_pos - (env->paddle_size / 2) - BALL_WC);
-        float xP2 = (float)(env->paddle_pos + (env->paddle_size / 2) + BALL_WC);
+        float xP1 =
+            (float)env->paddle_pos - (float)env->paddle_size / 2.0f - (float)BALL_WIDTH / 2.0f;
+        float xP2 =
+            (float)env->paddle_pos + (float)env->paddle_size / 2.0f + (float)BALL_WIDTH / 2.0f;
 
         if (b->dx == 0 || b->dy == 0)
         {
@@ -884,46 +888,26 @@ static int check_for_collision(ball_system_t *ctx, int x, int y, int *r, int *c,
     row = *r;
     col = *c;
 
-    /* Check cell and 8 neighbors */
-    if ((ret = ctx->callbacks.check_region(row, col, x, y, 0, ctx->user_data)) != BALL_REGION_NONE)
-        ; /* hit in center cell */
-    else if ((ret = ctx->callbacks.check_region(row + 1, col, x, y, 0, ctx->user_data)) !=
-             BALL_REGION_NONE)
-        row++;
-    else if ((ret = ctx->callbacks.check_region(row - 1, col, x, y, 0, ctx->user_data)) !=
-             BALL_REGION_NONE)
-        row--;
-    else if ((ret = ctx->callbacks.check_region(row, col + 1, x, y, 0, ctx->user_data)) !=
-             BALL_REGION_NONE)
-        col++;
-    else if ((ret = ctx->callbacks.check_region(row, col - 1, x, y, 0, ctx->user_data)) !=
-             BALL_REGION_NONE)
-        col--;
-    else if ((ret = ctx->callbacks.check_region(row + 1, col + 1, x, y, 0, ctx->user_data)) !=
-             BALL_REGION_NONE)
+    /* Check cell and 8 neighbors: center first, then orthogonal, then diagonal. */
+    static const int dr[] = {0, 1, -1, 0, 0, 1, -1, 1, -1};
+    static const int dc[] = {0, 0, 0, 1, -1, 1, -1, -1, 1};
+
+    for (int n = 0; n < 9; n++)
     {
-        row++;
-        col++;
-    }
-    else if ((ret = ctx->callbacks.check_region(row - 1, col - 1, x, y, 0, ctx->user_data)) !=
-             BALL_REGION_NONE)
-    {
-        row--;
-        col--;
-    }
-    else if ((ret = ctx->callbacks.check_region(row + 1, col - 1, x, y, 0, ctx->user_data)) !=
-             BALL_REGION_NONE)
-    {
-        row++;
-        col--;
-    }
-    else if ((ret = ctx->callbacks.check_region(row - 1, col + 1, x, y, 0, ctx->user_data)) !=
-             BALL_REGION_NONE)
-    {
-        /* Legacy bug: ball.c:1494-1498 sets r/c but returns REGION_NONE */
-        *r = row - 1;
-        *c = col + 1;
-        return BALL_REGION_NONE;
+        ret = ctx->callbacks.check_region(row + dr[n], col + dc[n], x, y, 0, ctx->user_data);
+        if (ret != BALL_REGION_NONE)
+        {
+            row += dr[n];
+            col += dc[n];
+            break;
+        }
+        if (n == 8)
+        {
+            /* Legacy bug: ball.c:1494-1498 sets r/c but returns REGION_NONE */
+            *r = row - 1;
+            *c = col + 1;
+            return BALL_REGION_NONE;
+        }
     }
 
     (void)ball_index;
