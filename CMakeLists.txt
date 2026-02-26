@@ -425,6 +425,18 @@ target_include_directories(special_system PUBLIC
 )
 target_compile_options(special_system PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
 
+# --- Bonus tally sequence library -------------------------------------------
+#
+# Pure C module — no SDL2 or X11 dependency.  Owns the 10-state bonus screen
+# state machine, coin counting, score computation, and save trigger logic.
+# Side effects communicated via injected callback table.
+
+add_library(bonus_system STATIC src/bonus_system.c)
+target_include_directories(bonus_system PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+target_compile_options(bonus_system PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+
 # --- Tests ------------------------------------------------------------------
 
 option(BUILD_TESTING "Build unit tests" ON)

@@ -313,3 +313,11 @@ add_executable(test_special_system test_special_system.c)
 target_compile_options(test_special_system PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
 target_link_libraries(test_special_system PRIVATE special_system ${CMOCKA_LIBRARIES})
 add_test(NAME test_special_system COMMAND test_special_system)
+
+# Bonus tally sequence tests (bead xboing-qf4.2)
+# Pure logic tests — no SDL2, X11, video, or audio driver needed.
+# Links against bonus_system static library.
+add_executable(test_bonus_system test_bonus_system.c)
+target_compile_options(test_bonus_system PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+target_link_libraries(test_bonus_system PRIVATE bonus_system ${CMOCKA_LIBRARIES})
+add_test(NAME test_bonus_system COMMAND test_bonus_system)
