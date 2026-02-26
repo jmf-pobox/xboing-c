@@ -264,3 +264,11 @@ add_executable(test_ball_system test_ball_system.c)
 target_compile_options(test_ball_system PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
 target_link_libraries(test_ball_system PRIVATE ball_system ${CMOCKA_LIBRARIES})
 add_test(NAME test_ball_system COMMAND test_ball_system)
+
+# Block grid system tests (bead xboing-1ka.2)
+# Pure logic tests — no SDL2, X11, video, or audio driver needed.
+# Links against block_system static library (includes score_logic.c).
+add_executable(test_block_system test_block_system.c)
+target_compile_options(test_block_system PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+target_link_libraries(test_block_system PRIVATE block_system ${CMOCKA_LIBRARIES})
+add_test(NAME test_block_system COMMAND test_block_system)

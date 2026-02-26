@@ -952,3 +952,67 @@ through an injected callback table. Key design points:
   the complete port.
 - The guide direction table, state machine dispatch, and all physics math
   are preserved exactly as characterized by existing tests.
+
+## ADR-016: Pure C block grid system with diagonal cross-product collision
+
+**Status:** Accepted
+
+**Context:**
+
+The legacy `blocks.c` (2,614 lines) owns the 18x9 block grid and uses X11
+Region objects (`XPolygonRegion`, `XRectInRegion`) for collision detection.
+Each block has 4 triangular regions (top, bottom, left, right) created by
+`CalculateBlockGeometry()`.  These X11 Region pointers are stored in
+`struct aBlock` and must be explicitly destroyed with `XDestroyRegion()`.
+This is the tightest X11 coupling in the block system.
+
+The `ball_system` module (ADR-015) already abstracts collision via a
+`check_region` callback.  We need a pure C implementation of this callback
+that produces equivalent results without any X11 dependency.
+
+**Decision:**
+
+Create a `block_system` module (`src/block_system.c`, `include/block_system.h`)
+that owns the block grid and replaces X11 Region objects with on-the-fly
+diagonal cross-product math:
+
+1. **No stored regions.** Each block stores only its bounding box
+   (`x, y, width, height`).  The 4 triangular regions are fully defined by
+   these values and computed during collision checks.
+
+2. **Diagonal cross-product algorithm.** The block rectangle is divided into
+   4 triangles by its two diagonals.  Two cross-product values (`d1`, `d2`)
+   determine which triangle the ball center falls in:
+
+   ```text
+   d1 = w * (by - y) - h * (bx - x)     (TL-BR diagonal)
+   d2 = h * (x + w - bx) - w * (by - y) (TR-BL diagonal)
+
+   d1 <= 0, d2 >= 0  =>  TOP
+   d1 >= 0, d2 <= 0  =>  BOTTOM
+   d1 >= 0, d2 >= 0  =>  LEFT
+   d1 <= 0, d2 <= 0  =>  RIGHT
+   ```
+
+3. **Three-step collision check:**
+   - AABB overlap test (ball bounding box vs block bounding box)
+   - Diagonal cross-product to determine hit face
+   - Adjacency filter (suppress hit if neighbor in that direction is occupied)
+
+4. **Callback-compatible API.** `block_system_check_region()` and
+   `block_system_cell_available()` match the callback signatures in
+   `ball_system.h`, allowing direct use as callbacks.
+
+5. **Opaque context pattern** matching `ball_system_t` — heap-allocated,
+   no globals, fully testable.
+
+**Consequences:**
+
+- Eliminates all X11 Region dependency from block collision detection.
+- The center-point approach (vs. legacy rect-region intersection) may produce
+  slightly different results at extreme corners, but the ball system already
+  simplifies compound regions to single values, so gameplay impact is minimal.
+- The adjacency filter preserves the key legacy behavior of suppressing
+  bounces at block junctions.
+- Block info catalog, geometry calculation, and grid queries are all pure C
+  with zero platform dependencies.
