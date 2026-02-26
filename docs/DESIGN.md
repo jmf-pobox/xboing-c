@@ -1064,3 +1064,61 @@ Create a `paddle_system` module (`src/paddle_system.c`,
 - The module does not own sticky bat behavior (ball catching) — that
   remains in `ball_system`.  The sticky flag is stored here as a
   convenience for the render layer.
+
+### ADR-018: Pure C gun/bullet system
+
+**Status:** Accepted
+**Date:** 2026-02-25
+**Bead:** xboing-1ka.4
+
+**Context:**
+
+`gun.c` (643 lines) provides the bullet shooting system.  It has tight
+X11 coupling (Display/Window on every function), directly references
+global `paddlePos`/`fastGun`/`frame`/`noSound`, calls into `ball.c`,
+`blocks.c`, and `eyedude.c` for collision checks, and handles block
+type-specific damage dispatch.
+
+**Decision:**
+
+Create `gun_system` as a pure C module using the same opaque context
+and callback injection patterns as `ball_system`, `block_system`, and
+`paddle_system`.
+
+Key design choices:
+
+1. **Callback-based collision dispatch:** 8 function pointers replace
+   direct calls to other subsystems.  `check_block_hit` + `on_block_hit`
+   abstract the X2COL/Y2ROW grid lookup and block type-specific damage
+   (COUNTER decrement, HYPERSPACE/BLACK absorb, special block SHOTS_TO_KILL).
+   This separates "does bullet hit something?" from "what happens?"
+
+2. **Collision priority preserved:** ball > eyedude > block, matching
+   the loop order in legacy `UpdateBullet()`.  A bullet that hits a ball
+   is consumed before eyedude or block checks run.
+
+3. **Environment struct replaces globals:** `gun_system_env_t` carries
+   `frame`, `paddle_pos`, `paddle_size`, and `fast_gun` per-update.
+
+4. **Bullet array:** 40 slots with sentinel `xpos == -1`.  Normal mode
+   uses only slot 0 (returns early if occupied).  Fast gun mode searches
+   all 40 slots, spawning 2 bullets per shot at `paddle_pos ± size/3`.
+
+5. **Tink array:** 40 slots with frame-based expiry (`clearFrame =
+   creation_frame + 100`).  Checked every frame (not gated by
+   BULLET_FRAME_RATE).
+
+6. **Ammo model:** `set_ammo`, `add_ammo` (clamp at 20), `use_ammo`
+   (no-op if unlimited).  Matches legacy `SetNumberBullets` / `IncNumber
+   Bullets` / `DecNumberBullets` / `SetUnlimitedBullets`.
+
+**Consequences:**
+
+- Eliminates all X11 dependency from gun/bullet logic.
+- Block type-specific damage dispatch moves to the integration layer's
+  `on_block_hit` callback, keeping the gun system free of block type
+  knowledge.
+- The `is_ball_waiting` callback preserves the legacy guard that prevents
+  shooting while the ball sits on the paddle.
+- Render info queries (`get_bullet_info`, `get_tink_info`) provide
+  position data for the integration layer to draw bullet/tink sprites.
