@@ -1,0 +1,8 @@
+xboing (2.4-1) unstable; urgency=medium
+
+  * Initial Debian packaging.
+  * Modernized build system (CMake + SDL2).
+  * Added .desktop file and AppStream metainfo.
+  * Added application icons at standard sizes.
+
+ -- Justin Freeman <jmf@pobox.com>  Wed, 26 Feb 2026 12:00:00 -0800
