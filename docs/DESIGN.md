@@ -1320,3 +1320,65 @@ Key design choices:
 - 23 CMocka tests cover lifecycle, individual toggles, mutual
   exclusion, turn-off semantics, state queries, labels, and
   attract-mode randomization.
+
+## ADR-022: Pure C bonus tally sequence state machine
+
+**Status:** Accepted
+
+**Context:**
+Legacy `bonus.c` (776 lines) implements the end-of-level bonus screen —
+a 10-state sequence that tallies coins, level bonus, bullets, and time
+bonus with animated counters, then shows a high-score ranking and
+transitions to the next level.  Every function takes `Display *display,
+Window window` as its first two arguments.  The module reads 13 extern
+globals (`score`, `level`, `bonusBlock`, `numBullets`, etc.) and calls
+into 5 other modules (`score.c`, `ball.c`, `highscore.c`, `audio.c`,
+`file.c`).
+
+Key legacy behavior: `ComputeAndAddBonusScore()` pre-commits all bonus
+points to the real score at screen entry — the animated tally is purely
+cosmetic.  Save is triggered every `SAVE_LEVEL` (5) levels relative to
+starting level.
+
+**Decision:**
+Create `bonus_system.c`/`bonus_system.h` as a pure C module using the
+opaque context pattern established by all prior game systems.
+
+Key design choices:
+
+1. **Score pre-computation preserved:** `bonus_system_begin()` computes
+   the total bonus and fires `on_score_add` immediately, matching the
+   legacy pattern where all points are committed before the animation
+   starts.
+
+2. **Environment struct replaces globals:** A `bonus_system_env_t`
+   snapshot (score, level, starting_level, time_bonus_secs, bullet_count,
+   highscore_rank) is passed to `begin()` and stored internally.
+
+3. **Stateless computation exported:** `bonus_system_compute_total()` and
+   `bonus_system_should_save()` are pure functions callable without a
+   context, enabling direct unit testing of scoring rules.
+
+4. **Coin counting during gameplay:** `inc_coins`/`dec_coins`/`get_coins`/
+   `reset_coins` manage the bonus coin count accumulated during play.
+   The count is consumed during the bonus sequence animation.
+
+5. **Wait timer pattern:** State transitions use a uniform
+   `set_bonus_wait()` mechanism: set `wait_mode` and `wait_frame`, enter
+   `BONUS_STATE_WAIT`, and let `do_bonus_wait()` poll the frame counter.
+   `BONUS_LINE_DELAY` (100 frames) matches the legacy `BONUSDELAY`.
+
+6. **Finished flag:** `is_finished()` checks a dedicated `finished` flag
+   set by `do_finish()`, not the state enum.  This avoids a race where
+   the WAIT→FINISH transition would make `is_finished()` true before the
+   `on_finished` callback fires.
+
+**Consequences:**
+
+- Eliminates all X11 dependency from bonus sequence management.
+- Score computation logic is independently testable as pure functions.
+- The 10-state animation is fully deterministic given frame numbers.
+- All rendering responsibility is delegated to the integration layer
+  via `get_display_score()` and `get_state()` queries.
+- 23 CMocka tests cover lifecycle, score computation, coin management,
+  save trigger logic, full state machine sequences, and skip behavior.
