@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: MIT -->
+<component type="desktop-application">
+  <id>com.github.xboing</id>
+
+  <name>XBoing</name>
+  <summary>Classic breakout-style arcade game</summary>
+
+  <metadata_license>MIT</metadata_license>
+  <project_license>MIT</project_license>
+
+  <developer id="com.github.xboing">
+    <name>Justin C. Kibell</name>
+  </developer>
+
+  <description>
+    <p>
+      XBoing is a blockout-style arcade game where you control a paddle to
+      bounce a ball and destroy blocks. Originally created in 1993 for X11,
+      it features 80 levels with 30 different block types, power-ups, a
+      built-in level editor, and multiball gameplay.
+    </p>
+    <p>
+      The game includes special blocks like bombs, death blocks, teleporters,
+      and roaming blocks that add variety and challenge. Collect bonuses for
+      extra lives, score multipliers, machine guns, and more.
+    </p>
+  </description>
+
+  <launchable type="desktop-id">xboing.desktop</launchable>
+
+  <url type="homepage">https://github.com/jmf-pobox/xboing-c</url>
+  <url type="bugtracker">https://github.com/jmf-pobox/xboing-c/issues</url>
+  <url type="vcs-browser">https://github.com/jmf-pobox/xboing-c</url>
+
+  <provides>
+    <binary>xboing</binary>
+  </provides>
+
+  <categories>
+    <category>Game</category>
+    <category>ArcadeGame</category>
+    <category>BlocksGame</category>
+  </categories>
+
+  <keywords>
+    <keyword>breakout</keyword>
+    <keyword>arkanoid</keyword>
+    <keyword>blocks</keyword>
+    <keyword>paddle</keyword>
+    <keyword>ball</keyword>
+    <keyword>arcade</keyword>
+  </keywords>
+
+  <content_rating type="oars-1.1" />
+
+  <releases>
+    <release version="2.4" date="1996-01-01">
+      <description>
+        <p>Original release by Justin C. Kibell. Features 80 levels,
+        30 block types, built-in level editor, and multiball support.</p>
+      </description>
+    </release>
+  </releases>
+</component>
