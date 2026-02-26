@@ -527,6 +527,18 @@ target_include_directories(highscore_system PUBLIC
 )
 target_compile_options(highscore_system PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
 
+# --- Message display system library ----------------------------------------
+#
+# Pure C module — no SDL2 or X11 dependency.  Manages the single-line
+# message bar: set with optional auto-clear delay, reverts to default
+# message (level name) when the delay expires.
+
+add_library(message_system STATIC src/message_system.c)
+target_include_directories(message_system PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+target_compile_options(message_system PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+
 # --- Tests ------------------------------------------------------------------
 
 option(BUILD_TESTING "Build unit tests" ON)

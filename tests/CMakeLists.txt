@@ -385,3 +385,11 @@ add_executable(test_highscore_system test_highscore_system.c)
 target_compile_options(test_highscore_system PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
 target_link_libraries(test_highscore_system PRIVATE highscore_system ${CMOCKA_LIBRARIES})
 add_test(NAME test_highscore_system COMMAND test_highscore_system)
+
+# Message display system tests (bead xboing-dm8.7)
+# Pure logic tests — no SDL2, X11, video, or audio driver needed.
+# Links against message_system static library.
+add_executable(test_message_system test_message_system.c)
+target_compile_options(test_message_system PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+target_link_libraries(test_message_system PRIVATE message_system ${CMOCKA_LIBRARIES})
+add_test(NAME test_message_system COMMAND test_message_system)
