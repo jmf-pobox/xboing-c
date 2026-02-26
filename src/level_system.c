@@ -254,8 +254,15 @@ level_system_status_t level_system_load_file(level_system_t *ctx, const char *pa
             }
         }
 
-        /* Consume the newline after each row */
-        (void)fgetc(fp);
+        /* Consume the newline after each row.
+         * EOF is tolerated only for the final row to allow a missing
+         * trailing newline at end-of-file. */
+        int newline = fgetc(fp);
+        if (newline == EOF && row != LEVEL_GRID_ROWS - 1)
+        {
+            fclose(fp);
+            return LEVEL_SYS_ERR_PARSE_FAILED;
+        }
     }
 
     fclose(fp);
@@ -320,9 +327,9 @@ int level_system_get_time_bonus(const level_system_t *ctx)
 int level_system_wrap_number(int level_number)
 {
     int wrapped = level_number % LEVEL_MAX_NUM;
-    if (wrapped == 0)
+    if (wrapped <= 0)
     {
-        wrapped = LEVEL_MAX_NUM;
+        wrapped += LEVEL_MAX_NUM;
     }
     return wrapped;
 }

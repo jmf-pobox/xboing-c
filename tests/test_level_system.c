@@ -170,6 +170,20 @@ static void test_wrap_level_161(void **state)
     assert_int_equal(level_system_wrap_number(161), 1);
 }
 
+static void test_wrap_level_negative(void **state)
+{
+    (void)state;
+    /* Negative inputs should still produce valid 1..80 range */
+    int w1 = level_system_wrap_number(-1);
+    assert_true(w1 >= 1 && w1 <= 80);
+
+    int w80 = level_system_wrap_number(-80);
+    assert_true(w80 >= 1 && w80 <= 80);
+
+    int w81 = level_system_wrap_number(-81);
+    assert_true(w81 >= 1 && w81 <= 80);
+}
+
 /* =========================================================================
  * Group 3: Character mapping
  * ========================================================================= */
@@ -586,6 +600,7 @@ int main(void)
         cmocka_unit_test(test_wrap_level_81),
         cmocka_unit_test(test_wrap_level_160),
         cmocka_unit_test(test_wrap_level_161),
+        cmocka_unit_test(test_wrap_level_negative),
 
         /* Group 3: Character mapping */
         cmocka_unit_test(test_char_color_blocks),
