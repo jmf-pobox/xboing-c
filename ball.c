@@ -145,7 +145,7 @@ static void DoBallWait(int i);
 static void EraseTheBall(Display *display, Window window, int x, int y);
 static void ChangeBallDirectionToGuide(int i);
 static void Ball2BallCollision(BALL *ball1, BALL *ball2);
-static int WhenBallsCollide(BALL *ball1, BALL *ball2, float *time);
+static int WhenBallsCollide(const BALL *ball1, const BALL *ball2, float *time);
 
 typedef struct
 {
@@ -515,7 +515,7 @@ static void TeleportBall(Display *display, Window window, int i)
 
     int r1, c1, s1, r2, c2, s2, r3, c3, s3, r4, c4, s4;
     int r, c, x, y;
-    struct aBlock *blockP, *bP;
+    const struct aBlock *blockP, *bP;
     int done = False;
     int count = 0;
 
@@ -545,6 +545,7 @@ static void TeleportBall(Display *display, Window window, int i)
             r1 = r;
             c1 = c - 1;
             s1 = 0;
+            // cppcheck-suppress knownConditionTrueFalse
             if (r1 < 0 || r1 >= MAX_ROW)
                 s1 = 1;
             if (c1 < 0 || c1 >= MAX_COL)
@@ -561,6 +562,7 @@ static void TeleportBall(Display *display, Window window, int i)
             s2 = 0;
             if (r2 < 0 || r2 >= MAX_ROW)
                 s2 = 1;
+            // cppcheck-suppress knownConditionTrueFalse
             if (c2 < 0 || c2 >= MAX_COL)
                 s2 = 1;
             if (s2 == 0)
@@ -573,8 +575,10 @@ static void TeleportBall(Display *display, Window window, int i)
             r3 = r;
             c3 = c + 1;
             s3 = 0;
+            // cppcheck-suppress knownConditionTrueFalse
             if (r3 < 0 || r3 >= MAX_ROW)
                 s3 = 1;
+            // cppcheck-suppress knownConditionTrueFalse
             if (c3 < 0 || c3 >= MAX_COL)
                 s3 = 1;
             if (s3 == 0)
@@ -587,8 +591,10 @@ static void TeleportBall(Display *display, Window window, int i)
             r4 = r + 1;
             c4 = c;
             s4 = 0;
+            // cppcheck-suppress knownConditionTrueFalse
             if (r4 < 0 || r4 >= MAX_ROW)
                 s4 = 1;
+            // cppcheck-suppress knownConditionTrueFalse
             if (c4 < 0 || c4 >= MAX_COL)
                 s4 = 1;
             if (s4 == 0)
@@ -618,8 +624,6 @@ static void TeleportBall(Display *display, Window window, int i)
             balls[i].lastPaddleHitFrame = frame + PADDLE_BALL_FRAME_TILT;
 
             /* Ok jump out now thanks. */
-            done = True;
-
             DEBUG("Ball was Teleported.");
 
             return;
@@ -1354,10 +1358,10 @@ static int CheckRegions(Display *display, Window window, int row, int col, int x
      */
 
     struct aBlock *blockP;
-    struct aBlock *blockPleft;
-    struct aBlock *blockPright;
-    struct aBlock *blockPtop;
-    struct aBlock *blockPbottom;
+    const struct aBlock *blockPleft;
+    const struct aBlock *blockPright;
+    const struct aBlock *blockPtop;
+    const struct aBlock *blockPbottom;
 
     int region = REGION_NONE;
 
@@ -1505,7 +1509,7 @@ static int CheckForCollision(Display *display, Window window, int x, int y, int 
     return ret;
 }
 
-static int WhenBallsCollide(BALL *ball1, BALL *ball2, float *time)
+static int WhenBallsCollide(const BALL *ball1, const BALL *ball2, float *time)
 {
     /*
      * Calculate when 2 balls will collide.

@@ -218,20 +218,18 @@ void SetWindowSizeHints(Display *display, int w, int h)
 void CreateAllWindows(Display *display, Colormap colormap, char **argv, int argc)
 {
     char title[80];
-    int offsetX, offsetY, scoreWidth;
+    int offsetX, scoreWidth;
     XWMHints wmhints;
     XClassHint classhints;
     XSizeHints sizehints;
     XTextProperty windowName, iconName;
     XSetWindowAttributes winattr;
     unsigned long valuemask;
-    int temp;
 
     char *window_Name = "- XBoing II -";
     char *icon_Name = "XBoing II";
 
     offsetX = MAIN_WIDTH / 2;
-    offsetY = MAIN_HEIGHT / 2;
     scoreWidth = 224;
 
     DEBUG("Creating windows ....");

@@ -75,7 +75,7 @@
  */
 
 Display *InitialiseGame(char **argv, int argc);
-void ShutDown(Display *display, int exitCode, char *message);
+void ShutDown(Display *display, int exitCode, const char *message);
 void GrabPointer(Display *display, Window window);
 void UnGrabPointer(Display *display);
 void ChangePointer(Display *display, Window window, int cursorState);

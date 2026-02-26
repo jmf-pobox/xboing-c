@@ -43,11 +43,23 @@ jobs:
             --error-exitcode=1 \
             src/ ball_math.c
 
-      - name: cppcheck (legacy files - informational)
+      - name: cppcheck (legacy files - strict)
         run: |
           cppcheck \
             --enable=warning,style,performance,portability \
+            --inline-suppr \
             --suppress=missingIncludeSystem \
+            --suppress=variableScope \
+            --error-exitcode=1 \
             -I include/ \
-            $(ls *.c | grep -v '^ball_math\.c$') \
-            || true
+            $(ls *.c | grep -v '^ball_math\.c$')
+
+      - name: cppcheck (test files - strict)
+        run: |
+          cppcheck \
+            --enable=warning,style,performance,portability \
+            --inline-suppr \
+            --suppress=missingIncludeSystem \
+            --error-exitcode=1 \
+            -I include/ \
+            tests/

@@ -159,13 +159,12 @@ void SetGameSpeed(int delay)
 
 static KeySym GetKeySym(XEvent event)
 {
-    int count;
     char key;
     KeySym keysym;
     XComposeStatus compose;
 
     /* Lookup a keysym using the event key */
-    count = XLookupString(&event.xkey, &key, 1, &keysym, &compose);
+    (void)XLookupString(&event.xkey, &key, 1, &keysym, &compose);
 
     return keysym;
 }
@@ -1233,7 +1232,7 @@ static void handleEventLoop(Display *display)
     int pending;
     KeySym keysym;
 
-    pending = frame = 0;
+    frame = 0;
 
     /* Initial mode for game is Introduction */
     mode = MODE_PRESENTS;

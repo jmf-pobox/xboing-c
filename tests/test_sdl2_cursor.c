@@ -113,7 +113,7 @@ static void test_create_null_status(void **state)
 /* TC-07: Initial current() returns SDL2CUR_COUNT (no cursor set yet). */
 static void test_initial_current(void **state)
 {
-    sdl2_cursor_t *ctx = (sdl2_cursor_t *)*state;
+    const sdl2_cursor_t *ctx = (const sdl2_cursor_t *)*state;
     assert_int_equal(sdl2_cursor_current(ctx), SDL2CUR_COUNT);
 }
 

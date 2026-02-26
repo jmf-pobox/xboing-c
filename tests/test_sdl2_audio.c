@@ -161,14 +161,14 @@ static void test_create_destroy(void **state)
 
 static void test_count_positive(void **state)
 {
-    sdl2_audio_t *ctx = (sdl2_audio_t *)*state;
+    const sdl2_audio_t *ctx = (const sdl2_audio_t *)*state;
     int count = sdl2_audio_count(ctx);
     assert_true(count > 0);
 }
 
 static void test_count_matches_wav_files(void **state)
 {
-    sdl2_audio_t *ctx = (sdl2_audio_t *)*state;
+    const sdl2_audio_t *ctx = (const sdl2_audio_t *)*state;
     int count = sdl2_audio_count(ctx);
     /* sounds/ has 46 .wav files; allow range for robustness */
     assert_true(count >= 40);
@@ -215,7 +215,7 @@ static void test_halt_no_crash(void **state)
 
 static void test_volume_default(void **state)
 {
-    sdl2_audio_t *ctx = (sdl2_audio_t *)*state;
+    const sdl2_audio_t *ctx = (const sdl2_audio_t *)*state;
     assert_int_equal(sdl2_audio_get_volume(ctx), MIX_MAX_VOLUME);
 }
 
@@ -253,7 +253,7 @@ static void test_volume_null_ctx(void **state)
 
 static void test_volume_percent_default(void **state)
 {
-    sdl2_audio_t *ctx = (sdl2_audio_t *)*state;
+    const sdl2_audio_t *ctx = (const sdl2_audio_t *)*state;
     /* Default volume is MIX_MAX_VOLUME (128), which maps to 100%. */
     assert_int_equal(sdl2_audio_get_volume_percent(ctx), 100);
 }

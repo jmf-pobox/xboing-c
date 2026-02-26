@@ -66,7 +66,7 @@
 
 void InitialiseMessageSystem(Display *display, Window window, Colormap colormap);
 void FreeMessageSystem(Display *display);
-void SetCurrentMessage(Display *display, Window window, char *newMessage, int clear);
+void SetCurrentMessage(Display *display, Window window, const char *newMessage, int clear);
 void DisplayCurrentMessage(Display *display, Window window);
 
 #endif

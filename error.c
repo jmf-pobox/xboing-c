@@ -65,14 +65,14 @@
  *  Internal variable declarations:
  */
 
-void NormalMessage(char *message)
+void NormalMessage(const char *message)
 {
     /* Print a message to standard out flush it */
     fprintf(stdout, "XBoing - %s\n", message);
     fflush(stdout);
 }
 
-void ErrorMessage(char *message)
+void ErrorMessage(const char *message)
 {
 
 #ifndef READMEP_FILE
@@ -86,17 +86,17 @@ void ErrorMessage(char *message)
     fflush(stdout);
 }
 
-void WarningMessage(char *message)
+void WarningMessage(const char *message)
 {
     /* Print a standard warning message to stdout and flush it */
     fprintf(stdout, "XBoing - Warning: %s\n", message);
     fflush(stdout);
 }
 
-void HandleXPMError(Display *display, int ErrorStatus, char *tag)
+void HandleXPMError(Display *display, int ErrorStatus, const char *tag)
 {
-    char *error = NULL;
-    char *warning = NULL;
+    const char *error = NULL;
+    const char *warning = NULL;
 
     /* Switch on the type of error returned by xpm library */
     switch (ErrorStatus)

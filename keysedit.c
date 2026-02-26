@@ -134,7 +134,7 @@ static void DoText(Display *display, Window window)
     for (i = 0, j = 0; i < (sizeof(infoText) / sizeof(char *)); i++)
     {
         /* If the text is not null then print it */
-        if (infoText[i] != '\0')
+        if (infoText[i] != NULL)
         {
             snprintf(string, sizeof(string), "%s", infoText[i]);
             DrawShadowCentredText(display, window, dataFont, string, y,
@@ -169,7 +169,6 @@ static void DoText(Display *display, Window window)
 
     snprintf(string, sizeof(string), "%s", "<H/V> = Scroll horz/vert");
     DrawShadowText(display, window, textFont, string, x, y, yellow);
-    y += textFont->ascent + GAP;
 
     y = y1;
     x = 270;

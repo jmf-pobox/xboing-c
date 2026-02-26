@@ -245,7 +245,6 @@ static void DoBlocks(Display *display, Window window)
 
     DrawTheBlock(display, window, x, y, MULTIBALL_BLK, 0, 0, 0);
     DrawShadowText(display, window, textFont, "- Multi Balls", x + 60, y, green);
-    y += 40;
 
     /* New line from top again on right */
     y = 120;
@@ -293,7 +292,6 @@ static void DoBlocks(Display *display, Window window)
 
     DrawTheBlock(display, window, x + 10, y - 5, STICKY_BLK, 0, 0, 0);
     DrawShadowText(display, window, textFont, "- Sticky Ball", x + 60, y, green);
-    y += 40;
 }
 
 static void DoText(Display *display, Window window)

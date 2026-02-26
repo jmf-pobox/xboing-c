@@ -973,7 +973,7 @@ void ExplodeAllOfOneType(Display *display, Window window, int type)
      * passed to blow up ASAP. He he he.
      */
 
-    struct aBlock *blockP;
+    const struct aBlock *blockP;
     int r, c;
 
     /* Check all blocks looking for a type we want */
@@ -1214,7 +1214,7 @@ void HandlePendingBonuses(Display *display, Window window, int type, int r, int 
 static int CheckAdjacentBlocks(Display *display, Window window, int r, int c)
 {
     /* True - yes go ahead moved down one block - false no don't */
-    struct aBlock *blockP;
+    const struct aBlock *blockP;
     int row, col, i;
 
     if (r < 0 || r >= MAX_ROW)
@@ -1633,7 +1633,7 @@ void ExplodeBlocksPending(Display *display, Window window)
 void DrawTheBlock(Display *display, Window window, int x, int y, int blockType, int slide, int r,
                   int c)
 {
-    struct aBlock *blockP;
+    const struct aBlock *blockP;
     char tmp[10];
     int w, h, x1, y1, len;
 
@@ -1827,7 +1827,7 @@ static void SetBlockUpForExplosion(int row, int col, int frame)
 
 void DrawBlock(Display *display, Window window, int row, int col, int blockType)
 {
-    struct aBlock *blockP;
+    const struct aBlock *blockP;
 
     if (row < 0 || row > MAX_ROW)
     {
@@ -2390,7 +2390,7 @@ void AddNewBlock(Display *display, Window window, int row, int col, int blockTyp
 
 void SkipToNextLevel(Display *display, Window window)
 {
-    struct aBlock *blockP;
+    const struct aBlock *blockP;
     int r, c;
 
     /* This will kill all blocks that need to go before next level can
@@ -2445,7 +2445,7 @@ void SkipToNextLevel(Display *display, Window window)
 
 void RedrawAllBlocks(Display *display, Window window)
 {
-    struct aBlock *blockP;
+    const struct aBlock *blockP;
     int r, c;
 
     for (r = 0; r < MAX_ROW; r++)
@@ -2467,7 +2467,7 @@ int StillActiveBlocks(void)
      * Returns False if level is finished. True otherwise.
      */
 
-    struct aBlock *blockP;
+    const struct aBlock *blockP;
     int r, c;
 
     /* Check all blocks to see if they still are active */

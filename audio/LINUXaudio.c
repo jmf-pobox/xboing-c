@@ -111,7 +111,7 @@ int SetUpAudioSystem(Display *display)
                 /* Child Thread */
 	        {
                 static char string[257];     /* String to put read material in */
-                static char *str = NULL;
+                static const char *str = NULL;
 		static char soundfile[512];
 		static int ifd;
 
@@ -182,8 +182,11 @@ int SetUpAudioSystem(Display *display)
 		(void) close(Audio_fd);
              } while (True);
           }
-       
+
      }
+
+    /* Audio system already running */
+    return True;
 }
 void FreeAudioSystem(void)
 {
@@ -212,7 +215,7 @@ void audioDeviceEvents(void)
     /* None to do */
 }
 
-void playSoundFile(char *filename, int volume)
+void playSoundFile(const char *filename, int volume)
 {
 	char snd_file[256];
 

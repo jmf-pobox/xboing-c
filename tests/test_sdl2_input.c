@@ -128,39 +128,39 @@ static void test_create_null_status_ptr(void **state)
 
 static void test_default_left_binding(void **state)
 {
-    sdl2_input_t *ctx = (sdl2_input_t *)*state;
+    const sdl2_input_t *ctx = (const sdl2_input_t *)*state;
     assert_int_equal(sdl2_input_get_binding(ctx, SDL2I_LEFT, 0), SDL_SCANCODE_LEFT);
     assert_int_equal(sdl2_input_get_binding(ctx, SDL2I_LEFT, 1), SDL_SCANCODE_J);
 }
 
 static void test_default_right_binding(void **state)
 {
-    sdl2_input_t *ctx = (sdl2_input_t *)*state;
+    const sdl2_input_t *ctx = (const sdl2_input_t *)*state;
     assert_int_equal(sdl2_input_get_binding(ctx, SDL2I_RIGHT, 0), SDL_SCANCODE_RIGHT);
     assert_int_equal(sdl2_input_get_binding(ctx, SDL2I_RIGHT, 1), SDL_SCANCODE_L);
 }
 
 static void test_default_shoot_binding(void **state)
 {
-    sdl2_input_t *ctx = (sdl2_input_t *)*state;
+    const sdl2_input_t *ctx = (const sdl2_input_t *)*state;
     assert_int_equal(sdl2_input_get_binding(ctx, SDL2I_SHOOT, 0), SDL_SCANCODE_K);
 }
 
 static void test_default_pause_binding(void **state)
 {
-    sdl2_input_t *ctx = (sdl2_input_t *)*state;
+    const sdl2_input_t *ctx = (const sdl2_input_t *)*state;
     assert_int_equal(sdl2_input_get_binding(ctx, SDL2I_PAUSE, 0), SDL_SCANCODE_P);
 }
 
 static void test_default_quit_binding(void **state)
 {
-    sdl2_input_t *ctx = (sdl2_input_t *)*state;
+    const sdl2_input_t *ctx = (const sdl2_input_t *)*state;
     assert_int_equal(sdl2_input_get_binding(ctx, SDL2I_QUIT, 0), SDL_SCANCODE_Q);
 }
 
 static void test_default_speed_bindings(void **state)
 {
-    sdl2_input_t *ctx = (sdl2_input_t *)*state;
+    const sdl2_input_t *ctx = (const sdl2_input_t *)*state;
     assert_int_equal(sdl2_input_get_binding(ctx, SDL2I_SPEED_1, 0), SDL_SCANCODE_1);
     assert_int_equal(sdl2_input_get_binding(ctx, SDL2I_SPEED_5, 0), SDL_SCANCODE_5);
     assert_int_equal(sdl2_input_get_binding(ctx, SDL2I_SPEED_9, 0), SDL_SCANCODE_9);
@@ -318,7 +318,7 @@ static void test_mouse_null_ctx(void **state)
 
 static void test_mouse_invalid_button(void **state)
 {
-    sdl2_input_t *ctx = (sdl2_input_t *)*state;
+    const sdl2_input_t *ctx = (const sdl2_input_t *)*state;
     assert_false(sdl2_input_mouse_pressed(ctx, 0));
     assert_false(sdl2_input_mouse_pressed(ctx, 6));
 }
@@ -349,7 +349,7 @@ static void test_mouse_invalid_button_event(void **state)
 
 static void test_shift_not_held(void **state)
 {
-    sdl2_input_t *ctx = (sdl2_input_t *)*state;
+    const sdl2_input_t *ctx = (const sdl2_input_t *)*state;
     assert_false(sdl2_input_shift_held(ctx));
 }
 
@@ -439,7 +439,7 @@ static void test_pressed_null_ctx(void **state)
 
 static void test_pressed_invalid_action(void **state)
 {
-    sdl2_input_t *ctx = (sdl2_input_t *)*state;
+    const sdl2_input_t *ctx = (const sdl2_input_t *)*state;
     assert_false(sdl2_input_pressed(ctx, SDL2I_ACTION_COUNT));
     assert_false(sdl2_input_pressed(ctx, (sdl2_input_action_t)-1));
 }

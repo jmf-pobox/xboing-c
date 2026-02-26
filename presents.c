@@ -210,8 +210,6 @@ void DoPresentFlag(Display *display, Window window)
 {
     char string[80];
     int y, x;
-    XPoint pt[4];
-    int z;
 
     DEBUG("Drawing earth in presents mode.")
 
@@ -236,6 +234,9 @@ void DoPresentFlag(Display *display, Window window)
         playSoundFile("intro", 40);
 
 #ifdef testing
+    {
+    XPoint pt[4];
+    int z;
     for (z = 0; z < 700; z += 10)
     {
         pt[0].x = 0;
@@ -247,6 +248,7 @@ void DoPresentFlag(Display *display, Window window)
         pt[3].x = 300;
         pt[3].y = 50;
         Draw4PointCurve(display, window, pt, 100);
+    }
     }
 #endif
 
@@ -355,7 +357,7 @@ static void DoSparkle(Display *display, Window window)
 {
     static Pixmap store;
     static int in = 0;
-    static int startFrame;
+    static int localStartFrame;
     static int x, y;
 
     if (!store)
@@ -363,7 +365,7 @@ static void DoSparkle(Display *display, Window window)
         store =
             XCreatePixmap(display, window, 20, 20, DefaultDepth(display, XDefaultScreen(display)));
 
-        startFrame = frame;
+        localStartFrame = frame;
         x = MAIN_WIDTH + PLAY_WIDTH - 50;
         y = 212;
         if (noSound == False)
@@ -375,12 +377,12 @@ static void DoSparkle(Display *display, Window window)
     if (in == 0)
         XCopyArea(display, window, store, gc, x, y, 20, 20, 0, 0);
 
-    if (frame == startFrame)
+    if (frame == localStartFrame)
     {
         RenderShape(display, window, stars[in], starsM[in], x, y, 20, 20, False);
 
         in++;
-        startFrame = frame + 35;
+        localStartFrame = frame + 35;
 
         if (in == 11)
         {

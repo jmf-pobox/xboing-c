@@ -112,7 +112,7 @@ void DrawMessage(Display *display, Window window, char *message, int clear, int 
     XFlush(display);
 }
 
-void SetCurrentMessage(Display *display, Window window, char *newMessage, int clear)
+void SetCurrentMessage(Display *display, Window window, const char *newMessage, int clear)
 {
     /* Draw out new message */
     snprintf(currentMessage, sizeof(currentMessage), "%s", newMessage);
@@ -129,7 +129,7 @@ void SetCurrentMessage(Display *display, Window window, char *newMessage, int cl
 void DisplayCurrentMessage(Display *display, Window window)
 {
     char str[80];
-    char str2[80];
+    char str2[80] = "";
 
     if (newMessageStart == True)
     {

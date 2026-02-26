@@ -103,8 +103,8 @@
 
 static void ParseCommandLine(char **argv, int argc);
 static void InitialiseSettings(void);
-static int compareArgument(char *arg1, char *arg2, int minMatch);
-static void HandleDisplayErrors(char *displayName);
+static int compareArgument(const char *arg1, const char *arg2, int minMatch);
+static void HandleDisplayErrors(const char *displayName);
 static void PrintVersion(void);
 static void PrintUsage(void);
 static void PrintHelp(void);
@@ -290,7 +290,7 @@ static void ReleaseGraphics(Display *display)
         XFreeGC(display, gcsfx);
 }
 
-void ShutDown(Display *display, int exit_code, char *message)
+void ShutDown(Display *display, int exit_code, const char *message)
 {
     /* This is the last function called when exiting */
 
@@ -352,7 +352,7 @@ static int ErrorHandler(Display *display, XErrorEvent *err)
     return True;
 }
 
-static void HandleDisplayErrors(char *displayName)
+static void HandleDisplayErrors(const char *displayName)
 {
     char string[256];
 
@@ -395,7 +395,7 @@ static void PrintUsage(void)
 static void PrintSetup(void)
 {
     /* Print setup information about xboing */
-    char *str;
+    const char *str;
 
     fprintf(stdout, "xboing: Setup Information\n");
     fprintf(stdout, "           Audio: %s\n", AUDIO_AVAILABLE ? "Available" : "Not available");
@@ -458,7 +458,7 @@ static void PrintHelp(void)
     ExitProgramNow(0);
 }
 
-static int compareArgument(char *arg1, char *arg2, int minMatch)
+static int compareArgument(const char *arg1, const char *arg2, int minMatch)
 {
     if ((strlen(arg1) < minMatch) || (strlen(arg2) < minMatch))
         return 1;

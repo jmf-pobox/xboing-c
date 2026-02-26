@@ -86,7 +86,7 @@ void sleepSync(Display *display, unsigned long ms);
 void usleep(unsigned long usec);
 #endif
 int ObtainMousePosition(Display *display, Window window, int *x, int *y);
-int YesNoDialogue(Display *display, char *message);
+int YesNoDialogue(Display *display, const char *message);
 Pixmap ScalePixmap(Display *display, Window window, Pixmap source, int swidth, int sheight,
                    int dwidth, int dheight);
 void Draw4PointCurve(Display *display, Window window, XPoint *p, int num_steps);

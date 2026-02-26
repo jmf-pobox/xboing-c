@@ -81,9 +81,9 @@ typedef struct
  *  Function prototypes:
  */
 
-int ReadNextLevel(Display *display, Window window, char *levelName, int draw);
+int ReadNextLevel(Display *display, Window window, const char *levelName, int draw);
 void SetupStage(Display *display, Window window);
-int SaveLevelDataFile(Display *display, char *levelName);
+int SaveLevelDataFile(Display *display, const char *levelName);
 int SaveCurrentGame(Display *display, Window window);
 int LoadSavedGame(Display *display, Window window);
 

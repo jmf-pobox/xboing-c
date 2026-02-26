@@ -146,7 +146,7 @@ static void DoText(Display *display, Window window)
     for (i = 0; i < (sizeof(instructionText) / sizeof(char *)); i++)
     {
         /* If the text is not null then print it */
-        if (instructionText[i] != '\0')
+        if (instructionText[i] != NULL)
         {
             snprintf(string, sizeof(string), "%s", instructionText[i]);
             DrawShadowCentredText(display, window, dataFont, string, y,
@@ -157,8 +157,6 @@ static void DoText(Display *display, Window window)
         else
             y += dataFont->ascent + GAP;
     }
-
-    y += dataFont->ascent + GAP / 2;
 
     /* Draw the standard message */
     snprintf(string, sizeof(string), "%s", "Insert coin to start the game");

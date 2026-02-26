@@ -96,7 +96,7 @@ saveGameStruct saveGame;
 void SetupStage(Display *display, Window window)
 {
     char levelPath[1024];
-    char *str;
+    const char *str;
     char str2[1024];
     static int bgrnd = 1;
     u_long newLevel;
@@ -314,7 +314,7 @@ int SaveCurrentGame(Display *display, Window window)
     return False;
 }
 
-int ReadNextLevel(Display *display, Window window, char *levelName, int draw)
+int ReadNextLevel(Display *display, Window window, const char *levelName, int draw)
 {
     FILE *levelFile;
     int row, col, type;
@@ -358,6 +358,7 @@ int ReadNextLevel(Display *display, Window window, char *levelName, int draw)
     {
         /* Error in the time limit of the level data file */
         ErrorMessage("Cannot parse level data - time bonus error.");
+        fclose(levelFile);
         return False;
     }
 
@@ -505,7 +506,7 @@ int ReadNextLevel(Display *display, Window window, char *levelName, int draw)
         }
 
         /* Get the newline */
-        type = fgetc(levelFile);
+        (void)fgetc(levelFile);
     }
 
     /* Close our level data file */
@@ -516,12 +517,12 @@ int ReadNextLevel(Display *display, Window window, char *levelName, int draw)
     return True;
 }
 
-int SaveLevelDataFile(Display *display, char *levelName)
+int SaveLevelDataFile(Display *display, const char *levelName)
 {
     FILE *levelFile;
     int row, col;
     char str[BUF_SIZE];
-    struct aBlock *blockP;
+    const struct aBlock *blockP;
 
     /* Open the new level data file for reading */
     if ((levelFile = fopen(levelName, "w")) == NULL)
@@ -682,7 +683,6 @@ int SaveLevelDataFile(Display *display, char *levelName)
                 default:
                     /* Nothing in the block so put dot */
                     fputc('.', levelFile);
-                    break;
                     break;
             }
         }

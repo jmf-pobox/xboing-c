@@ -139,13 +139,13 @@ static char nickName[22];
 highScoreEntry highScores[NUM_HIGHSCORES];
 highScoreHeader scoresHeader;
 
-void SetNickName(char *nick)
+void SetNickName(const char *nick)
 {
     /* Change the users nick name */
     strncpy(nickName, nick, 20);
 }
 
-void SetBoingMasterText(char *message)
+void SetBoingMasterText(const char *message)
 {
     /* Change the boing masters text */
     snprintf(scoresHeader.masterText, sizeof(scoresHeader.masterText), "%s", message);
@@ -250,7 +250,6 @@ static void DoHighScores(Display *display, Window window)
     else
         snprintf(string, sizeof(string), "%s", "- Personal Best -");
     DrawShadowCentredText(display, window, textFont, string, ym, red, PLAY_WIDTH);
-    ym += textFont->ascent + GAP;
 
     /* Draw the titles for the highscore table */
     snprintf(string, sizeof(string), "%s", "#");
@@ -386,7 +385,7 @@ static void DoHighScores(Display *display, Window window)
 
 static void DoTitleSparkle(Display *display, Window window)
 {
-    static int sindex = 0;
+    static int sparkle_idx = 0;
     static int delay = 30;
 
     if ((frame % delay) == 0)
@@ -395,18 +394,18 @@ static void DoTitleSparkle(Display *display, Window window)
             delay = 30;
 
         /* Draw stars either side of high scores title */
-        RenderShape(display, window, stars[sindex], starsM[sindex], 25, 27, 20, 20, True);
-        RenderShape(display, window, stars[10 - sindex], starsM[10 - sindex], PLAY_WIDTH - 45, 27,
+        RenderShape(display, window, stars[sparkle_idx], starsM[sparkle_idx], 25, 27, 20, 20, True);
+        RenderShape(display, window, stars[10 - sparkle_idx], starsM[10 - sparkle_idx], PLAY_WIDTH - 45, 27,
                     20, 20, True);
 
-        sindex++;
-        if (sindex == 11)
+        sparkle_idx++;
+        if (sparkle_idx == 11)
         {
             /* Clear away the stars */
             XClearArea(display, window, 25, 27, 20, 20, False);
             XClearArea(display, window, PLAY_WIDTH - 45, 27, 20, 20, False);
 
-            sindex = 0;
+            sparkle_idx = 0;
             if (delay == 30)
                 delay = 800;
         }
@@ -640,7 +639,7 @@ int GetHighScoreRanking(u_long score)
     return -1;
 }
 
-static void ShiftScoresDown(int j, u_long score, u_long level, time_t gameTime, char *name)
+static void ShiftScoresDown(int j, u_long score, u_long level, time_t gameTime, const char *name)
 {
     /* This function will shift all score below the index down
      * towards the end and kill off the last dude. Sorry mate.
@@ -694,7 +693,7 @@ static void DeleteScore(int j)
 }
 
 int CheckAndAddScoreToHighScore(u_long score, u_long level, time_t gameTime, int type,
-                                char *message)
+                                const char *message)
 {
     int i;
     int id = -1;
@@ -733,7 +732,7 @@ int CheckAndAddScoreToHighScore(u_long score, u_long level, time_t gameTime, int
                 {
                     /* Don't add as score is smaller */
                     if (id != -1)
-                        id = LockUnlock(UNLOCK_FILE);
+                        (void)LockUnlock(UNLOCK_FILE);
                     return False;
                 }
             }
@@ -756,7 +755,7 @@ int CheckAndAddScoreToHighScore(u_long score, u_long level, time_t gameTime, int
 
                 /* Unlock the file now thanks */
                 if (id != -1)
-                    id = LockUnlock(UNLOCK_FILE);
+                    (void)LockUnlock(UNLOCK_FILE);
 
                 /* Yes - it was placed in the highscore */
                 return True;
@@ -765,7 +764,7 @@ int CheckAndAddScoreToHighScore(u_long score, u_long level, time_t gameTime, int
 
         /* Unlock the file now thanks */
         if (id != -1)
-            id = LockUnlock(UNLOCK_FILE);
+            (void)LockUnlock(UNLOCK_FILE);
 
         /* Not even a highscore - loser! */
         return False;
@@ -860,7 +859,7 @@ int ReadHighScoreTable(int type)
     FILE *hsfp;
     int i;
     char filename[MAXPATHLEN];
-    char *str;
+    const char *str;
 
     /* Are we going to use the global or personal highscore file */
     if (type == GLOBAL)
@@ -923,7 +922,7 @@ int WriteHighScoreTable(int type)
     FILE *hsfp;
     int i;
     char filename[MAXPATHLEN];
-    char *str;
+    const char *str;
 
     /* Make sure the table is sorted */
     SortHighScores();
@@ -1012,7 +1011,7 @@ static int LockUnlock(int cmd)
 {
     static int inter = -1;
     char filename[1024];
-    char *str;
+    const char *str;
     int theCmd;
 
 #ifndef NO_LOCKING
