@@ -123,10 +123,8 @@ int score_block_hit_points(int block_type, int row)
             return 100;
 
         case DEATH_BLK:
-            return 0;
-
         default:
-            /* DYNAMITE_BLK, BONUSX2_BLK, BONUSX4_BLK, BONUS_BLK,
+            /* DEATH_BLK, DYNAMITE_BLK, BONUSX2_BLK, BONUSX4_BLK, BONUS_BLK,
              * BLACKHIT_BLK, BLACK_BLK — hitPoints is implicitly 0
              * (struct is zeroed before the switch in AddNewBlock). */
             return 0;

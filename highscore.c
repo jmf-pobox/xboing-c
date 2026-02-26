@@ -156,8 +156,8 @@ char *GetNickName(void)
     /* Return the nickname or NULL */
     if (nickName[0] == '\0')
         return NULL;
-    else
-        return nickName;
+
+    return nickName;
 }
 
 void SetUpHighScore(Display *display, Window window, Colormap colormap)
@@ -728,13 +728,11 @@ int CheckAndAddScoreToHighScore(u_long score, u_long level, time_t gameTime, int
 
                     break;
                 }
-                else
-                {
-                    /* Don't add as score is smaller */
-                    if (id != -1)
-                        (void)LockUnlock(UNLOCK_FILE);
-                    return False;
-                }
+
+                /* Don't add as score is smaller */
+                if (id != -1)
+                    (void)LockUnlock(UNLOCK_FILE);
+                return False;
             }
         } /* for */
 
@@ -769,27 +767,27 @@ int CheckAndAddScoreToHighScore(u_long score, u_long level, time_t gameTime, int
         /* Not even a highscore - loser! */
         return False;
     }
-    else /* Type == PERSONAL */
+
+    /* Type == PERSONAL */
+
+    /* Go through the highscore table */
+    for (i = 0; i < NUM_HIGHSCORES; i++)
     {
-        /* Go through the highscore table */
-        for (i = 0; i < NUM_HIGHSCORES; i++)
+        /* Can the last game be added to the highscores */
+        if (score > ntohl(highScores[i].score))
         {
-            /* Can the last game be added to the highscores */
-            if (score > ntohl(highScores[i].score))
-            {
-                ShiftScoresDown(i, score, level, gameTime, name);
+            ShiftScoresDown(i, score, level, gameTime, name);
 
-                /* Add to the highscore by writing it out */
-                (void)WriteHighScoreTable(type);
+            /* Add to the highscore by writing it out */
+            (void)WriteHighScoreTable(type);
 
-                /* Yes - it was placed in the highscore */
-                return True;
-            }
+            /* Yes - it was placed in the highscore */
+            return True;
         }
-
-        /* Not even a highscore - loser! */
-        return False;
     }
+
+    /* Not even a highscore - loser! */
+    return False;
 }
 
 static void SortHighScores(void)

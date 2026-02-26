@@ -103,6 +103,9 @@ void DrawPaddle(Display *display, Window window, int x, int y, int size)
         case PADDLE_HUGE:
             RenderShape(display, window, paddleHugePixmap, paddleHugeMask, x - 35, y, 70, 15, True);
             break;
+
+        default:
+            break;
     }
 }
 
@@ -196,6 +199,9 @@ void MovePaddle(Display *display, Window window, int direction, int size, int xp
                 xpos = PLAY_WIDTH - xpos;
             }
             break;
+
+        default:
+            break;
     }
 
     /* Switch on the size of the paddle */
@@ -254,6 +260,9 @@ void MovePaddle(Display *display, Window window, int direction, int size, int xp
 
             DrawPaddle(display, window, paddlePos, PLAY_HEIGHT - DIST_BASE, PADDLE_HUGE);
             break;
+
+        default:
+            break;
     }
 }
 
@@ -281,6 +290,9 @@ int GetPaddleSize(void)
         case PADDLE_HUGE:
             /* Return the size of the huge paddle in pixels */
             return 70;
+
+        default:
+            break;
     }
 
     /* Bug if this happens */

@@ -1,0 +1,49 @@
+---
+# XBoing clang-tidy configuration
+#
+# We enable all checks by default and disable specific ones that conflict
+# with legitimate C idioms used throughout the legacy codebase.
+
+Checks: >
+  -*,
+  bugprone-*,
+  performance-*,
+  readability-else-after-return,
+  readability-misleading-indentation,
+  readability-redundant-control-flow,
+  readability-simplify-boolean-expr,
+  -bugprone-assignment-in-if-condition,
+  -bugprone-branch-clone,
+  -bugprone-signal-handler,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-integer-division,
+  -bugprone-narrowing-conversions,
+  -bugprone-macro-parentheses
+
+# bugprone-assignment-in-if-condition:
+#   The codebase uses the standard C idiom `if ((fd = open(...)))`
+#   extensively (~50 occurrences). Intentional, not a bug.
+#
+# bugprone-branch-clone:
+#   State machines and key handlers often have distinct cases with
+#   identical implementations (e.g., Escape and Return both dismiss
+#   a dialogue). The semantic distinction is intentional.
+#
+# bugprone-signal-handler:
+#   Legacy signal handlers call non-async-signal-safe functions
+#   (exit, fprintf). Fixing requires major refactoring of the
+#   shutdown path. Tracked for future work.
+#
+# bugprone-integer-division:
+#   Ball physics and block rendering use pixel-level integer
+#   arithmetic (BALL_WC=20/2, paddle_size/2, block_height/2).
+#   The integer truncation is intentional for pixel coordinates.
+#
+# bugprone-easily-swappable-parameters, bugprone-narrowing-conversions,
+# bugprone-macro-parentheses:
+#   Too noisy for a legacy C codebase. Would require pervasive
+#   refactoring with no safety benefit.
+
+CheckOptions:
+  - key: readability-else-after-return.WarnOnUnfixable
+    value: false

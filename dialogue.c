@@ -179,6 +179,9 @@ static void ShowUserInputDialogue(Display *display)
         case TEXT_ICON:
             RenderShape(display, inputWindow, text, textM, 2, 4, 32, 32, False);
             break;
+
+        default:
+            break;
     }
 
     DrawLine(display, inputWindow, 10, 45, dw - 10, 45, white, 2);
@@ -222,11 +225,7 @@ void ProcessDialogue(Display *display)
             break;
 
         case DIALOGUE_TEXT:
-            break;
-
         case DIALOGUE_FINISHED:
-            break;
-
         default:
             break;
     }
@@ -266,6 +265,9 @@ static void validateDialogueKeys(Display *display, KeySym keysym, const char *st
         case ALL_ENTRY: /* Anything goes */
             if (keysym < XK_space || keysym > XK_asciitilde)
                 return;
+            break;
+
+        default:
             break;
     }
 
@@ -318,9 +320,6 @@ void handleDialogueKeys(Display *display, XEvent event)
     switch (keysym)
     {
         case XK_Escape:
-            dialogueState = DIALOGUE_UNMAP;
-            break;
-
         case XK_Return:
             dialogueState = DIALOGUE_UNMAP;
             break;
@@ -381,8 +380,6 @@ static void handleDialogueEventLoop(Display *display)
                     break;
 
                 case Expose:
-                    break;
-
                 default:
                     break;
             }

@@ -739,6 +739,9 @@ void ChangePointer(Display *display, Window window, int cursorState)
             if (cursorPixmap)
                 XFreePixmap(display, cursorPixmap);
             break;
+
+        default:
+            break;
     }
 
     XDefineCursor(display, window, cursor);

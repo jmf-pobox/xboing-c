@@ -562,8 +562,8 @@ static int CheckEyeDudeBulletCollision(Display *display, Window window, int bx, 
     if (((bx + BULLET_WC) >= (eyeX - EYEDUDE_WC)) && ((bx - BULLET_WC) <= (eyeX + EYEDUDE_WC)) &&
         ((by + BULLET_HC) >= (eyeY - EYEDUDE_WC)) && ((by - BULLET_HC) <= (eyeY + EYEDUDE_WC)))
         return True;
-    else
-        return False;
+
+    return False;
 }
 
 static int CheckBallBulletCollision(Display *display, Window window, int bx, int by, int j)
@@ -576,8 +576,8 @@ static int CheckBallBulletCollision(Display *display, Window window, int bx, int
     if (((bx + BULLET_WC) >= (ballX - BALL_WC)) && ((bx - BULLET_WC) <= (ballX + BALL_WC)) &&
         ((by + BULLET_HC) >= (ballY - BALL_HC)) && ((by - BULLET_HC) <= (ballY + BALL_HC)))
         return True;
-    else
-        return False;
+
+    return False;
 }
 
 static int CheckForBulletCollision(Display *display, Window window, int x, int y)

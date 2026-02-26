@@ -677,6 +677,9 @@ int SaveLevelDataFile(Display *display, const char *levelName)
                         case 5:
                             fputc('5', levelFile);
                             break;
+
+                        default:
+                            break;
                     }
                     break;
 

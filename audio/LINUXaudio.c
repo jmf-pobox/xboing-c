@@ -67,7 +67,7 @@
  *  Internal macro definitions:
  */
 
-#define BUFFER_SIZE				(1024 * SBUF_SIZE)
+#define BUFFER_SIZE				((size_t)1024 * SBUF_SIZE)
 
 static int child_pid = 0;
 static int snd_pipes[2];
@@ -107,7 +107,7 @@ int SetUpAudioSystem(Display *display)
 		/* Successfully forked child */
 		return True;
                 }
-           else
+
                 /* Child Thread */
 	        {
                 static char string[257];     /* String to put read material in */
@@ -135,7 +135,7 @@ int SetUpAudioSystem(Display *display)
   	          }
 	
 		/* Must be a sound file name */
- 		if (str != NULL)
+		if (str != NULL)
 			snprintf(soundfile, sizeof(soundfile), "%s/%s.au", str, string);
 		else
 			snprintf(soundfile, sizeof(soundfile), "%s/%s.au", SOUNDS_DIR, string);

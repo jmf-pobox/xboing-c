@@ -2015,3 +2015,50 @@ function tops).
   (10 headers, plus test stubs).
 - `variableScope` suppressed globally for legacy files only;
   modernized code in `src/` has no suppressions for this category.
+
+## ADR-036: clang-tidy pass with .clang-tidy configuration
+
+**Status:** Accepted
+
+**Context:**
+
+clang-tidy with `bugprone-*`, `performance-*`, and targeted
+`readability-*` checks reported 136 findings across modernized and
+legacy files. Many findings were genuine improvements (missing default
+cases, redundant else-after-return, float-precision math functions,
+implicit widening casts). Others were C idioms that clang-tidy
+incorrectly flagged as bugs (assignment-in-if, branch clones in
+state machines, integer division for pixel coordinates).
+
+**Decision:**
+
+1. **Fix all actionable findings:** Added `default: break;` to 28
+   switch statements. Removed 10 redundant `else` blocks after
+   `return`. Replaced 10 double-precision math calls with float
+   variants (`sqrtf`, `atanf`, `sinf`, `cosf`). Fixed 6 integer
+   divisions used in float context with explicit casts. Fixed 5
+   implicit widening multiplication results. Collapsed 3 duplicate
+   switch branches. Fixed 1 misleading indentation. Fixed 1
+   `BUFFER_SIZE` macro widening.
+
+2. **Create `.clang-tidy` config:** Enables `bugprone-*`,
+   `performance-*`, and four targeted `readability-*` checks.
+   Disables 6 checks that conflict with legitimate C idioms:
+   `assignment-in-if-condition`, `branch-clone`, `signal-handler`,
+   `integer-division`, `easily-swappable-parameters`,
+   `narrowing-conversions`, `macro-parentheses`.
+
+3. **Zero NOLINT comments in production code:** All suppressions
+   are handled by the `.clang-tidy` config file, not inline comments.
+   Only `cppcheck-suppress` comments remain for cppcheck-specific
+   findings.
+
+**Consequences:**
+
+- Zero clang-tidy warnings across entire codebase (src/, legacy,
+  ball_math.c) with the project `.clang-tidy` configuration.
+- `.clang-tidy` config documents each disabled check with rationale.
+- Ball physics float precision improved (eliminates unnecessary
+  double promotion in 10 math calls).
+- All switch statements now have default cases, preventing silent
+  fallthrough on unexpected enum values.
