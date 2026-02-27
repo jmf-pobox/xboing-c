@@ -1,136 +1,142 @@
 # Development Loop
 
-This document defines the autonomous bead-by-bead development loop for
-the XBoing modernization project. It is the reference specification for
-the `/autopilot` skill.
+This document defines the autonomous phase-by-phase development loop for
+the XBoing integration layer. It is the reference specification for the
+`/autopilot` skill.
 
-## Loop: Repeat Until `bd ready` Returns Empty
+## Overview
 
-### 1. Preflight
+The integration layer wires 35 static libraries into a playable SDL2 game.
+Work is organized into 6 phases (see `docs/INTEGRATION_ROADMAP.md`), each
+containing 2-6 beads. The loop processes one phase per iteration:
 
-```bash
-bd ready                          # Pick the highest-priority unblocked bead
-bd show <id>                      # Read description and dependencies
+1. Load context (roadmap, existing code, module APIs)
+2. Create beads for the phase (if they don't exist)
+3. Implement bead-by-bead on a single branch
+4. Run full quality gates
+5. Create PR, get review, merge
+6. Close phase, update roadmap, loop
+
+## Loop: Repeat Until All Phases Complete
+
+### 0. Load Context
+
+Before writing any code, build a mental model:
+
+```text
+Read docs/INTEGRATION_ROADMAP.md        — phase structure, dependencies
+Read include/game_context.h             — master struct
+Read src/game_init.c                    — module creation, callback wiring
+Read src/game_render.c                  — current rendering
+Read src/sprite_catalog.h               — texture key mappings
 ```
 
-Choose the **workflow tier** based on design ambiguity:
-
-| Tier | When | Tool |
-| ---- | ---- | ---- |
-| T3: Direct | Obvious implementation, fewer than 3 files | Manual or plan mode |
-| T2: Feature Dev | Multi-file, needs codebase exploration | `/feature-dev` |
-| T1: Forge | Competing design approaches, cross-cutting | `/feature-forge` |
-
-### 2. Claim and Branch
+Check current state:
 
 ```bash
-bd update <id> --status=in_progress
-git checkout -b <prefix>/<slug> master
+bd ready                                # Unblocked work
+bd list --status=open                   # All open
+bd list --status=in_progress            # Anything mid-flight
 ```
 
-Branch prefixes: `feat/`, `fix/`, `refactor/`, `port/`, `docs/`, `test/`.
+Verify clean build:
 
-### 3. Do the Work
+```bash
+cmake --build build 2>&1 | grep -c "warning:"
+ctest --test-dir build --output-on-failure
+```
 
-- Read before you write. Understand existing code before modifying it.
-- Consult expert agents when appropriate (see CLAUDE.md Agent table).
-- Separate concerns: format-only commits stay separate from logic changes.
-- Write ADR in `docs/DESIGN.md` for non-trivial decisions.
+### 1. Plan the Phase
+
+Determine the next phase from the roadmap. Create task beads if they
+don't exist:
+
+```bash
+bd create "Bead N.M: <title>" --type=task --priority=1 \
+  --parent=<phase-epic> \
+  --deps=<predecessor> \
+  --description="<files, wiring, verification>"
+```
+
+**Read module headers** for every system you'll touch. Understand create
+signatures, callback structs, render info types, environment structs.
+
+### 2. Branch
+
+```bash
+bd update <first-bead> --status=in_progress
+git checkout master && git pull origin master
+git checkout -b feat/<phase-slug> master
+```
+
+One branch per phase, not per bead.
+
+### 3. Implement Bead-by-Bead
+
+For each bead:
+
+1. **Read** every file you'll modify and every module header you'll call
+2. **Write** the code, following existing patterns
+3. **Build and test** — `cmake --build build && ctest --test-dir build`
+4. **Commit** — `git commit -m "feat(integration): <bead summary>\n\nBead <id>"`
+5. **Close bead** — `bd close <id> -r "Committed in <sha>"`
+6. **Claim next** — `bd update <next-id> --status=in_progress`
 
 ### 4. Quality Gates (All Must Pass)
 
 ```bash
-# Build both systems
+# CMake build (strict)
 cmake --build build --clean-first
+
+# Legacy build
 make clean && make
 
-# Static analysis (strict — zero warnings)
+# Static analysis
 cppcheck --enable=warning,style,performance,portability \
   --inline-suppr --suppress=variableScope:ball_math.c \
   --error-exitcode=1 src/ ball_math.c
-cppcheck --enable=warning,style,performance,portability \
-  --inline-suppr --suppress=missingIncludeSystem \
-  --suppress=variableScope --error-exitcode=1 \
-  -I include/ $(ls *.c | grep -v '^ball_math\.c$')
-cppcheck --enable=warning,style,performance,portability \
-  --inline-suppr --suppress=missingIncludeSystem \
-  --error-exitcode=1 -I include/ tests/
-clang-tidy src/*.c ball_math.c -- -I include/ -I /usr/include/X11
+clang-format --dry-run --Werror src/*.c include/game_*.h
 
-# Formatting (modernized files only)
-clang-format --dry-run --Werror src/*.c ball_math.c include/sdl2_*.h
-
-# Unit tests
+# Tests
 ctest --test-dir build --output-on-failure
-
-# Sanitizer tests
 cmake --build build-asan --clean-first
 ctest --test-dir build-asan --output-on-failure
 
-# Markdown lint (if .md files changed)
+# Markdown lint (if changed)
 npx markdownlint-cli2 "*.{md,markdown}"
 ```
 
-### 5. Commit
-
-```bash
-git add <specific files>
-git commit -m "<type>(<scope>): <description>
-
-Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>"
-```
-
-Commit types: `feat:`, `fix:`, `refactor:`, `test:`, `port:`, `build:`, `docs:`.
-
-### 6. Push and Create PR
+### 5. Push and PR
 
 ```bash
 git push -u origin <branch>
-gh pr create --title "<type>(<scope>): <summary>" \
-  --body "## Summary\n...\n## Test plan\n..."
+gh pr create --title "feat(integration): Phase N — <summary>" \
+  --body "## Summary\n- Bead N.1: ...\n- Bead N.2: ...\n\n## Test plan\n..."
 ```
 
-### 7. Copilot Review Cycle
+Request Copilot review via MCP tool. Wait for CI. Address feedback (up to
+3 rounds).
+
+### 6. Merge and Close
 
 ```bash
-# Request review
-gh api repos/{owner}/{repo}/pulls/{pr}/requested_reviewers \
-  -f '{"reviewers":["copilot-pull-request-reviewer"]}'
-
-# Wait for CI (all checks must pass)
-gh pr checks <pr> --watch
-
-# Check for review feedback
-gh api repos/{owner}/{repo}/pulls/{pr}/reviews
-gh api repos/{owner}/{repo}/pulls/{pr}/comments
-```
-
-**If feedback exists:** Address it. Push fixes. Re-check CI. Repeat up
-to 3 rounds. If feedback is a false positive, respond with rationale.
-
-**If no feedback after CI passes:** Proceed to merge.
-
-### 8. Merge and Close
-
-```bash
-# Squash merge
 gh pr merge <pr> --squash
-
-# Update local
 git checkout master && git pull origin master
 git branch -d <branch>
-
-# Close bead
-bd close <id> -r "Merged PR #<n>"
-
-# Close parent epic if all children are done
-bd show <parent-id>   # Check children status
-bd close <parent-id> -r "All children complete"
-
-# Sync
+bd close <phase-epic> -r "Merged PR #<n>"
 bd sync
 ```
 
-### 9. Loop
+### 7. Update and Loop
 
-Go to step 1. Stop when `bd ready` returns empty.
+Update `docs/INTEGRATION_ROADMAP.md` to mark the completed phase.
+Go to step 0.
+
+## Expert Agents
+
+| When | Agent |
+| ---- | ----- |
+| Gameplay mechanics, physics, constants | `xboing-author` |
+| C code quality, sanitizer findings | `c-modernization-expert` |
+| SDL2 rendering/audio, X11 porting | `av-platform-expert` |
+| Test strategy, testability seams | `test-expert` |

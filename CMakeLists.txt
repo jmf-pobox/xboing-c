@@ -609,6 +609,78 @@ target_include_directories(config_io PUBLIC
 )
 target_compile_options(config_io PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
 
+# --- XDG paths library -------------------------------------------------------
+#
+# Pure C module — no SDL2 or X11 dependency.  XDG Base Directory path resolution
+# for levels, sounds, scores, and save files.
+
+add_library(paths STATIC src/paths.c)
+target_include_directories(paths PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+target_compile_options(paths PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+
+# --- SDL2 game executable (integration layer) --------------------------------
+#
+# The new SDL2-based game binary.  Links all pure C system libraries and SDL2
+# platform libraries.  Built only when all required SDL2 libs are available.
+
+if(SDL2_FOUND AND SDL2_IMAGE_FOUND AND SDL2_MIXER_FOUND AND SDL2_TTF_FOUND)
+    add_executable(xboing_sdl2
+        src/game_init.c
+        src/game_main.c
+        src/game_render.c
+    )
+    target_include_directories(xboing_sdl2 PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${SDL2_INCLUDE_DIRS}
+    )
+    target_compile_options(xboing_sdl2 PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+    target_link_libraries(xboing_sdl2 PRIVATE
+        # SDL2 platform
+        sdl2_renderer
+        sdl2_texture
+        sdl2_font
+        sdl2_audio
+        sdl2_input
+        sdl2_cursor
+        sdl2_state
+        sdl2_loop
+        sdl2_cli
+        # Game systems
+        ball_system
+        block_system
+        paddle_system
+        gun_system
+        score_system
+        level_system
+        special_system
+        bonus_system
+        sfx_system
+        eyedude_system
+        message_system
+        editor_system
+        # Persistence
+        highscore_io
+        savegame_io
+        config_io
+        paths
+        # Math
+        score_logic
+        m
+    )
+    # UI sequencers
+    target_link_libraries(xboing_sdl2 PRIVATE
+        presents_system
+        intro_system
+        demo_system
+        keys_system
+        dialogue_system
+        highscore_system
+    )
+endif()
+
 # --- Tests ------------------------------------------------------------------
 
 option(BUILD_TESTING "Build unit tests" ON)
