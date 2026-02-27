@@ -15,6 +15,7 @@
  */
 
 #include "game_init.h"
+#include "game_render.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -70,6 +71,9 @@
 /* These will be replaced when game_modes.c / game_callbacks.c are wired. */
 static void stub_tick(void *user_data);
 static void stub_render(double alpha, void *user_data);
+
+/* Level → block system bridge callback */
+static void on_level_add_block(int row, int col, int block_type, int counter_slide, void *ud);
 
 /* =========================================================================
  * game_create
@@ -329,9 +333,9 @@ game_ctx_t *game_create(int argc, char *argv[])
         }
     }
 
-    /* Level system (stub callbacks) */
+    /* Level system (wired to block system) */
     {
-        level_system_callbacks_t lcb = {0};
+        level_system_callbacks_t lcb = {.on_add_block = on_level_add_block};
         level_system_status_t ls;
         ctx->level = level_system_create(&lcb, ctx, &ls);
         if (!ctx->level)
@@ -471,6 +475,25 @@ game_ctx_t *game_create(int argc, char *argv[])
         }
     }
 
+    /* ---- Phase 6: Load initial level ------------------------------------ */
+    {
+        int file_num = level_system_wrap_number(ctx->level_number);
+        char filename[32];
+        snprintf(filename, sizeof(filename), "level%02d.data", file_num);
+
+        char level_path[PATHS_MAX_PATH];
+        if (paths_level_file(&ctx->paths, filename, level_path, sizeof(level_path)) == PATHS_OK)
+        {
+            block_system_clear_all(ctx->block);
+            level_system_advance_background(ctx->level);
+            level_system_load_file(ctx->level, level_path);
+        }
+        else
+        {
+            fprintf(stderr, "Warning: could not find level file: %s\n", filename);
+        }
+    }
+
     return ctx;
 
 fail:
@@ -540,6 +563,16 @@ static void stub_render(double alpha, void *user_data)
 {
     (void)alpha;
     game_ctx_t *ctx = user_data;
-    sdl2_renderer_clear(ctx->renderer);
-    sdl2_renderer_present(ctx->renderer);
+    game_render_frame(ctx);
+}
+
+/* =========================================================================
+ * Level → block system bridge
+ * ========================================================================= */
+
+static void on_level_add_block(int row, int col, int block_type, int counter_slide, void *ud)
+{
+    game_ctx_t *ctx = ud;
+    /* frame=0 for initial load — animation timing is irrelevant */
+    block_system_add(ctx->block, row, col, block_type, counter_slide, 0);
 }
