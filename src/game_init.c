@@ -61,7 +61,7 @@
 #define GAME_PLAY_WIDTH 495
 #define GAME_PLAY_HEIGHT 580
 #define GAME_MAIN_WIDTH 70
-#define GAME_COL_WIDTH (GAME_PLAY_WIDTH / 9)  /* 55 */
+#define GAME_COL_WIDTH (GAME_PLAY_WIDTH / 9)    /* 55 */
 #define GAME_ROW_HEIGHT (GAME_PLAY_HEIGHT / 18) /* 32 */
 
 /* =========================================================================
@@ -205,8 +205,7 @@ game_ctx_t *game_create(int argc, char *argv[])
         ctx->font = sdl2_font_create(&fcfg, &fs);
         if (!ctx->font)
         {
-            fprintf(stderr, "game_create: font creation failed: %s\n",
-                    sdl2_font_status_string(fs));
+            fprintf(stderr, "game_create: font creation failed: %s\n", sdl2_font_status_string(fs));
             goto fail;
         }
     }
@@ -289,7 +288,8 @@ game_ctx_t *game_create(int argc, char *argv[])
     /* Paddle system */
     {
         paddle_system_status_t ps2;
-        ctx->paddle = paddle_system_create(GAME_PLAY_WIDTH, GAME_PLAY_HEIGHT, GAME_MAIN_WIDTH, &ps2);
+        ctx->paddle =
+            paddle_system_create(GAME_PLAY_WIDTH, GAME_PLAY_HEIGHT, GAME_MAIN_WIDTH, &ps2);
         if (!ctx->paddle)
         {
             fprintf(stderr, "game_create: paddle system creation failed\n");

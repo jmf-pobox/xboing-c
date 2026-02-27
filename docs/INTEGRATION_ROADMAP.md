@@ -6,7 +6,7 @@ playable SDL2 game binary.
 
 ## File Structure
 
-```
+```text
 src/
   game_context.h      — master context struct (all module pointers + game state)
   game_main.c         — main(), SDL2 init, event pump, top-level loop
@@ -86,7 +86,7 @@ Full startup sequence and post-game screens.
 
 ## Dependency Graph
 
-```
+```text
 Phase 1: 1.1 → 1.2 → 1.3 → 1.4   (COMPLETE)
 Phase 2: 1.4 → 2.1 → 2.2 → 2.3 → 2.4
                               ↓

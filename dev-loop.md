@@ -23,7 +23,7 @@ containing 2-6 beads. The loop processes one phase per iteration:
 
 Before writing any code, build a mental model:
 
-```
+```text
 Read docs/INTEGRATION_ROADMAP.md        — phase structure, dependencies
 Read include/game_context.h             — master struct
 Read src/game_init.c                    — module creation, callback wiring
@@ -32,6 +32,7 @@ Read src/sprite_catalog.h               — texture key mappings
 ```
 
 Check current state:
+
 ```bash
 bd ready                                # Unblocked work
 bd list --status=open                   # All open
@@ -39,6 +40,7 @@ bd list --status=in_progress            # Anything mid-flight
 ```
 
 Verify clean build:
+
 ```bash
 cmake --build build 2>&1 | grep -c "warning:"
 ctest --test-dir build --output-on-failure
@@ -133,7 +135,7 @@ Go to step 0.
 ## Expert Agents
 
 | When | Agent |
-|------|-------|
+| ---- | ----- |
 | Gameplay mechanics, physics, constants | `xboing-author` |
 | C code quality, sanitizer findings | `c-modernization-expert` |
 | SDL2 rendering/audio, X11 porting | `av-platform-expert` |

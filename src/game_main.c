@@ -48,17 +48,17 @@ int main(int argc, char *argv[])
         {
             switch (event.type)
             {
-            case SDL_QUIT:
-                running = false;
-                break;
-
-            case SDL_WINDOWEVENT:
-                if (event.window.event == SDL_WINDOWEVENT_CLOSE)
+                case SDL_QUIT:
                     running = false;
-                break;
+                    break;
 
-            default:
-                break;
+                case SDL_WINDOWEVENT:
+                    if (event.window.event == SDL_WINDOWEVENT_CLOSE)
+                        running = false;
+                    break;
+
+                default:
+                    break;
             }
 
             /* Feed every event to the input module */

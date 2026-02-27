@@ -280,68 +280,68 @@ static inline const char *sprite_block_key(int block_type)
 {
     switch (block_type)
     {
-    case RED_BLK:
-        return SPR_BLOCK_RED;
-    case BLUE_BLK:
-        return SPR_BLOCK_BLUE;
-    case GREEN_BLK:
-        return SPR_BLOCK_GREEN;
-    case TAN_BLK:
-        return SPR_BLOCK_TAN;
-    case YELLOW_BLK:
-        return SPR_BLOCK_YELLOW;
-    case PURPLE_BLK:
-        return SPR_BLOCK_PURPLE;
-    case BULLET_BLK:
-        return SPR_BLOCK_LOTSAMMO;
-    case BLACK_BLK:
-        return SPR_BLOCK_BLACK;
-    case COUNTER_BLK:
-        return SPR_BLOCK_COUNTER;
-    case BOMB_BLK:
-        return SPR_BLOCK_BOMB;
-    case DEATH_BLK:
-        return SPR_BLOCK_DEATH_1;
-    case REVERSE_BLK:
-        return SPR_BLOCK_REVERSE;
-    case HYPERSPACE_BLK:
-        return SPR_BLOCK_HYPERSPACE;
-    case EXTRABALL_BLK:
-        return SPR_BLOCK_EXTRABALL;
-    case MGUN_BLK:
-        return SPR_BLOCK_MACHGUN;
-    case WALLOFF_BLK:
-        return SPR_BLOCK_WALLOFF;
-    case MULTIBALL_BLK:
-        return SPR_BLOCK_MULTIBALL;
-    case STICKY_BLK:
-        return SPR_BLOCK_STICKY;
-    case PAD_SHRINK_BLK:
-        return SPR_BLOCK_PAD_SHRINK;
-    case PAD_EXPAND_BLK:
-        return SPR_BLOCK_PAD_EXPAND;
-    case DROP_BLK:
-        return SPR_BLOCK_RED; /* Drop uses row-dependent coloring */
-    case MAXAMMO_BLK:
-        return SPR_BLOCK_LOTSAMMO;
-    case ROAMER_BLK:
-        return SPR_BLOCK_ROAMER;
-    case TIMER_BLK:
-        return SPR_BLOCK_CLOCK;
-    case RANDOM_BLK:
-        return SPR_BLOCK_BONUS_1; /* Random uses animated bonus frames */
-    case DYNAMITE_BLK:
-        return SPR_BLOCK_DYNAMITE;
-    case BONUSX2_BLK:
-        return SPR_BLOCK_X2_1;
-    case BONUSX4_BLK:
-        return SPR_BLOCK_X4_1;
-    case BONUS_BLK:
-        return SPR_BLOCK_BONUS_1;
-    case BLACKHIT_BLK:
-        return SPR_BLOCK_BLACK_HIT;
-    default:
-        return NULL;
+        case RED_BLK:
+            return SPR_BLOCK_RED;
+        case BLUE_BLK:
+            return SPR_BLOCK_BLUE;
+        case GREEN_BLK:
+            return SPR_BLOCK_GREEN;
+        case TAN_BLK:
+            return SPR_BLOCK_TAN;
+        case YELLOW_BLK:
+            return SPR_BLOCK_YELLOW;
+        case PURPLE_BLK:
+            return SPR_BLOCK_PURPLE;
+        case BULLET_BLK:
+            return SPR_BLOCK_LOTSAMMO;
+        case BLACK_BLK:
+            return SPR_BLOCK_BLACK;
+        case COUNTER_BLK:
+            return SPR_BLOCK_COUNTER;
+        case BOMB_BLK:
+            return SPR_BLOCK_BOMB;
+        case DEATH_BLK:
+            return SPR_BLOCK_DEATH_1;
+        case REVERSE_BLK:
+            return SPR_BLOCK_REVERSE;
+        case HYPERSPACE_BLK:
+            return SPR_BLOCK_HYPERSPACE;
+        case EXTRABALL_BLK:
+            return SPR_BLOCK_EXTRABALL;
+        case MGUN_BLK:
+            return SPR_BLOCK_MACHGUN;
+        case WALLOFF_BLK:
+            return SPR_BLOCK_WALLOFF;
+        case MULTIBALL_BLK:
+            return SPR_BLOCK_MULTIBALL;
+        case STICKY_BLK:
+            return SPR_BLOCK_STICKY;
+        case PAD_SHRINK_BLK:
+            return SPR_BLOCK_PAD_SHRINK;
+        case PAD_EXPAND_BLK:
+            return SPR_BLOCK_PAD_EXPAND;
+        case DROP_BLK:
+            return SPR_BLOCK_RED; /* Drop uses row-dependent coloring */
+        case MAXAMMO_BLK:
+            return SPR_BLOCK_LOTSAMMO;
+        case ROAMER_BLK:
+            return SPR_BLOCK_ROAMER;
+        case TIMER_BLK:
+            return SPR_BLOCK_CLOCK;
+        case RANDOM_BLK:
+            return SPR_BLOCK_BONUS_1; /* Random uses animated bonus frames */
+        case DYNAMITE_BLK:
+            return SPR_BLOCK_DYNAMITE;
+        case BONUSX2_BLK:
+            return SPR_BLOCK_X2_1;
+        case BONUSX4_BLK:
+            return SPR_BLOCK_X4_1;
+        case BONUS_BLK:
+            return SPR_BLOCK_BONUS_1;
+        case BLACKHIT_BLK:
+            return SPR_BLOCK_BLACK_HIT;
+        default:
+            return NULL;
     }
 }
 
@@ -352,16 +352,16 @@ static inline const char *sprite_ball_key(int slide)
 {
     switch (slide % 4)
     {
-    case 0:
-        return SPR_BALL_1;
-    case 1:
-        return SPR_BALL_2;
-    case 2:
-        return SPR_BALL_3;
-    case 3:
-        return SPR_BALL_4;
-    default:
-        return SPR_BALL_1;
+        case 0:
+            return SPR_BALL_1;
+        case 1:
+            return SPR_BALL_2;
+        case 2:
+            return SPR_BALL_3;
+        case 3:
+            return SPR_BALL_4;
+        default:
+            return SPR_BALL_1;
     }
 }
 
@@ -411,8 +411,8 @@ static inline const char *sprite_digit_key(int digit)
 static inline const char *sprite_star_key(int frame)
 {
     static const char *const stars[] = {
-        SPR_STAR_1,  SPR_STAR_2,  SPR_STAR_3, SPR_STAR_4, SPR_STAR_5, SPR_STAR_6,
-        SPR_STAR_7,  SPR_STAR_8,  SPR_STAR_9, SPR_STAR_10, SPR_STAR_11,
+        SPR_STAR_1, SPR_STAR_2, SPR_STAR_3, SPR_STAR_4,  SPR_STAR_5,  SPR_STAR_6,
+        SPR_STAR_7, SPR_STAR_8, SPR_STAR_9, SPR_STAR_10, SPR_STAR_11,
     };
     if (frame < 1 || frame > 11)
         return SPR_STAR_1;
@@ -427,18 +427,18 @@ static inline const char *sprite_background_key(int number)
 {
     switch (number)
     {
-    case 1:
-        return SPR_BGRND;
-    case 2:
-        return SPR_BGRND_2;
-    case 3:
-        return SPR_BGRND_3;
-    case 4:
-        return SPR_BGRND_4;
-    case 5:
-        return SPR_BGRND_5;
-    default:
-        return SPR_BGRND;
+        case 1:
+            return SPR_BGRND;
+        case 2:
+            return SPR_BGRND_2;
+        case 3:
+            return SPR_BGRND_3;
+        case 4:
+            return SPR_BGRND_4;
+        case 5:
+            return SPR_BGRND_5;
+        default:
+            return SPR_BGRND;
     }
 }
 
