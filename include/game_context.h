@@ -53,7 +53,7 @@ typedef struct intro_system intro_system_t;
 typedef struct demo_system demo_system_t;
 typedef struct keys_system keys_system_t;
 typedef struct dialogue_system dialogue_system_t;
-typedef struct highscore_system highscore_system_t;
+/* highscore_system_t already typedef'd via highscore_system.h above */
 
 /* =========================================================================
  * Master context

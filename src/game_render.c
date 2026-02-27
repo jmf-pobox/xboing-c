@@ -85,18 +85,19 @@ void game_render_playfield(const game_ctx_t *ctx)
 {
     SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
 
-    /* Draw play area border (red rectangle) */
+    /* Draw play area border (red rectangle).
+     * Top border sits just above the play area; left/right extend from the
+     * top border down past the play area bottom (bottom is open for ball death). */
     SDL_SetRenderDrawColor(sdl, 200, 0, 0, 255);
-    SDL_Rect border = {
-        .x = PLAY_AREA_X - BORDER_THICKNESS,
-        .y = PLAY_AREA_Y - BORDER_THICKNESS,
-        .w = PLAY_AREA_W + 2 * BORDER_THICKNESS,
-        .h = PLAY_AREA_H + 2 * BORDER_THICKNESS,
-    };
-    /* Draw top, left, right borders (bottom is open for ball death) */
-    SDL_Rect top = {border.x, border.y, border.w, BORDER_THICKNESS};
-    SDL_Rect left = {border.x, border.y, BORDER_THICKNESS, border.h};
-    SDL_Rect right = {border.x + border.w - BORDER_THICKNESS, border.y, BORDER_THICKNESS, border.h};
+
+    int bx = PLAY_AREA_X - BORDER_THICKNESS;
+    int by = PLAY_AREA_Y; /* top border at y=0, not negative */
+    int bw = PLAY_AREA_W + 2 * BORDER_THICKNESS;
+    int bh = PLAY_AREA_H + BORDER_THICKNESS; /* extends from top to bottom */
+
+    SDL_Rect top = {bx, by, bw, BORDER_THICKNESS};
+    SDL_Rect left = {bx, by, BORDER_THICKNESS, bh};
+    SDL_Rect right = {bx + bw - BORDER_THICKNESS, by, BORDER_THICKNESS, bh};
     SDL_RenderFillRect(sdl, &top);
     SDL_RenderFillRect(sdl, &left);
     SDL_RenderFillRect(sdl, &right);
