@@ -587,3 +587,82 @@ highscore_system_callbacks_t game_callbacks_highscore(void)
     };
     return cbs;
 }
+
+/* =========================================================================
+ * SFX system callbacks
+ * ========================================================================= */
+
+static void sfx_cb_on_move_window(int x, int y, void *ud)
+{
+    (void)x;
+    (void)y;
+    (void)ud;
+    /* Shake offset is applied during rendering via sfx_system_get_shake_pos() */
+}
+
+static void sfx_cb_on_sound(const char *name, void *ud)
+{
+    game_ctx_t *ctx = ud;
+    if (ctx->audio)
+        sdl2_audio_play(ctx->audio, name);
+}
+
+sfx_system_callbacks_t game_callbacks_sfx(void)
+{
+    sfx_system_callbacks_t cbs = {
+        .on_move_window = sfx_cb_on_move_window,
+        .on_sound = sfx_cb_on_sound,
+    };
+    return cbs;
+}
+
+/* =========================================================================
+ * EyeDude system callbacks
+ * ========================================================================= */
+
+static int eyedude_cb_is_path_clear(void *ud)
+{
+    game_ctx_t *ctx = ud;
+    /* Check if top row has blocks */
+    for (int col = 0; col < MAX_COL; col++)
+    {
+        if (block_system_is_occupied(ctx->block, 0, col))
+            return 0;
+    }
+    return 1;
+}
+
+static void eyedude_cb_on_score(unsigned long points, void *ud)
+{
+    game_ctx_t *ctx = ud;
+    score_system_env_t senv = {
+        .x2_active = special_system_is_active(ctx->special, SPECIAL_X2_BONUS),
+        .x4_active = special_system_is_active(ctx->special, SPECIAL_X4_BONUS),
+    };
+    score_system_add(ctx->score, points, &senv);
+}
+
+static void eyedude_cb_on_sound(const char *name, void *ud)
+{
+    game_ctx_t *ctx = ud;
+    if (ctx->audio)
+        sdl2_audio_play(ctx->audio, name);
+}
+
+static void eyedude_cb_on_message(const char *msg, void *ud)
+{
+    game_ctx_t *ctx = ud;
+    int frame = (int)sdl2_state_frame(ctx->state);
+    message_system_set(ctx->message, msg, 1, frame);
+}
+
+eyedude_system_callbacks_t game_callbacks_eyedude(void)
+{
+    eyedude_system_callbacks_t cbs = {
+        .is_path_clear = eyedude_cb_is_path_clear,
+        .on_score = eyedude_cb_on_score,
+        .on_sound = eyedude_cb_on_sound,
+        .on_message = eyedude_cb_on_message,
+    };
+    return cbs;
+}

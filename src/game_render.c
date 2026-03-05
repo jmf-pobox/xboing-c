@@ -21,6 +21,7 @@
 #include "ball_types.h"
 #include "block_system.h"
 #include "block_types.h"
+#include "eyedude_system.h"
 #include "game_context.h"
 #include "gun_system.h"
 #include "level_system.h"
@@ -29,6 +30,7 @@
 #include "sdl2_renderer.h"
 #include "sdl2_state.h"
 #include "sdl2_texture.h"
+#include "sfx_system.h"
 #include "sprite_catalog.h"
 
 /* =========================================================================
@@ -447,6 +449,91 @@ static void render_main_background(const game_ctx_t *ctx)
     }
 }
 
+/* =========================================================================
+ * EyeDude rendering
+ * ========================================================================= */
+
+void game_render_eyedude(const game_ctx_t *ctx)
+{
+    eyedude_render_info_t info = eyedude_system_get_render_info(ctx->eyedude);
+    if (!info.visible)
+        return;
+
+    /* Select sprite based on direction and frame */
+    const char *key = NULL;
+    if (info.dir == EYEDUDE_DIR_LEFT)
+    {
+        static const char *const left_keys[] = {SPR_GUY_LEFT_1, SPR_GUY_LEFT_2, SPR_GUY_LEFT_3,
+                                                 SPR_GUY_LEFT_4, SPR_GUY_LEFT_5, SPR_GUY_LEFT_6};
+        key = left_keys[info.frame_index % 6];
+    }
+    else if (info.dir == EYEDUDE_DIR_RIGHT)
+    {
+        static const char *const right_keys[] = {SPR_GUY_RIGHT_1, SPR_GUY_RIGHT_2, SPR_GUY_RIGHT_3,
+                                                  SPR_GUY_RIGHT_4, SPR_GUY_RIGHT_5, SPR_GUY_RIGHT_6};
+        key = right_keys[info.frame_index % 6];
+    }
+    else if (info.dir == EYEDUDE_DIR_DEAD)
+    {
+        key = SPR_EYEDUDE_DEAD;
+    }
+
+    if (!key)
+        return;
+
+    sdl2_texture_info_t tex;
+    if (sdl2_texture_get(ctx->texture, key, &tex) != SDL2T_OK)
+        return;
+
+    SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
+    SDL_Rect dst = {
+        .x = PLAY_AREA_X + info.x - EYEDUDE_WC,
+        .y = PLAY_AREA_Y + info.y - EYEDUDE_HC,
+        .w = EYEDUDE_WIDTH,
+        .h = EYEDUDE_HEIGHT,
+    };
+    SDL_RenderCopy(sdl, tex.texture, NULL, &dst);
+}
+
+/* =========================================================================
+ * Border glow rendering — ambient color cycling on the play area border
+ * ========================================================================= */
+
+void game_render_border_glow(const game_ctx_t *ctx)
+{
+    sfx_glow_state_t glow = sfx_system_update_glow(ctx->sfx, 0); /* read-only query */
+    (void)glow;
+    /* Border glow changes the red border color — simplified for now,
+     * full color cycling deferred to Phase 6 polish. */
+}
+
+/* =========================================================================
+ * Devil eyes rendering
+ * ========================================================================= */
+
+void game_render_deveyes(const game_ctx_t *ctx)
+{
+    sfx_deveye_info_t info = sfx_system_get_deveye_info(ctx->sfx);
+    if (!info.active)
+        return;
+
+    static const char *const eye_keys[] = {SPR_EYEDUDE,   SPR_EYEDUDE_1, SPR_EYEDUDE_2,
+                                           SPR_EYEDUDE_3, SPR_EYEDUDE_4, SPR_EYEDUDE_5};
+    int fi = info.frame_index % SFX_DEVEYE_FRAMES;
+    sdl2_texture_info_t tex;
+    if (sdl2_texture_get(ctx->texture, eye_keys[fi], &tex) != SDL2T_OK)
+        return;
+
+    SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
+    SDL_Rect dst = {
+        .x = PLAY_AREA_X + info.x,
+        .y = PLAY_AREA_Y + info.y,
+        .w = SFX_DEVEYE_WIDTH,
+        .h = SFX_DEVEYE_HEIGHT,
+    };
+    SDL_RenderCopy(sdl, tex.texture, NULL, &dst);
+}
+
 void game_render_frame(const game_ctx_t *ctx)
 {
     sdl2_renderer_clear(ctx->renderer);
@@ -499,8 +586,12 @@ void game_render_frame(const game_ctx_t *ctx)
         case SDL2ST_PAUSE:
             /* Play area background (level-specific tile) */
             game_render_background(ctx);
-            /* Playfield border + blocks */
+            /* Playfield border + blocks + paddle + balls + bullets (clipped) */
             game_render_playfield(ctx);
+            /* EyeDude character (inside play area, after clip removed) */
+            game_render_eyedude(ctx);
+            /* Devil eyes blink animation */
+            game_render_deveyes(ctx);
             /* Score and status */
             game_render_score(ctx);
             /* Lives and level */

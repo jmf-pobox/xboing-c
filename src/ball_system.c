@@ -771,9 +771,14 @@ static void animate_ball_create(ball_system_t *ctx, const ball_system_env_t *env
 
     BALL *b = &ctx->balls[i];
 
-    /* Track paddle position during birth animation so ball stays aligned */
-    b->ballx = env->paddle_pos;
-    b->bally = env->play_height - DIST_BALL_OF_PADDLE;
+    /* Track paddle during birth animation — only for balls spawned on the
+     * paddle (reset_start), not for balls added at arbitrary positions
+     * (e.g., multiball split via ball_system_add). */
+    int paddle_y = env->play_height - DIST_BALL_OF_PADDLE;
+    if (b->bally == paddle_y)
+    {
+        b->ballx = env->paddle_pos;
+    }
 
     if (env->frame == b->nextFrame)
     {
