@@ -801,14 +801,18 @@ static char block_type_to_char(int block_type)
 static int editor_cb_save_level(const char *path, void *ud)
 {
     game_ctx_t *ctx = ud;
+    fprintf(stderr, "[editor] Saving to: %s\n", path);
 
     FILE *fp = fopen(path, "w");
     if (!fp)
+    {
+        fprintf(stderr, "[editor] fopen failed: %s\n", path);
         return 0;
+    }
 
     /* Line 1: level title */
     const char *title = editor_system_get_level_title(ctx->editor);
-    fprintf(fp, "%s\n", title ? title : "Untitled");
+    fprintf(fp, "%s\n", (title && title[0] != '\0') ? title : "Untitled");
 
     /* Line 2: time bonus (default 120) */
     fprintf(fp, "120\n");
@@ -835,7 +839,6 @@ static int editor_cb_save_level(const char *path, void *ud)
  */
 static const char *editor_cb_input_dialogue(const char *message, int numeric_only, void *ud)
 {
-    (void)message;
     (void)numeric_only;
     game_ctx_t *ctx = ud;
     static char buf[16];
@@ -843,6 +846,7 @@ static const char *editor_cb_input_dialogue(const char *message, int numeric_onl
     if (num <= 0 || num > 80)
         num = 80;
     snprintf(buf, sizeof(buf), "%d", num);
+    fprintf(stderr, "[editor] input_dialogue('%s') -> '%s'\n", message, buf);
     return buf;
 }
 
