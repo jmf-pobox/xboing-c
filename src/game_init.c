@@ -17,6 +17,7 @@
 #include "game_callbacks.h"
 #include "game_init.h"
 #include "game_render.h"
+#include "game_rules.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -575,12 +576,13 @@ static void stub_tick(void *user_data)
     game_ctx_t *ctx = user_data;
     sdl2_state_update(ctx->state);
 
-    /* Update ball physics during gameplay */
+    /* Update gameplay systems */
     sdl2_state_mode_t mode = sdl2_state_current(ctx->state);
     if (mode == SDL2ST_GAME)
     {
         ball_system_env_t env = game_callbacks_ball_env(ctx);
         ball_system_update(ctx->ball, &env);
+        game_rules_check(ctx);
     }
 }
 

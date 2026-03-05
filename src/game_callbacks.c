@@ -15,6 +15,7 @@
 #include "block_system.h"
 #include "block_types.h"
 #include "game_context.h"
+#include "game_rules.h"
 #include "message_system.h"
 #include "paddle_system.h"
 #include "score_logic.h"
@@ -161,9 +162,22 @@ static void ball_cb_on_message(const char *msg, void *ud)
 static void ball_cb_on_event(ball_system_event_t event, int ball_index, void *ud)
 {
     (void)ball_index;
-    (void)ud;
-    (void)event;
-    /* Real event handling wired in bead 2.4 (game_rules.c) */
+    game_ctx_t *ctx = ud;
+
+    switch (event)
+    {
+        case BALL_EVT_DIED:
+            game_rules_ball_died(ctx);
+            break;
+
+        case BALL_EVT_PADDLE_HIT:
+            if (ctx->audio)
+                sdl2_audio_play(ctx->audio, "paddle");
+            break;
+
+        default:
+            break;
+    }
 }
 
 /* =========================================================================

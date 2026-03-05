@@ -224,6 +224,56 @@ void game_render_background(const game_ctx_t *ctx)
 }
 
 /* =========================================================================
+ * Lives display — small ball sprites below the score area
+ * ========================================================================= */
+
+/* Level window position (from legacy stage.c) */
+#define LEVEL_AREA_X 496
+#define LEVEL_AREA_Y 5
+
+void game_render_lives(const game_ctx_t *ctx)
+{
+    SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
+
+    sdl2_texture_info_t tex;
+    if (sdl2_texture_get(ctx->texture, SPR_BALL_LIFE, &tex) != SDL2T_OK)
+        return;
+
+    /* Draw one life ball for each life remaining */
+    int lives = ctx->lives_left;
+    if (lives > 5)
+        lives = 5; /* Cap display at 5 */
+
+    for (int i = 0; i < lives; i++)
+    {
+        SDL_Rect dst = {
+            .x = LEVEL_AREA_X + 5 + i * 18,
+            .y = LEVEL_AREA_Y + 30,
+            .w = 16,
+            .h = 16,
+        };
+        SDL_RenderCopy(sdl, tex.texture, NULL, &dst);
+    }
+
+    /* Draw level number as digits */
+    int level = ctx->level_number;
+    int d1 = level / 10;
+    int d0 = level % 10;
+
+    sdl2_texture_info_t dtex;
+    if (d1 > 0 && sdl2_texture_get(ctx->texture, sprite_digit_key(d1), &dtex) == SDL2T_OK)
+    {
+        SDL_Rect dst = {LEVEL_AREA_X + 5, LEVEL_AREA_Y + 5, 20, 25};
+        SDL_RenderCopy(sdl, dtex.texture, NULL, &dst);
+    }
+    if (sdl2_texture_get(ctx->texture, sprite_digit_key(d0), &dtex) == SDL2T_OK)
+    {
+        SDL_Rect dst = {LEVEL_AREA_X + 27, LEVEL_AREA_Y + 5, 20, 25};
+        SDL_RenderCopy(sdl, dtex.texture, NULL, &dst);
+    }
+}
+
+/* =========================================================================
  * Score digit rendering
  * ========================================================================= */
 
@@ -272,6 +322,9 @@ void game_render_frame(const game_ctx_t *ctx)
 
     /* Score display */
     game_render_score(ctx);
+
+    /* Lives and level */
+    game_render_lives(ctx);
 
     sdl2_renderer_present(ctx->renderer);
 }

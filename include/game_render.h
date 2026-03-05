@@ -28,4 +28,7 @@ void game_render_balls(const game_ctx_t *ctx);
 /* Render the score digit display. */
 void game_render_score(const game_ctx_t *ctx);
 
+/* Render lives remaining and level number. */
+void game_render_lives(const game_ctx_t *ctx);
+
 #endif /* GAME_RENDER_H */
