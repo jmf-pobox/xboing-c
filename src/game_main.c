@@ -9,6 +9,7 @@
  */
 
 #include "game_init.h"
+#include "game_input.h"
 
 #include <stdbool.h>
 #include <stdio.h>
@@ -72,6 +73,9 @@ int main(int argc, char *argv[])
         /* Toggle fullscreen on F11 */
         if (sdl2_input_just_pressed(ctx->input, SDL2I_ICONIFY))
             sdl2_renderer_toggle_fullscreen(ctx->renderer);
+
+        /* Dispatch input to game modules before the tick */
+        game_input_update(ctx);
 
         /* Calculate elapsed time and drive the game loop */
         Uint64 now = SDL_GetTicks64();

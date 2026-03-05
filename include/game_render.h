@@ -19,4 +19,19 @@ void game_render_playfield(const game_ctx_t *ctx);
 /* Render all occupied blocks in the grid. */
 void game_render_blocks(const game_ctx_t *ctx);
 
+/* Render the paddle at its current position. */
+void game_render_paddle(const game_ctx_t *ctx);
+
+/* Render all active balls. */
+void game_render_balls(const game_ctx_t *ctx);
+
+/* Render all active bullets and tink impact effects. */
+void game_render_bullets(const game_ctx_t *ctx);
+
+/* Render the score digit display. */
+void game_render_score(const game_ctx_t *ctx);
+
+/* Render lives remaining and level number. */
+void game_render_lives(const game_ctx_t *ctx);
+
 #endif /* GAME_RENDER_H */

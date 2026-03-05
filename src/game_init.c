@@ -15,7 +15,9 @@
  */
 
 #include "game_init.h"
+#include "game_callbacks.h"
 #include "game_render.h"
+#include "game_rules.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -297,9 +299,9 @@ game_ctx_t *game_create(int argc, char *argv[])
         }
     }
 
-    /* Ball system (stub callbacks — wired by game_callbacks.c) */
+    /* Ball system (callbacks wired by game_callbacks.c) */
     {
-        ball_system_callbacks_t bcb = {0};
+        ball_system_callbacks_t bcb = game_callbacks_ball();
         ball_system_status_t bs;
         ctx->ball = ball_system_create(&bcb, ctx, &bs);
         if (!ctx->ball)
@@ -309,9 +311,9 @@ game_ctx_t *game_create(int argc, char *argv[])
         }
     }
 
-    /* Gun system (stub callbacks) */
+    /* Gun system (callbacks wired by game_callbacks.c) */
     {
-        gun_system_callbacks_t gcb = {0};
+        gun_system_callbacks_t gcb = game_callbacks_gun();
         gun_system_status_t gs;
         ctx->gun = gun_system_create(GAME_PLAY_HEIGHT, &gcb, ctx, &gs);
         if (!ctx->gun)
@@ -475,7 +477,10 @@ game_ctx_t *game_create(int argc, char *argv[])
         }
     }
 
-    /* ---- Phase 6: Load initial level ------------------------------------ */
+    /* Give initial ammo */
+    gun_system_set_ammo(ctx->gun, GUN_AMMO_PER_LEVEL);
+
+    /* ---- Phase 6: Load initial level + place ball on paddle ------------- */
     {
         int file_num = level_system_wrap_number(ctx->level_number);
         char filename[32];
@@ -492,6 +497,22 @@ game_ctx_t *game_create(int argc, char *argv[])
         {
             fprintf(stderr, "Warning: could not find level file: %s\n", filename);
         }
+    }
+
+    /* Place the first ball on the paddle */
+    {
+        ball_system_env_t env = {
+            .frame = 0,
+            .speed_level = ctx->config.speed,
+            .paddle_pos = paddle_system_get_pos(ctx->paddle),
+            .paddle_dx = 0,
+            .paddle_size = paddle_system_get_size(ctx->paddle),
+            .play_width = GAME_PLAY_WIDTH,
+            .play_height = GAME_PLAY_HEIGHT,
+            .col_width = GAME_COL_WIDTH,
+            .row_height = GAME_ROW_HEIGHT,
+        };
+        ball_system_reset_start(ctx->ball, &env);
     }
 
     return ctx;
@@ -557,6 +578,19 @@ static void stub_tick(void *user_data)
 {
     game_ctx_t *ctx = user_data;
     sdl2_state_update(ctx->state);
+
+    /* Update gameplay systems */
+    sdl2_state_mode_t mode = sdl2_state_current(ctx->state);
+    if (mode == SDL2ST_GAME)
+    {
+        ball_system_env_t benv = game_callbacks_ball_env(ctx);
+        ball_system_update(ctx->ball, &benv);
+
+        gun_system_env_t genv = game_callbacks_gun_env(ctx);
+        gun_system_update(ctx->gun, &genv);
+
+        game_rules_check(ctx);
+    }
 }
 
 static void stub_render(double alpha, void *user_data)
