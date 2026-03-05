@@ -33,7 +33,7 @@ SDL2 window opens, loads assets, shows a static level with blocks rendered.
 - 1.3: Main entry point + event pump
 - 1.4: Static level rendering
 
-### Phase 2: Core Gameplay — 6 beads
+### Phase 2: Core Gameplay (COMPLETE — PR #66)
 
 Paddle moves, ball bounces, blocks break, score updates, levels advance.
 
