@@ -43,4 +43,7 @@ void game_render_deveyes(const game_ctx_t *ctx);
 /* Render border glow color cycling. */
 void game_render_border_glow(const game_ctx_t *ctx);
 
+/* Render the editor palette sidebar. */
+void game_render_editor_palette(const game_ctx_t *ctx);
+
 #endif /* GAME_RENDER_H */

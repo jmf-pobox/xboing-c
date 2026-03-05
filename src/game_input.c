@@ -315,11 +315,18 @@ void game_input_update(game_ctx_t *ctx)
             if (!sdl2_input_shift_held(ctx->input))
                 input_check_speed(ctx);
 
+            /* E key enters editor */
+            if (sdl2_input_just_pressed(ctx->input, SDL2I_ENTER_EDITOR))
+                sdl2_state_transition(ctx->state, SDL2ST_EDIT);
+
             /* Debug cheat codes (Shift+key, --debug only) */
             input_debug_cheats(ctx);
             break;
 
         default:
+            /* E key enters editor from any attract screen */
+            if (sdl2_input_just_pressed(ctx->input, SDL2I_ENTER_EDITOR))
+                sdl2_state_transition(ctx->state, SDL2ST_EDIT);
             break;
     }
 }

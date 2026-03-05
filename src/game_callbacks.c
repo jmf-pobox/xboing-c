@@ -17,6 +17,7 @@
 #include "bonus_system.h"
 #include "config_io.h"
 #include "demo_system.h"
+#include "editor_system.h"
 #include "game_context.h"
 #include "game_rules.h"
 #include "intro_system.h"
@@ -663,6 +664,98 @@ eyedude_system_callbacks_t game_callbacks_eyedude(void)
         .on_score = eyedude_cb_on_score,
         .on_sound = eyedude_cb_on_sound,
         .on_message = eyedude_cb_on_message,
+    };
+    return cbs;
+}
+
+/* =========================================================================
+ * Editor system callbacks
+ * ========================================================================= */
+
+static void editor_cb_add_block(int row, int col, int block_type, int counter_slide, int visible,
+                                void *ud)
+{
+    (void)visible;
+    game_ctx_t *ctx = ud;
+    block_system_add(ctx->block, row, col, block_type, counter_slide, 0);
+}
+
+static void editor_cb_erase_block(int row, int col, void *ud)
+{
+    game_ctx_t *ctx = ud;
+    block_system_clear(ctx->block, row, col);
+}
+
+static void editor_cb_clear_grid(void *ud)
+{
+    game_ctx_t *ctx = ud;
+    block_system_clear_all(ctx->block);
+}
+
+static int editor_cb_query_cell(int row, int col, editor_cell_t *cell, void *ud)
+{
+    game_ctx_t *ctx = ud;
+    if (!block_system_is_occupied(ctx->block, row, col))
+        return 0;
+    cell->occupied = 1;
+    cell->block_type = block_system_get_type(ctx->block, row, col);
+    cell->counter_slide = 0; /* Simplified — full counter tracking deferred */
+    return 1;
+}
+
+static void editor_cb_on_sound(const char *name, int volume, void *ud)
+{
+    (void)volume;
+    game_ctx_t *ctx = ud;
+    if (ctx->audio)
+        sdl2_audio_play(ctx->audio, name);
+}
+
+static void editor_cb_on_message(const char *message, int sticky, void *ud)
+{
+    game_ctx_t *ctx = ud;
+    int frame = (int)sdl2_state_frame(ctx->state);
+    message_system_set(ctx->message, message, sticky ? 0 : 1, frame);
+}
+
+static int editor_cb_load_level(const char *path, void *ud)
+{
+    game_ctx_t *ctx = ud;
+    block_system_clear_all(ctx->block);
+    return level_system_load_file(ctx->level, path) == LEVEL_SYS_OK ? 1 : 0;
+}
+
+static void editor_cb_on_finish(void *ud)
+{
+    game_ctx_t *ctx = ud;
+    sdl2_state_transition(ctx->state, SDL2ST_INTRO);
+}
+
+static void editor_cb_on_playtest_start(void *ud)
+{
+    game_ctx_t *ctx = ud;
+    sdl2_state_transition(ctx->state, SDL2ST_GAME);
+}
+
+static void editor_cb_on_playtest_end(void *ud)
+{
+    game_ctx_t *ctx = ud;
+    sdl2_state_transition(ctx->state, SDL2ST_EDIT);
+}
+
+editor_system_callbacks_t game_callbacks_editor(void)
+{
+    editor_system_callbacks_t cbs = {
+        .on_add_block = editor_cb_add_block,
+        .on_erase_block = editor_cb_erase_block,
+        .on_clear_grid = editor_cb_clear_grid,
+        .query_cell = editor_cb_query_cell,
+        .on_sound = editor_cb_on_sound,
+        .on_message = editor_cb_on_message,
+        .on_load_level = editor_cb_load_level,
+        .on_finish = editor_cb_on_finish,
+        .on_playtest_start = editor_cb_on_playtest_start,
+        .on_playtest_end = editor_cb_on_playtest_end,
     };
     return cbs;
 }

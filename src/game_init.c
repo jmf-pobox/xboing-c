@@ -400,9 +400,9 @@ game_ctx_t *game_create(int argc, char *argv[])
         goto fail;
     }
 
-    /* Editor system (stub callbacks) */
+    /* Editor system (callbacks wired by game_callbacks.c) */
     {
-        editor_system_callbacks_t ecb = {0};
+        editor_system_callbacks_t ecb = game_callbacks_editor();
         char levels_dir[PATHS_MAX_PATH] = "levels";
         paths_levels_dir(&ctx->paths, levels_dir, sizeof(levels_dir));
         ctx->editor = editor_system_create(&ecb, ctx, levels_dir, !ctx->config.sound);

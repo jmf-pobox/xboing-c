@@ -16,6 +16,7 @@
 #include "block_system.h"
 #include "bonus_system.h"
 #include "demo_system.h"
+#include "editor_system.h"
 #include "eyedude_system.h"
 #include "game_callbacks.h"
 #include "game_context.h"
@@ -48,6 +49,10 @@
 #define GAME_PLAY_HEIGHT 580
 #define GAME_COL_WIDTH (GAME_PLAY_WIDTH / 9)
 #define GAME_ROW_HEIGHT (GAME_PLAY_HEIGHT / 18)
+
+/* Play area position in window (from legacy stage.c) */
+#define PLAY_AREA_X 35
+#define PLAY_AREA_Y 60
 
 static void start_new_game(game_ctx_t *ctx)
 {
@@ -490,6 +495,72 @@ static void mode_highscore_update(sdl2_state_mode_t mode, void *ud)
 }
 
 /* =========================================================================
+ * MODE_EDIT — level editor
+ * ========================================================================= */
+
+static void mode_edit_enter(sdl2_state_mode_t mode, void *ud)
+{
+    (void)mode;
+    game_ctx_t *ctx = ud;
+    editor_system_reset(ctx->editor);
+    editor_system_init_palette(ctx->editor, MAX_STATIC_BLOCKS);
+    block_system_clear_all(ctx->block);
+}
+
+static void mode_edit_update(sdl2_state_mode_t mode, void *ud)
+{
+    (void)mode;
+    game_ctx_t *ctx = ud;
+
+    int frame = (int)sdl2_state_frame(ctx->state);
+    editor_system_update(ctx->editor, frame);
+
+    /* Mouse input — translate window coords to play area coords */
+    int mx = 0, my = 0;
+    sdl2_input_get_mouse(ctx->input, &mx, &my);
+    int play_x = mx - PLAY_AREA_X;
+    int play_y = my - PLAY_AREA_Y;
+
+    /* Mouse buttons */
+    if (sdl2_input_mouse_pressed(ctx->input, 1))
+        editor_system_mouse_button(ctx->editor, play_x, play_y, 1, 1);
+    else
+        editor_system_mouse_button(ctx->editor, play_x, play_y, 1, 0);
+
+    if (sdl2_input_mouse_pressed(ctx->input, 2))
+        editor_system_mouse_button(ctx->editor, play_x, play_y, 2, 1);
+
+    if (sdl2_input_mouse_pressed(ctx->input, 3))
+        editor_system_mouse_button(ctx->editor, play_x, play_y, 3, 1);
+
+    /* Mouse drag */
+    editor_system_mouse_motion(ctx->editor, play_x, play_y);
+
+    /* Keyboard commands */
+    if (sdl2_input_just_pressed(ctx->input, SDL2I_QUIT))
+        editor_system_key_input(ctx->editor, EDITOR_KEY_QUIT);
+    if (sdl2_input_just_pressed(ctx->input, SDL2I_ABORT))
+        editor_system_key_input(ctx->editor, EDITOR_KEY_QUIT);
+    if (sdl2_input_just_pressed(ctx->input, SDL2I_PAUSE))
+        editor_system_key_input(ctx->editor, EDITOR_KEY_PLAYTEST);
+    if (sdl2_input_just_pressed(ctx->input, SDL2I_SAVE))
+        editor_system_key_input(ctx->editor, EDITOR_KEY_SAVE);
+    if (sdl2_input_just_pressed(ctx->input, SDL2I_LOAD))
+        editor_system_key_input(ctx->editor, EDITOR_KEY_LOAD);
+
+    /* Palette scroll with speed keys as palette index shortcut */
+    for (int s = 1; s <= 9; s++)
+    {
+        sdl2_input_action_t action = (sdl2_input_action_t)(SDL2I_SPEED_1 + s - 1);
+        if (sdl2_input_just_pressed(ctx->input, action))
+        {
+            editor_system_select_palette(ctx->editor, s - 1);
+            break;
+        }
+    }
+}
+
+/* =========================================================================
  * Registration
  * ========================================================================= */
 
@@ -595,5 +666,12 @@ void game_modes_register(game_ctx_t *ctx)
         sdl2_state_register(ctx->state, SDL2ST_BONUS, &def);
     }
 
-    /* Remaining modes (dialogue, edit) registered in later beads. */
+    /* MODE_EDIT */
+    {
+        sdl2_state_mode_def_t def = {
+            .on_enter = mode_edit_enter,
+            .on_update = mode_edit_update,
+        };
+        sdl2_state_register(ctx->state, SDL2ST_EDIT, &def);
+    }
 }
