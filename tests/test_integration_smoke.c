@@ -22,6 +22,15 @@
 #include "sdl2_state.h"
 
 /* =========================================================================
+ * Writable argv buffers — CLI parsing may mutate argv strings, so we
+ * must not pass string literals (UB if written to).
+ * ========================================================================= */
+
+static char arg_prog[] = "xboing_test";
+static char arg_startlevel[] = "-startlevel";
+static char arg_five[] = "5";
+
+/* =========================================================================
  * Smoke tests
  * ========================================================================= */
 
@@ -29,7 +38,7 @@ static void test_game_create_returns_non_null(void **vstate)
 {
     (void)vstate;
 
-    char *argv[] = {"xboing_test", NULL};
+    char *argv[] = {arg_prog, NULL};
     int argc = 1;
 
     game_ctx_t *ctx = game_create(argc, argv);
@@ -42,7 +51,7 @@ static void test_all_modules_initialized(void **vstate)
 {
     (void)vstate;
 
-    char *argv[] = {"xboing_test", NULL};
+    char *argv[] = {arg_prog, NULL};
     int argc = 1;
 
     game_ctx_t *ctx = game_create(argc, argv);
@@ -87,7 +96,7 @@ static void test_initial_state_machine_mode(void **vstate)
 {
     (void)vstate;
 
-    char *argv[] = {"xboing_test", NULL};
+    char *argv[] = {arg_prog, NULL};
     int argc = 1;
 
     game_ctx_t *ctx = game_create(argc, argv);
@@ -105,7 +114,7 @@ static void test_initial_game_state(void **vstate)
 {
     (void)vstate;
 
-    char *argv[] = {"xboing_test", NULL};
+    char *argv[] = {arg_prog, NULL};
     int argc = 1;
 
     game_ctx_t *ctx = game_create(argc, argv);
@@ -129,7 +138,7 @@ static void test_create_with_start_level(void **vstate)
 {
     (void)vstate;
 
-    char *argv[] = {"xboing_test", "-startlevel", "5", NULL};
+    char *argv[] = {arg_prog, arg_startlevel, arg_five, NULL};
     int argc = 3;
 
     game_ctx_t *ctx = game_create(argc, argv);

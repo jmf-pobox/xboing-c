@@ -630,6 +630,7 @@ static void mode_edit_update(sdl2_state_mode_t mode, void *ud)
     /* Palette selection via mouse click on sidebar (x > play area right edge) */
     {
         int palette_x = PLAY_AREA_X + 495 + 15; /* PALETTE_X from game_render.c */
+        /* cppcheck-suppress variableScope ; kept local to this block for clarity */
         int palette_entry_h = 25;
         if (mx > palette_x && sdl2_input_mouse_pressed(ctx->input, 1))
         {
