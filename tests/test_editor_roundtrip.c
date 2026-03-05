@@ -184,8 +184,8 @@ static void reset_load_state(load_state_t *s)
  * Helper: write a level file from a block type grid
  * ========================================================================= */
 
-/* cppcheck-suppress constParameter ; const triggers -Wpedantic with array-of-array args */
 static int write_level_file(const char *path, const char *title, int time_bonus,
+                            /* cppcheck-suppress constParameter */
                             int grid[LEVEL_GRID_ROWS][LEVEL_GRID_COLS])
 {
     FILE *fp = fopen(path, "w");
