@@ -548,10 +548,15 @@ static void mode_edit_update(sdl2_state_mode_t mode, void *ud)
     editor_system_mouse_motion(ctx->editor, play_x, play_y);
 
     /* Keyboard commands */
-    if (sdl2_input_just_pressed(ctx->input, SDL2I_QUIT))
+    if (sdl2_input_just_pressed(ctx->input, SDL2I_QUIT) ||
+        sdl2_input_just_pressed(ctx->input, SDL2I_ABORT))
+    {
+        /* Try editor's quit flow first (sets state to FINISH) */
         editor_system_key_input(ctx->editor, EDITOR_KEY_QUIT);
-    if (sdl2_input_just_pressed(ctx->input, SDL2I_ABORT))
-        editor_system_key_input(ctx->editor, EDITOR_KEY_QUIT);
+        /* If the editor didn't handle it (state unchanged), force exit */
+        if (editor_system_get_state(ctx->editor) != EDITOR_STATE_FINISH)
+            sdl2_state_transition(ctx->state, SDL2ST_INTRO);
+    }
     if (sdl2_input_just_pressed(ctx->input, SDL2I_PAUSE))
         editor_system_key_input(ctx->editor, EDITOR_KEY_PLAYTEST);
     if (sdl2_input_just_pressed(ctx->input, SDL2I_SAVE))

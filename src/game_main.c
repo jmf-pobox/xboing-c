@@ -65,8 +65,9 @@ int main(int argc, char *argv[])
             sdl2_input_process_event(ctx->input, &event);
         }
 
-        /* Check for quit action (Ctrl+Q or similar) */
-        if (sdl2_input_just_pressed(ctx->input, SDL2I_QUIT))
+        /* Check for quit action — but not in editor mode (Q is used for editor exit) */
+        if (sdl2_input_just_pressed(ctx->input, SDL2I_QUIT) &&
+            sdl2_state_current(ctx->state) != SDL2ST_EDIT)
             running = false;
 
         /* Toggle fullscreen on F11 */

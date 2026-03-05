@@ -828,16 +828,21 @@ static int editor_cb_save_level(const char *path, void *ud)
     return 1;
 }
 
-/* Simple input dialogue: returns a static string with an auto-incrementing level number */
-static int editor_save_level_num = 81; /* Start at 81 to avoid overwriting existing levels */
-
+/*
+ * Simple input dialogue: returns the current editor level number as a string.
+ * If no level is loaded (number=0), defaults to level 80.
+ * Proper dialogue integration deferred to Phase 6.
+ */
 static const char *editor_cb_input_dialogue(const char *message, int numeric_only, void *ud)
 {
     (void)message;
     (void)numeric_only;
-    (void)ud;
+    game_ctx_t *ctx = ud;
     static char buf[16];
-    snprintf(buf, sizeof(buf), "%d", editor_save_level_num);
+    int num = editor_system_get_level_number(ctx->editor);
+    if (num <= 0 || num > 80)
+        num = 80;
+    snprintf(buf, sizeof(buf), "%d", num);
     return buf;
 }
 
