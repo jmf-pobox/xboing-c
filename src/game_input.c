@@ -315,8 +315,9 @@ void game_input_update(game_ctx_t *ctx)
             if (!sdl2_input_shift_held(ctx->input))
                 input_check_speed(ctx);
 
-            /* E key enters editor */
-            if (sdl2_input_just_pressed(ctx->input, SDL2I_ENTER_EDITOR))
+            /* E key enters editor (not Shift+E which is EyeDude cheat) */
+            if (!sdl2_input_shift_held(ctx->input) &&
+                sdl2_input_just_pressed(ctx->input, SDL2I_ENTER_EDITOR))
                 sdl2_state_transition(ctx->state, SDL2ST_EDIT);
 
             /* Escape returns to editor if play-testing */
@@ -333,7 +334,8 @@ void game_input_update(game_ctx_t *ctx)
 
         default:
             /* E key enters editor from any attract screen */
-            if (sdl2_input_just_pressed(ctx->input, SDL2I_ENTER_EDITOR))
+            if (!sdl2_input_shift_held(ctx->input) &&
+                sdl2_input_just_pressed(ctx->input, SDL2I_ENTER_EDITOR))
                 sdl2_state_transition(ctx->state, SDL2ST_EDIT);
             break;
     }
