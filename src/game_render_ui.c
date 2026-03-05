@@ -15,8 +15,8 @@
 #include "bonus_system.h"
 #include "demo_system.h"
 #include "game_context.h"
-#include "highscore_system.h"
 #include "game_render.h"
+#include "highscore_system.h"
 #include "intro_system.h"
 #include "keys_system.h"
 #include "presents_system.h"
@@ -93,8 +93,8 @@ void game_render_presents(const game_ctx_t *ctx)
         sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TEXT, "Justin C. Kibell",
                                       PLAY_AREA_Y + 200, white, PLAY_AREA_W);
         if (state >= PRESENTS_STATE_TEXT2)
-            sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_COPY, "presents",
-                                          PLAY_AREA_Y + 230, yellow, PLAY_AREA_W);
+            sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_COPY, "presents", PLAY_AREA_Y + 230,
+                                          yellow, PLAY_AREA_W);
         if (state >= PRESENTS_STATE_TEXT3)
             sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TITLE, "XBoing II",
                                           PLAY_AREA_Y + 270, white, PLAY_AREA_W);
@@ -344,8 +344,8 @@ void game_render_demo(const game_ctx_t *ctx)
         for (int i = 0; i < count; i++)
         {
             if (lines[i].text)
-                sdl2_font_draw(ctx->font, SDL2F_FONT_DATA, lines[i].text,
-                               PLAY_AREA_X + lines[i].x, PLAY_AREA_Y + lines[i].y, green);
+                sdl2_font_draw(ctx->font, SDL2F_FONT_DATA, lines[i].text, PLAY_AREA_X + lines[i].x,
+                               PLAY_AREA_Y + lines[i].y, green);
         }
     }
 
@@ -401,8 +401,8 @@ void game_render_keys(const game_ctx_t *ctx)
     if (state >= KEYS_STATE_TITLE)
     {
         SDL_Color white = {255, 255, 255, 255};
-        sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TITLE, "Game Controls", PLAY_AREA_Y + 20,
-                                      white, PLAY_AREA_W);
+        sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TITLE, "Game Controls",
+                                      PLAY_AREA_Y + 20, white, PLAY_AREA_W);
     }
 
     if (state >= KEYS_STATE_TEXT)
@@ -563,8 +563,7 @@ void game_render_highscore(const game_ctx_t *ctx)
 
     /* Title */
     highscore_type_t type = highscore_system_get_type(ctx->highscore_display);
-    const char *title =
-        (type == HIGHSCORE_TYPE_GLOBAL) ? "Hall of Fame" : "Personal Best";
+    const char *title = (type == HIGHSCORE_TYPE_GLOBAL) ? "Hall of Fame" : "Personal Best";
     sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TITLE, title, PLAY_AREA_Y + 20, red,
                                   PLAY_AREA_W);
 
@@ -601,8 +600,7 @@ void game_render_highscore(const game_ctx_t *ctx)
         if (ts.active)
         {
             render_sparkle(ctx, PLAY_AREA_X + 20, PLAY_AREA_Y + 20, ts.frame_index);
-            render_sparkle(ctx, PLAY_AREA_X + PLAY_AREA_W - 40, PLAY_AREA_Y + 20,
-                           ts.mirror_index);
+            render_sparkle(ctx, PLAY_AREA_X + PLAY_AREA_W - 40, PLAY_AREA_Y + 20, ts.mirror_index);
         }
     }
 

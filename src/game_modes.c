@@ -22,10 +22,10 @@
 #include "highscore_io.h"
 #include "highscore_system.h"
 #include "intro_system.h"
-#include "score_system.h"
 #include "keys_system.h"
 #include "message_system.h"
 #include "presents_system.h"
+#include "score_system.h"
 #include "sdl2_input.h"
 #include "sdl2_state.h"
 
