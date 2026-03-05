@@ -17,7 +17,9 @@
 #include "game_render.h"
 #include "game_rules.h"
 #include "gun_system.h"
+#include "intro_system.h"
 #include "message_system.h"
+#include "presents_system.h"
 #include "sdl2_input.h"
 #include "sdl2_state.h"
 
@@ -92,6 +94,90 @@ static void mode_pause_exit(sdl2_state_mode_t mode, void *ud)
 }
 
 /* =========================================================================
+ * MODE_PRESENTS — splash screen sequence
+ * ========================================================================= */
+
+static void mode_presents_enter(sdl2_state_mode_t mode, void *ud)
+{
+    (void)mode;
+    game_ctx_t *ctx = ud;
+    int frame = (int)sdl2_state_frame(ctx->state);
+    presents_system_begin(ctx->presents, frame);
+}
+
+static void mode_presents_update(sdl2_state_mode_t mode, void *ud)
+{
+    (void)mode;
+    game_ctx_t *ctx = ud;
+    int frame = (int)sdl2_state_frame(ctx->state);
+
+    presents_system_update(ctx->presents, frame);
+
+    /* Space skips presents */
+    if (sdl2_input_just_pressed(ctx->input, SDL2I_START))
+        presents_system_skip(ctx->presents, frame);
+
+    /* on_finished callback handles the transition to intro */
+}
+
+/* =========================================================================
+ * MODE_INTRO — block descriptions + sparkle
+ * ========================================================================= */
+
+static void mode_intro_enter(sdl2_state_mode_t mode, void *ud)
+{
+    (void)mode;
+    game_ctx_t *ctx = ud;
+    int frame = (int)sdl2_state_frame(ctx->state);
+    intro_system_begin(ctx->intro, INTRO_MODE_INTRO, frame);
+}
+
+static void mode_intro_update(sdl2_state_mode_t mode, void *ud)
+{
+    (void)mode;
+    game_ctx_t *ctx = ud;
+    int frame = (int)sdl2_state_frame(ctx->state);
+
+    intro_system_update(ctx->intro, frame);
+
+    /* Space starts the game from intro */
+    if (sdl2_input_just_pressed(ctx->input, SDL2I_START))
+    {
+        sdl2_state_transition(ctx->state, SDL2ST_GAME);
+        return;
+    }
+
+    /* on_finished callback handles cycling to next attract screen */
+}
+
+/* =========================================================================
+ * MODE_INSTRUCT — instructions text + sparkle
+ * ========================================================================= */
+
+static void mode_instruct_enter(sdl2_state_mode_t mode, void *ud)
+{
+    (void)mode;
+    game_ctx_t *ctx = ud;
+    int frame = (int)sdl2_state_frame(ctx->state);
+    intro_system_begin(ctx->intro, INTRO_MODE_INSTRUCT, frame);
+}
+
+static void mode_instruct_update(sdl2_state_mode_t mode, void *ud)
+{
+    (void)mode;
+    game_ctx_t *ctx = ud;
+    int frame = (int)sdl2_state_frame(ctx->state);
+
+    intro_system_update(ctx->intro, frame);
+
+    if (sdl2_input_just_pressed(ctx->input, SDL2I_START))
+    {
+        sdl2_state_transition(ctx->state, SDL2ST_GAME);
+        return;
+    }
+}
+
+/* =========================================================================
  * Registration
  * ========================================================================= */
 
@@ -116,6 +202,33 @@ void game_modes_register(game_ctx_t *ctx)
         sdl2_state_register(ctx->state, SDL2ST_PAUSE, &def);
     }
 
-    /* Remaining modes (presents, intro, demo, keys, bonus, highscore, etc.)
-     * are registered in later beads as their rendering is implemented. */
+    /* MODE_PRESENTS */
+    {
+        sdl2_state_mode_def_t def = {
+            .on_enter = mode_presents_enter,
+            .on_update = mode_presents_update,
+        };
+        sdl2_state_register(ctx->state, SDL2ST_PRESENTS, &def);
+    }
+
+    /* MODE_INTRO */
+    {
+        sdl2_state_mode_def_t def = {
+            .on_enter = mode_intro_enter,
+            .on_update = mode_intro_update,
+        };
+        sdl2_state_register(ctx->state, SDL2ST_INTRO, &def);
+    }
+
+    /* MODE_INSTRUCT */
+    {
+        sdl2_state_mode_def_t def = {
+            .on_enter = mode_instruct_enter,
+            .on_update = mode_instruct_update,
+        };
+        sdl2_state_register(ctx->state, SDL2ST_INSTRUCT, &def);
+    }
+
+    /* Remaining modes (demo, keys, bonus, highscore, etc.)
+     * are registered in later beads. */
 }

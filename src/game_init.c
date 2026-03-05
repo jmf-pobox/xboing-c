@@ -415,9 +415,9 @@ game_ctx_t *game_create(int argc, char *argv[])
 
     /* ---- Phase 5: UI sequencers ----------------------------------------- */
 
-    /* Presents */
+    /* Presents (callbacks wired by game_callbacks.c) */
     {
-        presents_system_callbacks_t pcb = {0};
+        presents_system_callbacks_t pcb = game_callbacks_presents();
         ctx->presents = presents_system_create(&pcb, ctx);
         if (!ctx->presents)
         {
@@ -426,9 +426,9 @@ game_ctx_t *game_create(int argc, char *argv[])
         }
     }
 
-    /* Intro */
+    /* Intro (callbacks wired by game_callbacks.c) */
     {
-        intro_system_callbacks_t icb = {0};
+        intro_system_callbacks_t icb = game_callbacks_intro();
         ctx->intro = intro_system_create(&icb, ctx, NULL);
         if (!ctx->intro)
         {

@@ -13,6 +13,7 @@
  */
 
 #include "game_render.h"
+#include "game_render_ui.h"
 
 #include <SDL2/SDL.h>
 
@@ -26,6 +27,7 @@
 #include "paddle_system.h"
 #include "score_system.h"
 #include "sdl2_renderer.h"
+#include "sdl2_state.h"
 #include "sdl2_texture.h"
 #include "sprite_catalog.h"
 
@@ -445,17 +447,37 @@ void game_render_frame(const game_ctx_t *ctx)
     /* Main window background (dark texture tiles across entire window) */
     render_main_background(ctx);
 
-    /* Play area background (level-specific tile) */
-    game_render_background(ctx);
+    sdl2_state_mode_t mode = sdl2_state_current(ctx->state);
 
-    /* Playfield border + blocks */
-    game_render_playfield(ctx);
+    switch (mode)
+    {
+        case SDL2ST_PRESENTS:
+            game_render_presents(ctx);
+            break;
 
-    /* Score and status */
-    game_render_score(ctx);
+        case SDL2ST_INTRO:
+            game_render_intro(ctx);
+            break;
 
-    /* Lives and level */
-    game_render_lives(ctx);
+        case SDL2ST_INSTRUCT:
+            game_render_instruct(ctx);
+            break;
+
+        case SDL2ST_GAME:
+        case SDL2ST_PAUSE:
+            /* Play area background (level-specific tile) */
+            game_render_background(ctx);
+            /* Playfield border + blocks */
+            game_render_playfield(ctx);
+            /* Score and status */
+            game_render_score(ctx);
+            /* Lives and level */
+            game_render_lives(ctx);
+            break;
+
+        default:
+            break;
+    }
 
     sdl2_renderer_present(ctx->renderer);
 }

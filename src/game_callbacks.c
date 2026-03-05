@@ -14,10 +14,13 @@
 #include "ball_system.h"
 #include "block_system.h"
 #include "block_types.h"
+#include "config_io.h"
 #include "game_context.h"
 #include "game_rules.h"
+#include "intro_system.h"
 #include "message_system.h"
 #include "paddle_system.h"
+#include "presents_system.h"
 #include "score_logic.h"
 #include "score_system.h"
 #include "sdl2_audio.h"
@@ -395,4 +398,57 @@ ball_system_env_t game_callbacks_ball_env(const game_ctx_t *ctx)
         .row_height = GAME_ROW_HEIGHT,
     };
     return env;
+}
+
+/* =========================================================================
+ * Presents system callbacks
+ * ========================================================================= */
+
+static void presents_cb_on_finished(void *ud)
+{
+    game_ctx_t *ctx = ud;
+    sdl2_state_transition(ctx->state, SDL2ST_INTRO);
+}
+
+static const char *presents_cb_get_nickname(void *ud)
+{
+    game_ctx_t *ctx = ud;
+    return ctx->config.nickname;
+}
+
+static const char *presents_cb_get_fullname(void *ud)
+{
+    (void)ud;
+    return "Player";
+}
+
+presents_system_callbacks_t game_callbacks_presents(void)
+{
+    presents_system_callbacks_t cbs = {
+        .on_finished = presents_cb_on_finished,
+        .get_nickname = presents_cb_get_nickname,
+        .get_fullname = presents_cb_get_fullname,
+    };
+    return cbs;
+}
+
+/* =========================================================================
+ * Intro system callbacks
+ * ========================================================================= */
+
+static void intro_cb_on_finished(intro_screen_mode_t mode, void *ud)
+{
+    game_ctx_t *ctx = ud;
+    if (mode == INTRO_MODE_INTRO)
+        sdl2_state_transition(ctx->state, SDL2ST_INSTRUCT);
+    else
+        sdl2_state_transition(ctx->state, SDL2ST_DEMO);
+}
+
+intro_system_callbacks_t game_callbacks_intro(void)
+{
+    intro_system_callbacks_t cbs = {
+        .on_finished = intro_cb_on_finished,
+    };
+    return cbs;
 }
