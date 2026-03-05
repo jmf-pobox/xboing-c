@@ -11,6 +11,8 @@
 
 #include "game_callbacks.h"
 
+#include <stdio.h>
+
 #include "ball_system.h"
 #include "block_system.h"
 #include "block_types.h"
@@ -725,6 +727,124 @@ static int editor_cb_load_level(const char *path, void *ud)
     return level_system_load_file(ctx->level, path) == LEVEL_SYS_OK ? 1 : 0;
 }
 
+static int editor_cb_yes_no(const char *message, void *ud)
+{
+    (void)message;
+    (void)ud;
+    /* Always confirm — proper dialogue integration deferred to Phase 6 */
+    return 1;
+}
+
+/*
+ * Reverse mapping: block type → level file character.
+ * Inverse of level_system_char_to_block().
+ */
+static char block_type_to_char(int block_type)
+{
+    switch (block_type)
+    {
+        case RED_BLK:
+            return 'r';
+        case GREEN_BLK:
+            return 'g';
+        case BLUE_BLK:
+            return 'b';
+        case TAN_BLK:
+            return 't';
+        case PURPLE_BLK:
+            return 'p';
+        case YELLOW_BLK:
+            return 'y';
+        case BLACK_BLK:
+            return 'w';
+        case COUNTER_BLK:
+            return '0';
+        case BOMB_BLK:
+            return 'X';
+        case DEATH_BLK:
+            return 'D';
+        case HYPERSPACE_BLK:
+            return 'H';
+        case BULLET_BLK:
+            return 'B';
+        case MAXAMMO_BLK:
+            return 'c';
+        case ROAMER_BLK:
+            return '+';
+        case EXTRABALL_BLK:
+            return 'L';
+        case MGUN_BLK:
+            return 'M';
+        case WALLOFF_BLK:
+            return 'W';
+        case RANDOM_BLK:
+            return '?';
+        case DROP_BLK:
+            return 'd';
+        case TIMER_BLK:
+            return 'T';
+        case MULTIBALL_BLK:
+            return 'm';
+        case STICKY_BLK:
+            return 's';
+        case REVERSE_BLK:
+            return 'R';
+        case PAD_SHRINK_BLK:
+            return '<';
+        case PAD_EXPAND_BLK:
+            return '>';
+        default:
+            return '.';
+    }
+}
+
+static int editor_cb_save_level(const char *path, void *ud)
+{
+    game_ctx_t *ctx = ud;
+    FILE *fp = fopen(path, "w");
+    if (!fp)
+        return 0;
+
+    /* Line 1: level title */
+    const char *title = editor_system_get_level_title(ctx->editor);
+    fprintf(fp, "%s\n", (title && title[0] != '\0') ? title : "Untitled");
+
+    /* Line 2: time bonus (default 120) */
+    fprintf(fp, "120\n");
+
+    /* Lines 3-17: 15 rows of 9 characters */
+    for (int row = 0; row < 15; row++)
+    {
+        for (int col = 0; col < 9; col++)
+        {
+            int btype = block_system_get_type(ctx->block, row, col);
+            fputc(block_type_to_char(btype), fp);
+        }
+        fputc('\n', fp);
+    }
+
+    fclose(fp);
+    return 1;
+}
+
+/*
+ * Simple input dialogue: returns the current editor level number as a string.
+ * If no level is loaded (number=0), defaults to level 80.
+ * Proper dialogue integration deferred to Phase 6.
+ */
+static const char *editor_cb_input_dialogue(const char *message, int numeric_only, void *ud)
+{
+    (void)message;
+    (void)numeric_only;
+    game_ctx_t *ctx = ud;
+    static char buf[16];
+    int num = editor_system_get_level_number(ctx->editor);
+    if (num <= 0 || num > 80)
+        num = 80;
+    snprintf(buf, sizeof(buf), "%d", num);
+    return buf;
+}
+
 static void editor_cb_on_finish(void *ud)
 {
     game_ctx_t *ctx = ud;
@@ -753,6 +873,9 @@ editor_system_callbacks_t game_callbacks_editor(void)
         .on_sound = editor_cb_on_sound,
         .on_message = editor_cb_on_message,
         .on_load_level = editor_cb_load_level,
+        .on_save_level = editor_cb_save_level,
+        .on_yes_no_dialogue = editor_cb_yes_no,
+        .on_input_dialogue = editor_cb_input_dialogue,
         .on_finish = editor_cb_on_finish,
         .on_playtest_start = editor_cb_on_playtest_start,
         .on_playtest_end = editor_cb_on_playtest_end,

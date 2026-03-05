@@ -425,3 +425,73 @@ add_executable(test_config_io test_config_io.c)
 target_compile_options(test_config_io PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
 target_link_libraries(test_config_io PRIVATE config_io ${CMOCKA_LIBRARIES})
 add_test(NAME test_config_io COMMAND test_config_io)
+
+# Editor round-trip tests — save level file → load → verify grid matches.
+# Tests character mapping exhaustively and file I/O round-trip cycle.
+# Links against level_system (for load + char_to_block).
+add_executable(test_editor_roundtrip test_editor_roundtrip.c)
+target_compile_definitions(test_editor_roundtrip PRIVATE
+    LEVELS_DIR="${CMAKE_SOURCE_DIR}/levels"
+)
+target_compile_options(test_editor_roundtrip PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+target_link_libraries(test_editor_roundtrip PRIVATE level_system ${CMOCKA_LIBRARIES})
+add_test(NAME test_editor_roundtrip COMMAND test_editor_roundtrip)
+
+# Level parser fuzz test (clang only — requires libFuzzer).
+# NOT registered as ctest — run manually: ./build/tests/fuzz_level_parse -max_total_time=30
+if(CMAKE_C_COMPILER_ID MATCHES "Clang")
+    add_executable(fuzz_level_parse fuzz_level_parse.c)
+    target_include_directories(fuzz_level_parse PRIVATE
+        ${CMAKE_SOURCE_DIR}/include
+    )
+    target_compile_options(fuzz_level_parse PRIVATE
+        -fsanitize=fuzzer,address,undefined -fno-omit-frame-pointer)
+    target_link_options(fuzz_level_parse PRIVATE
+        -fsanitize=fuzzer,address,undefined)
+    target_link_libraries(fuzz_level_parse PRIVATE level_system)
+    # Not a ctest target — fuzz tests run indefinitely by default
+endif()
+
+# Integration smoke test — full game_create/destroy lifecycle.
+# Links all game_*.c integration sources + all static libraries.
+# Uses SDL_VIDEODRIVER=dummy + SDL_AUDIODRIVER=dummy for headless operation.
+if(SDL2_FOUND AND SDL2_IMAGE_FOUND AND SDL2_MIXER_FOUND AND SDL2_TTF_FOUND)
+    add_executable(test_integration_smoke
+        test_integration_smoke.c
+        ${CMAKE_SOURCE_DIR}/src/game_callbacks.c
+        ${CMAKE_SOURCE_DIR}/src/game_init.c
+        ${CMAKE_SOURCE_DIR}/src/game_input.c
+        ${CMAKE_SOURCE_DIR}/src/game_modes.c
+        ${CMAKE_SOURCE_DIR}/src/game_render.c
+        ${CMAKE_SOURCE_DIR}/src/game_render_ui.c
+        ${CMAKE_SOURCE_DIR}/src/game_rules.c
+    )
+    target_include_directories(test_integration_smoke PRIVATE
+        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/src
+        ${SDL2_INCLUDE_DIRS}
+    )
+    target_compile_options(test_integration_smoke PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+    target_link_libraries(test_integration_smoke PRIVATE
+        # SDL2 platform
+        sdl2_renderer sdl2_texture sdl2_font sdl2_audio sdl2_input
+        sdl2_cursor sdl2_state sdl2_loop sdl2_cli
+        # Game systems
+        ball_system block_system paddle_system gun_system score_system
+        level_system special_system bonus_system sfx_system eyedude_system
+        message_system editor_system
+        # Persistence
+        highscore_io savegame_io config_io paths
+        # Math
+        score_logic m
+        # UI sequencers
+        presents_system intro_system demo_system keys_system
+        dialogue_system highscore_system
+        # Test framework
+        ${CMOCKA_LIBRARIES}
+    )
+    add_test(NAME test_integration_smoke COMMAND test_integration_smoke)
+    set_tests_properties(test_integration_smoke PROPERTIES
+        ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_AUDIODRIVER=dummy"
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+endif()

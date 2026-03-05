@@ -12,6 +12,8 @@
 
 #include <stdio.h>
 
+#include <SDL2/SDL.h>
+
 #include "ball_system.h"
 #include "block_system.h"
 #include "bonus_system.h"
@@ -517,7 +519,8 @@ static void mode_edit_enter(sdl2_state_mode_t mode, void *ud)
     game_ctx_t *ctx = ud;
     editor_system_reset(ctx->editor);
     editor_system_init_palette(ctx->editor, MAX_STATIC_BLOCKS);
-    block_system_clear_all(ctx->block);
+    /* Don't clear blocks here — editor_system's do_load_level handles loading.
+     * The on_load_level callback calls block_system_clear_all before loading. */
 }
 
 static void mode_edit_update(sdl2_state_mode_t mode, void *ud)
@@ -534,34 +537,72 @@ static void mode_edit_update(sdl2_state_mode_t mode, void *ud)
     int play_x = mx - PLAY_AREA_X;
     int play_y = my - PLAY_AREA_Y;
 
-    /* Mouse buttons */
+    /* Mouse buttons: left=draw, middle or right=erase */
     if (sdl2_input_mouse_pressed(ctx->input, 1))
         editor_system_mouse_button(ctx->editor, play_x, play_y, 1, 1);
     else
         editor_system_mouse_button(ctx->editor, play_x, play_y, 1, 0);
 
-    if (sdl2_input_mouse_pressed(ctx->input, 2))
+    if (sdl2_input_mouse_pressed(ctx->input, 2) || sdl2_input_mouse_pressed(ctx->input, 3))
         editor_system_mouse_button(ctx->editor, play_x, play_y, 2, 1);
-
-    if (sdl2_input_mouse_pressed(ctx->input, 3))
-        editor_system_mouse_button(ctx->editor, play_x, play_y, 3, 1);
 
     /* Mouse drag */
     editor_system_mouse_motion(ctx->editor, play_x, play_y);
 
     /* Keyboard commands */
-    if (sdl2_input_just_pressed(ctx->input, SDL2I_QUIT))
+    if (sdl2_input_just_pressed(ctx->input, SDL2I_QUIT) ||
+        sdl2_input_just_pressed(ctx->input, SDL2I_ABORT))
+    {
+        /* Try editor's quit flow first (sets state to FINISH) */
         editor_system_key_input(ctx->editor, EDITOR_KEY_QUIT);
-    if (sdl2_input_just_pressed(ctx->input, SDL2I_ABORT))
-        editor_system_key_input(ctx->editor, EDITOR_KEY_QUIT);
-    if (sdl2_input_just_pressed(ctx->input, SDL2I_PAUSE))
+        /* If the editor didn't handle it (state unchanged), force exit */
+        if (editor_system_get_state(ctx->editor) != EDITOR_STATE_FINISH)
+            sdl2_state_transition(ctx->state, SDL2ST_INTRO);
+    }
+    /* Editor keys match legacy editor.c:handleAllEditorKeys():
+     * P=playtest, S=save, L=load, C=clear, T=time, N=name, R=redraw
+     * h=flip-h, H=scroll-h, v=flip-v, V=scroll-v
+     *
+     * Uses raw SDL scancodes because many of these letters are bound to
+     * game actions (L=right, S=sfx toggle) in the input binding table. */
+    if (sdl2_input_just_pressed(ctx->input, SDL2I_PAUSE)) /* P */
         editor_system_key_input(ctx->editor, EDITOR_KEY_PLAYTEST);
-    if (sdl2_input_just_pressed(ctx->input, SDL2I_SAVE))
-        editor_system_key_input(ctx->editor, EDITOR_KEY_SAVE);
-    if (sdl2_input_just_pressed(ctx->input, SDL2I_LOAD))
-        editor_system_key_input(ctx->editor, EDITOR_KEY_LOAD);
 
-    /* Palette scroll with speed keys as palette index shortcut */
+    {
+        static Uint32 ed_last[SDL_NUM_SCANCODES];
+        const Uint8 *keys = SDL_GetKeyboardState(NULL);
+        Uint32 now = SDL_GetTicks();
+        int shift = keys[SDL_SCANCODE_LSHIFT] || keys[SDL_SCANCODE_RSHIFT];
+
+#define ED_KEY(sc, cmd)                                                                            \
+    if (keys[(sc)] && (now - ed_last[(sc)] > 300))                                                 \
+    {                                                                                              \
+        ed_last[(sc)] = now;                                                                       \
+        editor_system_key_input(ctx->editor, (cmd));                                               \
+    }
+
+        ED_KEY(SDL_SCANCODE_S, EDITOR_KEY_SAVE)
+        ED_KEY(SDL_SCANCODE_L, EDITOR_KEY_LOAD)
+        ED_KEY(SDL_SCANCODE_C, EDITOR_KEY_CLEAR)
+        ED_KEY(SDL_SCANCODE_T, EDITOR_KEY_TIME)
+        ED_KEY(SDL_SCANCODE_N, EDITOR_KEY_NAME)
+        ED_KEY(SDL_SCANCODE_R, EDITOR_KEY_REDRAW)
+
+        if (!shift)
+        {
+            ED_KEY(SDL_SCANCODE_H, EDITOR_KEY_FLIP_H)
+            ED_KEY(SDL_SCANCODE_V, EDITOR_KEY_FLIP_V)
+        }
+        else
+        {
+            ED_KEY(SDL_SCANCODE_H, EDITOR_KEY_SCROLL_H)
+            ED_KEY(SDL_SCANCODE_V, EDITOR_KEY_SCROLL_V)
+        }
+
+#undef ED_KEY
+    }
+
+    /* Palette selection: keys 1-9 select palette entries 0-8 */
     for (int s = 1; s <= 9; s++)
     {
         sdl2_input_action_t action = (sdl2_input_action_t)(SDL2I_SPEED_1 + s - 1);
@@ -569,6 +610,34 @@ static void mode_edit_update(sdl2_state_mode_t mode, void *ud)
         {
             editor_system_select_palette(ctx->editor, s - 1);
             break;
+        }
+    }
+
+    /* Palette selection via left/right arrows to cycle */
+    if (sdl2_input_just_pressed(ctx->input, SDL2I_RIGHT))
+    {
+        int sel = editor_system_get_selected_palette(ctx->editor);
+        int count = editor_system_get_palette_count(ctx->editor);
+        editor_system_select_palette(ctx->editor, (sel + 1) % count);
+    }
+    if (sdl2_input_just_pressed(ctx->input, SDL2I_LEFT))
+    {
+        int sel = editor_system_get_selected_palette(ctx->editor);
+        int count = editor_system_get_palette_count(ctx->editor);
+        editor_system_select_palette(ctx->editor, (sel - 1 + count) % count);
+    }
+
+    /* Palette selection via mouse click on sidebar (x > play area right edge) */
+    {
+        int palette_x = PLAY_AREA_X + 495 + 15; /* PALETTE_X from game_render.c */
+        /* cppcheck-suppress variableScope ; kept local to this block for clarity */
+        int palette_entry_h = 25;
+        if (mx > palette_x && sdl2_input_mouse_pressed(ctx->input, 1))
+        {
+            int idx = (my - PLAY_AREA_Y) / palette_entry_h;
+            int count = editor_system_get_palette_count(ctx->editor);
+            if (idx >= 0 && idx < count)
+                editor_system_select_palette(ctx->editor, idx);
         }
     }
 }
