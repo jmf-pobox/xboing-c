@@ -43,10 +43,13 @@
 
 static int find_random_empty_cell(const block_system_t *block, int *out_row, int *out_col)
 {
-    /* Try random positions up to 100 times */
+    /* Try random positions up to 100 times.
+     * Row range: 1 to MAX_ROW-7 (rows 1-11) — matches legacy
+     * AddBonusBlock/AddSpecialBlock: r = (rand() % (MAX_ROW - 7)) + 1
+     * This keeps bonus blocks in the upper half, away from the paddle. */
     for (int attempt = 0; attempt < 100; attempt++)
     {
-        int row = rand() % MAX_ROW;
+        int row = (rand() % (MAX_ROW - 7)) + 1;
         int col = rand() % MAX_COL;
         if (!block_system_is_occupied(block, row, col))
         {
