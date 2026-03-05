@@ -160,9 +160,9 @@ static void try_spawn_bonus(game_ctx_t *ctx, int frame)
         if (ctx->audio)
             sdl2_audio_play(ctx->audio, "explosion");
     }
-    else if (roll == 26)
+    else
     {
-        /* Case 26: start eyedude */
+        /* Case 26 (final): start eyedude */
         eyedude_system_set_state(ctx->eyedude, EYEDUDE_STATE_RESET);
     }
 
