@@ -771,6 +771,10 @@ static void animate_ball_create(ball_system_t *ctx, const ball_system_env_t *env
 
     BALL *b = &ctx->balls[i];
 
+    /* Track paddle position during birth animation so ball stays aligned */
+    b->ballx = env->paddle_pos;
+    b->bally = env->play_height - DIST_BALL_OF_PADDLE;
+
     if (env->frame == b->nextFrame)
     {
         b->slide++;
@@ -780,7 +784,7 @@ static void animate_ball_create(ball_system_t *ctx, const ball_system_env_t *env
         {
             b->slide = 0;
 
-            /* Position ball on paddle */
+            /* Final position on paddle */
             b->ballx = env->paddle_pos;
             b->bally = env->play_height - DIST_BALL_OF_PADDLE;
             b->oldx = b->ballx;
