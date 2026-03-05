@@ -15,6 +15,7 @@
 #include "bonus_system.h"
 #include "demo_system.h"
 #include "game_context.h"
+#include "highscore_system.h"
 #include "game_render.h"
 #include "intro_system.h"
 #include "keys_system.h"
@@ -543,4 +544,69 @@ void game_render_bonus(const game_ctx_t *ctx)
         sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TEXT, buf, PLAY_AREA_Y + 400, yellow,
                                       PLAY_AREA_W);
     }
+}
+
+/* =========================================================================
+ * High score table display
+ * ========================================================================= */
+
+void game_render_highscore(const game_ctx_t *ctx)
+{
+    highscore_state_t state = highscore_system_get_state(ctx->highscore_display);
+    if (state == HIGHSCORE_STATE_NONE)
+        return;
+
+    SDL_Color white = {255, 255, 255, 255};
+    SDL_Color yellow = {255, 255, 0, 255};
+    SDL_Color green = {0, 255, 0, 255};
+    SDL_Color red = {255, 80, 80, 255};
+
+    /* Title */
+    highscore_type_t type = highscore_system_get_type(ctx->highscore_display);
+    const char *title =
+        (type == HIGHSCORE_TYPE_GLOBAL) ? "Hall of Fame" : "Personal Best";
+    sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TITLE, title, PLAY_AREA_Y + 20, red,
+                                  PLAY_AREA_W);
+
+    /* Score table */
+    if (state >= HIGHSCORE_STATE_SHOW)
+    {
+        const highscore_table_t *table = highscore_system_get_table(ctx->highscore_display);
+        if (!table)
+            return;
+
+        unsigned long current = highscore_system_get_current_score(ctx->highscore_display);
+
+        for (int i = 0; i < HIGHSCORE_NUM_ENTRIES; i++)
+        {
+            if (table->entries[i].score == 0)
+                continue;
+
+            /* Highlight the player's score */
+            SDL_Color clr = (table->entries[i].score == current) ? green : white;
+
+            char line[128];
+            snprintf(line, sizeof(line), "%2d. %-20s %7lu  Lv.%lu", i + 1, table->entries[i].name,
+                     table->entries[i].score, table->entries[i].level);
+            sdl2_font_draw(ctx->font, SDL2F_FONT_DATA, line, PLAY_AREA_X + 30,
+                           PLAY_AREA_Y + 90 + i * 38, clr);
+        }
+    }
+
+    /* Title sparkle */
+    if (state == HIGHSCORE_STATE_SPARKLE)
+    {
+        highscore_title_sparkle_t ts;
+        highscore_system_get_title_sparkle(ctx->highscore_display, &ts);
+        if (ts.active)
+        {
+            render_sparkle(ctx, PLAY_AREA_X + 20, PLAY_AREA_Y + 20, ts.frame_index);
+            render_sparkle(ctx, PLAY_AREA_X + PLAY_AREA_W - 40, PLAY_AREA_Y + 20,
+                           ts.mirror_index);
+        }
+    }
+
+    /* "Press SPACE to continue" */
+    sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_COPY, "Press SPACE to continue",
+                                  PLAY_AREA_Y + PLAY_AREA_H - 40, yellow, PLAY_AREA_W);
 }

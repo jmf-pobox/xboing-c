@@ -13,6 +13,7 @@
 #include "demo_system.h"
 #include "game_context.h"
 #include "gun_system.h"
+#include "highscore_system.h"
 #include "intro_system.h"
 #include "keys_system.h"
 #include "presents_system.h"
@@ -53,5 +54,8 @@ demo_system_callbacks_t game_callbacks_demo(void);
 
 /* Keys system callback table. */
 keys_system_callbacks_t game_callbacks_keys(void);
+
+/* Highscore system callback table. */
+highscore_system_callbacks_t game_callbacks_highscore(void);
 
 #endif /* GAME_CALLBACKS_H */

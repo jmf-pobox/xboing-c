@@ -467,9 +467,9 @@ game_ctx_t *game_create(int argc, char *argv[])
         goto fail;
     }
 
-    /* High score display */
+    /* High score display (callbacks wired by game_callbacks.c) */
     {
-        highscore_system_callbacks_t hcb = {0};
+        highscore_system_callbacks_t hcb = game_callbacks_highscore();
         ctx->highscore_display = highscore_system_create(&hcb, ctx);
         if (!ctx->highscore_display)
         {

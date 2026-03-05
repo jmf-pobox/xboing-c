@@ -20,6 +20,7 @@
 #include "game_rules.h"
 #include "gun_system.h"
 #include "highscore_io.h"
+#include "highscore_system.h"
 #include "intro_system.h"
 #include "score_system.h"
 #include "keys_system.h"
@@ -334,30 +335,42 @@ static void mode_bonus_update(sdl2_state_mode_t mode, void *ud)
  * MODE_HIGHSCORE — high score table display (attract mode cycling)
  * ========================================================================= */
 
-static int highscore_enter_frame;
-
 static void mode_highscore_enter(sdl2_state_mode_t mode, void *ud)
 {
     (void)mode;
     game_ctx_t *ctx = ud;
-    highscore_enter_frame = (int)sdl2_state_frame(ctx->state);
+    int frame = (int)sdl2_state_frame(ctx->state);
+
+    /* Load table data and begin the display sequence */
+    highscore_system_set_table(ctx->highscore_display, &ctx->hs_personal);
+    highscore_system_set_current_score(ctx->highscore_display, score_system_get(ctx->score));
+    highscore_system_begin(ctx->highscore_display, HIGHSCORE_TYPE_PERSONAL, frame);
 }
 
 static void mode_highscore_update(sdl2_state_mode_t mode, void *ud)
 {
     (void)mode;
     game_ctx_t *ctx = ud;
+    int frame = (int)sdl2_state_frame(ctx->state);
+
+    highscore_system_update(ctx->highscore_display, frame);
 
     if (sdl2_input_just_pressed(ctx->input, SDL2I_START))
     {
-        sdl2_state_transition(ctx->state, SDL2ST_GAME);
+        /* If came from game over, start new game; if attract mode, go to intro */
+        if (ctx->game_active)
+        {
+            ctx->game_active = false;
+            sdl2_state_transition(ctx->state, SDL2ST_INTRO);
+        }
+        else
+        {
+            sdl2_state_transition(ctx->state, SDL2ST_GAME);
+        }
         return;
     }
 
-    /* Auto-cycle back to intro after 4000 frames (simplified — full rendering in bead 3.5) */
-    int frame = (int)sdl2_state_frame(ctx->state);
-    if (frame - highscore_enter_frame > 4000)
-        sdl2_state_transition(ctx->state, SDL2ST_INTRO);
+    /* on_finished callback handles auto-cycle */
 }
 
 /* =========================================================================

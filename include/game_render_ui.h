@@ -34,4 +34,7 @@ void game_render_keysedit(const game_ctx_t *ctx);
 /* Render the bonus tally screen. */
 void game_render_bonus(const game_ctx_t *ctx);
 
+/* Render the high score table. */
+void game_render_highscore(const game_ctx_t *ctx);
+
 #endif /* GAME_RENDER_UI_H */

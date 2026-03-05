@@ -567,3 +567,23 @@ keys_system_callbacks_t game_callbacks_keys(void)
     };
     return cbs;
 }
+
+/* =========================================================================
+ * Highscore system callbacks
+ * ========================================================================= */
+
+static void highscore_cb_on_finished(highscore_type_t type, void *ud)
+{
+    (void)type;
+    game_ctx_t *ctx = ud;
+    /* After highscore display, cycle back to intro */
+    sdl2_state_transition(ctx->state, SDL2ST_INTRO);
+}
+
+highscore_system_callbacks_t game_callbacks_highscore(void)
+{
+    highscore_system_callbacks_t cbs = {
+        .on_finished = highscore_cb_on_finished,
+    };
+    return cbs;
+}

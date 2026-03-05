@@ -485,7 +485,7 @@ void game_render_frame(const game_ctx_t *ctx)
             break;
 
         case SDL2ST_HIGHSCORE:
-            /* Stub — full rendering in bead 3.5 */
+            game_render_highscore(ctx);
             break;
 
         case SDL2ST_GAME:
