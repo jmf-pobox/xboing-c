@@ -517,7 +517,8 @@ static void mode_edit_enter(sdl2_state_mode_t mode, void *ud)
     game_ctx_t *ctx = ud;
     editor_system_reset(ctx->editor);
     editor_system_init_palette(ctx->editor, MAX_STATIC_BLOCKS);
-    block_system_clear_all(ctx->block);
+    /* Don't clear blocks here — editor_system's do_load_level handles loading.
+     * The on_load_level callback calls block_system_clear_all before loading. */
 }
 
 static void mode_edit_update(sdl2_state_mode_t mode, void *ud)
