@@ -16,6 +16,7 @@
 
 #include "game_init.h"
 #include "game_callbacks.h"
+#include "game_modes.h"
 #include "game_render.h"
 #include "game_rules.h"
 
@@ -477,6 +478,9 @@ game_ctx_t *game_create(int argc, char *argv[])
         }
     }
 
+    /* Register mode handlers with the state machine */
+    game_modes_register(ctx);
+
     /* Give initial ammo */
     gun_system_set_ammo(ctx->gun, GUN_AMMO_PER_LEVEL);
 
@@ -577,20 +581,10 @@ void game_destroy(game_ctx_t *ctx)
 static void stub_tick(void *user_data)
 {
     game_ctx_t *ctx = user_data;
+    /* sdl2_state_update dispatches to mode-specific on_update handlers
+     * registered by game_modes_register() — gameplay logic, input, etc.
+     * all happen inside the mode handler. */
     sdl2_state_update(ctx->state);
-
-    /* Update gameplay systems */
-    sdl2_state_mode_t mode = sdl2_state_current(ctx->state);
-    if (mode == SDL2ST_GAME)
-    {
-        ball_system_env_t benv = game_callbacks_ball_env(ctx);
-        ball_system_update(ctx->ball, &benv);
-
-        gun_system_env_t genv = game_callbacks_gun_env(ctx);
-        gun_system_update(ctx->gun, &genv);
-
-        game_rules_check(ctx);
-    }
 }
 
 static void stub_render(double alpha, void *user_data)
