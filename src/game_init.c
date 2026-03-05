@@ -14,8 +14,8 @@
  * modules (game_callbacks.c, game_modes.c) wire real callbacks later.
  */
 
-#include "game_callbacks.h"
 #include "game_init.h"
+#include "game_callbacks.h"
 #include "game_render.h"
 #include "game_rules.h"
 

@@ -9,8 +9,8 @@
  * game state directly — modules handle their own state changes.
  */
 
-#include "game_callbacks.h"
 #include "game_input.h"
+#include "game_callbacks.h"
 
 #include "ball_system.h"
 #include "gun_system.h"

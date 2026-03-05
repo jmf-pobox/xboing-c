@@ -146,7 +146,7 @@ static void try_spawn_bonus(game_ctx_t *ctx, int frame)
     else if (roll == 25)
     {
         /* Case 25: dynamite — clear all blocks of a random color */
-        static const int dyn_types[] = {YELLOW_BLK, BLUE_BLK, RED_BLK, PURPLE_BLK,
+        static const int dyn_types[] = {YELLOW_BLK, BLUE_BLK,    RED_BLK,  PURPLE_BLK,
                                         TAN_BLK,    COUNTER_BLK, GREEN_BLK};
         int target = dyn_types[rand() % 7];
         for (int r = 0; r < MAX_ROW; r++)

@@ -83,7 +83,8 @@ static int ball_cb_on_block_hit(int row, int col, int ball_index, void *ud)
             block_system_clear(ctx->block, row, col);
             for (int dr = -1; dr <= 1; dr++)
                 for (int dc = -1; dc <= 1; dc++)
-                    if (!(dr == 0 && dc == 0) && block_system_is_occupied(ctx->block, row + dr, col + dc))
+                    if (!(dr == 0 && dc == 0) &&
+                        block_system_is_occupied(ctx->block, row + dr, col + dc))
                         block_system_clear(ctx->block, row + dr, col + dc);
             if (ctx->audio)
                 sdl2_audio_play(ctx->audio, "explosion");
