@@ -11,11 +11,13 @@
 
 #include "game_input.h"
 #include "game_callbacks.h"
+#include "game_rules.h"
 
 #include <stdio.h>
 
 #include "ball_system.h"
 #include "block_system.h"
+#include "eyedude_system.h"
 #include "gun_system.h"
 #include "level_system.h"
 #include "message_system.h"
@@ -26,6 +28,8 @@
 #include "sdl2_input.h"
 #include "sdl2_loop.h"
 #include "sdl2_state.h"
+#include "sfx_system.h"
+#include "special_system.h"
 
 /* =========================================================================
  * Paddle input — keyboard direction + mouse position
@@ -151,6 +155,116 @@ static void input_check_speed(game_ctx_t *ctx)
 }
 
 /* =========================================================================
+ * Debug cheat codes — only active when ctx->debug_mode is true
+ *
+ * All cheats require Shift held:
+ *   Shift+N  — skip level (clear blocks → bonus → next)
+ *   Shift+D  — kill ball (force ball death)
+ *   Shift+G  — game over (set lives=0, kill ball)
+ *   Shift+L  — add 5 lives
+ *   Shift+A  — max ammo (20 bullets)
+ *   Shift+E  — spawn EyeDude
+ *   Shift+S  — trigger screen shake
+ *   Shift+1..9 — jump to level 10/20/30/.../90
+ * ========================================================================= */
+
+static void input_debug_cheats(game_ctx_t *ctx)
+{
+    if (!ctx->debug_mode)
+        return;
+    if (!sdl2_input_shift_held(ctx->input))
+        return;
+
+    int frame = (int)sdl2_state_frame(ctx->state);
+
+    /* Shift+N: skip level */
+    if (sdl2_input_just_pressed(ctx->input, SDL2I_NEXT_LEVEL))
+    {
+        /* Clear all blocks to trigger level completion on next rules check */
+        for (int r = 0; r < 18; r++)
+            for (int c = 0; c < 9; c++)
+                block_system_clear(ctx->block, r, c);
+        message_system_set(ctx->message, "[DEBUG] Level skipped", 1, frame);
+    }
+
+    /* Shift+D: kill ball */
+    if (sdl2_input_just_pressed(ctx->input, SDL2I_KILL_BALL))
+    {
+        ball_system_env_t env = game_callbacks_ball_env(ctx);
+        for (int i = 0; i < 5; i++)
+        {
+            if (ball_system_get_state(ctx->ball, i) == BALL_ACTIVE ||
+                ball_system_get_state(ctx->ball, i) == BALL_READY)
+            {
+                ball_system_change_mode(ctx->ball, &env, i, BALL_POP);
+            }
+        }
+        message_system_set(ctx->message, "[DEBUG] Ball killed", 1, frame);
+    }
+
+    /* Shift+G: game over */
+    if (sdl2_input_just_pressed(ctx->input, SDL2I_TOGGLE_CONTROL))
+    {
+        ctx->lives_left = 0;
+        ball_system_env_t env = game_callbacks_ball_env(ctx);
+        for (int i = 0; i < 5; i++)
+        {
+            if (ball_system_get_state(ctx->ball, i) != BALL_NONE)
+                ball_system_change_mode(ctx->ball, &env, i, BALL_POP);
+        }
+        message_system_set(ctx->message, "[DEBUG] Game over triggered", 1, frame);
+    }
+
+    /* Shift+L: add 5 lives */
+    if (sdl2_input_just_pressed(ctx->input, SDL2I_LOAD))
+    {
+        ctx->lives_left += 5;
+        char buf[64];
+        snprintf(buf, sizeof(buf), "[DEBUG] Lives: %d", ctx->lives_left);
+        message_system_set(ctx->message, buf, 1, frame);
+    }
+
+    /* Shift+A: max ammo */
+    if (sdl2_input_just_pressed(ctx->input, SDL2I_TOGGLE_AUDIO))
+    {
+        gun_system_set_ammo(ctx->gun, GUN_MAX_AMMO);
+        gun_system_set_unlimited(ctx->gun, 1);
+        message_system_set(ctx->message, "[DEBUG] Max ammo + unlimited", 1, frame);
+    }
+
+    /* Shift+E: spawn EyeDude */
+    if (sdl2_input_just_pressed(ctx->input, SDL2I_ENTER_EDITOR))
+    {
+        eyedude_system_set_state(ctx->eyedude, EYEDUDE_STATE_RESET);
+        message_system_set(ctx->message, "[DEBUG] EyeDude spawned", 1, frame);
+    }
+
+    /* Shift+S: trigger shake */
+    if (sdl2_input_just_pressed(ctx->input, SDL2I_TOGGLE_SFX))
+    {
+        sfx_system_set_mode(ctx->sfx, SFX_MODE_SHAKE);
+        sfx_system_set_end_frame(ctx->sfx, frame + 100);
+        message_system_set(ctx->message, "[DEBUG] Shake!", 1, frame);
+    }
+
+    /* Shift+1..9: jump to level 10/20/30/.../90 */
+    for (int s = 1; s <= 9; s++)
+    {
+        sdl2_input_action_t action = (sdl2_input_action_t)(SDL2I_SPEED_1 + s - 1);
+        if (sdl2_input_just_pressed(ctx->input, action))
+        {
+            ctx->level_number = s * 10;
+            game_rules_next_level(ctx);
+            sdl2_state_transition(ctx->state, SDL2ST_GAME);
+            char buf[64];
+            snprintf(buf, sizeof(buf), "[DEBUG] Jump to level %d", ctx->level_number);
+            message_system_set(ctx->message, buf, 1, frame);
+            break;
+        }
+    }
+}
+
+/* =========================================================================
  * Public API
  * ========================================================================= */
 
@@ -181,8 +295,12 @@ void game_input_update(game_ctx_t *ctx)
             if (sdl2_input_just_pressed(ctx->input, SDL2I_LOAD))
                 input_load_game(ctx);
 
-            /* Speed keys 1-9 */
-            input_check_speed(ctx);
+            /* Speed keys 1-9 (only without Shift — Shift+1..9 are debug cheats) */
+            if (!sdl2_input_shift_held(ctx->input))
+                input_check_speed(ctx);
+
+            /* Debug cheat codes (Shift+key, --debug only) */
+            input_debug_cheats(ctx);
             break;
 
         default:
