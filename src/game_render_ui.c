@@ -119,8 +119,8 @@ void game_render_presents(const game_ctx_t *ctx)
 
             sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TEXT, "Justin C. Kibell",
                                           PLAY_AREA_Y + 200, white, PLAY_AREA_W);
-            sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_COPY, "presents",
-                                          PLAY_AREA_Y + 230, yellow, PLAY_AREA_W);
+            sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_COPY, "presents", PLAY_AREA_Y + 230,
+                                          yellow, PLAY_AREA_W);
             sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TITLE, "XBoing II",
                                           PLAY_AREA_Y + 270, white, PLAY_AREA_W);
         }

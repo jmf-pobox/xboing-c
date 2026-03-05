@@ -507,8 +507,7 @@ void game_render_editor_palette(const game_ctx_t *ctx)
     {
         char buf[32];
         snprintf(buf, sizeof(buf), "Level %d", level);
-        sdl2_font_draw(ctx->font, SDL2F_FONT_COPY, buf, PLAY_AREA_X + 200, PLAY_AREA_Y - 15,
-                        white);
+        sdl2_font_draw(ctx->font, SDL2F_FONT_COPY, buf, PLAY_AREA_X + 200, PLAY_AREA_Y - 15, white);
     }
 }
 
