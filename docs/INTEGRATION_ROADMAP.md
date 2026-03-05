@@ -50,7 +50,7 @@ Paddle moves, ball bounces, blocks break, score updates, levels advance.
 - **2.6: Specials + bonus block spawning** — port spawning logic from
   `main.c:handleGameMode()`. Files: `game_rules.c`, `game_render.c`
 
-### Phase 3: Attract Mode Screens — 5 beads
+### Phase 3: Attract Mode Screens (COMPLETE — PR #67)
 
 Full startup sequence and post-game screens.
 
