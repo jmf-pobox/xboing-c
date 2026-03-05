@@ -9,8 +9,10 @@
  * game state directly — modules handle their own state changes.
  */
 
+#include "game_callbacks.h"
 #include "game_input.h"
 
+#include "ball_system.h"
 #include "paddle_system.h"
 #include "sdl2_input.h"
 #include "sdl2_state.h"
@@ -38,6 +40,21 @@ static void input_update_paddle(game_ctx_t *ctx)
 }
 
 /* =========================================================================
+ * Ball launch — space bar or mouse click fires the ball
+ * ========================================================================= */
+
+static void input_launch_ball(game_ctx_t *ctx)
+{
+    /* Space activates a waiting ball (legacy also uses mouse click —
+     * that will be wired when mouse edge triggers are available) */
+    if (sdl2_input_just_pressed(ctx->input, SDL2I_START))
+    {
+        ball_system_env_t env = game_callbacks_ball_env(ctx);
+        ball_system_activate_waiting(ctx->ball, &env);
+    }
+}
+
+/* =========================================================================
  * Public API
  * ========================================================================= */
 
@@ -49,6 +66,7 @@ void game_input_update(game_ctx_t *ctx)
     {
         case SDL2ST_GAME:
             input_update_paddle(ctx);
+            input_launch_ball(ctx);
             break;
 
         default:

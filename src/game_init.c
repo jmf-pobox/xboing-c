@@ -14,6 +14,7 @@
  * modules (game_callbacks.c, game_modes.c) wire real callbacks later.
  */
 
+#include "game_callbacks.h"
 #include "game_init.h"
 #include "game_render.h"
 
@@ -297,9 +298,9 @@ game_ctx_t *game_create(int argc, char *argv[])
         }
     }
 
-    /* Ball system (stub callbacks — wired by game_callbacks.c) */
+    /* Ball system (callbacks wired by game_callbacks.c) */
     {
-        ball_system_callbacks_t bcb = {0};
+        ball_system_callbacks_t bcb = game_callbacks_ball();
         ball_system_status_t bs;
         ctx->ball = ball_system_create(&bcb, ctx, &bs);
         if (!ctx->ball)
@@ -475,7 +476,7 @@ game_ctx_t *game_create(int argc, char *argv[])
         }
     }
 
-    /* ---- Phase 6: Load initial level ------------------------------------ */
+    /* ---- Phase 6: Load initial level + place ball on paddle ------------- */
     {
         int file_num = level_system_wrap_number(ctx->level_number);
         char filename[32];
@@ -492,6 +493,22 @@ game_ctx_t *game_create(int argc, char *argv[])
         {
             fprintf(stderr, "Warning: could not find level file: %s\n", filename);
         }
+    }
+
+    /* Place the first ball on the paddle */
+    {
+        ball_system_env_t env = {
+            .frame = 0,
+            .speed_level = ctx->config.speed,
+            .paddle_pos = paddle_system_get_pos(ctx->paddle),
+            .paddle_dx = 0,
+            .paddle_size = paddle_system_get_size(ctx->paddle),
+            .play_width = GAME_PLAY_WIDTH,
+            .play_height = GAME_PLAY_HEIGHT,
+            .col_width = GAME_COL_WIDTH,
+            .row_height = GAME_ROW_HEIGHT,
+        };
+        ball_system_reset_start(ctx->ball, &env);
     }
 
     return ctx;
@@ -557,6 +574,14 @@ static void stub_tick(void *user_data)
 {
     game_ctx_t *ctx = user_data;
     sdl2_state_update(ctx->state);
+
+    /* Update ball physics during gameplay */
+    sdl2_state_mode_t mode = sdl2_state_current(ctx->state);
+    if (mode == SDL2ST_GAME)
+    {
+        ball_system_env_t env = game_callbacks_ball_env(ctx);
+        ball_system_update(ctx->ball, &env);
+    }
 }
 
 static void stub_render(double alpha, void *user_data)

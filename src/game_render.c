@@ -16,6 +16,8 @@
 
 #include <SDL2/SDL.h>
 
+#include "ball_system.h"
+#include "ball_types.h"
 #include "block_system.h"
 #include "block_types.h"
 #include "game_context.h"
@@ -79,6 +81,67 @@ void game_render_blocks(const game_ctx_t *ctx)
 }
 
 /* =========================================================================
+ * Ball rendering
+ * ========================================================================= */
+
+void game_render_balls(const game_ctx_t *ctx)
+{
+    SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
+
+    for (int i = 0; i < MAX_BALLS; i++)
+    {
+        ball_system_render_info_t info;
+        if (ball_system_get_render_info(ctx->ball, i, &info) != BALL_SYS_OK)
+            continue;
+        if (!info.active)
+            continue;
+
+        const char *key = NULL;
+
+        switch (info.state)
+        {
+            case BALL_CREATE:
+            {
+                /* Birth animation: slide is 1-8 */
+                key = sprite_ball_birth_key(info.slide);
+                break;
+            }
+
+            case BALL_ACTIVE:
+            case BALL_READY:
+            case BALL_DIE:
+            case BALL_WAIT:
+                key = sprite_ball_key(info.slide);
+                break;
+
+            case BALL_POP:
+                /* Pop animation reuses birth frames in reverse */
+                key = sprite_ball_birth_key(info.slide);
+                break;
+
+            default:
+                continue;
+        }
+
+        if (!key)
+            continue;
+
+        sdl2_texture_info_t tex;
+        if (sdl2_texture_get(ctx->texture, key, &tex) != SDL2T_OK)
+            continue;
+
+        /* Ball position is center — convert to top-left */
+        SDL_Rect dst = {
+            .x = PLAY_AREA_X + info.x - BALL_WC,
+            .y = PLAY_AREA_Y + info.y - BALL_HC,
+            .w = BALL_WIDTH,
+            .h = BALL_HEIGHT,
+        };
+        SDL_RenderCopy(sdl, tex.texture, NULL, &dst);
+    }
+}
+
+/* =========================================================================
  * Paddle rendering
  * ========================================================================= */
 
@@ -136,6 +199,9 @@ void game_render_playfield(const game_ctx_t *ctx)
 
     /* Render paddle */
     game_render_paddle(ctx);
+
+    /* Render balls */
+    game_render_balls(ctx);
 }
 
 /* =========================================================================
