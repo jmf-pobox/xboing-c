@@ -319,6 +319,14 @@ void game_input_update(game_ctx_t *ctx)
             if (sdl2_input_just_pressed(ctx->input, SDL2I_ENTER_EDITOR))
                 sdl2_state_transition(ctx->state, SDL2ST_EDIT);
 
+            /* Escape returns to editor if play-testing */
+            if (sdl2_input_just_pressed(ctx->input, SDL2I_ABORT))
+            {
+                sdl2_state_mode_t prev = sdl2_state_previous(ctx->state);
+                if (prev == SDL2ST_EDIT)
+                    sdl2_state_transition(ctx->state, SDL2ST_EDIT);
+            }
+
             /* Debug cheat codes (Shift+key, --debug only) */
             input_debug_cheats(ctx);
             break;

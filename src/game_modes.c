@@ -110,12 +110,25 @@ static void mode_game_enter(sdl2_state_mode_t mode, void *ud)
     (void)mode;
     game_ctx_t *ctx = ud;
 
-    /* Coming from attract mode or game over — start a new game */
     sdl2_state_mode_t prev = sdl2_state_previous(ctx->state);
-    if (!ctx->game_active || prev == SDL2ST_HIGHSCORE || prev == SDL2ST_INTRO ||
-        prev == SDL2ST_INSTRUCT || prev == SDL2ST_DEMO || prev == SDL2ST_KEYS ||
-        prev == SDL2ST_KEYSEDIT || prev == SDL2ST_PREVIEW || prev == SDL2ST_PRESENTS)
+
+    if (prev == SDL2ST_EDIT)
     {
+        /* Play-test from editor — use existing blocks, just place ball */
+        ctx->lives_left = 3;
+        ctx->game_active = true;
+        paddle_system_reset(ctx->paddle);
+        paddle_system_set_size(ctx->paddle, PADDLE_SIZE_HUGE);
+        ball_system_clear_all(ctx->ball);
+        ball_system_env_t env = game_callbacks_ball_env(ctx);
+        ball_system_reset_start(ctx->ball, &env);
+        gun_system_set_ammo(ctx->gun, GUN_MAX_AMMO);
+    }
+    else if (!ctx->game_active || prev == SDL2ST_HIGHSCORE || prev == SDL2ST_INTRO ||
+             prev == SDL2ST_INSTRUCT || prev == SDL2ST_DEMO || prev == SDL2ST_KEYS ||
+             prev == SDL2ST_KEYSEDIT || prev == SDL2ST_PREVIEW || prev == SDL2ST_PRESENTS)
+    {
+        /* Coming from attract mode or game over — start a new game */
         start_new_game(ctx);
     }
     /* Coming from pause or bonus — just resume, don't reset */
