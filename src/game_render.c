@@ -211,6 +211,10 @@ void game_render_playfield(const game_ctx_t *ctx)
     SDL_RenderFillRect(sdl, &left);
     SDL_RenderFillRect(sdl, &right);
 
+    /* Clip all play area content to the border bounds */
+    SDL_Rect clip = {PLAY_AREA_X, PLAY_AREA_Y, PLAY_AREA_W, PLAY_AREA_H};
+    SDL_RenderSetClipRect(sdl, &clip);
+
     /* Render blocks */
     game_render_blocks(ctx);
 
@@ -222,6 +226,9 @@ void game_render_playfield(const game_ctx_t *ctx)
 
     /* Render bullets and tinks */
     game_render_bullets(ctx);
+
+    /* Remove clip rect */
+    SDL_RenderSetClipRect(sdl, NULL);
 }
 
 /* =========================================================================
