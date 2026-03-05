@@ -12,6 +12,8 @@
 
 #include <stdio.h>
 
+#include <SDL2/SDL.h>
+
 #include "ball_system.h"
 #include "block_system.h"
 #include "bonus_system.h"
@@ -557,12 +559,48 @@ static void mode_edit_update(sdl2_state_mode_t mode, void *ud)
         if (editor_system_get_state(ctx->editor) != EDITOR_STATE_FINISH)
             sdl2_state_transition(ctx->state, SDL2ST_INTRO);
     }
-    if (sdl2_input_just_pressed(ctx->input, SDL2I_PAUSE))
+    /* Editor keys match legacy editor.c:handleAllEditorKeys():
+     * P=playtest, S=save, L=load, C=clear, T=time, N=name, R=redraw
+     * h=flip-h, H=scroll-h, v=flip-v, V=scroll-v
+     *
+     * Uses raw SDL scancodes because many of these letters are bound to
+     * game actions (L=right, S=sfx toggle) in the input binding table. */
+    if (sdl2_input_just_pressed(ctx->input, SDL2I_PAUSE)) /* P */
         editor_system_key_input(ctx->editor, EDITOR_KEY_PLAYTEST);
-    if (sdl2_input_just_pressed(ctx->input, SDL2I_SAVE))
-        editor_system_key_input(ctx->editor, EDITOR_KEY_SAVE);
-    if (sdl2_input_just_pressed(ctx->input, SDL2I_LOAD))
-        editor_system_key_input(ctx->editor, EDITOR_KEY_LOAD);
+
+    {
+        static Uint32 ed_last[SDL_NUM_SCANCODES];
+        const Uint8 *keys = SDL_GetKeyboardState(NULL);
+        Uint32 now = SDL_GetTicks();
+        int shift = keys[SDL_SCANCODE_LSHIFT] || keys[SDL_SCANCODE_RSHIFT];
+
+#define ED_KEY(sc, cmd)                                                                            \
+    if (keys[(sc)] && (now - ed_last[(sc)] > 300))                                                 \
+    {                                                                                              \
+        ed_last[(sc)] = now;                                                                       \
+        editor_system_key_input(ctx->editor, (cmd));                                               \
+    }
+
+        ED_KEY(SDL_SCANCODE_S, EDITOR_KEY_SAVE)
+        ED_KEY(SDL_SCANCODE_L, EDITOR_KEY_LOAD)
+        ED_KEY(SDL_SCANCODE_C, EDITOR_KEY_CLEAR)
+        ED_KEY(SDL_SCANCODE_T, EDITOR_KEY_TIME)
+        ED_KEY(SDL_SCANCODE_N, EDITOR_KEY_NAME)
+        ED_KEY(SDL_SCANCODE_R, EDITOR_KEY_REDRAW)
+
+        if (!shift)
+        {
+            ED_KEY(SDL_SCANCODE_H, EDITOR_KEY_FLIP_H)
+            ED_KEY(SDL_SCANCODE_V, EDITOR_KEY_FLIP_V)
+        }
+        else
+        {
+            ED_KEY(SDL_SCANCODE_H, EDITOR_KEY_SCROLL_H)
+            ED_KEY(SDL_SCANCODE_V, EDITOR_KEY_SCROLL_V)
+        }
+
+#undef ED_KEY
+    }
 
     /* Palette selection: keys 1-9 select palette entries 0-8 */
     for (int s = 1; s <= 9; s++)
