@@ -464,13 +464,13 @@ void game_render_eyedude(const game_ctx_t *ctx)
     if (info.dir == EYEDUDE_DIR_LEFT)
     {
         static const char *const left_keys[] = {SPR_GUY_LEFT_1, SPR_GUY_LEFT_2, SPR_GUY_LEFT_3,
-                                                 SPR_GUY_LEFT_4, SPR_GUY_LEFT_5, SPR_GUY_LEFT_6};
+                                                SPR_GUY_LEFT_4, SPR_GUY_LEFT_5, SPR_GUY_LEFT_6};
         key = left_keys[info.frame_index % 6];
     }
     else if (info.dir == EYEDUDE_DIR_RIGHT)
     {
         static const char *const right_keys[] = {SPR_GUY_RIGHT_1, SPR_GUY_RIGHT_2, SPR_GUY_RIGHT_3,
-                                                  SPR_GUY_RIGHT_4, SPR_GUY_RIGHT_5, SPR_GUY_RIGHT_6};
+                                                 SPR_GUY_RIGHT_4, SPR_GUY_RIGHT_5, SPR_GUY_RIGHT_6};
         key = right_keys[info.frame_index % 6];
     }
     else if (info.dir == EYEDUDE_DIR_DEAD)

@@ -35,8 +35,8 @@
 #include "score_system.h"
 #include "sdl2_audio.h"
 #include "sdl2_input.h"
-#include "sfx_system.h"
 #include "sdl2_state.h"
+#include "sfx_system.h"
 #include "special_system.h"
 
 /* =========================================================================
