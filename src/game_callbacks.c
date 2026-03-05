@@ -14,6 +14,7 @@
 #include "ball_system.h"
 #include "block_system.h"
 #include "block_types.h"
+#include "bonus_system.h"
 #include "config_io.h"
 #include "demo_system.h"
 #include "game_context.h"
@@ -453,6 +454,56 @@ intro_system_callbacks_t game_callbacks_intro(void)
 {
     intro_system_callbacks_t cbs = {
         .on_finished = intro_cb_on_finished,
+    };
+    return cbs;
+}
+
+/* =========================================================================
+ * Bonus system callbacks
+ * ========================================================================= */
+
+static void bonus_cb_on_score_add(unsigned long points, void *ud)
+{
+    game_ctx_t *ctx = ud;
+    score_system_add_raw(ctx->score, points);
+}
+
+static void bonus_cb_on_bullet_consumed(void *ud)
+{
+    game_ctx_t *ctx = ud;
+    gun_system_use_ammo(ctx->gun);
+}
+
+static void bonus_cb_on_save_triggered(void *ud)
+{
+    (void)ud;
+    /* TODO: auto-save game state (bead 4.3) */
+}
+
+static void bonus_cb_on_sound(const char *name, void *ud)
+{
+    game_ctx_t *ctx = ud;
+    if (ctx->audio)
+        sdl2_audio_play(ctx->audio, name);
+}
+
+static void bonus_cb_on_finished(int next_level, void *ud)
+{
+    (void)next_level;
+    game_ctx_t *ctx = ud;
+    /* Advance to the next level */
+    game_rules_next_level(ctx);
+    sdl2_state_transition(ctx->state, SDL2ST_GAME);
+}
+
+bonus_system_callbacks_t game_callbacks_bonus(void)
+{
+    bonus_system_callbacks_t cbs = {
+        .on_score_add = bonus_cb_on_score_add,
+        .on_bullet_consumed = bonus_cb_on_bullet_consumed,
+        .on_save_triggered = bonus_cb_on_save_triggered,
+        .on_sound = bonus_cb_on_sound,
+        .on_finished = bonus_cb_on_finished,
     };
     return cbs;
 }

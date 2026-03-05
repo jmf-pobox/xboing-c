@@ -12,6 +12,7 @@
 
 #include <SDL2/SDL.h>
 
+#include "bonus_system.h"
 #include "demo_system.h"
 #include "game_context.h"
 #include "game_render.h"
@@ -477,5 +478,69 @@ void game_render_keysedit(const game_ctx_t *ctx)
         keys_system_get_sparkle_info(ctx->keys, &si);
         if (si.active)
             render_sparkle(ctx, PLAY_AREA_X + si.x, PLAY_AREA_Y + si.y, si.frame_index);
+    }
+}
+
+/* =========================================================================
+ * Bonus tally screen — score breakdown between levels
+ * ========================================================================= */
+
+void game_render_bonus(const game_ctx_t *ctx)
+{
+    bonus_state_t state = bonus_system_get_state(ctx->bonus);
+    if (state == BONUS_STATE_FINISH)
+        return;
+
+    SDL_Color white = {255, 255, 255, 255};
+    SDL_Color yellow = {255, 255, 0, 255};
+    SDL_Color green = {0, 255, 0, 255};
+    SDL_Color red = {255, 80, 80, 255};
+
+    /* Title */
+    sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TITLE, "BONUS", PLAY_AREA_Y + 40, red,
+                                  PLAY_AREA_W);
+
+    /* Display score running total */
+    unsigned long dscore = bonus_system_get_display_score(ctx->bonus);
+    char score_buf[64];
+    snprintf(score_buf, sizeof(score_buf), "Score: %lu", dscore);
+    sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TEXT, score_buf, PLAY_AREA_Y + 100, white,
+                                  PLAY_AREA_W);
+
+    if (state >= BONUS_STATE_SCORE)
+        sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_DATA, "Congratulations!",
+                                      PLAY_AREA_Y + 160, yellow, PLAY_AREA_W);
+
+    if (state >= BONUS_STATE_BONUS)
+    {
+        int coins = bonus_system_get_coins(ctx->bonus);
+        char buf[64];
+        snprintf(buf, sizeof(buf), "Bonus Coins: %d x 3000 = %d", coins, coins * 3000);
+        sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_DATA, buf, PLAY_AREA_Y + 200, green,
+                                      PLAY_AREA_W);
+    }
+
+    if (state >= BONUS_STATE_LEVEL)
+    {
+        char buf[64];
+        snprintf(buf, sizeof(buf), "Level Bonus: %d x 100", ctx->level_number);
+        sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_DATA, buf, PLAY_AREA_Y + 240, green,
+                                      PLAY_AREA_W);
+    }
+
+    if (state >= BONUS_STATE_BULLET)
+        sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_DATA, "Bullet Bonus...",
+                                      PLAY_AREA_Y + 280, green, PLAY_AREA_W);
+
+    if (state >= BONUS_STATE_TIME)
+        sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_DATA, "Time Bonus...",
+                                      PLAY_AREA_Y + 320, green, PLAY_AREA_W);
+
+    if (state >= BONUS_STATE_END_TEXT)
+    {
+        char buf[64];
+        snprintf(buf, sizeof(buf), "Prepare for level %d!", ctx->level_number + 1);
+        sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TEXT, buf, PLAY_AREA_Y + 400, yellow,
+                                      PLAY_AREA_W);
     }
 }

@@ -11,6 +11,7 @@
 #include "game_modes.h"
 
 #include "ball_system.h"
+#include "bonus_system.h"
 #include "demo_system.h"
 #include "game_callbacks.h"
 #include "game_context.h"
@@ -18,7 +19,9 @@
 #include "game_render.h"
 #include "game_rules.h"
 #include "gun_system.h"
+#include "highscore_io.h"
 #include "intro_system.h"
+#include "score_system.h"
 #include "keys_system.h"
 #include "message_system.h"
 #include "presents_system.h"
@@ -287,6 +290,50 @@ static void mode_keysedit_update(sdl2_state_mode_t mode, void *ud)
  * MODE_HIGHSCORE — high score table display (attract mode cycling)
  * ========================================================================= */
 
+/* =========================================================================
+ * MODE_BONUS — bonus tally sequence between levels
+ * ========================================================================= */
+
+static void mode_bonus_enter(sdl2_state_mode_t mode, void *ud)
+{
+    (void)mode;
+    game_ctx_t *ctx = ud;
+    int frame = (int)sdl2_state_frame(ctx->state);
+
+    /* Check high score ranking */
+    unsigned long score_val = score_system_get(ctx->score);
+    int rank = highscore_io_get_ranking(&ctx->hs_personal, score_val);
+
+    bonus_system_env_t env = {
+        .score = score_val,
+        .level = ctx->level_number,
+        .starting_level = ctx->start_level,
+        .time_bonus_secs = 0, /* TODO: wire time bonus */
+        .bullet_count = gun_system_get_ammo(ctx->gun),
+        .highscore_rank = rank,
+    };
+    bonus_system_begin(ctx->bonus, &env, frame);
+}
+
+static void mode_bonus_update(sdl2_state_mode_t mode, void *ud)
+{
+    (void)mode;
+    game_ctx_t *ctx = ud;
+    int frame = (int)sdl2_state_frame(ctx->state);
+
+    bonus_system_update(ctx->bonus, frame);
+
+    /* Space skips the bonus tally */
+    if (sdl2_input_just_pressed(ctx->input, SDL2I_START))
+        bonus_system_skip(ctx->bonus, frame);
+
+    /* on_finished callback handles transition to next level */
+}
+
+/* =========================================================================
+ * MODE_HIGHSCORE — high score table display (attract mode cycling)
+ * ========================================================================= */
+
 static int highscore_enter_frame;
 
 static void mode_highscore_enter(sdl2_state_mode_t mode, void *ud)
@@ -410,5 +457,14 @@ void game_modes_register(game_ctx_t *ctx)
         sdl2_state_register(ctx->state, SDL2ST_HIGHSCORE, &def);
     }
 
-    /* Remaining modes (bonus, dialogue, edit) registered in later beads. */
+    /* MODE_BONUS */
+    {
+        sdl2_state_mode_def_t def = {
+            .on_enter = mode_bonus_enter,
+            .on_update = mode_bonus_update,
+        };
+        sdl2_state_register(ctx->state, SDL2ST_BONUS, &def);
+    }
+
+    /* Remaining modes (dialogue, edit) registered in later beads. */
 }

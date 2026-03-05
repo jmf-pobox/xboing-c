@@ -480,6 +480,10 @@ void game_render_frame(const game_ctx_t *ctx)
             game_render_keysedit(ctx);
             break;
 
+        case SDL2ST_BONUS:
+            game_render_bonus(ctx);
+            break;
+
         case SDL2ST_HIGHSCORE:
             /* Stub — full rendering in bead 3.5 */
             break;

@@ -359,9 +359,9 @@ game_ctx_t *game_create(int argc, char *argv[])
         }
     }
 
-    /* Bonus system (stub callbacks) */
+    /* Bonus system (callbacks wired by game_callbacks.c) */
     {
-        bonus_system_callbacks_t bcb = {0};
+        bonus_system_callbacks_t bcb = game_callbacks_bonus();
         ctx->bonus = bonus_system_create(&bcb, ctx);
         if (!ctx->bonus)
         {
