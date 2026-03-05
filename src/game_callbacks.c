@@ -184,6 +184,121 @@ static void ball_cb_on_event(ball_system_event_t event, int ball_index, void *ud
  * Public: build callback tables
  * ========================================================================= */
 
+/* =========================================================================
+ * Gun system callbacks
+ * ========================================================================= */
+
+/*
+ * Check if bullet at (bx, by) hits any block in the grid.
+ * Iterates all occupied blocks and checks AABB overlap.
+ */
+static int gun_cb_check_block_hit(int bx, int by, int *out_row, int *out_col, void *ud)
+{
+    game_ctx_t *ctx = ud;
+
+    for (int row = 0; row < MAX_ROW; row++)
+    {
+        for (int col = 0; col < MAX_COL; col++)
+        {
+            if (!block_system_is_occupied(ctx->block, row, col))
+                continue;
+
+            block_system_render_info_t info;
+            if (block_system_get_render_info(ctx->block, row, col, &info) != BLOCK_SYS_OK)
+                continue;
+
+            /* AABB overlap: bullet center vs block rectangle */
+            if (bx >= info.x && bx < info.x + info.width && by >= info.y &&
+                by < info.y + info.height)
+            {
+                *out_row = row;
+                *out_col = col;
+                return 1;
+            }
+        }
+    }
+    return 0;
+}
+
+/* Handle bullet-block hit: clear block and award points */
+static void gun_cb_on_block_hit(int row, int col, void *ud)
+{
+    game_ctx_t *ctx = ud;
+    int block_type = block_system_get_type(ctx->block, row, col);
+    if (block_type == NONE_BLK)
+        return;
+
+    int points = score_block_hit_points(block_type, row);
+    if (points > 0)
+    {
+        score_system_env_t senv = {
+            .x2_active = special_system_is_active(ctx->special, SPECIAL_X2_BONUS),
+            .x4_active = special_system_is_active(ctx->special, SPECIAL_X4_BONUS),
+        };
+        score_system_add(ctx->score, (unsigned long)points, &senv);
+    }
+    block_system_clear(ctx->block, row, col);
+}
+
+/* Check if bullet hits any active ball (AABB overlap) */
+static int gun_cb_check_ball_hit(int bx, int by, void *ud)
+{
+    game_ctx_t *ctx = ud;
+    for (int i = 0; i < MAX_BALLS; i++)
+    {
+        ball_system_render_info_t info;
+        if (ball_system_get_render_info(ctx->ball, i, &info) != BALL_SYS_OK)
+            continue;
+        if (!info.active || info.state != BALL_ACTIVE)
+            continue;
+        /* Simple distance check */
+        int dx = bx - info.x;
+        int dy = by - info.y;
+        if (dx * dx + dy * dy < 15 * 15)
+            return i;
+    }
+    return -1;
+}
+
+/* Bullet hit ball: activate it (wake up from stun) */
+static void gun_cb_on_ball_hit(int ball_index, void *ud)
+{
+    (void)ball_index;
+    (void)ud;
+    /* Ball activation on bullet hit — simplified for now */
+}
+
+/* Check if bullet hits eyedude — stub until bead 4.2 */
+static int gun_cb_check_eyedude_hit(int bx, int by, void *ud)
+{
+    (void)bx;
+    (void)by;
+    (void)ud;
+    return 0;
+}
+
+static void gun_cb_on_eyedude_hit(void *ud)
+{
+    (void)ud;
+}
+
+static void gun_cb_on_sound(const char *name, void *ud)
+{
+    game_ctx_t *ctx = ud;
+    if (ctx->audio)
+        sdl2_audio_play(ctx->audio, name);
+}
+
+static int gun_cb_is_ball_waiting(void *ud)
+{
+    game_ctx_t *ctx = ud;
+    return ball_system_is_ball_waiting(ctx->ball);
+}
+
+/* =========================================================================
+ * Public: build callback tables
+ * ========================================================================= */
+
 ball_system_callbacks_t game_callbacks_ball(void)
 {
     ball_system_callbacks_t cbs = {
@@ -196,6 +311,32 @@ ball_system_callbacks_t game_callbacks_ball(void)
         .on_event = ball_cb_on_event,
     };
     return cbs;
+}
+
+gun_system_callbacks_t game_callbacks_gun(void)
+{
+    gun_system_callbacks_t cbs = {
+        .check_block_hit = gun_cb_check_block_hit,
+        .on_block_hit = gun_cb_on_block_hit,
+        .check_ball_hit = gun_cb_check_ball_hit,
+        .on_ball_hit = gun_cb_on_ball_hit,
+        .check_eyedude_hit = gun_cb_check_eyedude_hit,
+        .on_eyedude_hit = gun_cb_on_eyedude_hit,
+        .on_sound = gun_cb_on_sound,
+        .is_ball_waiting = gun_cb_is_ball_waiting,
+    };
+    return cbs;
+}
+
+gun_system_env_t game_callbacks_gun_env(const game_ctx_t *ctx)
+{
+    gun_system_env_t env = {
+        .frame = (int)sdl2_state_frame(ctx->state),
+        .paddle_pos = paddle_system_get_pos(ctx->paddle),
+        .paddle_size = paddle_system_get_size(ctx->paddle),
+        .fast_gun = special_system_is_active(ctx->special, SPECIAL_FAST_GUN),
+    };
+    return env;
 }
 
 ball_system_env_t game_callbacks_ball_env(const game_ctx_t *ctx)

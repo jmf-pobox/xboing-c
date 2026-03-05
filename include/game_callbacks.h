@@ -24,4 +24,14 @@ ball_system_callbacks_t game_callbacks_ball(void);
  */
 ball_system_env_t game_callbacks_ball_env(const game_ctx_t *ctx);
 
+/*
+ * Build and return the gun_system callback table.
+ */
+gun_system_callbacks_t game_callbacks_gun(void);
+
+/*
+ * Build a gun_system_env_t snapshot from current game state.
+ */
+gun_system_env_t game_callbacks_gun_env(const game_ctx_t *ctx);
+
 #endif /* GAME_CALLBACKS_H */

@@ -311,9 +311,9 @@ game_ctx_t *game_create(int argc, char *argv[])
         }
     }
 
-    /* Gun system (stub callbacks) */
+    /* Gun system (callbacks wired by game_callbacks.c) */
     {
-        gun_system_callbacks_t gcb = {0};
+        gun_system_callbacks_t gcb = game_callbacks_gun();
         gun_system_status_t gs;
         ctx->gun = gun_system_create(GAME_PLAY_HEIGHT, &gcb, ctx, &gs);
         if (!ctx->gun)
@@ -477,6 +477,9 @@ game_ctx_t *game_create(int argc, char *argv[])
         }
     }
 
+    /* Give initial ammo */
+    gun_system_set_ammo(ctx->gun, GUN_AMMO_PER_LEVEL);
+
     /* ---- Phase 6: Load initial level + place ball on paddle ------------- */
     {
         int file_num = level_system_wrap_number(ctx->level_number);
@@ -580,8 +583,12 @@ static void stub_tick(void *user_data)
     sdl2_state_mode_t mode = sdl2_state_current(ctx->state);
     if (mode == SDL2ST_GAME)
     {
-        ball_system_env_t env = game_callbacks_ball_env(ctx);
-        ball_system_update(ctx->ball, &env);
+        ball_system_env_t benv = game_callbacks_ball_env(ctx);
+        ball_system_update(ctx->ball, &benv);
+
+        gun_system_env_t genv = game_callbacks_gun_env(ctx);
+        gun_system_update(ctx->gun, &genv);
+
         game_rules_check(ctx);
     }
 }

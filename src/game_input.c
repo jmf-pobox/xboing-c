@@ -13,6 +13,7 @@
 #include "game_input.h"
 
 #include "ball_system.h"
+#include "gun_system.h"
 #include "paddle_system.h"
 #include "sdl2_input.h"
 #include "sdl2_state.h"
@@ -67,6 +68,13 @@ void game_input_update(game_ctx_t *ctx)
         case SDL2ST_GAME:
             input_update_paddle(ctx);
             input_launch_ball(ctx);
+
+            /* K key shoots a bullet */
+            if (sdl2_input_just_pressed(ctx->input, SDL2I_SHOOT))
+            {
+                gun_system_env_t genv = game_callbacks_gun_env(ctx);
+                gun_system_shoot(ctx->gun, &genv);
+            }
             break;
 
         default:

@@ -72,6 +72,9 @@ void game_rules_next_level(game_ctx_t *ctx)
     ball_system_env_t env = game_callbacks_ball_env(ctx);
     ball_system_reset_start(ctx->ball, &env);
 
+    /* Give ammo for the new level */
+    gun_system_set_ammo(ctx->gun, GUN_AMMO_PER_LEVEL);
+
     /* Reset bonus spawning state */
     ctx->bonus_block_active = false;
     ctx->next_bonus_frame = 0;

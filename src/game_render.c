@@ -21,6 +21,7 @@
 #include "block_system.h"
 #include "block_types.h"
 #include "game_context.h"
+#include "gun_system.h"
 #include "level_system.h"
 #include "paddle_system.h"
 #include "score_system.h"
@@ -203,6 +204,9 @@ void game_render_playfield(const game_ctx_t *ctx)
 
     /* Render balls */
     game_render_balls(ctx);
+
+    /* Render bullets and tinks */
+    game_render_bullets(ctx);
 }
 
 /* =========================================================================
@@ -220,6 +224,64 @@ void game_render_background(const game_ctx_t *ctx)
         SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
         SDL_Rect dst = {PLAY_AREA_X, PLAY_AREA_Y, PLAY_AREA_W, PLAY_AREA_H};
         SDL_RenderCopy(sdl, tex.texture, NULL, &dst);
+    }
+}
+
+/* =========================================================================
+ * Bullet and tink rendering
+ * ========================================================================= */
+
+void game_render_bullets(const game_ctx_t *ctx)
+{
+    SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
+
+    /* Render bullets */
+    sdl2_texture_info_t btex;
+    int have_bullet_tex = (sdl2_texture_get(ctx->texture, SPR_BULLET, &btex) == SDL2T_OK);
+
+    for (int i = 0; i < GUN_MAX_BULLETS; i++)
+    {
+        gun_system_bullet_info_t info;
+        if (gun_system_get_bullet_info(ctx->gun, i, &info) != GUN_SYS_OK)
+            continue;
+        if (!info.active)
+            continue;
+
+        if (have_bullet_tex)
+        {
+            SDL_Rect dst = {
+                .x = PLAY_AREA_X + info.x - GUN_BULLET_WC,
+                .y = PLAY_AREA_Y + info.y - GUN_BULLET_HC,
+                .w = GUN_BULLET_WIDTH,
+                .h = GUN_BULLET_HEIGHT,
+            };
+            SDL_RenderCopy(sdl, btex.texture, NULL, &dst);
+        }
+    }
+
+    /* Render tinks (impact effects) */
+    sdl2_texture_info_t ttex;
+    int have_tink_tex = (sdl2_texture_get(ctx->texture, SPR_TINK, &ttex) == SDL2T_OK);
+
+    for (int i = 0; i < GUN_MAX_TINKS; i++)
+    {
+        gun_system_tink_info_t info;
+        if (gun_system_get_tink_info(ctx->gun, i, &info) != GUN_SYS_OK)
+            continue;
+        if (!info.active)
+            continue;
+
+        if (have_tink_tex)
+        {
+            /* Tinks render at top of play area at the bullet's X position */
+            SDL_Rect dst = {
+                .x = PLAY_AREA_X + info.x - GUN_TINK_WC,
+                .y = PLAY_AREA_Y + 2,
+                .w = GUN_TINK_WIDTH,
+                .h = GUN_TINK_HEIGHT,
+            };
+            SDL_RenderCopy(sdl, ttex.texture, NULL, &dst);
+        }
     }
 }
 
