@@ -14,10 +14,18 @@
 #include "ball_system.h"
 #include "block_system.h"
 #include "block_types.h"
+#include "bonus_system.h"
+#include "config_io.h"
+#include "demo_system.h"
 #include "game_context.h"
 #include "game_rules.h"
+#include "intro_system.h"
+#include "keys_system.h"
+#include "level_system.h"
 #include "message_system.h"
 #include "paddle_system.h"
+#include "paths.h"
+#include "presents_system.h"
 #include "score_logic.h"
 #include "score_system.h"
 #include "sdl2_audio.h"
@@ -395,4 +403,187 @@ ball_system_env_t game_callbacks_ball_env(const game_ctx_t *ctx)
         .row_height = GAME_ROW_HEIGHT,
     };
     return env;
+}
+
+/* =========================================================================
+ * Presents system callbacks
+ * ========================================================================= */
+
+static void presents_cb_on_finished(void *ud)
+{
+    game_ctx_t *ctx = ud;
+    sdl2_state_transition(ctx->state, SDL2ST_INTRO);
+}
+
+static const char *presents_cb_get_nickname(void *ud)
+{
+    game_ctx_t *ctx = ud;
+    return ctx->config.nickname;
+}
+
+static const char *presents_cb_get_fullname(void *ud)
+{
+    (void)ud;
+    return "Player";
+}
+
+presents_system_callbacks_t game_callbacks_presents(void)
+{
+    presents_system_callbacks_t cbs = {
+        .on_finished = presents_cb_on_finished,
+        .get_nickname = presents_cb_get_nickname,
+        .get_fullname = presents_cb_get_fullname,
+    };
+    return cbs;
+}
+
+/* =========================================================================
+ * Intro system callbacks
+ * ========================================================================= */
+
+static void intro_cb_on_finished(intro_screen_mode_t mode, void *ud)
+{
+    game_ctx_t *ctx = ud;
+    if (mode == INTRO_MODE_INTRO)
+        sdl2_state_transition(ctx->state, SDL2ST_INSTRUCT);
+    else
+        sdl2_state_transition(ctx->state, SDL2ST_DEMO);
+}
+
+intro_system_callbacks_t game_callbacks_intro(void)
+{
+    intro_system_callbacks_t cbs = {
+        .on_finished = intro_cb_on_finished,
+    };
+    return cbs;
+}
+
+/* =========================================================================
+ * Bonus system callbacks
+ * ========================================================================= */
+
+static void bonus_cb_on_score_add(unsigned long points, void *ud)
+{
+    game_ctx_t *ctx = ud;
+    score_system_add_raw(ctx->score, points);
+}
+
+static void bonus_cb_on_bullet_consumed(void *ud)
+{
+    game_ctx_t *ctx = ud;
+    gun_system_use_ammo(ctx->gun);
+}
+
+static void bonus_cb_on_save_triggered(void *ud)
+{
+    (void)ud;
+    /* TODO: auto-save game state (bead 4.3) */
+}
+
+static void bonus_cb_on_sound(const char *name, void *ud)
+{
+    game_ctx_t *ctx = ud;
+    if (ctx->audio)
+        sdl2_audio_play(ctx->audio, name);
+}
+
+static void bonus_cb_on_finished(int next_level, void *ud)
+{
+    (void)next_level;
+    game_ctx_t *ctx = ud;
+    /* Advance to the next level */
+    game_rules_next_level(ctx);
+    sdl2_state_transition(ctx->state, SDL2ST_GAME);
+}
+
+bonus_system_callbacks_t game_callbacks_bonus(void)
+{
+    bonus_system_callbacks_t cbs = {
+        .on_score_add = bonus_cb_on_score_add,
+        .on_bullet_consumed = bonus_cb_on_bullet_consumed,
+        .on_save_triggered = bonus_cb_on_save_triggered,
+        .on_sound = bonus_cb_on_sound,
+        .on_finished = bonus_cb_on_finished,
+    };
+    return cbs;
+}
+
+/* =========================================================================
+ * Demo system callbacks
+ * ========================================================================= */
+
+static void demo_cb_on_finished(demo_screen_mode_t mode, void *ud)
+{
+    game_ctx_t *ctx = ud;
+    /* Attract cycle: demo → keys → keysedit → preview → highscore → intro */
+    if (mode == DEMO_MODE_DEMO)
+        sdl2_state_transition(ctx->state, SDL2ST_KEYS);
+    else /* DEMO_MODE_PREVIEW */
+        sdl2_state_transition(ctx->state, SDL2ST_HIGHSCORE);
+}
+
+static void demo_cb_on_load_level(int level_num, void *ud)
+{
+    game_ctx_t *ctx = ud;
+    int file_num = level_system_wrap_number(level_num);
+    char filename[32];
+    snprintf(filename, sizeof(filename), "level%02d.data", file_num);
+
+    char level_path[PATHS_MAX_PATH];
+    if (paths_level_file(&ctx->paths, filename, level_path, sizeof(level_path)) == PATHS_OK)
+    {
+        block_system_clear_all(ctx->block);
+        level_system_load_file(ctx->level, level_path);
+    }
+}
+
+demo_system_callbacks_t game_callbacks_demo(void)
+{
+    demo_system_callbacks_t cbs = {
+        .on_finished = demo_cb_on_finished,
+        .on_load_level = demo_cb_on_load_level,
+    };
+    return cbs;
+}
+
+/* =========================================================================
+ * Keys system callbacks
+ * ========================================================================= */
+
+static void keys_cb_on_finished(keys_screen_mode_t mode, void *ud)
+{
+    game_ctx_t *ctx = ud;
+    /* Attract cycle: keys → keysedit → preview → highscore → intro */
+    if (mode == KEYS_MODE_GAME)
+        sdl2_state_transition(ctx->state, SDL2ST_KEYSEDIT);
+    else /* KEYS_MODE_EDITOR */
+        sdl2_state_transition(ctx->state, SDL2ST_PREVIEW);
+}
+
+keys_system_callbacks_t game_callbacks_keys(void)
+{
+    keys_system_callbacks_t cbs = {
+        .on_finished = keys_cb_on_finished,
+    };
+    return cbs;
+}
+
+/* =========================================================================
+ * Highscore system callbacks
+ * ========================================================================= */
+
+static void highscore_cb_on_finished(highscore_type_t type, void *ud)
+{
+    (void)type;
+    game_ctx_t *ctx = ud;
+    /* After highscore display, cycle back to intro */
+    sdl2_state_transition(ctx->state, SDL2ST_INTRO);
+}
+
+highscore_system_callbacks_t game_callbacks_highscore(void)
+{
+    highscore_system_callbacks_t cbs = {
+        .on_finished = highscore_cb_on_finished,
+    };
+    return cbs;
 }

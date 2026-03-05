@@ -261,10 +261,13 @@ void game_rules_ball_died(game_ctx_t *ctx)
 
 void game_rules_check(game_ctx_t *ctx)
 {
-    /* Level completion: no required blocks remain */
+    /* Level completion: no required blocks remain → go to bonus screen */
     if (!block_system_still_active(ctx->block))
     {
-        game_rules_next_level(ctx);
+        special_system_turn_off(ctx->special);
+        if (ctx->audio)
+            sdl2_audio_play(ctx->audio, "applause");
+        sdl2_state_transition(ctx->state, SDL2ST_BONUS);
         return;
     }
 

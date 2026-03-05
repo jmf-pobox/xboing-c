@@ -13,6 +13,7 @@
  */
 
 #include "game_render.h"
+#include "game_render_ui.h"
 
 #include <SDL2/SDL.h>
 
@@ -26,6 +27,7 @@
 #include "paddle_system.h"
 #include "score_system.h"
 #include "sdl2_renderer.h"
+#include "sdl2_state.h"
 #include "sdl2_texture.h"
 #include "sprite_catalog.h"
 
@@ -33,15 +35,26 @@
  * Play area geometry (from stage.h constants)
  * ========================================================================= */
 
-/* The play area is the right-side region of the window.
- * Origin is at (MAIN_WIDTH, 0) = (70, 0). */
-#define PLAY_AREA_X 70
-#define PLAY_AREA_Y 0
+/*
+ * Layout constants from legacy stage.c:CreateAllWindows().
+ *
+ * offsetX = MAIN_WIDTH / 2 = 35
+ * mainWindow: 575 x 720 (PLAY_WIDTH + MAIN_WIDTH + 10) x (PLAY_HEIGHT + MAIN_HEIGHT + 10)
+ * scoreWindow:  x=35,  y=10,  w=224, h=42
+ * levelWindow:  x=284, y=5,   w=286, h=52
+ * playWindow:   x=35,  y=60,  w=495, h=580 (border=2)
+ * messWindow:   x=35,  y=655, w=247, h=30
+ * specialWindow: x=292, y=655, w=180, h=35
+ * timeWindow:   x=477, y=655, w=61,  h=35
+ */
+#define OFFSET_X 35
+#define PLAY_AREA_X OFFSET_X
+#define PLAY_AREA_Y 60
 #define PLAY_AREA_W 495
 #define PLAY_AREA_H 580
 
-/* Border thickness around the play area */
-#define BORDER_THICKNESS 3
+/* Border thickness — matches legacy playWindow border_width=2 */
+#define BORDER_THICKNESS 2
 
 /* =========================================================================
  * Block rendering
@@ -179,20 +192,22 @@ void game_render_playfield(const game_ctx_t *ctx)
 {
     SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
 
-    /* Draw play area border (red rectangle).
-     * Top border sits just above the play area; left/right extend from the
-     * top border down past the play area bottom (bottom is open for ball death). */
+    /* Draw play area border — matches legacy playWindow border_width=2, color=red.
+     * X11 draws the border outside the window content area, so we draw a 2px
+     * border around all 4 sides of the play area. */
     SDL_SetRenderDrawColor(sdl, 200, 0, 0, 255);
 
     int bx = PLAY_AREA_X - BORDER_THICKNESS;
-    int by = PLAY_AREA_Y; /* top border at y=0, not negative */
+    int by = PLAY_AREA_Y - BORDER_THICKNESS;
     int bw = PLAY_AREA_W + 2 * BORDER_THICKNESS;
-    int bh = PLAY_AREA_H + BORDER_THICKNESS; /* extends from top to bottom */
+    int bh = PLAY_AREA_H + 2 * BORDER_THICKNESS;
 
     SDL_Rect top = {bx, by, bw, BORDER_THICKNESS};
+    SDL_Rect bottom = {bx, by + bh - BORDER_THICKNESS, bw, BORDER_THICKNESS};
     SDL_Rect left = {bx, by, BORDER_THICKNESS, bh};
     SDL_Rect right = {bx + bw - BORDER_THICKNESS, by, BORDER_THICKNESS, bh};
     SDL_RenderFillRect(sdl, &top);
+    SDL_RenderFillRect(sdl, &bottom);
     SDL_RenderFillRect(sdl, &left);
     SDL_RenderFillRect(sdl, &right);
 
@@ -219,11 +234,34 @@ void game_render_background(const game_ctx_t *ctx)
     const char *key = sprite_background_key(bg_num);
 
     sdl2_texture_info_t tex;
-    if (sdl2_texture_get(ctx->texture, key, &tex) == SDL2T_OK)
+    if (sdl2_texture_get(ctx->texture, key, &tex) != SDL2T_OK)
+        return;
+
+    SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
+
+    /* Background PNGs are small tiles (e.g., 32x32) — tile them across the play area */
+    int tw = tex.width;
+    int th = tex.height;
+    if (tw <= 0 || th <= 0)
+        return;
+
+    for (int ty = PLAY_AREA_Y; ty < PLAY_AREA_Y + PLAY_AREA_H; ty += th)
     {
-        SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
-        SDL_Rect dst = {PLAY_AREA_X, PLAY_AREA_Y, PLAY_AREA_W, PLAY_AREA_H};
-        SDL_RenderCopy(sdl, tex.texture, NULL, &dst);
+        for (int tx = PLAY_AREA_X; tx < PLAY_AREA_X + PLAY_AREA_W; tx += tw)
+        {
+            int dw = tw;
+            int dh = th;
+
+            /* Clip partial tiles at play area edges */
+            if (tx + dw > PLAY_AREA_X + PLAY_AREA_W)
+                dw = PLAY_AREA_X + PLAY_AREA_W - tx;
+            if (ty + dh > PLAY_AREA_Y + PLAY_AREA_H)
+                dh = PLAY_AREA_Y + PLAY_AREA_H - ty;
+
+            SDL_Rect src = {0, 0, dw, dh};
+            SDL_Rect dst = {tx, ty, dw, dh};
+            SDL_RenderCopy(sdl, tex.texture, &src, &dst);
+        }
     }
 }
 
@@ -289,8 +327,8 @@ void game_render_bullets(const game_ctx_t *ctx)
  * Lives display — small ball sprites below the score area
  * ========================================================================= */
 
-/* Level window position (from legacy stage.c) */
-#define LEVEL_AREA_X 496
+/* Level window position (from legacy stage.c: scoreWidth + offsetX + 25 = 284) */
+#define LEVEL_AREA_X 284
 #define LEVEL_AREA_Y 5
 
 void game_render_lives(const game_ctx_t *ctx)
@@ -339,8 +377,8 @@ void game_render_lives(const game_ctx_t *ctx)
  * Score digit rendering
  * ========================================================================= */
 
-/* Score window position in the main window (from legacy stage.c) */
-#define SCORE_AREA_X 247
+/* Score window position (from legacy stage.c: offsetX=35, y=10) */
+#define SCORE_AREA_X OFFSET_X
 #define SCORE_AREA_Y 10
 
 void game_render_score(const game_ctx_t *ctx)
@@ -372,21 +410,99 @@ void game_render_score(const game_ctx_t *ctx)
  * Full frame rendering
  * ========================================================================= */
 
+/* Tile the space background across the entire window */
+static void render_main_background(const game_ctx_t *ctx)
+{
+    sdl2_texture_info_t tex;
+    if (sdl2_texture_get(ctx->texture, SPR_BGRND_SPACE, &tex) != SDL2T_OK)
+        return;
+
+    SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
+    int tw = tex.width;
+    int th = tex.height;
+    if (tw <= 0 || th <= 0)
+        return;
+
+    for (int ty = 0; ty < SDL2R_LOGICAL_HEIGHT; ty += th)
+    {
+        for (int tx = 0; tx < SDL2R_LOGICAL_WIDTH; tx += tw)
+        {
+            int dw = tw;
+            int dh = th;
+            if (tx + dw > SDL2R_LOGICAL_WIDTH)
+                dw = SDL2R_LOGICAL_WIDTH - tx;
+            if (ty + dh > SDL2R_LOGICAL_HEIGHT)
+                dh = SDL2R_LOGICAL_HEIGHT - ty;
+            SDL_Rect src = {0, 0, dw, dh};
+            SDL_Rect dst = {tx, ty, dw, dh};
+            SDL_RenderCopy(sdl, tex.texture, &src, &dst);
+        }
+    }
+}
+
 void game_render_frame(const game_ctx_t *ctx)
 {
     sdl2_renderer_clear(ctx->renderer);
 
-    /* Background fills the play area */
-    game_render_background(ctx);
+    /* Main window background (dark texture tiles across entire window) */
+    render_main_background(ctx);
 
-    /* Playfield border + blocks */
-    game_render_playfield(ctx);
+    sdl2_state_mode_t mode = sdl2_state_current(ctx->state);
 
-    /* Score and status */
-    game_render_score(ctx);
+    switch (mode)
+    {
+        case SDL2ST_PRESENTS:
+            game_render_presents(ctx);
+            break;
 
-    /* Lives and level */
-    game_render_lives(ctx);
+        case SDL2ST_INTRO:
+            game_render_intro(ctx);
+            break;
+
+        case SDL2ST_INSTRUCT:
+            game_render_instruct(ctx);
+            break;
+
+        case SDL2ST_DEMO:
+            game_render_demo(ctx);
+            break;
+
+        case SDL2ST_PREVIEW:
+            game_render_background(ctx);
+            game_render_preview(ctx);
+            break;
+
+        case SDL2ST_KEYS:
+            game_render_keys(ctx);
+            break;
+
+        case SDL2ST_KEYSEDIT:
+            game_render_keysedit(ctx);
+            break;
+
+        case SDL2ST_BONUS:
+            game_render_bonus(ctx);
+            break;
+
+        case SDL2ST_HIGHSCORE:
+            game_render_highscore(ctx);
+            break;
+
+        case SDL2ST_GAME:
+        case SDL2ST_PAUSE:
+            /* Play area background (level-specific tile) */
+            game_render_background(ctx);
+            /* Playfield border + blocks */
+            game_render_playfield(ctx);
+            /* Score and status */
+            game_render_score(ctx);
+            /* Lives and level */
+            game_render_lives(ctx);
+            break;
+
+        default:
+            break;
+    }
 
     sdl2_renderer_present(ctx->renderer);
 }

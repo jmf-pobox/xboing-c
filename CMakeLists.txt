@@ -631,7 +631,9 @@ if(SDL2_FOUND AND SDL2_IMAGE_FOUND AND SDL2_MIXER_FOUND AND SDL2_TTF_FOUND)
         src/game_init.c
         src/game_input.c
         src/game_main.c
+        src/game_modes.c
         src/game_render.c
+        src/game_render_ui.c
         src/game_rules.c
     )
     target_include_directories(xboing_sdl2 PRIVATE

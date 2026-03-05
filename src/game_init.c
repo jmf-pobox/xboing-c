@@ -16,6 +16,7 @@
 
 #include "game_init.h"
 #include "game_callbacks.h"
+#include "game_modes.h"
 #include "game_render.h"
 #include "game_rules.h"
 
@@ -358,9 +359,9 @@ game_ctx_t *game_create(int argc, char *argv[])
         }
     }
 
-    /* Bonus system (stub callbacks) */
+    /* Bonus system (callbacks wired by game_callbacks.c) */
     {
-        bonus_system_callbacks_t bcb = {0};
+        bonus_system_callbacks_t bcb = game_callbacks_bonus();
         ctx->bonus = bonus_system_create(&bcb, ctx);
         if (!ctx->bonus)
         {
@@ -414,9 +415,9 @@ game_ctx_t *game_create(int argc, char *argv[])
 
     /* ---- Phase 5: UI sequencers ----------------------------------------- */
 
-    /* Presents */
+    /* Presents (callbacks wired by game_callbacks.c) */
     {
-        presents_system_callbacks_t pcb = {0};
+        presents_system_callbacks_t pcb = game_callbacks_presents();
         ctx->presents = presents_system_create(&pcb, ctx);
         if (!ctx->presents)
         {
@@ -425,9 +426,9 @@ game_ctx_t *game_create(int argc, char *argv[])
         }
     }
 
-    /* Intro */
+    /* Intro (callbacks wired by game_callbacks.c) */
     {
-        intro_system_callbacks_t icb = {0};
+        intro_system_callbacks_t icb = game_callbacks_intro();
         ctx->intro = intro_system_create(&icb, ctx, NULL);
         if (!ctx->intro)
         {
@@ -436,9 +437,9 @@ game_ctx_t *game_create(int argc, char *argv[])
         }
     }
 
-    /* Demo */
+    /* Demo (callbacks wired by game_callbacks.c) */
     {
-        demo_system_callbacks_t dcb = {0};
+        demo_system_callbacks_t dcb = game_callbacks_demo();
         ctx->demo = demo_system_create(&dcb, ctx, NULL);
         if (!ctx->demo)
         {
@@ -447,9 +448,9 @@ game_ctx_t *game_create(int argc, char *argv[])
         }
     }
 
-    /* Keys */
+    /* Keys (callbacks wired by game_callbacks.c) */
     {
-        keys_system_callbacks_t kcb = {0};
+        keys_system_callbacks_t kcb = game_callbacks_keys();
         ctx->keys = keys_system_create(&kcb, ctx, NULL);
         if (!ctx->keys)
         {
@@ -466,9 +467,9 @@ game_ctx_t *game_create(int argc, char *argv[])
         goto fail;
     }
 
-    /* High score display */
+    /* High score display (callbacks wired by game_callbacks.c) */
     {
-        highscore_system_callbacks_t hcb = {0};
+        highscore_system_callbacks_t hcb = game_callbacks_highscore();
         ctx->highscore_display = highscore_system_create(&hcb, ctx);
         if (!ctx->highscore_display)
         {
@@ -476,6 +477,9 @@ game_ctx_t *game_create(int argc, char *argv[])
             goto fail;
         }
     }
+
+    /* Register mode handlers with the state machine */
+    game_modes_register(ctx);
 
     /* Give initial ammo */
     gun_system_set_ammo(ctx->gun, GUN_AMMO_PER_LEVEL);
@@ -577,20 +581,10 @@ void game_destroy(game_ctx_t *ctx)
 static void stub_tick(void *user_data)
 {
     game_ctx_t *ctx = user_data;
+    /* sdl2_state_update dispatches to mode-specific on_update handlers
+     * registered by game_modes_register() — gameplay logic, input, etc.
+     * all happen inside the mode handler. */
     sdl2_state_update(ctx->state);
-
-    /* Update gameplay systems */
-    sdl2_state_mode_t mode = sdl2_state_current(ctx->state);
-    if (mode == SDL2ST_GAME)
-    {
-        ball_system_env_t benv = game_callbacks_ball_env(ctx);
-        ball_system_update(ctx->ball, &benv);
-
-        gun_system_env_t genv = game_callbacks_gun_env(ctx);
-        gun_system_update(ctx->gun, &genv);
-
-        game_rules_check(ctx);
-    }
 }
 
 static void stub_render(double alpha, void *user_data)

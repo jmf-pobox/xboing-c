@@ -75,6 +75,10 @@ void game_input_update(game_ctx_t *ctx)
                 gun_system_env_t genv = game_callbacks_gun_env(ctx);
                 gun_system_shoot(ctx->gun, &genv);
             }
+
+            /* P key pauses */
+            if (sdl2_input_just_pressed(ctx->input, SDL2I_PAUSE))
+                sdl2_state_transition(ctx->state, SDL2ST_PAUSE);
             break;
 
         default:
