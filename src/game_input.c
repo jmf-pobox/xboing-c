@@ -168,19 +168,37 @@ static void input_check_speed(game_ctx_t *ctx)
  *   Shift+1..9 — jump to level 10/20/30/.../90
  * ========================================================================= */
 
+/* Debounce state for debug keys — prevents repeat firing */
+static Uint32 debug_last_fire[SDL_NUM_SCANCODES];
+
+static bool debug_key_edge(game_ctx_t *ctx, SDL_Scancode sc)
+{
+    (void)ctx;
+    const Uint8 *keys = SDL_GetKeyboardState(NULL);
+    Uint32 now = SDL_GetTicks();
+    if (keys[sc] && (now - debug_last_fire[sc] > 300))
+    {
+        debug_last_fire[sc] = now;
+        return true;
+    }
+    return false;
+}
+
 static void input_debug_cheats(game_ctx_t *ctx)
 {
     if (!ctx->debug_mode)
         return;
-    if (!sdl2_input_shift_held(ctx->input))
+
+    const Uint8 *keys = SDL_GetKeyboardState(NULL);
+    int shift = keys[SDL_SCANCODE_LSHIFT] || keys[SDL_SCANCODE_RSHIFT];
+    if (!shift)
         return;
 
     int frame = (int)sdl2_state_frame(ctx->state);
 
     /* Shift+N: skip level */
-    if (sdl2_input_just_pressed(ctx->input, SDL2I_NEXT_LEVEL))
+    if (debug_key_edge(ctx, SDL_SCANCODE_N))
     {
-        /* Clear all blocks to trigger level completion on next rules check */
         for (int r = 0; r < 18; r++)
             for (int c = 0; c < 9; c++)
                 block_system_clear(ctx->block, r, c);
@@ -188,22 +206,20 @@ static void input_debug_cheats(game_ctx_t *ctx)
     }
 
     /* Shift+D: kill ball */
-    if (sdl2_input_just_pressed(ctx->input, SDL2I_KILL_BALL))
+    if (debug_key_edge(ctx, SDL_SCANCODE_D))
     {
         ball_system_env_t env = game_callbacks_ball_env(ctx);
         for (int i = 0; i < 5; i++)
         {
-            if (ball_system_get_state(ctx->ball, i) == BALL_ACTIVE ||
-                ball_system_get_state(ctx->ball, i) == BALL_READY)
-            {
+            enum BallStates st = ball_system_get_state(ctx->ball, i);
+            if (st == BALL_ACTIVE || st == BALL_READY)
                 ball_system_change_mode(ctx->ball, &env, i, BALL_POP);
-            }
         }
         message_system_set(ctx->message, "[DEBUG] Ball killed", 1, frame);
     }
 
     /* Shift+G: game over */
-    if (sdl2_input_just_pressed(ctx->input, SDL2I_TOGGLE_CONTROL))
+    if (debug_key_edge(ctx, SDL_SCANCODE_G))
     {
         ctx->lives_left = 0;
         ball_system_env_t env = game_callbacks_ball_env(ctx);
@@ -216,7 +232,7 @@ static void input_debug_cheats(game_ctx_t *ctx)
     }
 
     /* Shift+L: add 5 lives */
-    if (sdl2_input_just_pressed(ctx->input, SDL2I_LOAD))
+    if (debug_key_edge(ctx, SDL_SCANCODE_L))
     {
         ctx->lives_left += 5;
         char buf[64];
@@ -225,7 +241,7 @@ static void input_debug_cheats(game_ctx_t *ctx)
     }
 
     /* Shift+A: max ammo */
-    if (sdl2_input_just_pressed(ctx->input, SDL2I_TOGGLE_AUDIO))
+    if (debug_key_edge(ctx, SDL_SCANCODE_A))
     {
         gun_system_set_ammo(ctx->gun, GUN_MAX_AMMO);
         gun_system_set_unlimited(ctx->gun, 1);
@@ -233,25 +249,25 @@ static void input_debug_cheats(game_ctx_t *ctx)
     }
 
     /* Shift+E: spawn EyeDude */
-    if (sdl2_input_just_pressed(ctx->input, SDL2I_ENTER_EDITOR))
+    if (debug_key_edge(ctx, SDL_SCANCODE_E))
     {
         eyedude_system_set_state(ctx->eyedude, EYEDUDE_STATE_RESET);
         message_system_set(ctx->message, "[DEBUG] EyeDude spawned", 1, frame);
     }
 
     /* Shift+S: trigger shake */
-    if (sdl2_input_just_pressed(ctx->input, SDL2I_TOGGLE_SFX))
+    if (debug_key_edge(ctx, SDL_SCANCODE_S))
     {
         sfx_system_set_mode(ctx->sfx, SFX_MODE_SHAKE);
         sfx_system_set_end_frame(ctx->sfx, frame + 100);
         message_system_set(ctx->message, "[DEBUG] Shake!", 1, frame);
     }
 
-    /* Shift+1..9: jump to level 10/20/30/.../90 */
+    /* Shift+1..9: jump to level 10/20/.../90 */
     for (int s = 1; s <= 9; s++)
     {
-        sdl2_input_action_t action = (sdl2_input_action_t)(SDL2I_SPEED_1 + s - 1);
-        if (sdl2_input_just_pressed(ctx->input, action))
+        SDL_Scancode sc = (SDL_Scancode)(SDL_SCANCODE_1 + s - 1);
+        if (debug_key_edge(ctx, sc))
         {
             ctx->level_number = s * 10;
             game_rules_next_level(ctx);
