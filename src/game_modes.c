@@ -11,6 +11,7 @@
 #include "game_modes.h"
 
 #include "ball_system.h"
+#include "block_system.h"
 #include "bonus_system.h"
 #include "demo_system.h"
 #include "game_callbacks.h"
@@ -23,26 +24,85 @@
 #include "highscore_system.h"
 #include "intro_system.h"
 #include "keys_system.h"
+#include "level_system.h"
 #include "message_system.h"
+#include "paddle_system.h"
+#include "paths.h"
 #include "presents_system.h"
 #include "score_system.h"
+#include "sdl2_audio.h"
 #include "sdl2_input.h"
 #include "sdl2_state.h"
+#include "special_system.h"
 
 /* =========================================================================
  * MODE_GAME — core gameplay
  * ========================================================================= */
+
+/* Play area constants */
+#define GAME_PLAY_WIDTH 495
+#define GAME_PLAY_HEIGHT 580
+#define GAME_COL_WIDTH (GAME_PLAY_WIDTH / 9)
+#define GAME_ROW_HEIGHT (GAME_PLAY_HEIGHT / 18)
+
+static void start_new_game(game_ctx_t *ctx)
+{
+    /* Reset game state */
+    ctx->level_number = ctx->start_level;
+    ctx->lives_left = 3;
+    ctx->game_active = true;
+    ctx->bonus_block_active = false;
+    ctx->next_bonus_frame = 0;
+    ctx->user_tilts = 0;
+
+    /* Reset modules */
+    score_system_set(ctx->score, 0);
+    special_system_turn_off(ctx->special);
+    gun_system_set_ammo(ctx->gun, GUN_AMMO_PER_LEVEL);
+    paddle_system_reset(ctx->paddle);
+    paddle_system_set_size(ctx->paddle, PADDLE_SIZE_HUGE);
+    ball_system_clear_all(ctx->ball);
+
+    /* Load the starting level */
+    int file_num = level_system_wrap_number(ctx->level_number);
+    char filename[32];
+    snprintf(filename, sizeof(filename), "level%02d.data", file_num);
+
+    char level_path[PATHS_MAX_PATH];
+    if (paths_level_file(&ctx->paths, filename, level_path, sizeof(level_path)) == PATHS_OK)
+    {
+        block_system_clear_all(ctx->block);
+        level_system_advance_background(ctx->level);
+        level_system_load_file(ctx->level, level_path);
+    }
+
+    /* Set level title as default message */
+    const char *title = level_system_get_title(ctx->level);
+    if (title)
+        message_system_set_default(ctx->message, title);
+
+    /* Place ball on paddle */
+    ball_system_env_t env = game_callbacks_ball_env(ctx);
+    ball_system_reset_start(ctx->ball, &env);
+
+    if (ctx->audio)
+        sdl2_audio_play(ctx->audio, "newlevel");
+}
 
 static void mode_game_enter(sdl2_state_mode_t mode, void *ud)
 {
     (void)mode;
     game_ctx_t *ctx = ud;
 
-    if (!ctx->game_active)
+    /* Coming from attract mode or game over — start a new game */
+    sdl2_state_mode_t prev = sdl2_state_previous(ctx->state);
+    if (!ctx->game_active || prev == SDL2ST_HIGHSCORE || prev == SDL2ST_INTRO ||
+        prev == SDL2ST_INSTRUCT || prev == SDL2ST_DEMO || prev == SDL2ST_KEYS ||
+        prev == SDL2ST_KEYSEDIT || prev == SDL2ST_PREVIEW || prev == SDL2ST_PRESENTS)
     {
-        /* New game — reset state */
-        ctx->game_active = true;
+        start_new_game(ctx);
     }
+    /* Coming from pause or bonus — just resume, don't reset */
 }
 
 static void mode_game_update(sdl2_state_mode_t mode, void *ud)
