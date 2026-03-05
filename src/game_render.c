@@ -20,6 +20,7 @@
 #include "block_types.h"
 #include "game_context.h"
 #include "level_system.h"
+#include "paddle_system.h"
 #include "sdl2_renderer.h"
 #include "sdl2_texture.h"
 #include "sprite_catalog.h"
@@ -78,6 +79,34 @@ void game_render_blocks(const game_ctx_t *ctx)
 }
 
 /* =========================================================================
+ * Paddle rendering
+ * ========================================================================= */
+
+void game_render_paddle(const game_ctx_t *ctx)
+{
+    paddle_system_render_info_t info;
+    if (paddle_system_get_render_info(ctx->paddle, &info) != PADDLE_SYS_OK)
+        return;
+
+    const char *key = sprite_paddle_key(info.width);
+    sdl2_texture_info_t tex;
+    if (sdl2_texture_get(ctx->texture, key, &tex) != SDL2T_OK)
+        return;
+
+    SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
+
+    /* Paddle position is center X in play-area coordinates.
+     * Convert to top-left corner for SDL_RenderCopy. */
+    SDL_Rect dst = {
+        .x = PLAY_AREA_X + info.pos - info.width / 2,
+        .y = PLAY_AREA_Y + info.y,
+        .w = info.width,
+        .h = info.height,
+    };
+    SDL_RenderCopy(sdl, tex.texture, NULL, &dst);
+}
+
+/* =========================================================================
  * Playfield rendering
  * ========================================================================= */
 
@@ -104,6 +133,9 @@ void game_render_playfield(const game_ctx_t *ctx)
 
     /* Render blocks */
     game_render_blocks(ctx);
+
+    /* Render paddle */
+    game_render_paddle(ctx);
 }
 
 /* =========================================================================

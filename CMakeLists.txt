@@ -628,6 +628,7 @@ target_compile_options(paths PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
 if(SDL2_FOUND AND SDL2_IMAGE_FOUND AND SDL2_MIXER_FOUND AND SDL2_TTF_FOUND)
     add_executable(xboing_sdl2
         src/game_init.c
+        src/game_input.c
         src/game_main.c
         src/game_render.c
     )

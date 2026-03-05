@@ -19,4 +19,7 @@ void game_render_playfield(const game_ctx_t *ctx);
 /* Render all occupied blocks in the grid. */
 void game_render_blocks(const game_ctx_t *ctx);
 
+/* Render the paddle at its current position. */
+void game_render_paddle(const game_ctx_t *ctx);
+
 #endif /* GAME_RENDER_H */
