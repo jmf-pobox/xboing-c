@@ -58,55 +58,79 @@ static void render_sparkle(const game_ctx_t *ctx, int x, int y, int frame_index)
 void game_render_presents(const game_ctx_t *ctx)
 {
     SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
-    presents_state_t state = presents_system_get_state(ctx->presents);
 
-    if (state == PRESENTS_STATE_NONE || state == PRESENTS_STATE_FINISH)
+    if (presents_system_is_finished(ctx->presents))
         return;
 
-    /* Flag + earth (shown in FLAG state) */
-    if (state == PRESENTS_STATE_FLAG)
+    /*
+     * The presents module uses a WAIT state between content states.
+     * Content data persists in the module after each state runs, so we
+     * query and render unconditionally — the query functions return the
+     * data that was set during the most recent content state.
+     *
+     * Rendering layers bottom-to-top: flag → credits → letters → sparkle
+     * → typewriter → wipe.
+     */
+
+    /* Flag + earth — always render once set (persists from FLAG state) */
     {
         presents_flag_info_t fi;
         presents_system_get_flag_info(ctx->presents, &fi);
 
-        sdl2_texture_info_t tex;
-        if (sdl2_texture_get(ctx->texture, SPR_PRESENTS_FLAG, &tex) == SDL2T_OK)
+        /* flag_x is set to non-zero when FLAG state runs */
+        if (fi.flag_x > 0 || fi.flag_y > 0)
         {
-            SDL_Rect dst = {PLAY_AREA_X + fi.flag_x, PLAY_AREA_Y + fi.flag_y, tex.width,
-                            tex.height};
-            SDL_RenderCopy(sdl, tex.texture, NULL, &dst);
-        }
-        if (sdl2_texture_get(ctx->texture, SPR_PRESENTS_EARTH, &tex) == SDL2T_OK)
-        {
-            SDL_Rect dst = {PLAY_AREA_X + fi.earth_x, PLAY_AREA_Y + fi.earth_y, tex.width,
-                            tex.height};
-            SDL_RenderCopy(sdl, tex.texture, NULL, &dst);
+            sdl2_texture_info_t tex;
+            if (sdl2_texture_get(ctx->texture, SPR_PRESENTS_FLAG, &tex) == SDL2T_OK)
+            {
+                SDL_Rect dst = {PLAY_AREA_X + fi.flag_x, PLAY_AREA_Y + fi.flag_y, tex.width,
+                                tex.height};
+                SDL_RenderCopy(sdl, tex.texture, NULL, &dst);
+            }
+            if (sdl2_texture_get(ctx->texture, SPR_PRESENTS_EARTH, &tex) == SDL2T_OK)
+            {
+                SDL_Rect dst = {PLAY_AREA_X + fi.earth_x, PLAY_AREA_Y + fi.earth_y, tex.width,
+                                tex.height};
+                SDL_RenderCopy(sdl, tex.texture, NULL, &dst);
+            }
+
+            /* Copyright text at bottom */
+            SDL_Color white = {255, 255, 255, 255};
+            sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_COPY,
+                                          "(c) 1993-1996 Justin C. Kibell",
+                                          PLAY_AREA_Y + fi.copyright_y, white, PLAY_AREA_W);
         }
     }
 
-    /* Author credits (TEXT1-TEXT3 states) */
-    if (state >= PRESENTS_STATE_TEXT1 && state <= PRESENTS_STATE_TEXT3)
+    /* Author credits — query the active typewriter line to know progress.
+     * TEXT1/TEXT2/TEXT3 states each set one line of credits. After TEXT3,
+     * all three are visible until TEXT_CLEAR. We render based on whether
+     * the typewriter has been used (active_line >= 0 means past flag). */
     {
-        SDL_Color white = {255, 255, 255, 255};
-        SDL_Color yellow = {255, 255, 0, 255};
+        int active_line = presents_system_get_active_typewriter_line(ctx->presents);
+        presents_state_t state = presents_system_get_state(ctx->presents);
 
-        sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TEXT, "Justin C. Kibell",
-                                      PLAY_AREA_Y + 200, white, PLAY_AREA_W);
-        if (state >= PRESENTS_STATE_TEXT2)
-            sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_COPY, "presents", PLAY_AREA_Y + 230,
-                                          yellow, PLAY_AREA_W);
-        if (state >= PRESENTS_STATE_TEXT3)
+        /* Credits text appears after FLAG, before LETTERS */
+        if (active_line < 0 && state != PRESENTS_STATE_FLAG && state != PRESENTS_STATE_NONE)
+        {
+            /* Between FLAG and LETTERS — show credits */
+            SDL_Color white = {255, 255, 255, 255};
+            SDL_Color yellow = {255, 255, 0, 255};
+
+            sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TEXT, "Justin C. Kibell",
+                                          PLAY_AREA_Y + 200, white, PLAY_AREA_W);
+            sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_COPY, "presents",
+                                          PLAY_AREA_Y + 230, yellow, PLAY_AREA_W);
             sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TITLE, "XBoing II",
                                           PLAY_AREA_Y + 270, white, PLAY_AREA_W);
+        }
     }
 
-    /* Letter stamps (LETTERS state) */
-    if (state == PRESENTS_STATE_LETTERS || state == PRESENTS_STATE_SHINE)
+    /* XBOING letter stamps — render if any letters have been placed */
     {
         presents_letter_info_t li;
         if (presents_system_get_letter_info(ctx->presents, &li))
         {
-            /* Draw individual XBOING letters */
             static const char *const letter_keys[] = {SPR_TITLE_X, SPR_TITLE_B, SPR_TITLE_O,
                                                       SPR_TITLE_I, SPR_TITLE_N, SPR_TITLE_G};
             for (int i = 0; i <= li.letter_index && i < 6; i++)
@@ -114,7 +138,6 @@ void game_render_presents(const game_ctx_t *ctx)
                 sdl2_texture_info_t tex;
                 if (sdl2_texture_get(ctx->texture, letter_keys[i], &tex) == SDL2T_OK)
                 {
-                    /* Letters are positioned sequentially across the play area */
                     int lx = PLAY_AREA_X + 10 + i * 80;
                     SDL_Rect dst = {lx, PLAY_AREA_Y + 250, tex.width, tex.height};
                     SDL_RenderCopy(sdl, tex.texture, NULL, &dst);
@@ -123,8 +146,7 @@ void game_render_presents(const game_ctx_t *ctx)
         }
     }
 
-    /* Sparkle animation (SHINE state) */
-    if (state == PRESENTS_STATE_SHINE)
+    /* Sparkle — render when active */
     {
         presents_sparkle_info_t si;
         presents_system_get_sparkle_info(ctx->presents, &si);
@@ -132,8 +154,7 @@ void game_render_presents(const game_ctx_t *ctx)
             render_sparkle(ctx, PLAY_AREA_X + si.x, PLAY_AREA_Y + si.y, si.frame_index);
     }
 
-    /* Typewriter text (SPECIAL_TEXT1-3 states) */
-    if (state >= PRESENTS_STATE_SPECIAL_TEXT1 && state <= PRESENTS_STATE_SPECIAL_TEXT3)
+    /* Typewriter text lines — render visible chars for each line */
     {
         SDL_Color green = {0, 255, 0, 255};
         for (int line = 0; line < 3; line++)
@@ -143,7 +164,6 @@ void game_render_presents(const game_ctx_t *ctx)
             {
                 if (ti.chars_visible > 0 && ti.text)
                 {
-                    /* Draw the visible portion of the typewriter text */
                     char buf[256];
                     int n = ti.chars_visible;
                     if (n > 255)
@@ -156,18 +176,19 @@ void game_render_presents(const game_ctx_t *ctx)
         }
     }
 
-    /* Curtain wipe (CLEAR state) — draw black rectangles from top and bottom */
-    if (state == PRESENTS_STATE_CLEAR)
+    /* Curtain wipe — draw black rectangles closing from top and bottom */
     {
         presents_wipe_info_t wi;
         presents_system_get_wipe_info(ctx->presents, &wi);
-
-        SDL_SetRenderDrawColor(sdl, 0, 0, 0, 255);
-        SDL_Rect top_rect = {PLAY_AREA_X, PLAY_AREA_Y, PLAY_AREA_W, wi.top_y};
-        SDL_Rect bot_rect = {PLAY_AREA_X, PLAY_AREA_Y + wi.bottom_y, PLAY_AREA_W,
-                             PLAY_AREA_H - wi.bottom_y};
-        SDL_RenderFillRect(sdl, &top_rect);
-        SDL_RenderFillRect(sdl, &bot_rect);
+        if (wi.top_y > 0 || wi.complete)
+        {
+            SDL_SetRenderDrawColor(sdl, 0, 0, 0, 255);
+            SDL_Rect top_rect = {PLAY_AREA_X, PLAY_AREA_Y, PLAY_AREA_W, wi.top_y};
+            SDL_Rect bot_rect = {PLAY_AREA_X, PLAY_AREA_Y + wi.bottom_y, PLAY_AREA_W,
+                                 PLAY_AREA_H - wi.bottom_y};
+            SDL_RenderFillRect(sdl, &top_rect);
+            SDL_RenderFillRect(sdl, &bot_rect);
+        }
     }
 }
 
