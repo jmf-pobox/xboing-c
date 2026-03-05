@@ -13,9 +13,12 @@
 
 #include "ball_system.h"
 #include "block_system.h"
+#include "block_types.h"
 #include "game_context.h"
 #include "message_system.h"
 #include "paddle_system.h"
+#include "score_logic.h"
+#include "score_system.h"
 #include "sdl2_audio.h"
 #include "sdl2_loop.h"
 #include "sdl2_state.h"
@@ -43,17 +46,73 @@ static int ball_cb_check_region(int row, int col, int bx, int by, int bdx, void 
 }
 
 /*
- * Block hit handler.
- * For now (bead 2.2) this is a stub — real hit logic wired in bead 2.3.
- * Returns 0 = ball should bounce normally.
+ * Block hit handler: process the hit, award points, clear the block.
+ *
+ * Returns nonzero if ball should NOT bounce (e.g., DEATH_BLK kills ball,
+ * HYPERSPACE_BLK teleports — these absorb the hit).
  */
 static int ball_cb_on_block_hit(int row, int col, int ball_index, void *ud)
 {
-    (void)row;
-    (void)col;
     (void)ball_index;
-    (void)ud;
-    return 0; /* Normal bounce */
+    game_ctx_t *ctx = ud;
+
+    int block_type = block_system_get_type(ctx->block, row, col);
+    if (block_type == NONE_BLK)
+        return 0;
+
+    /* Award points based on block type */
+    int points = score_block_hit_points(block_type, row);
+    if (points > 0)
+    {
+        score_system_env_t senv = {
+            .x2_active = special_system_is_active(ctx->special, SPECIAL_X2_BONUS),
+            .x4_active = special_system_is_active(ctx->special, SPECIAL_X4_BONUS),
+        };
+        score_system_add(ctx->score, (unsigned long)points, &senv);
+    }
+
+    /* Handle block-type-specific behavior */
+    switch (block_type)
+    {
+        case DEATH_BLK:
+            /* Death block kills the ball — return nonzero to suppress bounce */
+            block_system_clear(ctx->block, row, col);
+            return 1;
+
+        case BOMB_BLK:
+            /* Bomb: clear this block and neighbors */
+            block_system_clear(ctx->block, row, col);
+            /* Clear adjacent blocks (simplified — full chain explosion in bead 6.2) */
+            for (int dr = -1; dr <= 1; dr++)
+            {
+                for (int dc = -1; dc <= 1; dc++)
+                {
+                    if (dr == 0 && dc == 0)
+                        continue;
+                    int nr = row + dr, nc = col + dc;
+                    if (block_system_is_occupied(ctx->block, nr, nc))
+                        block_system_clear(ctx->block, nr, nc);
+                }
+            }
+            if (ctx->audio)
+                sdl2_audio_play(ctx->audio, "explosion");
+            return 0;
+
+        case BLACK_BLK:
+            /* Black blocks take 2 hits — just clear on hit (simplified) */
+            block_system_clear(ctx->block, row, col);
+            return 0;
+
+        case COUNTER_BLK:
+            /* Counter blocks decrement — simplified: just clear */
+            block_system_clear(ctx->block, row, col);
+            return 0;
+
+        default:
+            /* Standard block: just clear it */
+            block_system_clear(ctx->block, row, col);
+            return 0;
+    }
 }
 
 /*
@@ -76,12 +135,13 @@ static void ball_cb_on_sound(const char *name, void *ud)
 }
 
 /*
- * Score addition: stub for bead 2.2 — wired to score_system in bead 2.3.
+ * Score addition from ball events (paddle hit bonus, etc.).
+ * Uses raw add — no multiplier (multiplier applied in on_block_hit).
  */
 static void ball_cb_on_score(unsigned long points, void *ud)
 {
-    (void)points;
-    (void)ud;
+    game_ctx_t *ctx = ud;
+    score_system_add_raw(ctx->score, points);
 }
 
 /*

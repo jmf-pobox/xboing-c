@@ -25,4 +25,7 @@ void game_render_paddle(const game_ctx_t *ctx);
 /* Render all active balls. */
 void game_render_balls(const game_ctx_t *ctx);
 
+/* Render the score digit display. */
+void game_render_score(const game_ctx_t *ctx);
+
 #endif /* GAME_RENDER_H */

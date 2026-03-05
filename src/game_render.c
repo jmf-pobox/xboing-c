@@ -23,6 +23,7 @@
 #include "game_context.h"
 #include "level_system.h"
 #include "paddle_system.h"
+#include "score_system.h"
 #include "sdl2_renderer.h"
 #include "sdl2_texture.h"
 #include "sprite_catalog.h"
@@ -223,6 +224,39 @@ void game_render_background(const game_ctx_t *ctx)
 }
 
 /* =========================================================================
+ * Score digit rendering
+ * ========================================================================= */
+
+/* Score window position in the main window (from legacy stage.c) */
+#define SCORE_AREA_X 247
+#define SCORE_AREA_Y 10
+
+void game_render_score(const game_ctx_t *ctx)
+{
+    SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
+    unsigned long score_val = score_system_get(ctx->score);
+
+    score_system_digit_layout_t layout;
+    score_system_get_digit_layout(score_val, &layout);
+
+    for (int i = 0; i < layout.count; i++)
+    {
+        const char *key = sprite_digit_key(layout.digits[i]);
+        sdl2_texture_info_t tex;
+        if (sdl2_texture_get(ctx->texture, key, &tex) != SDL2T_OK)
+            continue;
+
+        SDL_Rect dst = {
+            .x = SCORE_AREA_X + layout.x_positions[i],
+            .y = SCORE_AREA_Y + layout.y,
+            .w = SCORE_DIGIT_WIDTH,
+            .h = SCORE_WINDOW_HEIGHT,
+        };
+        SDL_RenderCopy(sdl, tex.texture, NULL, &dst);
+    }
+}
+
+/* =========================================================================
  * Full frame rendering
  * ========================================================================= */
 
@@ -235,6 +269,9 @@ void game_render_frame(const game_ctx_t *ctx)
 
     /* Playfield border + blocks */
     game_render_playfield(ctx);
+
+    /* Score display */
+    game_render_score(ctx);
 
     sdl2_renderer_present(ctx->renderer);
 }
