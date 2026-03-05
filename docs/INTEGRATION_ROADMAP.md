@@ -65,7 +65,7 @@ Full startup sequence and post-game screens.
 - **3.5: High score display + name entry** — score table, name input dialogue.
   Files: `game_render_ui.c`, `game_modes.c`
 
-### Phase 4: SFX, EyeDude, Persistence — 4 beads
+### Phase 4: SFX, EyeDude, Persistence (COMPLETE — PR #69)
 
 - **4.1: SFX rendering** — window shake, screen fade, border glow
 - **4.2: EyeDude rendering + collision** — animated character
