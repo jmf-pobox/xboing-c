@@ -562,7 +562,7 @@ static void mode_edit_update(sdl2_state_mode_t mode, void *ud)
     if (sdl2_input_just_pressed(ctx->input, SDL2I_LOAD))
         editor_system_key_input(ctx->editor, EDITOR_KEY_LOAD);
 
-    /* Palette scroll with speed keys as palette index shortcut */
+    /* Palette selection: keys 1-9 select palette entries 0-8 */
     for (int s = 1; s <= 9; s++)
     {
         sdl2_input_action_t action = (sdl2_input_action_t)(SDL2I_SPEED_1 + s - 1);
@@ -570,6 +570,33 @@ static void mode_edit_update(sdl2_state_mode_t mode, void *ud)
         {
             editor_system_select_palette(ctx->editor, s - 1);
             break;
+        }
+    }
+
+    /* Palette selection via left/right arrows to cycle */
+    if (sdl2_input_just_pressed(ctx->input, SDL2I_RIGHT))
+    {
+        int sel = editor_system_get_selected_palette(ctx->editor);
+        int count = editor_system_get_palette_count(ctx->editor);
+        editor_system_select_palette(ctx->editor, (sel + 1) % count);
+    }
+    if (sdl2_input_just_pressed(ctx->input, SDL2I_LEFT))
+    {
+        int sel = editor_system_get_selected_palette(ctx->editor);
+        int count = editor_system_get_palette_count(ctx->editor);
+        editor_system_select_palette(ctx->editor, (sel - 1 + count) % count);
+    }
+
+    /* Palette selection via mouse click on sidebar (x > play area right edge) */
+    {
+        int palette_x = PLAY_AREA_X + 495 + 15; /* PALETTE_X from game_render.c */
+        int palette_entry_h = 25;
+        if (mx > palette_x && sdl2_input_mouse_pressed(ctx->input, 1))
+        {
+            int idx = (my - PLAY_AREA_Y) / palette_entry_h;
+            int count = editor_system_get_palette_count(ctx->editor);
+            if (idx >= 0 && idx < count)
+                editor_system_select_palette(ctx->editor, idx);
         }
     }
 }

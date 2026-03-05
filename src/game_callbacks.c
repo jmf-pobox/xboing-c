@@ -725,6 +725,14 @@ static int editor_cb_load_level(const char *path, void *ud)
     return level_system_load_file(ctx->level, path) == LEVEL_SYS_OK ? 1 : 0;
 }
 
+static int editor_cb_yes_no(const char *message, void *ud)
+{
+    (void)message;
+    (void)ud;
+    /* Always confirm — proper dialogue integration deferred to Phase 6 */
+    return 1;
+}
+
 static void editor_cb_on_finish(void *ud)
 {
     game_ctx_t *ctx = ud;
@@ -753,6 +761,7 @@ editor_system_callbacks_t game_callbacks_editor(void)
         .on_sound = editor_cb_on_sound,
         .on_message = editor_cb_on_message,
         .on_load_level = editor_cb_load_level,
+        .on_yes_no_dialogue = editor_cb_yes_no,
         .on_finish = editor_cb_on_finish,
         .on_playtest_start = editor_cb_on_playtest_start,
         .on_playtest_end = editor_cb_on_playtest_end,
