@@ -11,6 +11,7 @@
 #include "ball_system.h"
 #include "bonus_system.h"
 #include "demo_system.h"
+#include "editor_system.h"
 #include "eyedude_system.h"
 #include "game_context.h"
 #include "gun_system.h"
@@ -59,6 +60,9 @@ keys_system_callbacks_t game_callbacks_keys(void);
 
 /* Highscore system callback table. */
 highscore_system_callbacks_t game_callbacks_highscore(void);
+
+/* Editor system callback table. */
+editor_system_callbacks_t game_callbacks_editor(void);
 
 /* SFX system callback table. */
 sfx_system_callbacks_t game_callbacks_sfx(void);

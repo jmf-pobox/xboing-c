@@ -21,12 +21,14 @@
 #include "ball_types.h"
 #include "block_system.h"
 #include "block_types.h"
+#include "editor_system.h"
 #include "eyedude_system.h"
 #include "game_context.h"
 #include "gun_system.h"
 #include "level_system.h"
 #include "paddle_system.h"
 #include "score_system.h"
+#include "sdl2_font.h"
 #include "sdl2_renderer.h"
 #include "sdl2_state.h"
 #include "sdl2_texture.h"
@@ -450,6 +452,66 @@ static void render_main_background(const game_ctx_t *ctx)
 }
 
 /* =========================================================================
+ * Editor palette rendering — sidebar with block type selection
+ * ========================================================================= */
+
+/* Palette renders to the right of the play area */
+#define PALETTE_X (PLAY_AREA_X + PLAY_AREA_W + 15)
+#define PALETTE_Y PLAY_AREA_Y
+#define PALETTE_ENTRY_H 25
+#define PALETTE_W 100
+
+void game_render_editor_palette(const game_ctx_t *ctx)
+{
+    SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
+    int count = editor_system_get_palette_count(ctx->editor);
+    int selected = editor_system_get_selected_palette(ctx->editor);
+
+    for (int i = 0; i < count && i < 20; i++) /* Show up to 20 entries */
+    {
+        const editor_palette_entry_t *entry = editor_system_get_palette_entry(ctx->editor, i);
+        if (!entry)
+            continue;
+
+        int ey = PALETTE_Y + i * PALETTE_ENTRY_H;
+
+        /* Highlight selected entry */
+        if (i == selected)
+        {
+            SDL_SetRenderDrawColor(sdl, 255, 255, 0, 80);
+            SDL_Rect hl = {PALETTE_X - 2, ey - 2, PALETTE_W + 4, PALETTE_ENTRY_H};
+            SDL_RenderFillRect(sdl, &hl);
+        }
+
+        /* Draw block sprite */
+        const char *key = sprite_block_key(entry->block_type);
+        if (key)
+        {
+            sdl2_texture_info_t tex;
+            if (sdl2_texture_get(ctx->texture, key, &tex) == SDL2T_OK)
+            {
+                SDL_Rect dst = {PALETTE_X, ey, tex.width, tex.height};
+                SDL_RenderCopy(sdl, tex.texture, NULL, &dst);
+            }
+        }
+    }
+
+    /* Editor status text */
+    SDL_Color white = {255, 255, 255, 255};
+    const char *title = editor_system_get_level_title(ctx->editor);
+    if (title)
+        sdl2_font_draw(ctx->font, SDL2F_FONT_COPY, title, PLAY_AREA_X, PLAY_AREA_Y - 15, white);
+
+    int level = editor_system_get_level_number(ctx->editor);
+    if (level > 0)
+    {
+        char buf[32];
+        snprintf(buf, sizeof(buf), "Level %d", level);
+        sdl2_font_draw(ctx->font, SDL2F_FONT_COPY, buf, PLAY_AREA_X + 200, PLAY_AREA_Y - 15, white);
+    }
+}
+
+/* =========================================================================
  * EyeDude rendering
  * ========================================================================= */
 
@@ -596,6 +658,13 @@ void game_render_frame(const game_ctx_t *ctx)
             game_render_score(ctx);
             /* Lives and level */
             game_render_lives(ctx);
+            break;
+
+        case SDL2ST_EDIT:
+            /* Editor: show grid background + blocks + palette */
+            game_render_background(ctx);
+            game_render_playfield(ctx);
+            game_render_editor_palette(ctx);
             break;
 
         default:
