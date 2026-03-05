@@ -535,17 +535,14 @@ static void mode_edit_update(sdl2_state_mode_t mode, void *ud)
     int play_x = mx - PLAY_AREA_X;
     int play_y = my - PLAY_AREA_Y;
 
-    /* Mouse buttons */
+    /* Mouse buttons: left=draw, middle or right=erase */
     if (sdl2_input_mouse_pressed(ctx->input, 1))
         editor_system_mouse_button(ctx->editor, play_x, play_y, 1, 1);
     else
         editor_system_mouse_button(ctx->editor, play_x, play_y, 1, 0);
 
-    if (sdl2_input_mouse_pressed(ctx->input, 2))
+    if (sdl2_input_mouse_pressed(ctx->input, 2) || sdl2_input_mouse_pressed(ctx->input, 3))
         editor_system_mouse_button(ctx->editor, play_x, play_y, 2, 1);
-
-    if (sdl2_input_mouse_pressed(ctx->input, 3))
-        editor_system_mouse_button(ctx->editor, play_x, play_y, 3, 1);
 
     /* Mouse drag */
     editor_system_mouse_motion(ctx->editor, play_x, play_y);
