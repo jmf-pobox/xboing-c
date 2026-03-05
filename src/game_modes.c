@@ -179,6 +179,21 @@ static void mode_pause_exit(sdl2_state_mode_t mode, void *ud)
 }
 
 /* =========================================================================
+ * Attract mode frame acceleration
+ *
+ * The legacy game ran attract screens at sleepSync(display, 3) which
+ * is about 1.2ms per frame = ~833 fps.  Our fixed-timestep loop at
+ * speed 5 gives ~133 fps.  To match legacy timing, we call each
+ * attract module's update() multiple times per tick, advancing the
+ * module's internal frame counter faster than the real frame counter.
+ *
+ * ATTRACT_FRAME_MULTIPLIER controls how many virtual frames per tick.
+ * ========================================================================= */
+
+#define ATTRACT_FRAME_MULTIPLIER 6
+static int attract_frame_counter;
+
+/* =========================================================================
  * MODE_PRESENTS — splash screen sequence
  * ========================================================================= */
 
@@ -186,21 +201,24 @@ static void mode_presents_enter(sdl2_state_mode_t mode, void *ud)
 {
     (void)mode;
     game_ctx_t *ctx = ud;
-    int frame = (int)sdl2_state_frame(ctx->state);
-    presents_system_begin(ctx->presents, frame);
+    attract_frame_counter = 0;
+    presents_system_begin(ctx->presents, 0);
 }
 
 static void mode_presents_update(sdl2_state_mode_t mode, void *ud)
 {
     (void)mode;
     game_ctx_t *ctx = ud;
-    int frame = (int)sdl2_state_frame(ctx->state);
 
-    presents_system_update(ctx->presents, frame);
+    for (int i = 0; i < ATTRACT_FRAME_MULTIPLIER; i++)
+    {
+        attract_frame_counter++;
+        presents_system_update(ctx->presents, attract_frame_counter);
+    }
 
     /* Space skips presents */
     if (sdl2_input_just_pressed(ctx->input, SDL2I_START))
-        presents_system_skip(ctx->presents, frame);
+        presents_system_skip(ctx->presents, attract_frame_counter);
 
     /* on_finished callback handles the transition to intro */
 }
@@ -213,26 +231,26 @@ static void mode_intro_enter(sdl2_state_mode_t mode, void *ud)
 {
     (void)mode;
     game_ctx_t *ctx = ud;
-    int frame = (int)sdl2_state_frame(ctx->state);
-    intro_system_begin(ctx->intro, INTRO_MODE_INTRO, frame);
+    attract_frame_counter = 0;
+    intro_system_begin(ctx->intro, INTRO_MODE_INTRO, 0);
 }
 
 static void mode_intro_update(sdl2_state_mode_t mode, void *ud)
 {
     (void)mode;
     game_ctx_t *ctx = ud;
-    int frame = (int)sdl2_state_frame(ctx->state);
 
-    intro_system_update(ctx->intro, frame);
+    for (int i = 0; i < ATTRACT_FRAME_MULTIPLIER; i++)
+    {
+        attract_frame_counter++;
+        intro_system_update(ctx->intro, attract_frame_counter);
+    }
 
-    /* Space starts the game from intro */
     if (sdl2_input_just_pressed(ctx->input, SDL2I_START))
     {
         sdl2_state_transition(ctx->state, SDL2ST_GAME);
         return;
     }
-
-    /* on_finished callback handles cycling to next attract screen */
 }
 
 /* =========================================================================
@@ -243,17 +261,20 @@ static void mode_instruct_enter(sdl2_state_mode_t mode, void *ud)
 {
     (void)mode;
     game_ctx_t *ctx = ud;
-    int frame = (int)sdl2_state_frame(ctx->state);
-    intro_system_begin(ctx->intro, INTRO_MODE_INSTRUCT, frame);
+    attract_frame_counter = 0;
+    intro_system_begin(ctx->intro, INTRO_MODE_INSTRUCT, 0);
 }
 
 static void mode_instruct_update(sdl2_state_mode_t mode, void *ud)
 {
     (void)mode;
     game_ctx_t *ctx = ud;
-    int frame = (int)sdl2_state_frame(ctx->state);
 
-    intro_system_update(ctx->intro, frame);
+    for (int i = 0; i < ATTRACT_FRAME_MULTIPLIER; i++)
+    {
+        attract_frame_counter++;
+        intro_system_update(ctx->intro, attract_frame_counter);
+    }
 
     if (sdl2_input_just_pressed(ctx->input, SDL2I_START))
     {
@@ -270,16 +291,19 @@ static void mode_demo_enter(sdl2_state_mode_t mode, void *ud)
 {
     (void)mode;
     game_ctx_t *ctx = ud;
-    int frame = (int)sdl2_state_frame(ctx->state);
-    demo_system_begin(ctx->demo, DEMO_MODE_DEMO, frame);
+    attract_frame_counter = 0;
+    demo_system_begin(ctx->demo, DEMO_MODE_DEMO, 0);
 }
 
 static void mode_demo_update(sdl2_state_mode_t mode, void *ud)
 {
     (void)mode;
     game_ctx_t *ctx = ud;
-    int frame = (int)sdl2_state_frame(ctx->state);
-    demo_system_update(ctx->demo, frame);
+    for (int i = 0; i < ATTRACT_FRAME_MULTIPLIER; i++)
+    {
+        attract_frame_counter++;
+        demo_system_update(ctx->demo, attract_frame_counter);
+    }
 
     if (sdl2_input_just_pressed(ctx->input, SDL2I_START))
     {
@@ -296,16 +320,19 @@ static void mode_preview_enter(sdl2_state_mode_t mode, void *ud)
 {
     (void)mode;
     game_ctx_t *ctx = ud;
-    int frame = (int)sdl2_state_frame(ctx->state);
-    demo_system_begin(ctx->demo, DEMO_MODE_PREVIEW, frame);
+    attract_frame_counter = 0;
+    demo_system_begin(ctx->demo, DEMO_MODE_PREVIEW, 0);
 }
 
 static void mode_preview_update(sdl2_state_mode_t mode, void *ud)
 {
     (void)mode;
     game_ctx_t *ctx = ud;
-    int frame = (int)sdl2_state_frame(ctx->state);
-    demo_system_update(ctx->demo, frame);
+    for (int i = 0; i < ATTRACT_FRAME_MULTIPLIER; i++)
+    {
+        attract_frame_counter++;
+        demo_system_update(ctx->demo, attract_frame_counter);
+    }
 
     if (sdl2_input_just_pressed(ctx->input, SDL2I_START))
     {
@@ -322,16 +349,19 @@ static void mode_keys_enter(sdl2_state_mode_t mode, void *ud)
 {
     (void)mode;
     game_ctx_t *ctx = ud;
-    int frame = (int)sdl2_state_frame(ctx->state);
-    keys_system_begin(ctx->keys, KEYS_MODE_GAME, frame);
+    attract_frame_counter = 0;
+    keys_system_begin(ctx->keys, KEYS_MODE_GAME, 0);
 }
 
 static void mode_keys_update(sdl2_state_mode_t mode, void *ud)
 {
     (void)mode;
     game_ctx_t *ctx = ud;
-    int frame = (int)sdl2_state_frame(ctx->state);
-    keys_system_update(ctx->keys, frame);
+    for (int i = 0; i < ATTRACT_FRAME_MULTIPLIER; i++)
+    {
+        attract_frame_counter++;
+        keys_system_update(ctx->keys, attract_frame_counter);
+    }
 
     if (sdl2_input_just_pressed(ctx->input, SDL2I_START))
     {
@@ -348,16 +378,19 @@ static void mode_keysedit_enter(sdl2_state_mode_t mode, void *ud)
 {
     (void)mode;
     game_ctx_t *ctx = ud;
-    int frame = (int)sdl2_state_frame(ctx->state);
-    keys_system_begin(ctx->keys, KEYS_MODE_EDITOR, frame);
+    attract_frame_counter = 0;
+    keys_system_begin(ctx->keys, KEYS_MODE_EDITOR, 0);
 }
 
 static void mode_keysedit_update(sdl2_state_mode_t mode, void *ud)
 {
     (void)mode;
     game_ctx_t *ctx = ud;
-    int frame = (int)sdl2_state_frame(ctx->state);
-    keys_system_update(ctx->keys, frame);
+    for (int i = 0; i < ATTRACT_FRAME_MULTIPLIER; i++)
+    {
+        attract_frame_counter++;
+        keys_system_update(ctx->keys, attract_frame_counter);
+    }
 
     if (sdl2_input_just_pressed(ctx->input, SDL2I_START))
     {
@@ -378,9 +411,8 @@ static void mode_bonus_enter(sdl2_state_mode_t mode, void *ud)
 {
     (void)mode;
     game_ctx_t *ctx = ud;
-    int frame = (int)sdl2_state_frame(ctx->state);
+    attract_frame_counter = 0;
 
-    /* Check high score ranking */
     unsigned long score_val = score_system_get(ctx->score);
     int rank = highscore_io_get_ranking(&ctx->hs_personal, score_val);
 
@@ -392,20 +424,23 @@ static void mode_bonus_enter(sdl2_state_mode_t mode, void *ud)
         .bullet_count = gun_system_get_ammo(ctx->gun),
         .highscore_rank = rank,
     };
-    bonus_system_begin(ctx->bonus, &env, frame);
+    bonus_system_begin(ctx->bonus, &env, 0);
 }
 
 static void mode_bonus_update(sdl2_state_mode_t mode, void *ud)
 {
     (void)mode;
     game_ctx_t *ctx = ud;
-    int frame = (int)sdl2_state_frame(ctx->state);
 
-    bonus_system_update(ctx->bonus, frame);
+    for (int i = 0; i < ATTRACT_FRAME_MULTIPLIER; i++)
+    {
+        attract_frame_counter++;
+        bonus_system_update(ctx->bonus, attract_frame_counter);
+    }
 
     /* Space skips the bonus tally */
     if (sdl2_input_just_pressed(ctx->input, SDL2I_START))
-        bonus_system_skip(ctx->bonus, frame);
+        bonus_system_skip(ctx->bonus, attract_frame_counter);
 
     /* on_finished callback handles transition to next level */
 }
@@ -418,21 +453,23 @@ static void mode_highscore_enter(sdl2_state_mode_t mode, void *ud)
 {
     (void)mode;
     game_ctx_t *ctx = ud;
-    int frame = (int)sdl2_state_frame(ctx->state);
+    attract_frame_counter = 0;
 
-    /* Load table data and begin the display sequence */
     highscore_system_set_table(ctx->highscore_display, &ctx->hs_personal);
     highscore_system_set_current_score(ctx->highscore_display, score_system_get(ctx->score));
-    highscore_system_begin(ctx->highscore_display, HIGHSCORE_TYPE_PERSONAL, frame);
+    highscore_system_begin(ctx->highscore_display, HIGHSCORE_TYPE_PERSONAL, 0);
 }
 
 static void mode_highscore_update(sdl2_state_mode_t mode, void *ud)
 {
     (void)mode;
     game_ctx_t *ctx = ud;
-    int frame = (int)sdl2_state_frame(ctx->state);
 
-    highscore_system_update(ctx->highscore_display, frame);
+    for (int i = 0; i < ATTRACT_FRAME_MULTIPLIER; i++)
+    {
+        attract_frame_counter++;
+        highscore_system_update(ctx->highscore_display, attract_frame_counter);
+    }
 
     if (sdl2_input_just_pressed(ctx->input, SDL2I_START))
     {
