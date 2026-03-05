@@ -463,6 +463,27 @@ void game_render_frame(const game_ctx_t *ctx)
             game_render_instruct(ctx);
             break;
 
+        case SDL2ST_DEMO:
+            game_render_demo(ctx);
+            break;
+
+        case SDL2ST_PREVIEW:
+            game_render_background(ctx);
+            game_render_preview(ctx);
+            break;
+
+        case SDL2ST_KEYS:
+            game_render_keys(ctx);
+            break;
+
+        case SDL2ST_KEYSEDIT:
+            game_render_keysedit(ctx);
+            break;
+
+        case SDL2ST_HIGHSCORE:
+            /* Stub — full rendering in bead 3.5 */
+            break;
+
         case SDL2ST_GAME:
         case SDL2ST_PAUSE:
             /* Play area background (level-specific tile) */

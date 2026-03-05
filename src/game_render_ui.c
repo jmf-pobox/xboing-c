@@ -12,8 +12,11 @@
 
 #include <SDL2/SDL.h>
 
+#include "demo_system.h"
 #include "game_context.h"
+#include "game_render.h"
 #include "intro_system.h"
+#include "keys_system.h"
 #include "presents_system.h"
 #include "sdl2_font.h"
 #include "sdl2_renderer.h"
@@ -286,6 +289,192 @@ void game_render_instruct(const game_ctx_t *ctx)
     {
         intro_sparkle_info_t si;
         intro_system_get_sparkle_info(ctx->intro, &si);
+        if (si.active)
+            render_sparkle(ctx, PLAY_AREA_X + si.x, PLAY_AREA_Y + si.y, si.frame_index);
+    }
+}
+
+/* =========================================================================
+ * Demo screen — ball trail + descriptive text
+ * ========================================================================= */
+
+void game_render_demo(const game_ctx_t *ctx)
+{
+    demo_state_t state = demo_system_get_state(ctx->demo);
+    if (state == DEMO_STATE_NONE)
+        return;
+
+    /* Title */
+    if (state >= DEMO_STATE_TITLE)
+    {
+        SDL_Color white = {255, 255, 255, 255};
+        sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TITLE, "Demonstration",
+                                      PLAY_AREA_Y + 20, white, PLAY_AREA_W);
+    }
+
+    /* Ball trail animation */
+    if (state >= DEMO_STATE_BLOCKS)
+    {
+        const demo_ball_pos_t *trail = NULL;
+        int count = demo_system_get_ball_trail(ctx->demo, &trail);
+
+        for (int i = 0; i < count; i++)
+        {
+            const char *key = sprite_ball_key(trail[i].frame_index);
+            sdl2_texture_info_t tex;
+            if (sdl2_texture_get(ctx->texture, key, &tex) == SDL2T_OK)
+            {
+                SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
+                SDL_Rect dst = {PLAY_AREA_X + trail[i].x, PLAY_AREA_Y + trail[i].y, tex.width,
+                                tex.height};
+                SDL_RenderCopy(sdl, tex.texture, NULL, &dst);
+            }
+        }
+    }
+
+    /* Descriptive text */
+    if (state >= DEMO_STATE_TEXT)
+    {
+        const demo_text_line_t *lines = NULL;
+        int count = demo_system_get_demo_text(ctx->demo, &lines);
+
+        SDL_Color green = {0, 255, 0, 255};
+        for (int i = 0; i < count; i++)
+        {
+            if (lines[i].text)
+                sdl2_font_draw(ctx->font, SDL2F_FONT_DATA, lines[i].text,
+                               PLAY_AREA_X + lines[i].x, PLAY_AREA_Y + lines[i].y, green);
+        }
+    }
+
+    /* Sparkle */
+    if (state == DEMO_STATE_SPARKLE)
+    {
+        demo_sparkle_info_t si;
+        demo_system_get_sparkle_info(ctx->demo, &si);
+        if (si.active)
+            render_sparkle(ctx, PLAY_AREA_X + si.x, PLAY_AREA_Y + si.y, si.frame_index);
+    }
+}
+
+/* =========================================================================
+ * Preview screen — random level display
+ * ========================================================================= */
+
+void game_render_preview(const game_ctx_t *ctx)
+{
+    demo_state_t state = demo_system_get_state(ctx->demo);
+    if (state == DEMO_STATE_NONE)
+        return;
+
+    SDL_Color white = {255, 255, 255, 255};
+    int level = demo_system_get_preview_level(ctx->demo);
+    char title[64];
+    snprintf(title, sizeof(title), "Preview - Level %d", level);
+    sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TITLE, title, PLAY_AREA_Y + 20, white,
+                                  PLAY_AREA_W);
+
+    if (state >= DEMO_STATE_BLOCKS)
+        game_render_blocks(ctx);
+
+    if (state == DEMO_STATE_SPARKLE)
+    {
+        demo_sparkle_info_t si;
+        demo_system_get_sparkle_info(ctx->demo, &si);
+        if (si.active)
+            render_sparkle(ctx, PLAY_AREA_X + si.x, PLAY_AREA_Y + si.y, si.frame_index);
+    }
+}
+
+/* =========================================================================
+ * Keys screen — game controls binding table
+ * ========================================================================= */
+
+void game_render_keys(const game_ctx_t *ctx)
+{
+    keys_state_t state = keys_system_get_state(ctx->keys);
+    if (state == KEYS_STATE_NONE)
+        return;
+
+    if (state >= KEYS_STATE_TITLE)
+    {
+        SDL_Color white = {255, 255, 255, 255};
+        sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TITLE, "Game Controls", PLAY_AREA_Y + 20,
+                                      white, PLAY_AREA_W);
+    }
+
+    if (state >= KEYS_STATE_TEXT)
+    {
+        const keys_binding_entry_t *bindings = NULL;
+        int count = keys_system_get_game_bindings(ctx->keys, &bindings);
+
+        SDL_Color yellow = {255, 255, 0, 255};
+        for (int i = 0; i < count; i++)
+        {
+            int x = (bindings[i].column == 0) ? PLAY_AREA_X + 30 : PLAY_AREA_X + 280;
+            int row = (bindings[i].column == 0) ? i : i - 10;
+            sdl2_font_draw(ctx->font, SDL2F_FONT_COPY, bindings[i].text, x,
+                           PLAY_AREA_Y + 90 + row * 24, yellow);
+        }
+    }
+
+    if (state == KEYS_STATE_SPARKLE)
+    {
+        keys_sparkle_info_t si;
+        keys_system_get_sparkle_info(ctx->keys, &si);
+        if (si.active)
+            render_sparkle(ctx, PLAY_AREA_X + si.x, PLAY_AREA_Y + si.y, si.frame_index);
+    }
+}
+
+/* =========================================================================
+ * Editor keys screen — editor controls
+ * ========================================================================= */
+
+void game_render_keysedit(const game_ctx_t *ctx)
+{
+    keys_state_t state = keys_system_get_state(ctx->keys);
+    if (state == KEYS_STATE_NONE)
+        return;
+
+    if (state >= KEYS_STATE_TITLE)
+    {
+        SDL_Color white = {255, 255, 255, 255};
+        sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TITLE, "Editor Controls",
+                                      PLAY_AREA_Y + 20, white, PLAY_AREA_W);
+    }
+
+    if (state >= KEYS_STATE_TEXT)
+    {
+        const keys_info_line_t *info = NULL;
+        int info_count = keys_system_get_editor_info(ctx->keys, &info);
+
+        SDL_Color green = {0, 255, 0, 255};
+        for (int i = 0; i < info_count; i++)
+        {
+            if (info[i].text)
+                sdl2_font_draw(ctx->font, SDL2F_FONT_COPY, info[i].text, PLAY_AREA_X + 30,
+                               PLAY_AREA_Y + 90 + i * 22, green);
+        }
+
+        const keys_binding_entry_t *bindings = NULL;
+        int bind_count = keys_system_get_editor_bindings(ctx->keys, &bindings);
+
+        SDL_Color yellow = {255, 255, 0, 255};
+        int start_y = PLAY_AREA_Y + 90 + info_count * 22 + 20;
+        for (int i = 0; i < bind_count; i++)
+        {
+            int x = (bindings[i].column == 0) ? PLAY_AREA_X + 30 : PLAY_AREA_X + 270;
+            int row = (bindings[i].column == 0) ? i : i - 5;
+            sdl2_font_draw(ctx->font, SDL2F_FONT_COPY, bindings[i].text, x, start_y + row * 24,
+                           yellow);
+        }
+    }
+
+    if (state == KEYS_STATE_SPARKLE)
+    {
+        keys_sparkle_info_t si;
+        keys_system_get_sparkle_info(ctx->keys, &si);
         if (si.active)
             render_sparkle(ctx, PLAY_AREA_X + si.x, PLAY_AREA_Y + si.y, si.frame_index);
     }

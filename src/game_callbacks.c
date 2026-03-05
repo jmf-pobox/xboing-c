@@ -15,10 +15,14 @@
 #include "block_system.h"
 #include "block_types.h"
 #include "config_io.h"
+#include "demo_system.h"
 #include "game_context.h"
 #include "game_rules.h"
 #include "intro_system.h"
+#include "keys_system.h"
+#include "level_system.h"
 #include "message_system.h"
+#include "paths.h"
 #include "paddle_system.h"
 #include "presents_system.h"
 #include "score_logic.h"
@@ -449,6 +453,66 @@ intro_system_callbacks_t game_callbacks_intro(void)
 {
     intro_system_callbacks_t cbs = {
         .on_finished = intro_cb_on_finished,
+    };
+    return cbs;
+}
+
+/* =========================================================================
+ * Demo system callbacks
+ * ========================================================================= */
+
+static void demo_cb_on_finished(demo_screen_mode_t mode, void *ud)
+{
+    game_ctx_t *ctx = ud;
+    /* Attract cycle: demo → keys → keysedit → preview → highscore → intro */
+    if (mode == DEMO_MODE_DEMO)
+        sdl2_state_transition(ctx->state, SDL2ST_KEYS);
+    else /* DEMO_MODE_PREVIEW */
+        sdl2_state_transition(ctx->state, SDL2ST_HIGHSCORE);
+}
+
+static void demo_cb_on_load_level(int level_num, void *ud)
+{
+    game_ctx_t *ctx = ud;
+    int file_num = level_system_wrap_number(level_num);
+    char filename[32];
+    snprintf(filename, sizeof(filename), "level%02d.data", file_num);
+
+    char level_path[PATHS_MAX_PATH];
+    if (paths_level_file(&ctx->paths, filename, level_path, sizeof(level_path)) == PATHS_OK)
+    {
+        block_system_clear_all(ctx->block);
+        level_system_load_file(ctx->level, level_path);
+    }
+}
+
+demo_system_callbacks_t game_callbacks_demo(void)
+{
+    demo_system_callbacks_t cbs = {
+        .on_finished = demo_cb_on_finished,
+        .on_load_level = demo_cb_on_load_level,
+    };
+    return cbs;
+}
+
+/* =========================================================================
+ * Keys system callbacks
+ * ========================================================================= */
+
+static void keys_cb_on_finished(keys_screen_mode_t mode, void *ud)
+{
+    game_ctx_t *ctx = ud;
+    /* Attract cycle: keys → keysedit → preview → highscore → intro */
+    if (mode == KEYS_MODE_GAME)
+        sdl2_state_transition(ctx->state, SDL2ST_KEYSEDIT);
+    else /* KEYS_MODE_EDITOR */
+        sdl2_state_transition(ctx->state, SDL2ST_PREVIEW);
+}
+
+keys_system_callbacks_t game_callbacks_keys(void)
+{
+    keys_system_callbacks_t cbs = {
+        .on_finished = keys_cb_on_finished,
     };
     return cbs;
 }

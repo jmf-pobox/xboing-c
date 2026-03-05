@@ -11,6 +11,7 @@
 #include "game_modes.h"
 
 #include "ball_system.h"
+#include "demo_system.h"
 #include "game_callbacks.h"
 #include "game_context.h"
 #include "game_input.h"
@@ -18,6 +19,7 @@
 #include "game_rules.h"
 #include "gun_system.h"
 #include "intro_system.h"
+#include "keys_system.h"
 #include "message_system.h"
 #include "presents_system.h"
 #include "sdl2_input.h"
@@ -178,6 +180,140 @@ static void mode_instruct_update(sdl2_state_mode_t mode, void *ud)
 }
 
 /* =========================================================================
+ * MODE_DEMO — gameplay illustration
+ * ========================================================================= */
+
+static void mode_demo_enter(sdl2_state_mode_t mode, void *ud)
+{
+    (void)mode;
+    game_ctx_t *ctx = ud;
+    int frame = (int)sdl2_state_frame(ctx->state);
+    demo_system_begin(ctx->demo, DEMO_MODE_DEMO, frame);
+}
+
+static void mode_demo_update(sdl2_state_mode_t mode, void *ud)
+{
+    (void)mode;
+    game_ctx_t *ctx = ud;
+    int frame = (int)sdl2_state_frame(ctx->state);
+    demo_system_update(ctx->demo, frame);
+
+    if (sdl2_input_just_pressed(ctx->input, SDL2I_START))
+    {
+        sdl2_state_transition(ctx->state, SDL2ST_GAME);
+        return;
+    }
+}
+
+/* =========================================================================
+ * MODE_PREVIEW — random level preview
+ * ========================================================================= */
+
+static void mode_preview_enter(sdl2_state_mode_t mode, void *ud)
+{
+    (void)mode;
+    game_ctx_t *ctx = ud;
+    int frame = (int)sdl2_state_frame(ctx->state);
+    demo_system_begin(ctx->demo, DEMO_MODE_PREVIEW, frame);
+}
+
+static void mode_preview_update(sdl2_state_mode_t mode, void *ud)
+{
+    (void)mode;
+    game_ctx_t *ctx = ud;
+    int frame = (int)sdl2_state_frame(ctx->state);
+    demo_system_update(ctx->demo, frame);
+
+    if (sdl2_input_just_pressed(ctx->input, SDL2I_START))
+    {
+        sdl2_state_transition(ctx->state, SDL2ST_GAME);
+        return;
+    }
+}
+
+/* =========================================================================
+ * MODE_KEYS — game controls display
+ * ========================================================================= */
+
+static void mode_keys_enter(sdl2_state_mode_t mode, void *ud)
+{
+    (void)mode;
+    game_ctx_t *ctx = ud;
+    int frame = (int)sdl2_state_frame(ctx->state);
+    keys_system_begin(ctx->keys, KEYS_MODE_GAME, frame);
+}
+
+static void mode_keys_update(sdl2_state_mode_t mode, void *ud)
+{
+    (void)mode;
+    game_ctx_t *ctx = ud;
+    int frame = (int)sdl2_state_frame(ctx->state);
+    keys_system_update(ctx->keys, frame);
+
+    if (sdl2_input_just_pressed(ctx->input, SDL2I_START))
+    {
+        sdl2_state_transition(ctx->state, SDL2ST_GAME);
+        return;
+    }
+}
+
+/* =========================================================================
+ * MODE_KEYSEDIT — editor controls display
+ * ========================================================================= */
+
+static void mode_keysedit_enter(sdl2_state_mode_t mode, void *ud)
+{
+    (void)mode;
+    game_ctx_t *ctx = ud;
+    int frame = (int)sdl2_state_frame(ctx->state);
+    keys_system_begin(ctx->keys, KEYS_MODE_EDITOR, frame);
+}
+
+static void mode_keysedit_update(sdl2_state_mode_t mode, void *ud)
+{
+    (void)mode;
+    game_ctx_t *ctx = ud;
+    int frame = (int)sdl2_state_frame(ctx->state);
+    keys_system_update(ctx->keys, frame);
+
+    if (sdl2_input_just_pressed(ctx->input, SDL2I_START))
+    {
+        sdl2_state_transition(ctx->state, SDL2ST_GAME);
+        return;
+    }
+}
+
+/* =========================================================================
+ * MODE_HIGHSCORE — high score table display (attract mode cycling)
+ * ========================================================================= */
+
+static int highscore_enter_frame;
+
+static void mode_highscore_enter(sdl2_state_mode_t mode, void *ud)
+{
+    (void)mode;
+    game_ctx_t *ctx = ud;
+    highscore_enter_frame = (int)sdl2_state_frame(ctx->state);
+}
+
+static void mode_highscore_update(sdl2_state_mode_t mode, void *ud)
+{
+    (void)mode;
+    game_ctx_t *ctx = ud;
+
+    if (sdl2_input_just_pressed(ctx->input, SDL2I_START))
+    {
+        sdl2_state_transition(ctx->state, SDL2ST_GAME);
+        return;
+    }
+
+    /* Auto-cycle back to intro after 4000 frames (simplified — full rendering in bead 3.5) */
+    int frame = (int)sdl2_state_frame(ctx->state);
+    if (frame - highscore_enter_frame > 4000)
+        sdl2_state_transition(ctx->state, SDL2ST_INTRO);
+}
+
+/* =========================================================================
  * Registration
  * ========================================================================= */
 
@@ -229,6 +365,50 @@ void game_modes_register(game_ctx_t *ctx)
         sdl2_state_register(ctx->state, SDL2ST_INSTRUCT, &def);
     }
 
-    /* Remaining modes (demo, keys, bonus, highscore, etc.)
-     * are registered in later beads. */
+    /* MODE_DEMO */
+    {
+        sdl2_state_mode_def_t def = {
+            .on_enter = mode_demo_enter,
+            .on_update = mode_demo_update,
+        };
+        sdl2_state_register(ctx->state, SDL2ST_DEMO, &def);
+    }
+
+    /* MODE_PREVIEW */
+    {
+        sdl2_state_mode_def_t def = {
+            .on_enter = mode_preview_enter,
+            .on_update = mode_preview_update,
+        };
+        sdl2_state_register(ctx->state, SDL2ST_PREVIEW, &def);
+    }
+
+    /* MODE_KEYS */
+    {
+        sdl2_state_mode_def_t def = {
+            .on_enter = mode_keys_enter,
+            .on_update = mode_keys_update,
+        };
+        sdl2_state_register(ctx->state, SDL2ST_KEYS, &def);
+    }
+
+    /* MODE_KEYSEDIT */
+    {
+        sdl2_state_mode_def_t def = {
+            .on_enter = mode_keysedit_enter,
+            .on_update = mode_keysedit_update,
+        };
+        sdl2_state_register(ctx->state, SDL2ST_KEYSEDIT, &def);
+    }
+
+    /* MODE_HIGHSCORE (stub — full rendering in bead 3.5) */
+    {
+        sdl2_state_mode_def_t def = {
+            .on_enter = mode_highscore_enter,
+            .on_update = mode_highscore_update,
+        };
+        sdl2_state_register(ctx->state, SDL2ST_HIGHSCORE, &def);
+    }
+
+    /* Remaining modes (bonus, dialogue, edit) registered in later beads. */
 }

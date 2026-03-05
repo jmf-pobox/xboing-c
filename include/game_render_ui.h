@@ -19,4 +19,16 @@ void game_render_intro(const game_ctx_t *ctx);
 /* Render the instructions screen (text, sparkle). */
 void game_render_instruct(const game_ctx_t *ctx);
 
+/* Render the demo screen (ball trail, text, sparkle). */
+void game_render_demo(const game_ctx_t *ctx);
+
+/* Render the preview screen (random level blocks). */
+void game_render_preview(const game_ctx_t *ctx);
+
+/* Render the keys screen (key binding table). */
+void game_render_keys(const game_ctx_t *ctx);
+
+/* Render the editor keys screen. */
+void game_render_keysedit(const game_ctx_t *ctx);
+
 #endif /* GAME_RENDER_UI_H */

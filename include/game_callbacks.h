@@ -9,9 +9,11 @@
 #define GAME_CALLBACKS_H
 
 #include "ball_system.h"
+#include "demo_system.h"
 #include "game_context.h"
 #include "gun_system.h"
 #include "intro_system.h"
+#include "keys_system.h"
 #include "presents_system.h"
 
 /*
@@ -41,5 +43,11 @@ presents_system_callbacks_t game_callbacks_presents(void);
 
 /* Intro system callback table. */
 intro_system_callbacks_t game_callbacks_intro(void);
+
+/* Demo system callback table. */
+demo_system_callbacks_t game_callbacks_demo(void);
+
+/* Keys system callback table. */
+keys_system_callbacks_t game_callbacks_keys(void);
 
 #endif /* GAME_CALLBACKS_H */

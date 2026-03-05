@@ -437,9 +437,9 @@ game_ctx_t *game_create(int argc, char *argv[])
         }
     }
 
-    /* Demo */
+    /* Demo (callbacks wired by game_callbacks.c) */
     {
-        demo_system_callbacks_t dcb = {0};
+        demo_system_callbacks_t dcb = game_callbacks_demo();
         ctx->demo = demo_system_create(&dcb, ctx, NULL);
         if (!ctx->demo)
         {
@@ -448,9 +448,9 @@ game_ctx_t *game_create(int argc, char *argv[])
         }
     }
 
-    /* Keys */
+    /* Keys (callbacks wired by game_callbacks.c) */
     {
-        keys_system_callbacks_t kcb = {0};
+        keys_system_callbacks_t kcb = game_callbacks_keys();
         ctx->keys = keys_system_create(&kcb, ctx, NULL);
         if (!ctx->keys)
         {
