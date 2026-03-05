@@ -11,9 +11,12 @@
 #include "game_rules.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "ball_system.h"
 #include "block_system.h"
+#include "block_types.h"
+#include "eyedude_system.h"
 #include "game_callbacks.h"
 #include "gun_system.h"
 #include "level_system.h"
@@ -30,6 +33,141 @@
 #define GAME_PLAY_HEIGHT 580
 #define GAME_COL_WIDTH (GAME_PLAY_WIDTH / 9)
 #define GAME_ROW_HEIGHT (GAME_PLAY_HEIGHT / 18)
+
+/* Legacy bonus spawning constants */
+#define BONUS_SEED 2000
+
+/* =========================================================================
+ * Find a random empty cell in the block grid
+ * ========================================================================= */
+
+static int find_random_empty_cell(const block_system_t *block, int *out_row, int *out_col)
+{
+    /* Try random positions up to 100 times */
+    for (int attempt = 0; attempt < 100; attempt++)
+    {
+        int row = rand() % MAX_ROW;
+        int col = rand() % MAX_COL;
+        if (!block_system_is_occupied(block, row, col))
+        {
+            *out_row = row;
+            *out_col = col;
+            return 1;
+        }
+    }
+    return 0; /* Grid too full */
+}
+
+/* =========================================================================
+ * Bonus block spawning — port of main.c:handleGameMode() switch
+ * ========================================================================= */
+
+static void try_spawn_bonus(game_ctx_t *ctx, int frame)
+{
+    /* Schedule next bonus if not yet scheduled */
+    if (ctx->next_bonus_frame == 0)
+    {
+        ctx->next_bonus_frame = frame + (rand() % BONUS_SEED);
+        return;
+    }
+
+    /* Not time yet */
+    if (frame < ctx->next_bonus_frame || ctx->bonus_block_active)
+        return;
+
+    /* Find an empty cell */
+    int row, col;
+    if (!find_random_empty_cell(ctx->block, &row, &col))
+    {
+        ctx->next_bonus_frame = 0;
+        return;
+    }
+
+    /* Pick a bonus type — exact probability distribution from legacy */
+    int roll = rand() % 27;
+
+    if (roll <= 7)
+    {
+        /* Cases 0-7: normal bonus block (8/27 chance) */
+        block_system_add(ctx->block, row, col, BONUS_BLK, 0, frame);
+    }
+    else if (roll <= 11)
+    {
+        /* Cases 8-11: x2 bonus (4/27 chance) */
+        if (!special_system_is_active(ctx->special, SPECIAL_X2_BONUS))
+            block_system_add(ctx->block, row, col, BONUSX2_BLK, 0, frame);
+    }
+    else if (roll <= 13)
+    {
+        /* Cases 12-13: x4 bonus (2/27 chance) */
+        if (!special_system_is_active(ctx->special, SPECIAL_X4_BONUS))
+            block_system_add(ctx->block, row, col, BONUSX4_BLK, 0, frame);
+    }
+    else if (roll <= 15)
+    {
+        /* Cases 14-15: paddle shrink (2/27) */
+        block_system_add(ctx->block, row, col, PAD_SHRINK_BLK, 3, frame);
+    }
+    else if (roll <= 17)
+    {
+        /* Cases 16-17: paddle expand (2/27) */
+        block_system_add(ctx->block, row, col, PAD_EXPAND_BLK, 3, frame);
+    }
+    else if (roll == 18)
+    {
+        /* Case 18: multiball (1/27) */
+        block_system_add(ctx->block, row, col, MULTIBALL_BLK, 3, frame);
+    }
+    else if (roll == 19)
+    {
+        /* Case 19: reverse (1/27) */
+        block_system_add(ctx->block, row, col, REVERSE_BLK, 3, frame);
+    }
+    else if (roll <= 21)
+    {
+        /* Cases 20-21: machine gun (2/27) */
+        block_system_add(ctx->block, row, col, MGUN_BLK, 3, frame);
+    }
+    else if (roll == 22)
+    {
+        /* Case 22: wall off (1/27) */
+        block_system_add(ctx->block, row, col, WALLOFF_BLK, 3, frame);
+    }
+    else if (roll == 23)
+    {
+        /* Case 23: extra ball (1/27) */
+        block_system_add(ctx->block, row, col, EXTRABALL_BLK, 0, frame);
+    }
+    else if (roll == 24)
+    {
+        /* Case 24: death block (1/27) */
+        block_system_add(ctx->block, row, col, DEATH_BLK, 3, frame);
+    }
+    else if (roll == 25)
+    {
+        /* Case 25: dynamite — clear all blocks of a random color */
+        static const int dyn_types[] = {YELLOW_BLK, BLUE_BLK, RED_BLK, PURPLE_BLK,
+                                        TAN_BLK,    COUNTER_BLK, GREEN_BLK};
+        int target = dyn_types[rand() % 7];
+        for (int r = 0; r < MAX_ROW; r++)
+        {
+            for (int c = 0; c < MAX_COL; c++)
+            {
+                if (block_system_get_type(ctx->block, r, c) == target)
+                    block_system_clear(ctx->block, r, c);
+            }
+        }
+        if (ctx->audio)
+            sdl2_audio_play(ctx->audio, "explosion");
+    }
+    else if (roll == 26)
+    {
+        /* Case 26: start eyedude */
+        eyedude_system_set_state(ctx->eyedude, EYEDUDE_STATE_RESET);
+    }
+
+    ctx->next_bonus_frame = 0;
+}
 
 /* =========================================================================
  * Level advancement
@@ -130,5 +268,7 @@ void game_rules_check(game_ctx_t *ctx)
         return;
     }
 
-    /* Extra life check is handled by score_system's on_extra_life callback */
+    /* Bonus block spawning */
+    int frame = (int)sdl2_state_frame(ctx->state);
+    try_spawn_bonus(ctx, frame);
 }

@@ -382,7 +382,7 @@ void game_render_frame(const game_ctx_t *ctx)
     /* Playfield border + blocks */
     game_render_playfield(ctx);
 
-    /* Score display */
+    /* Score and status */
     game_render_score(ctx);
 
     /* Lives and level */

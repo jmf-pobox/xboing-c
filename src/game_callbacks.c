@@ -76,41 +76,79 @@ static int ball_cb_on_block_hit(int row, int col, int ball_index, void *ud)
     switch (block_type)
     {
         case DEATH_BLK:
-            /* Death block kills the ball — return nonzero to suppress bounce */
             block_system_clear(ctx->block, row, col);
-            return 1;
+            return 1; /* Kill the ball */
 
         case BOMB_BLK:
-            /* Bomb: clear this block and neighbors */
             block_system_clear(ctx->block, row, col);
-            /* Clear adjacent blocks (simplified — full chain explosion in bead 6.2) */
             for (int dr = -1; dr <= 1; dr++)
-            {
                 for (int dc = -1; dc <= 1; dc++)
-                {
-                    if (dr == 0 && dc == 0)
-                        continue;
-                    int nr = row + dr, nc = col + dc;
-                    if (block_system_is_occupied(ctx->block, nr, nc))
-                        block_system_clear(ctx->block, nr, nc);
-                }
-            }
+                    if (!(dr == 0 && dc == 0) && block_system_is_occupied(ctx->block, row + dr, col + dc))
+                        block_system_clear(ctx->block, row + dr, col + dc);
             if (ctx->audio)
                 sdl2_audio_play(ctx->audio, "explosion");
             return 0;
 
-        case BLACK_BLK:
-            /* Black blocks take 2 hits — just clear on hit (simplified) */
+        case REVERSE_BLK:
             block_system_clear(ctx->block, row, col);
+            paddle_system_toggle_reverse(ctx->paddle);
             return 0;
 
-        case COUNTER_BLK:
-            /* Counter blocks decrement — simplified: just clear */
+        case MULTIBALL_BLK:
+        {
             block_system_clear(ctx->block, row, col);
+            ball_system_env_t env = game_callbacks_ball_env(ctx);
+            ball_system_split(ctx->ball, &env);
             return 0;
+        }
+
+        case STICKY_BLK:
+            block_system_clear(ctx->block, row, col);
+            special_system_set(ctx->special, SPECIAL_STICKY, 1);
+            paddle_system_set_sticky(ctx->paddle, 1);
+            return 0;
+
+        case PAD_SHRINK_BLK:
+            block_system_clear(ctx->block, row, col);
+            paddle_system_change_size(ctx->paddle, 1); /* shrink */
+            return 0;
+
+        case PAD_EXPAND_BLK:
+            block_system_clear(ctx->block, row, col);
+            paddle_system_change_size(ctx->paddle, 0); /* expand */
+            return 0;
+
+        case MGUN_BLK:
+            block_system_clear(ctx->block, row, col);
+            special_system_set(ctx->special, SPECIAL_FAST_GUN, 1);
+            gun_system_set_unlimited(ctx->gun, 1);
+            return 0;
+
+        case WALLOFF_BLK:
+            block_system_clear(ctx->block, row, col);
+            special_system_set(ctx->special, SPECIAL_NO_WALLS, 1);
+            return 0;
+
+        case EXTRABALL_BLK:
+            block_system_clear(ctx->block, row, col);
+            ctx->lives_left++;
+            return 0;
+
+        case BONUSX2_BLK:
+            block_system_clear(ctx->block, row, col);
+            special_system_set(ctx->special, SPECIAL_X2_BONUS, 1);
+            return 0;
+
+        case BONUSX4_BLK:
+            block_system_clear(ctx->block, row, col);
+            special_system_set(ctx->special, SPECIAL_X4_BONUS, 1);
+            return 0;
+
+        case HYPERSPACE_BLK:
+            block_system_clear(ctx->block, row, col);
+            return 1; /* Absorb ball (teleport in full impl) */
 
         default:
-            /* Standard block: just clear it */
             block_system_clear(ctx->block, row, col);
             return 0;
     }
