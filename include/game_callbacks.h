@@ -11,12 +11,14 @@
 #include "ball_system.h"
 #include "bonus_system.h"
 #include "demo_system.h"
+#include "eyedude_system.h"
 #include "game_context.h"
 #include "gun_system.h"
 #include "highscore_system.h"
 #include "intro_system.h"
 #include "keys_system.h"
 #include "presents_system.h"
+#include "sfx_system.h"
 
 /*
  * Build and return the ball_system callback table.
@@ -57,5 +59,11 @@ keys_system_callbacks_t game_callbacks_keys(void);
 
 /* Highscore system callback table. */
 highscore_system_callbacks_t game_callbacks_highscore(void);
+
+/* SFX system callback table. */
+sfx_system_callbacks_t game_callbacks_sfx(void);
+
+/* EyeDude system callback table. */
+eyedude_system_callbacks_t game_callbacks_eyedude(void);
 
 #endif /* GAME_CALLBACKS_H */

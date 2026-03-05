@@ -370,9 +370,9 @@ game_ctx_t *game_create(int argc, char *argv[])
         }
     }
 
-    /* SFX system (stub callbacks) */
+    /* SFX system (callbacks wired by game_callbacks.c) */
     {
-        sfx_system_callbacks_t scb = {0};
+        sfx_system_callbacks_t scb = game_callbacks_sfx();
         ctx->sfx = sfx_system_create(&scb, ctx, NULL);
         if (!ctx->sfx)
         {
@@ -381,9 +381,9 @@ game_ctx_t *game_create(int argc, char *argv[])
         }
     }
 
-    /* EyeDude system (stub callbacks) */
+    /* EyeDude system (callbacks wired by game_callbacks.c) */
     {
-        eyedude_system_callbacks_t ecb = {0};
+        eyedude_system_callbacks_t ecb = game_callbacks_eyedude();
         ctx->eyedude = eyedude_system_create(&ecb, ctx, NULL);
         if (!ctx->eyedude)
         {

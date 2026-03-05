@@ -10,10 +10,13 @@
 
 #include "game_modes.h"
 
+#include <stdio.h>
+
 #include "ball_system.h"
 #include "block_system.h"
 #include "bonus_system.h"
 #include "demo_system.h"
+#include "eyedude_system.h"
 #include "game_callbacks.h"
 #include "game_context.h"
 #include "game_input.h"
@@ -33,6 +36,7 @@
 #include "sdl2_audio.h"
 #include "sdl2_input.h"
 #include "sdl2_state.h"
+#include "sfx_system.h"
 #include "special_system.h"
 
 /* =========================================================================
@@ -63,6 +67,10 @@ static void start_new_game(game_ctx_t *ctx)
     paddle_system_set_size(ctx->paddle, PADDLE_SIZE_HUGE);
     ball_system_clear_all(ctx->ball);
 
+    /* Clear level state before loading (prevents stale blocks if load fails) */
+    block_system_clear_all(ctx->block);
+    gun_system_clear(ctx->gun);
+
     /* Load the starting level */
     int file_num = level_system_wrap_number(ctx->level_number);
     char filename[32];
@@ -71,9 +79,12 @@ static void start_new_game(game_ctx_t *ctx)
     char level_path[PATHS_MAX_PATH];
     if (paths_level_file(&ctx->paths, filename, level_path, sizeof(level_path)) == PATHS_OK)
     {
-        block_system_clear_all(ctx->block);
         level_system_advance_background(ctx->level);
         level_system_load_file(ctx->level, level_path);
+    }
+    else
+    {
+        fprintf(stderr, "Warning: could not find level file: %s\n", filename);
     }
 
     /* Set level title as default message */
@@ -120,6 +131,14 @@ static void mode_game_update(sdl2_state_mode_t mode, void *ud)
     /* Gun physics */
     gun_system_env_t genv = game_callbacks_gun_env(ctx);
     gun_system_update(ctx->gun, &genv);
+
+    /* EyeDude character */
+    eyedude_system_update(ctx->eyedude, (int)sdl2_state_frame(ctx->state), GAME_PLAY_WIDTH);
+
+    /* SFX (shake, fade, etc.) */
+    sfx_system_update(ctx->sfx, (int)sdl2_state_frame(ctx->state));
+    sfx_system_update_glow(ctx->sfx, (int)sdl2_state_frame(ctx->state));
+    sfx_system_update_deveyes(ctx->sfx, GAME_PLAY_WIDTH, GAME_PLAY_HEIGHT);
 
     /* Message timer */
     int frame = (int)sdl2_state_frame(ctx->state);

@@ -34,4 +34,13 @@ void game_render_score(const game_ctx_t *ctx);
 /* Render lives remaining and level number. */
 void game_render_lives(const game_ctx_t *ctx);
 
+/* Render the EyeDude character. */
+void game_render_eyedude(const game_ctx_t *ctx);
+
+/* Render devil eyes blink animation. */
+void game_render_deveyes(const game_ctx_t *ctx);
+
+/* Render border glow color cycling. */
+void game_render_border_glow(const game_ctx_t *ctx);
+
 #endif /* GAME_RENDER_H */
