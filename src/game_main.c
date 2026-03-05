@@ -30,8 +30,8 @@ int main(int argc, char *argv[])
         return EXIT_SUCCESS;
     }
 
-    /* Start in presents mode (splash screen) */
-    sdl2_state_transition(ctx->state, SDL2ST_PRESENTS);
+    /* Start in game mode (presents/intro screens wired in Phase 3) */
+    sdl2_state_transition(ctx->state, SDL2ST_GAME);
 
     /* --- Event loop ------------------------------------------------------ */
 
