@@ -17,7 +17,7 @@ echo "=== Integration tests (build: $BUILD_DIR) ==="
 echo
 
 # Ensure build is current
-cmake --build "$BUILD_DIR" 2>&1 | tail -1
+cmake --build "$BUILD_DIR" 2>&1 | tail -n 1
 
 # Run only integration tests
 ctest --test-dir "$BUILD_DIR" -R "test_integration_" --output-on-failure

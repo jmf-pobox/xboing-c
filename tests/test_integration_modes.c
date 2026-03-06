@@ -161,7 +161,8 @@ static void test_mode_pause(void **vstate)
 {
     test_fixture_t *f = (test_fixture_t *)*vstate;
     /* Enter GAME first, then PAUSE (pause needs game to be active) */
-    sdl2_state_transition(f->ctx->state, SDL2ST_GAME);
+    sdl2_state_status_t status = sdl2_state_transition(f->ctx->state, SDL2ST_GAME);
+    assert_int_equal(status, SDL2ST_OK);
     enter_and_tick(f->ctx, SDL2ST_PAUSE);
 }
 
