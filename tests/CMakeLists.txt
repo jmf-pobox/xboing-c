@@ -567,4 +567,51 @@ if(SDL2_FOUND AND SDL2_IMAGE_FOUND AND SDL2_MIXER_FOUND AND SDL2_TTF_FOUND)
     set_tests_properties(test_integration_modes PROPERTIES
         ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_AUDIODRIVER=dummy"
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+    # Helper: add an integration test that links the full game stack.
+    # All integration tests share the same source + library set.
+    function(xboing_add_integration_test NAME)
+        add_executable(${NAME}
+            ${NAME}.c
+            ${CMAKE_SOURCE_DIR}/src/game_callbacks.c
+            ${CMAKE_SOURCE_DIR}/src/game_init.c
+            ${CMAKE_SOURCE_DIR}/src/game_input.c
+            ${CMAKE_SOURCE_DIR}/src/game_modes.c
+            ${CMAKE_SOURCE_DIR}/src/game_render.c
+            ${CMAKE_SOURCE_DIR}/src/game_render_ui.c
+            ${CMAKE_SOURCE_DIR}/src/game_rules.c
+        )
+        target_include_directories(${NAME} PRIVATE
+            ${CMAKE_SOURCE_DIR}/include
+            ${CMAKE_SOURCE_DIR}/src
+            ${SDL2_INCLUDE_DIRS}
+        )
+        target_compile_options(${NAME} PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+        target_link_libraries(${NAME} PRIVATE
+            sdl2_renderer sdl2_texture sdl2_font sdl2_audio sdl2_input
+            sdl2_cursor sdl2_state sdl2_loop sdl2_cli
+            ball_system block_system paddle_system gun_system score_system
+            level_system special_system bonus_system sfx_system eyedude_system
+            message_system editor_system
+            highscore_io savegame_io config_io paths
+            score_logic m
+            presents_system intro_system demo_system keys_system
+            dialogue_system highscore_system
+            ${CMOCKA_LIBRARIES}
+        )
+        add_test(NAME ${NAME} COMMAND ${NAME})
+        set_tests_properties(${NAME} PROPERTIES
+            ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_AUDIODRIVER=dummy"
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    endfunction()
+
+    # Gameplay integration test (bead xboing-3w5.1.3)
+    # Enters GAME mode, verifies state initialization, block loading,
+    # ball/paddle state, and extended gameplay ticking.
+    xboing_add_integration_test(test_integration_gameplay)
+
+    # Editor integration test (bead xboing-3w5.1.4)
+    # Enters EDIT mode, draws blocks, clears grid, tests play-test
+    # transitions and editor key commands through the full stack.
+    xboing_add_integration_test(test_integration_editor)
 endif()
