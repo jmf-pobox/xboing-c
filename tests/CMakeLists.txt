@@ -622,4 +622,9 @@ if(SDL2_FOUND AND SDL2_IMAGE_FOUND AND SDL2_MIXER_FOUND AND SDL2_TTF_FOUND)
     # mode transitions, game start from attract, pause, and extended
     # gameplay with active input.
     xboing_add_integration_test(test_replay_smoke test_replay.c)
+
+    # Golden attract cycle test (bead xboing-3w5.2.2)
+    # Records mode transitions during the deterministic attract cycle
+    # and verifies determinism, mode sequence, and transition timing.
+    xboing_add_integration_test(test_golden_attract test_replay.c)
 endif()
