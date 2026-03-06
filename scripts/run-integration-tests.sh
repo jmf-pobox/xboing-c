@@ -19,8 +19,8 @@ echo
 # Ensure build is current
 cmake --build "$BUILD_DIR" 2>&1 | tail -n 1
 
-# Run integration and replay tests
-ctest --test-dir "$BUILD_DIR" -R "test_integration_|test_replay_" --output-on-failure
+# Run integration, replay, and golden tests
+ctest --test-dir "$BUILD_DIR" -R "test_integration_|test_replay_|test_golden_" --output-on-failure
 
 echo
 echo "=== Done ==="
