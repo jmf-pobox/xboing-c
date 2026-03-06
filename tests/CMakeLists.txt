@@ -531,4 +531,40 @@ if(SDL2_FOUND AND SDL2_IMAGE_FOUND AND SDL2_MIXER_FOUND AND SDL2_TTF_FOUND)
         ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_AUDIODRIVER=dummy"
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
         TIMEOUT 60)
+
+    # Mode handler crash test (bead xboing-3w5.1.2)
+    # Force-transitions to each of 12 registered modes, ticks N frames,
+    # verifies no crashes.  Also tests dialogue push/pop and rapid transitions.
+    add_executable(test_integration_modes
+        test_integration_modes.c
+        ${CMAKE_SOURCE_DIR}/src/game_callbacks.c
+        ${CMAKE_SOURCE_DIR}/src/game_init.c
+        ${CMAKE_SOURCE_DIR}/src/game_input.c
+        ${CMAKE_SOURCE_DIR}/src/game_modes.c
+        ${CMAKE_SOURCE_DIR}/src/game_render.c
+        ${CMAKE_SOURCE_DIR}/src/game_render_ui.c
+        ${CMAKE_SOURCE_DIR}/src/game_rules.c
+    )
+    target_include_directories(test_integration_modes PRIVATE
+        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/src
+        ${SDL2_INCLUDE_DIRS}
+    )
+    target_compile_options(test_integration_modes PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+    target_link_libraries(test_integration_modes PRIVATE
+        sdl2_renderer sdl2_texture sdl2_font sdl2_audio sdl2_input
+        sdl2_cursor sdl2_state sdl2_loop sdl2_cli
+        ball_system block_system paddle_system gun_system score_system
+        level_system special_system bonus_system sfx_system eyedude_system
+        message_system editor_system
+        highscore_io savegame_io config_io paths
+        score_logic m
+        presents_system intro_system demo_system keys_system
+        dialogue_system highscore_system
+        ${CMOCKA_LIBRARIES}
+    )
+    add_test(NAME test_integration_modes COMMAND test_integration_modes)
+    set_tests_properties(test_integration_modes PROPERTIES
+        ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_AUDIODRIVER=dummy"
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 endif()
