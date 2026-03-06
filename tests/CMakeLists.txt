@@ -627,4 +627,9 @@ if(SDL2_FOUND AND SDL2_IMAGE_FOUND AND SDL2_MIXER_FOUND AND SDL2_TTF_FOUND)
     # Records mode transitions during the deterministic attract cycle
     # and verifies determinism, mode sequence, and transition timing.
     xboing_add_integration_test(test_golden_attract test_replay.c)
+
+    # Gameplay replay test (bead xboing-3w5.2.3)
+    # Scripted gameplay session: game start, paddle movement, shooting,
+    # pause/unpause, extended play — all via input replay.
+    xboing_add_integration_test(test_replay_gameplay test_replay.c)
 endif()
