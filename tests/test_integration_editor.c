@@ -2,7 +2,7 @@
  * test_integration_editor.c — Editor integration test.
  *
  * Enters EDIT mode through the full integration stack and exercises
- * editor operations: draw blocks, save, load, clear, and editor-to-game
+ * editor operations: draw blocks, clear, and editor-to-game
  * play-test transitions.
  *
  * Tests verify:

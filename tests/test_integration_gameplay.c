@@ -10,7 +10,6 @@
  *   - Paddle position is centered after game start
  *   - Blocks are loaded from level file
  *   - Extended gameplay ticking doesn't crash (ASan safety net)
- *   - Game-over lifecycle: lose all lives → transition to highscore
  *
  * Requires: SDL_VIDEODRIVER=dummy, SDL_AUDIODRIVER=dummy
  */
@@ -112,9 +111,9 @@ static void test_ball_exists_after_game_start(void **vstate)
 {
     const test_fixture_t *f = (const test_fixture_t *)*vstate;
 
-    /* Ball 0 should be in BALL_ON_PADDLE state after start */
+    /* Ball 0 should be in BALL_WAIT state after reset_start */
     enum BallStates state = ball_system_get_state(f->ctx->ball, 0);
-    assert_true(state != BALL_NONE);
+    assert_int_equal(state, BALL_WAIT);
 }
 
 static void test_paddle_centered(void **vstate)
@@ -122,8 +121,8 @@ static void test_paddle_centered(void **vstate)
     const test_fixture_t *f = (const test_fixture_t *)*vstate;
 
     int pos = paddle_system_get_pos(f->ctx->paddle);
-    /* Paddle should be roughly centered in the 495px play area */
-    assert_true(pos > 150 && pos < 350);
+    /* Paddle should be centered at play_width / 2 = 495 / 2 = 247 */
+    assert_int_equal(pos, 495 / 2);
 }
 
 static void test_gameplay_ticking_no_crash(void **vstate)
