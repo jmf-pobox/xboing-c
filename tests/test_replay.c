@@ -6,6 +6,7 @@
 
 #include "test_replay.h"
 
+#include <stdio.h>
 #include <string.h>
 
 #include <SDL2/SDL.h>
@@ -15,6 +16,12 @@
 
 /* =========================================================================
  * Action → scancode mapping (mirrors default_bindings in sdl2_input.c)
+ *
+ * SYNC NOTE: This table must match the default_bindings array in
+ * sdl2_input.c.  If bindings change, update this table.  Using a
+ * hardcoded table avoids requiring a live sdl2_input_t context for
+ * the mapping, keeping the replay module lightweight and usable
+ * before game_create().
  * ========================================================================= */
 
 static const SDL_Scancode action_scancodes[SDL2I_ACTION_COUNT] = {
@@ -86,10 +93,20 @@ void replay_init(replay_ctx_t *rctx, game_ctx_t *ctx, const replay_event_t *scri
     rctx->current_frame = 0;
     rctx->script_idx = 0;
 
-    /* Count script length (find sentinel) */
+    /* Count script length and validate non-decreasing frame order */
     rctx->script_len = 0;
     while (script[rctx->script_len].frame >= 0)
+    {
+        if (rctx->script_len > 0 &&
+            script[rctx->script_len].frame < script[rctx->script_len - 1].frame)
+        {
+            fprintf(stderr, "replay_init: script events must be in non-decreasing "
+                            "frame order (event %d: frame %d < frame %d)\n",
+                    rctx->script_len, script[rctx->script_len].frame,
+                    script[rctx->script_len - 1].frame);
+        }
         rctx->script_len++;
+    }
 }
 
 int replay_tick(replay_ctx_t *rctx)

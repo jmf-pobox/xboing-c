@@ -227,7 +227,7 @@ int main(void)
         cmocka_unit_test_setup_teardown(test_replay_tick_until, setup, teardown),
         cmocka_unit_test_setup_teardown(test_replay_space_starts_game, setup, teardown),
         cmocka_unit_test_setup_teardown(test_replay_game_then_pause, setup, teardown),
-        cmocka_unit_test_setup_teardown(test_replay_action_to_scancode, setup, teardown),
+        cmocka_unit_test(test_replay_action_to_scancode),
         cmocka_unit_test_setup_teardown(test_replay_extended_gameplay, setup, teardown),
     };
 
