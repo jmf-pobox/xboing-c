@@ -570,9 +570,11 @@ if(SDL2_FOUND AND SDL2_IMAGE_FOUND AND SDL2_MIXER_FOUND AND SDL2_TTF_FOUND)
 
     # Helper: add an integration test that links the full game stack.
     # All integration tests share the same source + library set.
+    # Extra source files can be passed after the test name.
     function(xboing_add_integration_test NAME)
         add_executable(${NAME}
             ${NAME}.c
+            ${ARGN}
             ${CMAKE_SOURCE_DIR}/src/game_callbacks.c
             ${CMAKE_SOURCE_DIR}/src/game_init.c
             ${CMAKE_SOURCE_DIR}/src/game_input.c
@@ -614,4 +616,10 @@ if(SDL2_FOUND AND SDL2_IMAGE_FOUND AND SDL2_MIXER_FOUND AND SDL2_TTF_FOUND)
     # Enters EDIT mode, draws blocks, clears grid, tests play-test
     # transitions and editor key commands through the full stack.
     xboing_add_integration_test(test_integration_editor)
+
+    # Input replay smoke test (bead xboing-3w5.2.1)
+    # Tests the replay infrastructure: synthetic key injection, scripted
+    # mode transitions, game start from attract, pause, and extended
+    # gameplay with active input.
+    xboing_add_integration_test(test_replay_smoke test_replay.c)
 endif()
