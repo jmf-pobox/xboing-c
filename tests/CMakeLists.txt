@@ -494,4 +494,41 @@ if(SDL2_FOUND AND SDL2_IMAGE_FOUND AND SDL2_MIXER_FOUND AND SDL2_TTF_FOUND)
     set_tests_properties(test_integration_smoke PROPERTIES
         ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_AUDIODRIVER=dummy"
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+    # Attract-mode auto-cycle integration test (bead xboing-3w5.1.1)
+    # Ticks the state machine thousands of frames, verifying the full
+    # attract sequence: PRESENTS→INTRO→INSTRUCT→DEMO→KEYS→KEYSEDIT→PREVIEW→HIGHSCORE→INTRO
+    add_executable(test_integration_autocycle
+        test_integration_autocycle.c
+        ${CMAKE_SOURCE_DIR}/src/game_callbacks.c
+        ${CMAKE_SOURCE_DIR}/src/game_init.c
+        ${CMAKE_SOURCE_DIR}/src/game_input.c
+        ${CMAKE_SOURCE_DIR}/src/game_modes.c
+        ${CMAKE_SOURCE_DIR}/src/game_render.c
+        ${CMAKE_SOURCE_DIR}/src/game_render_ui.c
+        ${CMAKE_SOURCE_DIR}/src/game_rules.c
+    )
+    target_include_directories(test_integration_autocycle PRIVATE
+        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/src
+        ${SDL2_INCLUDE_DIRS}
+    )
+    target_compile_options(test_integration_autocycle PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+    target_link_libraries(test_integration_autocycle PRIVATE
+        sdl2_renderer sdl2_texture sdl2_font sdl2_audio sdl2_input
+        sdl2_cursor sdl2_state sdl2_loop sdl2_cli
+        ball_system block_system paddle_system gun_system score_system
+        level_system special_system bonus_system sfx_system eyedude_system
+        message_system editor_system
+        highscore_io savegame_io config_io paths
+        score_logic m
+        presents_system intro_system demo_system keys_system
+        dialogue_system highscore_system
+        ${CMOCKA_LIBRARIES}
+    )
+    add_test(NAME test_integration_autocycle COMMAND test_integration_autocycle)
+    set_tests_properties(test_integration_autocycle PROPERTIES
+        ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_AUDIODRIVER=dummy"
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        TIMEOUT 60)
 endif()
