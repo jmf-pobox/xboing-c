@@ -1,0 +1,35 @@
+# Build artifacts
+build/
+build-asan/
+build-install/
+build-coverage/
+*.o
+
+# Generated files
+version.c
+audio.c
+
+# Binary assets (not useful for semantic search)
+sounds/
+bitmaps/
+assets/images/
+assets/fonts/
+
+# IDE / editor
+.direnv/
+.envrc
+
+# Plugin state
+.biff
+.biff.local
+.vox/
+.lux/
+.claude/
+
+# Beads database (binary JSONL)
+.beads/
+
+# Misc
+*.scr
+sounds/originals/
+sounds/*.raw

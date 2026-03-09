@@ -450,6 +450,26 @@ if(CMAKE_C_COMPILER_ID MATCHES "Clang")
         -fsanitize=fuzzer,address,undefined)
     target_link_libraries(fuzz_level_parse PRIVATE level_system)
     # Not a ctest target — fuzz tests run indefinitely by default
+
+    # Helper: add a fuzz harness target (clang-only, not registered as ctest).
+    function(xboing_add_fuzz_target NAME LINK_LIB)
+        add_executable(${NAME} ${NAME}.c)
+        target_include_directories(${NAME} PRIVATE ${CMAKE_SOURCE_DIR}/include)
+        target_compile_options(${NAME} PRIVATE
+            -fsanitize=fuzzer,address,undefined -fno-omit-frame-pointer)
+        target_link_options(${NAME} PRIVATE
+            -fsanitize=fuzzer,address,undefined)
+        target_link_libraries(${NAME} PRIVATE ${LINK_LIB})
+    endfunction()
+
+    # Config TOML parser fuzz test (bead xboing-3w5.3)
+    xboing_add_fuzz_target(fuzz_config_io config_io)
+
+    # Highscore JSON parser fuzz test (bead xboing-3w5.3)
+    xboing_add_fuzz_target(fuzz_highscore_io highscore_io)
+
+    # Savegame JSON parser fuzz test (bead xboing-3w5.3)
+    xboing_add_fuzz_target(fuzz_savegame_io savegame_io)
 endif()
 
 # Integration smoke test — full game_create/destroy lifecycle.
