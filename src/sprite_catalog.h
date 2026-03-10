@@ -442,4 +442,105 @@ static inline const char *sprite_background_key(int number)
     }
 }
 
+/*
+ * Return the texture key for a block explosion animation frame.
+ * frame is 0-based (0, 1, 2).  Returns NULL for block types without
+ * explosion sprites.
+ */
+static inline const char *sprite_block_explode_key(int block_type, int frame)
+{
+    switch (block_type)
+    {
+        case RED_BLK:
+        {
+            static const char *const k[] = {SPR_EXPLODE_RED_1, SPR_EXPLODE_RED_2,
+                                            SPR_EXPLODE_RED_3};
+            return k[frame % 3];
+        }
+        case BLUE_BLK:
+        {
+            static const char *const k[] = {SPR_EXPLODE_BLUE_1, SPR_EXPLODE_BLUE_2,
+                                            SPR_EXPLODE_BLUE_3};
+            return k[frame % 3];
+        }
+        case GREEN_BLK:
+        {
+            static const char *const k[] = {SPR_EXPLODE_GREEN_1, SPR_EXPLODE_GREEN_2,
+                                            SPR_EXPLODE_GREEN_3};
+            return k[frame % 3];
+        }
+        case TAN_BLK:
+        {
+            static const char *const k[] = {SPR_EXPLODE_TAN_1, SPR_EXPLODE_TAN_2,
+                                            SPR_EXPLODE_TAN_3};
+            return k[frame % 3];
+        }
+        case YELLOW_BLK:
+        {
+            static const char *const k[] = {SPR_EXPLODE_YELLOW_1, SPR_EXPLODE_YELLOW_2,
+                                            SPR_EXPLODE_YELLOW_3};
+            return k[frame % 3];
+        }
+        case PURPLE_BLK:
+        {
+            static const char *const k[] = {SPR_EXPLODE_PURPLE_1, SPR_EXPLODE_PURPLE_2,
+                                            SPR_EXPLODE_PURPLE_3};
+            return k[frame % 3];
+        }
+        case BOMB_BLK:
+        {
+            static const char *const k[] = {SPR_EXPLODE_BOMB_1, SPR_EXPLODE_BOMB_2,
+                                            SPR_EXPLODE_BOMB_3};
+            return k[frame % 3];
+        }
+        case COUNTER_BLK:
+        {
+            static const char *const k[] = {SPR_EXPLODE_COUNTER_1, SPR_EXPLODE_COUNTER_2,
+                                            SPR_EXPLODE_COUNTER_3};
+            return k[frame % 3];
+        }
+        case DEATH_BLK:
+        {
+            static const char *const k[] = {SPR_EXPLODE_DEATH_1, SPR_EXPLODE_DEATH_2,
+                                            SPR_EXPLODE_DEATH_3, SPR_EXPLODE_DEATH_4};
+            return k[frame % 4];
+        }
+        case BONUSX2_BLK:
+        case BONUSX4_BLK:
+        {
+            static const char *const k[] = {SPR_EXPLODE_X2_1, SPR_EXPLODE_X2_2, SPR_EXPLODE_X2_3};
+            return k[frame % 3];
+        }
+        default:
+            /* For block types without specific explosion sprites, use red */
+            {
+                static const char *const k[] = {SPR_EXPLODE_RED_1, SPR_EXPLODE_RED_2,
+                                                SPR_EXPLODE_RED_3};
+                return k[frame % 3];
+            }
+    }
+}
+
+/*
+ * Return the texture key for a COUNTER_BLK with a given hit count (1-5).
+ */
+static inline const char *sprite_counter_slide_key(int slide)
+{
+    switch (slide)
+    {
+        case 1:
+            return SPR_BLOCK_COUNTER_1;
+        case 2:
+            return SPR_BLOCK_COUNTER_2;
+        case 3:
+            return SPR_BLOCK_COUNTER_3;
+        case 4:
+            return SPR_BLOCK_COUNTER_4;
+        case 5:
+            return SPR_BLOCK_COUNTER_5;
+        default:
+            return SPR_BLOCK_COUNTER;
+    }
+}
+
 #endif /* SPRITE_CATALOG_H */

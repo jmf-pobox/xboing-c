@@ -79,8 +79,25 @@ void game_render_blocks(const game_ctx_t *ctx)
             if (!info.occupied)
                 continue;
 
-            /* Look up the sprite for this block type */
-            const char *key = sprite_block_key(info.block_type);
+            /* Select sprite key based on block state */
+            const char *key = NULL;
+
+            if (info.exploding)
+            {
+                /* Explosion animation overrides normal appearance */
+                key = sprite_block_explode_key(info.block_type, info.explode_slide);
+            }
+            else if (info.block_type == COUNTER_BLK && info.counter_slide > 0)
+            {
+                /* Counter blocks show their hit count */
+                key = sprite_counter_slide_key(info.counter_slide);
+            }
+            else
+            {
+                /* Normal static block sprite */
+                key = sprite_block_key(info.block_type);
+            }
+
             if (!key)
                 continue;
 
