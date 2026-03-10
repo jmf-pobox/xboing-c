@@ -76,7 +76,7 @@ void game_render_blocks(const game_ctx_t *ctx)
             block_system_render_info_t info;
             if (block_system_get_render_info(ctx->block, row, col, &info) != BLOCK_SYS_OK)
                 continue;
-            if (!info.occupied)
+            if (!info.occupied && !info.exploding)
                 continue;
 
             /* Select sprite key based on block state */

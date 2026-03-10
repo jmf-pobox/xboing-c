@@ -444,8 +444,9 @@ static inline const char *sprite_background_key(int number)
 
 /*
  * Return the texture key for a block explosion animation frame.
- * frame is 0-based (0, 1, 2).  Returns NULL for block types without
- * explosion sprites.
+ * frame is 0-based (0, 1, 2 for most types; 0-3 for DEATH_BLK).
+ * Falls back to red explosion for block types without specific
+ * explosion sprites.  Never returns NULL.
  */
 static inline const char *sprite_block_explode_key(int block_type, int frame)
 {
