@@ -581,8 +581,8 @@ void game_render_eyedude(const game_ctx_t *ctx)
 
 void game_render_border_glow(const game_ctx_t *ctx)
 {
-    int frame = (int)sdl2_state_frame(ctx->state);
-    sfx_glow_state_t glow = sfx_system_update_glow(ctx->sfx, frame);
+    /* Read-only — animation is advanced in mode_game_update() */
+    sfx_glow_state_t glow = sfx_system_get_glow_state(ctx->sfx);
 
     /* Map color_index (0-6) to intensity (100-255) */
     int intensity = 100 + (glow.color_index * 155 / (SFX_GLOW_STEPS - 1));
