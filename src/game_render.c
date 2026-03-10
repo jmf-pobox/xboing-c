@@ -26,6 +26,7 @@
 #include "game_context.h"
 #include "gun_system.h"
 #include "level_system.h"
+#include "message_system.h"
 #include "paddle_system.h"
 #include "score_system.h"
 #include "sdl2_font.h"
@@ -596,6 +597,55 @@ void game_render_deveyes(const game_ctx_t *ctx)
     SDL_RenderCopy(sdl, tex.texture, NULL, &dst);
 }
 
+/* =========================================================================
+ * Message bar rendering — status text below the play area
+ * ========================================================================= */
+
+/* messWindow: x=35, y=655, w=247, h=30 */
+#define MESSAGE_AREA_X OFFSET_X
+#define MESSAGE_AREA_Y 655
+#define MESSAGE_AREA_W 247
+
+void game_render_messages(const game_ctx_t *ctx)
+{
+    const char *text = message_system_get_text(ctx->message);
+    if (!text || text[0] == '\0')
+        return;
+
+    SDL_Color yellow = {255, 255, 50, 255};
+    sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_COPY, text,
+                          MESSAGE_AREA_X + 5, MESSAGE_AREA_Y + 8, yellow);
+}
+
+/* =========================================================================
+ * Timer display — seconds remaining, right side below play area
+ * ========================================================================= */
+
+/* timeWindow: x=477, y=655, w=61, h=35 */
+#define TIMER_AREA_X 477
+#define TIMER_AREA_Y 655
+
+void game_render_timer(const game_ctx_t *ctx)
+{
+    if (ctx->time_bonus_total <= 0)
+        return; /* No timer for this level */
+
+    char buf[16];
+    snprintf(buf, sizeof(buf), "%d", ctx->time_remaining);
+
+    /* Color shifts from green → yellow → red as time runs low */
+    SDL_Color color;
+    if (ctx->time_remaining > ctx->time_bonus_total / 2)
+        color = (SDL_Color){50, 255, 50, 255};   /* Green — plenty of time */
+    else if (ctx->time_remaining > ctx->time_bonus_total / 4)
+        color = (SDL_Color){255, 255, 50, 255};   /* Yellow — getting low */
+    else
+        color = (SDL_Color){255, 50, 50, 255};    /* Red — urgent */
+
+    sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_DATA, buf,
+                          TIMER_AREA_X + 5, TIMER_AREA_Y + 8, color);
+}
+
 void game_render_frame(const game_ctx_t *ctx)
 {
     sdl2_renderer_clear(ctx->renderer);
@@ -658,6 +708,9 @@ void game_render_frame(const game_ctx_t *ctx)
             game_render_score(ctx);
             /* Lives and level */
             game_render_lives(ctx);
+            /* Message bar and timer */
+            game_render_messages(ctx);
+            game_render_timer(ctx);
             break;
 
         case SDL2ST_EDIT:

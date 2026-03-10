@@ -38,6 +38,7 @@
 #include "score_system.h"
 #include "sdl2_audio.h"
 #include "sdl2_input.h"
+#include "sdl2_loop.h"
 #include "sdl2_state.h"
 #include "sfx_system.h"
 #include "special_system.h"
@@ -93,6 +94,11 @@ static void start_new_game(game_ctx_t *ctx)
     {
         fprintf(stderr, "Warning: could not find level file: %s\n", filename);
     }
+
+    /* Initialize timer from level file time bonus */
+    ctx->time_bonus_total = level_system_get_time_bonus(ctx->level);
+    ctx->time_remaining = ctx->time_bonus_total;
+    ctx->timer_frame_acc = 0;
 
     /* Set level title as default message */
     const char *title = level_system_get_title(ctx->level);
@@ -159,6 +165,23 @@ static void mode_game_update(sdl2_state_mode_t mode, void *ud)
     sfx_system_update(ctx->sfx, (int)sdl2_state_frame(ctx->state));
     sfx_system_update_glow(ctx->sfx, (int)sdl2_state_frame(ctx->state));
     sfx_system_update_deveyes(ctx->sfx, GAME_PLAY_WIDTH, GAME_PLAY_HEIGHT);
+
+    /* Level timer countdown — decrement once per second.
+     * At speed 5 (default), tick interval = 7500 us → ~133 ticks/sec.
+     * We compute ticks-per-second from the loop speed to stay correct
+     * at any speed level. */
+    if (ctx->time_remaining > 0)
+    {
+        ctx->timer_frame_acc++;
+        int speed = sdl2_loop_get_speed(ctx->loop);
+        uint64_t tick_us = sdl2_loop_tick_interval_us(speed);
+        int ticks_per_sec = (tick_us > 0) ? (int)(1000000ULL / tick_us) : 133;
+        if (ctx->timer_frame_acc >= ticks_per_sec)
+        {
+            ctx->timer_frame_acc -= ticks_per_sec;
+            ctx->time_remaining--;
+        }
+    }
 
     /* Message timer */
     int frame = (int)sdl2_state_frame(ctx->state);
@@ -440,7 +463,7 @@ static void mode_bonus_enter(sdl2_state_mode_t mode, void *ud)
         .score = score_val,
         .level = ctx->level_number,
         .starting_level = ctx->start_level,
-        .time_bonus_secs = 0, /* TODO: wire time bonus */
+        .time_bonus_secs = ctx->time_remaining,
         .bullet_count = gun_system_get_ammo(ctx->gun),
         .highscore_rank = rank,
     };
