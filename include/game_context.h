@@ -111,6 +111,11 @@ typedef struct game_ctx
     bool bonus_block_active; /* True while a bonus block is on the grid */
     int next_bonus_frame;    /* Frame at which next bonus block may spawn */
 
+    /* Timer state */
+    int time_bonus_total; /* Total time bonus from level file (seconds) */
+    int time_remaining;   /* Seconds remaining on level timer */
+    int timer_frame_acc;  /* Frame accumulator for 1-second countdown */
+
     /* Tilt state */
     int user_tilts; /* Remaining tilts this level */
 

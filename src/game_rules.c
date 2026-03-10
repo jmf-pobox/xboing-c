@@ -201,6 +201,11 @@ void game_rules_next_level(game_ctx_t *ctx)
     level_system_advance_background(ctx->level);
     level_system_load_file(ctx->level, level_path);
 
+    /* Reset timer for new level */
+    ctx->time_bonus_total = level_system_get_time_bonus(ctx->level);
+    ctx->time_remaining = ctx->time_bonus_total;
+    ctx->timer_frame_acc = 0;
+
     /* Set level title as default message */
     const char *title = level_system_get_title(ctx->level);
     if (title)

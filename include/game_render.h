@@ -46,4 +46,10 @@ void game_render_border_glow(const game_ctx_t *ctx);
 /* Render the editor palette sidebar. */
 void game_render_editor_palette(const game_ctx_t *ctx);
 
+/* Render the message bar below the play area. */
+void game_render_messages(const game_ctx_t *ctx);
+
+/* Render the timer display (seconds remaining). */
+void game_render_timer(const game_ctx_t *ctx);
+
 #endif /* GAME_RENDER_H */
