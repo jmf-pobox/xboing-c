@@ -613,8 +613,8 @@ void game_render_messages(const game_ctx_t *ctx)
         return;
 
     SDL_Color yellow = {255, 255, 50, 255};
-    sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_COPY, text,
-                          MESSAGE_AREA_X + 5, MESSAGE_AREA_Y + 8, yellow);
+    sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_COPY, text, MESSAGE_AREA_X + 5, MESSAGE_AREA_Y + 8,
+                          yellow);
 }
 
 /* =========================================================================
@@ -636,14 +636,14 @@ void game_render_timer(const game_ctx_t *ctx)
     /* Color shifts from green → yellow → red as time runs low */
     SDL_Color color;
     if (ctx->time_remaining > ctx->time_bonus_total / 2)
-        color = (SDL_Color){50, 255, 50, 255};   /* Green — plenty of time */
+        color = (SDL_Color){50, 255, 50, 255}; /* Green — plenty of time */
     else if (ctx->time_remaining > ctx->time_bonus_total / 4)
-        color = (SDL_Color){255, 255, 50, 255};   /* Yellow — getting low */
+        color = (SDL_Color){255, 255, 50, 255}; /* Yellow — getting low */
     else
-        color = (SDL_Color){255, 50, 50, 255};    /* Red — urgent */
+        color = (SDL_Color){255, 50, 50, 255}; /* Red — urgent */
 
-    sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_DATA, buf,
-                          TIMER_AREA_X + 5, TIMER_AREA_Y + 8, color);
+    sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_DATA, buf, TIMER_AREA_X + 5, TIMER_AREA_Y + 8,
+                          color);
 }
 
 void game_render_frame(const game_ctx_t *ctx)
