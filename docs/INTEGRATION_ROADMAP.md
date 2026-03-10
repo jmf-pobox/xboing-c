@@ -72,17 +72,17 @@ Full startup sequence and post-game screens.
 - **4.3: Save/load game state** — Z/X keys, savegame_io wiring
 - **4.4: Config file + startup preferences** — persistent settings
 
-### Phase 5: Level Editor — 2 beads
+### Phase 5: Level Editor (COMPLETE — PR #71)
 
 - **5.1: Editor rendering + input** — block palette, grid editing
 - **5.2: Editor play-test mode** — play-test and return to editor
 
-### Phase 6: Polish + Verification — 4 beads
+### Phase 6: Polish + Verification (COMPLETE — PRs #78-#81)
 
-- **6.1: Message bar + timer display**
-- **6.2: Block animations + explosion effects**
-- **6.3: Verification pass — all 80 levels**
-- **6.4: Final cleanup**
+- **6.1: Message bar + timer display** — render message bar and countdown timer
+- **6.2: Block animations + explosion effects** — explosion sprites, counter slides
+- **6.3: Verification pass — all 80 levels** — batch load + tick test
+- **6.4: Border glow + final cleanup** — animated border color cycling, roadmap update
 
 ## Dependency Graph
 
