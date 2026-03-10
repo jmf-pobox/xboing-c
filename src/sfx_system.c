@@ -504,6 +504,17 @@ sfx_glow_state_t sfx_system_update_glow(sfx_system_t *ctx, int frame)
     return state;
 }
 
+sfx_glow_state_t sfx_system_get_glow_state(const sfx_system_t *ctx)
+{
+    sfx_glow_state_t state = {0, 0};
+    if (ctx)
+    {
+        state.color_index = ctx->glow_index;
+        state.use_green = ctx->glow_phase < 0 ? 1 : 0;
+    }
+    return state;
+}
+
 void sfx_system_reset_glow(sfx_system_t *ctx)
 {
     if (ctx)

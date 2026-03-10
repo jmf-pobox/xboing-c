@@ -258,6 +258,9 @@ int sfx_system_get_blind_strips(const sfx_system_t *ctx, sfx_blind_strip_t *stri
  */
 sfx_glow_state_t sfx_system_update_glow(sfx_system_t *ctx, int frame);
 
+/* Return the current glow state without advancing the animation. */
+sfx_glow_state_t sfx_system_get_glow_state(const sfx_system_t *ctx);
+
 /* Reset the border glow to its initial state (red, index 0). */
 void sfx_system_reset_glow(sfx_system_t *ctx);
 

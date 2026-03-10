@@ -581,10 +581,31 @@ void game_render_eyedude(const game_ctx_t *ctx)
 
 void game_render_border_glow(const game_ctx_t *ctx)
 {
-    sfx_glow_state_t glow = sfx_system_update_glow(ctx->sfx, 0); /* read-only query */
-    (void)glow;
-    /* Border glow changes the red border color — simplified for now,
-     * full color cycling deferred to Phase 6 polish. */
+    /* Read-only — animation is advanced in mode_game_update() */
+    sfx_glow_state_t glow = sfx_system_get_glow_state(ctx->sfx);
+
+    /* Map color_index (0-6) to intensity (100-255) */
+    int intensity = 100 + (glow.color_index * 155 / (SFX_GLOW_STEPS - 1));
+
+    SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
+    if (glow.use_green)
+        SDL_SetRenderDrawColor(sdl, 0, (Uint8)intensity, 0, 255);
+    else
+        SDL_SetRenderDrawColor(sdl, (Uint8)intensity, 0, 0, 255);
+
+    int bx = PLAY_AREA_X - BORDER_THICKNESS;
+    int by = PLAY_AREA_Y - BORDER_THICKNESS;
+    int bw = PLAY_AREA_W + 2 * BORDER_THICKNESS;
+    int bh = PLAY_AREA_H + 2 * BORDER_THICKNESS;
+
+    SDL_Rect top = {bx, by, bw, BORDER_THICKNESS};
+    SDL_Rect bottom = {bx, by + bh - BORDER_THICKNESS, bw, BORDER_THICKNESS};
+    SDL_Rect left = {bx, by, BORDER_THICKNESS, bh};
+    SDL_Rect right = {bx + bw - BORDER_THICKNESS, by, BORDER_THICKNESS, bh};
+    SDL_RenderFillRect(sdl, &top);
+    SDL_RenderFillRect(sdl, &bottom);
+    SDL_RenderFillRect(sdl, &left);
+    SDL_RenderFillRect(sdl, &right);
 }
 
 /* =========================================================================
@@ -717,6 +738,8 @@ void game_render_frame(const game_ctx_t *ctx)
             game_render_background(ctx);
             /* Playfield border + blocks + paddle + balls + bullets (clipped) */
             game_render_playfield(ctx);
+            /* Animated border glow (overwrites static red border) */
+            game_render_border_glow(ctx);
             /* EyeDude character (inside play area, after clip removed) */
             game_render_eyedude(ctx);
             /* Devil eyes blink animation */
