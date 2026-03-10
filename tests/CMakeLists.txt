@@ -652,4 +652,22 @@ if(SDL2_FOUND AND SDL2_IMAGE_FOUND AND SDL2_MIXER_FOUND AND SDL2_TTF_FOUND)
     # Scripted gameplay session: game start, paddle movement, shooting,
     # pause/unpause, extended play — all via input replay.
     xboing_add_integration_test(test_replay_gameplay test_replay.c)
+
+    # All-levels verification test (bead xboing-imr.6.3)
+    # Loads all 80 level files, verifies parse success, block count,
+    # title, time bonus, and ticks 100 gameplay frames per level.
+    xboing_add_integration_test(test_integration_all_levels)
+    set_tests_properties(test_integration_all_levels PROPERTIES TIMEOUT 120)
+
+    # Convenience target: cmake --build build --target test-integration
+    add_custom_target(test-integration
+        COMMAND ${CMAKE_COMMAND} -E env
+            SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy
+            ${CMAKE_CTEST_COMMAND} --test-dir ${CMAKE_BINARY_DIR}
+            -R "test_integration_|test_replay_|test_golden_"
+            --output-on-failure
+        COMMENT "Running integration, replay, and golden tests with SDL dummy drivers"
+        USES_TERMINAL
+        VERBATIM
+    )
 endif()
