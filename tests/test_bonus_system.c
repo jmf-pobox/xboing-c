@@ -423,22 +423,22 @@ static void test_sequence_super_bonus(void **state)
     /* 50000 + 1*100 + 10*100 = 51100 */
     assert_int_equal(g_score_added, 51100);
 
-    /* Drive to completion — super bonus should play "supbns" sound */
+    /* Drive to completion — super bonus should play "supbons" sound */
     int frame = 0;
     int safety = 0;
-    int found_supbns = 0;
+    int found_supbons = 0;
     while (!bonus_system_is_finished(ctx) && safety < 2000)
     {
         frame++;
         bonus_system_update(ctx, frame);
-        if (strcmp(g_last_sound, "supbns") == 0)
+        if (strcmp(g_last_sound, "supbons") == 0)
         {
-            found_supbns = 1;
+            found_supbons = 1;
         }
         safety++;
     }
 
-    assert_int_equal(found_supbns, 1);
+    assert_int_equal(found_supbons, 1);
     assert_int_equal(g_finished, 1);
 
     bonus_system_destroy(ctx);

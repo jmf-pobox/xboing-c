@@ -90,8 +90,8 @@ static void test_init_defaults(void **state)
     assert_int_equal(d.start_level, 1);
     assert_false(d.use_keys);
     assert_true(d.sfx);
-    assert_false(d.sound);
-    assert_int_equal(d.max_volume, 0);
+    assert_true(d.sound);
+    assert_int_equal(d.max_volume, 80);
     assert_string_equal(d.nickname, "");
 }
 
@@ -139,8 +139,8 @@ static void test_roundtrip_defaults(void **state)
     assert_int_equal(loaded.start_level, 1);
     assert_false(loaded.use_keys);
     assert_true(loaded.sfx);
-    assert_false(loaded.sound);
-    assert_int_equal(loaded.max_volume, 0);
+    assert_true(loaded.sound);
+    assert_int_equal(loaded.max_volume, 80);
     assert_string_equal(loaded.nickname, "");
 }
 
@@ -303,7 +303,7 @@ static void test_out_of_range_values_keep_defaults(void **state)
     /* Out-of-range values should leave defaults in place. */
     assert_int_equal(d.speed, 5);
     assert_int_equal(d.start_level, 1);
-    assert_int_equal(d.max_volume, 0);
+    assert_int_equal(d.max_volume, 80);
 }
 
 static void test_partial_config(void **state)
@@ -322,7 +322,7 @@ static void test_partial_config(void **state)
     assert_int_equal(d.start_level, 1);
     assert_false(d.use_keys);
     assert_true(d.sfx);
-    assert_int_equal(d.max_volume, 0);
+    assert_int_equal(d.max_volume, 80);
     assert_string_equal(d.nickname, "");
 }
 

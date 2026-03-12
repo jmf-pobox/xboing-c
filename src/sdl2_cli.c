@@ -104,8 +104,8 @@ sdl2_cli_config_t sdl2_cli_config_defaults(void)
     cfg.start_level = SDL2C_DEFAULT_LEVEL;
     cfg.use_keys = false;
     cfg.sfx = true;
-    cfg.sound = false;
-    cfg.max_volume = SDL2C_MIN_VOLUME;
+    cfg.sound = true;
+    cfg.max_volume = 80;
     cfg.debug = false;
     cfg.grab = false;
     return cfg;
@@ -170,6 +170,11 @@ sdl2_cli_status_t sdl2_cli_parse(int argc, char *const argv[], sdl2_cli_config_t
         if (match_option(arg, "-sound"))
         {
             config->sound = true;
+            continue;
+        }
+        if (match_option(arg, "-nosound"))
+        {
+            config->sound = false;
             continue;
         }
         if (match_option(arg, "-nosfx"))

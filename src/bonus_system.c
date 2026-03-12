@@ -226,7 +226,7 @@ static void do_bonuses(bonus_system_t *ctx, int frame)
     if (ctx->coin_count > BONUS_MAX_COINS && ctx->first_time)
     {
         /* Super bonus — one-shot display */
-        fire_sound(ctx, "supbns");
+        fire_sound(ctx, "supbons");
         ctx->display_score += BONUS_SUPER_SCORE;
         ctx->coin_count = 0;
         set_bonus_wait(ctx, BONUS_STATE_LEVEL, frame + BONUS_LINE_DELAY);

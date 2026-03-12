@@ -36,10 +36,10 @@
 #define CONFIG_IO_VERSION 1
 #define CONFIG_IO_MAX_NICKNAME_LEN 20
 
-/* Default values — match legacy behavior. */
+/* Default values — sound on at 80% volume. */
 #define CONFIG_IO_DEFAULT_SPEED 5
 #define CONFIG_IO_DEFAULT_START_LEVEL 1
-#define CONFIG_IO_DEFAULT_MAX_VOLUME 0
+#define CONFIG_IO_DEFAULT_MAX_VOLUME 80
 
 /* =========================================================================
  * Types

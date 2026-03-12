@@ -67,14 +67,14 @@ static void test_defaults_sound(void **state)
 {
     (void)state;
     sdl2_cli_config_t cfg = sdl2_cli_config_defaults();
-    assert_false(cfg.sound);
+    assert_true(cfg.sound);
 }
 
 static void test_defaults_max_volume(void **state)
 {
     (void)state;
     sdl2_cli_config_t cfg = sdl2_cli_config_defaults();
-    assert_int_equal(cfg.max_volume, SDL2C_MIN_VOLUME);
+    assert_int_equal(cfg.max_volume, 80);
 }
 
 static void test_defaults_nickname_empty(void **state)
@@ -183,6 +183,15 @@ static void test_flag_sound(void **state)
     char *const argv[] = {"xboing", "-sound"};
     assert_int_equal(sdl2_cli_parse(2, argv, &cfg, NULL), SDL2C_OK);
     assert_true(cfg.sound);
+}
+
+static void test_flag_nosound(void **state)
+{
+    (void)state;
+    sdl2_cli_config_t cfg = sdl2_cli_config_defaults();
+    char *const argv[] = {"xboing", "-nosound"};
+    assert_int_equal(sdl2_cli_parse(2, argv, &cfg, NULL), SDL2C_OK);
+    assert_false(cfg.sound);
 }
 
 static void test_flag_nosfx(void **state)
@@ -541,7 +550,8 @@ int main(void)
 
     const struct CMUnitTest flag_tests[] = {
         cmocka_unit_test(test_flag_debug), cmocka_unit_test(test_flag_keys),
-        cmocka_unit_test(test_flag_sound), cmocka_unit_test(test_flag_nosfx),
+        cmocka_unit_test(test_flag_sound), cmocka_unit_test(test_flag_nosound),
+        cmocka_unit_test(test_flag_nosfx),
         cmocka_unit_test(test_flag_grab),
     };
 

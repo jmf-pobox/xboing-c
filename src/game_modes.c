@@ -110,7 +110,7 @@ static void start_new_game(game_ctx_t *ctx)
     ball_system_reset_start(ctx->ball, &env);
 
     if (ctx->audio)
-        sdl2_audio_play(ctx->audio, "newlevel");
+        sdl2_audio_play(ctx->audio, "buzzer");
 }
 
 static void mode_game_enter(sdl2_state_mode_t mode, void *ud)
@@ -257,6 +257,10 @@ static void mode_presents_update(sdl2_state_mode_t mode, void *ud)
     {
         attract_frame_counter++;
         presents_system_update(ctx->presents, attract_frame_counter);
+
+        presents_sound_t snd = presents_system_get_sound(ctx->presents);
+        if (snd.name && ctx->audio)
+            sdl2_audio_play(ctx->audio, snd.name);
     }
 
     /* Space skips presents */
@@ -287,6 +291,10 @@ static void mode_intro_update(sdl2_state_mode_t mode, void *ud)
     {
         attract_frame_counter++;
         intro_system_update(ctx->intro, attract_frame_counter);
+
+        intro_sound_t snd = intro_system_get_sound(ctx->intro);
+        if (snd.name && ctx->audio)
+            sdl2_audio_play(ctx->audio, snd.name);
     }
 
     if (sdl2_input_just_pressed(ctx->input, SDL2I_START))
@@ -317,6 +325,10 @@ static void mode_instruct_update(sdl2_state_mode_t mode, void *ud)
     {
         attract_frame_counter++;
         intro_system_update(ctx->intro, attract_frame_counter);
+
+        intro_sound_t snd = intro_system_get_sound(ctx->intro);
+        if (snd.name && ctx->audio)
+            sdl2_audio_play(ctx->audio, snd.name);
     }
 
     if (sdl2_input_just_pressed(ctx->input, SDL2I_START))
@@ -346,6 +358,10 @@ static void mode_demo_update(sdl2_state_mode_t mode, void *ud)
     {
         attract_frame_counter++;
         demo_system_update(ctx->demo, attract_frame_counter);
+
+        demo_sound_t snd = demo_system_get_sound(ctx->demo);
+        if (snd.name && ctx->audio)
+            sdl2_audio_play(ctx->audio, snd.name);
     }
 
     if (sdl2_input_just_pressed(ctx->input, SDL2I_START))
@@ -375,6 +391,10 @@ static void mode_preview_update(sdl2_state_mode_t mode, void *ud)
     {
         attract_frame_counter++;
         demo_system_update(ctx->demo, attract_frame_counter);
+
+        demo_sound_t snd = demo_system_get_sound(ctx->demo);
+        if (snd.name && ctx->audio)
+            sdl2_audio_play(ctx->audio, snd.name);
     }
 
     if (sdl2_input_just_pressed(ctx->input, SDL2I_START))

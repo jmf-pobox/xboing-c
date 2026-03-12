@@ -98,7 +98,7 @@ static int ball_cb_on_block_hit(int row, int col, int ball_index, void *ud)
                         block_system_is_occupied(ctx->block, row + dr, col + dc))
                         block_system_clear(ctx->block, row + dr, col + dc);
             if (ctx->audio)
-                sdl2_audio_play(ctx->audio, "explosion");
+                sdl2_audio_play(ctx->audio, "bomb");
             return 0;
 
         case REVERSE_BLK:
