@@ -659,6 +659,30 @@ if(SDL2_FOUND AND SDL2_IMAGE_FOUND AND SDL2_MIXER_FOUND AND SDL2_TTF_FOUND)
     xboing_add_integration_test(test_integration_all_levels)
     set_tests_properties(test_integration_all_levels PROPERTIES TIMEOUT 120)
 
+    # Convenience target: cmake --build build-coverage --target test-coverage
+    # Requires: build with --coverage flags:
+    #   cmake -B build-coverage -DCMAKE_BUILD_TYPE=Debug \
+    #     -DCMAKE_C_FLAGS="--coverage -fprofile-arcs -ftest-coverage"
+    #   cmake --build build-coverage
+    #   cmake --build build-coverage --target test-coverage
+    add_custom_target(test-coverage
+        COMMAND ${CMAKE_COMMAND} -E env
+            SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy
+            ${CMAKE_CTEST_COMMAND} --test-dir ${CMAKE_BINARY_DIR}
+            --output-on-failure
+        COMMAND lcov --capture --directory ${CMAKE_BINARY_DIR}
+            --output-file ${CMAKE_BINARY_DIR}/coverage.info
+            --ignore-errors mismatch --quiet
+        COMMAND lcov --remove ${CMAKE_BINARY_DIR}/coverage.info
+            "/usr/*" "*/tests/*"
+            --output-file ${CMAKE_BINARY_DIR}/coverage-src.info
+            --ignore-errors unused --quiet
+        COMMAND lcov --summary ${CMAKE_BINARY_DIR}/coverage-src.info
+        COMMENT "Running all tests and generating coverage report"
+        USES_TERMINAL
+        VERBATIM
+    )
+
     # Convenience target: cmake --build build --target test-integration
     add_custom_target(test-integration
         COMMAND ${CMAKE_COMMAND} -E env
