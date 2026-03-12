@@ -39,7 +39,7 @@
 /* Default values — match legacy behavior. */
 #define CONFIG_IO_DEFAULT_SPEED 5
 #define CONFIG_IO_DEFAULT_START_LEVEL 1
-#define CONFIG_IO_DEFAULT_MAX_VOLUME 0
+#define CONFIG_IO_DEFAULT_MAX_VOLUME 80
 
 /* =========================================================================
  * Types

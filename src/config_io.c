@@ -433,6 +433,6 @@ void config_io_init(config_data_t *data)
     data->start_level = CONFIG_IO_DEFAULT_START_LEVEL;
     data->use_keys = false;
     data->sfx = true;
-    data->sound = false;
+    data->sound = true;
     data->max_volume = CONFIG_IO_DEFAULT_MAX_VOLUME;
 }

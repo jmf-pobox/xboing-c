@@ -67,14 +67,14 @@ static void test_defaults_sound(void **state)
 {
     (void)state;
     sdl2_cli_config_t cfg = sdl2_cli_config_defaults();
-    assert_false(cfg.sound);
+    assert_true(cfg.sound);
 }
 
 static void test_defaults_max_volume(void **state)
 {
     (void)state;
     sdl2_cli_config_t cfg = sdl2_cli_config_defaults();
-    assert_int_equal(cfg.max_volume, SDL2C_MIN_VOLUME);
+    assert_int_equal(cfg.max_volume, 80);
 }
 
 static void test_defaults_nickname_empty(void **state)

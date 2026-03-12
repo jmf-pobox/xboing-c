@@ -161,7 +161,7 @@ static void try_spawn_bonus(game_ctx_t *ctx, int frame)
             }
         }
         if (ctx->audio)
-            sdl2_audio_play(ctx->audio, "explosion");
+            sdl2_audio_play(ctx->audio, "bomb");
     }
     else
     {
@@ -257,7 +257,7 @@ void game_rules_ball_died(game_ctx_t *ctx)
 
     /* Still have lives — reset ball on paddle */
     if (ctx->audio)
-        sdl2_audio_play(ctx->audio, "balldead");
+        sdl2_audio_play(ctx->audio, "balllost");
 
     ball_system_env_t env = game_callbacks_ball_env(ctx);
     ball_system_reset_start(ctx->ball, &env);
