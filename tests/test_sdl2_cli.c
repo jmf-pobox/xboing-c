@@ -185,6 +185,15 @@ static void test_flag_sound(void **state)
     assert_true(cfg.sound);
 }
 
+static void test_flag_nosound(void **state)
+{
+    (void)state;
+    sdl2_cli_config_t cfg = sdl2_cli_config_defaults();
+    char *const argv[] = {"xboing", "-nosound"};
+    assert_int_equal(sdl2_cli_parse(2, argv, &cfg, NULL), SDL2C_OK);
+    assert_false(cfg.sound);
+}
+
 static void test_flag_nosfx(void **state)
 {
     (void)state;
@@ -541,7 +550,8 @@ int main(void)
 
     const struct CMUnitTest flag_tests[] = {
         cmocka_unit_test(test_flag_debug), cmocka_unit_test(test_flag_keys),
-        cmocka_unit_test(test_flag_sound), cmocka_unit_test(test_flag_nosfx),
+        cmocka_unit_test(test_flag_sound), cmocka_unit_test(test_flag_nosound),
+        cmocka_unit_test(test_flag_nosfx),
         cmocka_unit_test(test_flag_grab),
     };
 

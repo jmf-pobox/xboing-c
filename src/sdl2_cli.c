@@ -172,6 +172,11 @@ sdl2_cli_status_t sdl2_cli_parse(int argc, char *const argv[], sdl2_cli_config_t
             config->sound = true;
             continue;
         }
+        if (match_option(arg, "-nosound"))
+        {
+            config->sound = false;
+            continue;
+        }
         if (match_option(arg, "-nosfx"))
         {
             config->sfx = false;
