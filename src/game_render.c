@@ -668,19 +668,23 @@ void game_render_timer(const game_ctx_t *ctx)
     if (ctx->time_bonus_total <= 0)
         return; /* No timer for this level */
 
+    /* Format as MM:SS to match legacy DrawLevelTimeBonus */
+    int minutes = ctx->time_remaining / 60;
+    int seconds = ctx->time_remaining % 60;
     char buf[16];
-    snprintf(buf, sizeof(buf), "%d", ctx->time_remaining);
+    snprintf(buf, sizeof(buf), "%02d:%02d", minutes, seconds);
 
-    /* Color shifts from green → yellow → red as time runs low */
+    /* Color thresholds match legacy: <=10s red, <=60s yellow, else green */
     SDL_Color color;
-    if (ctx->time_remaining > ctx->time_bonus_total / 2)
-        color = (SDL_Color){50, 255, 50, 255}; /* Green — plenty of time */
-    else if (ctx->time_remaining > ctx->time_bonus_total / 4)
-        color = (SDL_Color){255, 255, 50, 255}; /* Yellow — getting low */
+    if (ctx->time_remaining <= 10)
+        color = (SDL_Color){255, 50, 50, 255};    /* Red — critical */
+    else if (ctx->time_remaining <= 60)
+        color = (SDL_Color){255, 255, 50, 255};    /* Yellow — getting low */
     else
-        color = (SDL_Color){255, 50, 50, 255}; /* Red — urgent */
+        color = (SDL_Color){50, 255, 50, 255};     /* Green — plenty of time */
 
-    sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_DATA, buf, TIMER_AREA_X + 5, TIMER_AREA_Y + 8,
+    /* Legacy uses titleFont (bold 24pt) with shadow at (2,7) then color at (0,5) */
+    sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_TITLE, buf, TIMER_AREA_X, TIMER_AREA_Y + 5,
                           color);
 }
 

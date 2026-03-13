@@ -37,6 +37,7 @@
 #include "presents_system.h"
 #include "score_system.h"
 #include "sdl2_audio.h"
+#include "sdl2_cursor.h"
 #include "sdl2_input.h"
 #include "sdl2_loop.h"
 #include "sdl2_state.h"
@@ -140,6 +141,10 @@ static void mode_game_enter(sdl2_state_mode_t mode, void *ud)
         start_new_game(ctx);
     }
     /* Coming from pause or bonus — just resume, don't reset */
+
+    /* Hide cursor during gameplay — paddle replaces it */
+    if (ctx->cursor)
+        sdl2_cursor_set(ctx->cursor, SDL2CUR_NONE);
 }
 
 static void mode_game_update(sdl2_state_mode_t mode, void *ud)
@@ -201,6 +206,10 @@ static void mode_pause_enter(sdl2_state_mode_t mode, void *ud)
     game_ctx_t *ctx = ud;
     int frame = (int)sdl2_state_frame(ctx->state);
     message_system_set(ctx->message, "- Game paused -", 0, frame);
+
+    /* Restore cursor while paused */
+    if (ctx->cursor)
+        sdl2_cursor_set(ctx->cursor, SDL2CUR_POINT);
 }
 
 static void mode_pause_update(sdl2_state_mode_t mode, void *ud)
@@ -518,6 +527,10 @@ static void mode_highscore_enter(sdl2_state_mode_t mode, void *ud)
     game_ctx_t *ctx = ud;
     attract_frame_counter = 0;
 
+    /* Restore cursor when leaving gameplay */
+    if (ctx->cursor)
+        sdl2_cursor_set(ctx->cursor, SDL2CUR_POINT);
+
     highscore_system_set_table(ctx->highscore_display, &ctx->hs_personal);
     highscore_system_set_current_score(ctx->highscore_display, score_system_get(ctx->score));
     highscore_system_begin(ctx->highscore_display, HIGHSCORE_TYPE_PERSONAL, 0);
@@ -560,6 +573,11 @@ static void mode_edit_enter(sdl2_state_mode_t mode, void *ud)
 {
     (void)mode;
     game_ctx_t *ctx = ud;
+
+    /* Restore cursor for editor interaction */
+    if (ctx->cursor)
+        sdl2_cursor_set(ctx->cursor, SDL2CUR_PLUS);
+
     editor_system_reset(ctx->editor);
     editor_system_init_palette(ctx->editor, MAX_STATIC_BLOCKS);
     /* Don't clear blocks here — editor_system's do_load_level handles loading.
