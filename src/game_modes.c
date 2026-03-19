@@ -485,6 +485,10 @@ static void mode_bonus_enter(sdl2_state_mode_t mode, void *ud)
     game_ctx_t *ctx = ud;
     attract_frame_counter = 0;
 
+    /* Restore cursor during bonus tally */
+    if (ctx->cursor)
+        sdl2_cursor_set(ctx->cursor, SDL2CUR_POINT);
+
     unsigned long score_val = score_system_get(ctx->score);
     int rank = highscore_io_get_ranking(&ctx->hs_personal, score_val);
 
