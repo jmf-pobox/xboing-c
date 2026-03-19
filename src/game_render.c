@@ -677,15 +677,14 @@ void game_render_timer(const game_ctx_t *ctx)
     /* Color thresholds match legacy: <=10s red, <=60s yellow, else green */
     SDL_Color color;
     if (ctx->time_remaining <= 10)
-        color = (SDL_Color){255, 50, 50, 255};    /* Red — critical */
+        color = (SDL_Color){255, 50, 50, 255}; /* Red — critical */
     else if (ctx->time_remaining <= 60)
-        color = (SDL_Color){255, 255, 50, 255};    /* Yellow — getting low */
+        color = (SDL_Color){255, 255, 50, 255}; /* Yellow — getting low */
     else
-        color = (SDL_Color){50, 255, 50, 255};     /* Green — plenty of time */
+        color = (SDL_Color){50, 255, 50, 255}; /* Green — plenty of time */
 
     /* Legacy uses titleFont (bold 24pt) with shadow at (2,7) then color at (0,5) */
-    sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_TITLE, buf, TIMER_AREA_X, TIMER_AREA_Y + 5,
-                          color);
+    sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_TITLE, buf, TIMER_AREA_X, TIMER_AREA_Y + 5, color);
 }
 
 void game_render_frame(const game_ctx_t *ctx)
