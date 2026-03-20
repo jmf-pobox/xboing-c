@@ -175,6 +175,26 @@ void game_render_balls(const game_ctx_t *ctx)
             .h = BALL_HEIGHT,
         };
         SDL_RenderCopy(sdl, tex.texture, NULL, &dst);
+
+        /* Draw launch direction guide above BALL_READY balls */
+        if (info.state == BALL_READY)
+        {
+            ball_system_guide_info_t guide = ball_system_get_guide_info(ctx->ball);
+            const char *gkey = sprite_guide_key(guide.pos);
+            sdl2_texture_info_t gtex;
+            if (sdl2_texture_get(ctx->texture, gkey, &gtex) == SDL2T_OK)
+            {
+                /* Legacy top-left: (ballx-14, bally-22) for 29x12 sprite.
+                 * X: center on ball. Y: 16px gap + half sprite height above ball. */
+                SDL_Rect gdst = {
+                    .x = PLAY_AREA_X + info.x - gtex.width / 2,
+                    .y = PLAY_AREA_Y + info.y - 16 - gtex.height / 2,
+                    .w = gtex.width,
+                    .h = gtex.height,
+                };
+                SDL_RenderCopy(sdl, gtex.texture, NULL, &gdst);
+            }
+        }
     }
 }
 

@@ -209,6 +209,21 @@
 #define SPR_GUIDE_10 "guides/guide10"
 #define SPR_GUIDE_11 "guides/guide11"
 
+/*
+ * Return the texture key for a guide frame (pos 0-10 → guide1-guide11).
+ */
+static inline const char *sprite_guide_key(int pos)
+{
+    static const char *keys[] = {SPR_GUIDE_1,  SPR_GUIDE_2,  SPR_GUIDE_3, SPR_GUIDE_4,
+                                 SPR_GUIDE_5,  SPR_GUIDE_6,  SPR_GUIDE_7, SPR_GUIDE_8,
+                                 SPR_GUIDE_9,  SPR_GUIDE_10, SPR_GUIDE_11};
+    if (pos < 0 || pos > 10)
+    {
+        return SPR_GUIDE_6; /* center fallback */
+    }
+    return keys[pos];
+}
+
 /* =========================================================================
  * EyeDude  (assets/images/eyes/)
  * ========================================================================= */
