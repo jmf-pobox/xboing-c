@@ -332,6 +332,12 @@ void ball_system_update(ball_system_t *ctx, const ball_system_env_t *env)
         return;
     }
 
+    /* Update guide animation once per tick (not per-ball) */
+    if (ball_system_is_ball_waiting(ctx) && (env->frame % BALL_FRAME_RATE) == 0)
+    {
+        update_guide(ctx, env);
+    }
+
     for (int i = 0; i < MAX_BALLS; i++)
     {
         if (ctx->balls[i].active == 0)
@@ -359,10 +365,14 @@ void ball_system_update(ball_system_t *ctx, const ball_system_env_t *env)
                 ctx->balls[i].oldx = ctx->balls[i].ballx;
                 ctx->balls[i].oldy = ctx->balls[i].bally;
 
-                /* Update guide animation */
-                if ((env->frame % BALL_FRAME_RATE) == 0)
+                /* Animate ball on paddle — legacy MoveBall() does this */
+                if ((env->frame % BALL_ANIM_RATE) == 0)
                 {
-                    update_guide(ctx, env);
+                    ctx->balls[i].slide++;
+                }
+                if (ctx->balls[i].slide >= BALL_SLIDES - 1)
+                {
+                    ctx->balls[i].slide = 0;
                 }
 
                 /* Auto-activate after delay */
@@ -854,7 +864,7 @@ static void update_guide(ball_system_t *ctx, const ball_system_env_t *env)
      * Matches MoveGuides() in ball.c:425-467 (animation timing only).
      */
 
-    if ((env->frame % (BALL_FRAME_RATE * 8)) == 0)
+    if ((env->frame % (BALL_FRAME_RATE * 3)) == 0)
     {
         ctx->guide_pos += ctx->guide_inc;
     }

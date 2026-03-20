@@ -31,7 +31,7 @@
 #define MIN_DY_BALL 2
 #define MIN_DX_BALL 2
 
-#define BALL_ANIM_RATE 50
+#define BALL_ANIM_RATE 15
 #define BIRTH_FRAME_RATE 5
 #define BALL_FRAME_RATE 5
 #define BORDER_ANIM_DELAY 15
