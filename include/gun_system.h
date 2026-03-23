@@ -125,9 +125,11 @@ typedef struct
 
 typedef struct
 {
-    int active; /* Nonzero if this slot is in use */
-    int x;      /* Center X position */
-    int y;      /* Center Y position */
+    int active;           /* Nonzero if this slot is in use */
+    int x;                /* Center X position */
+    int y;                /* Center Y position */
+    int from_y;           /* Y before last movement (for interpolation) */
+    int ticks_since_move; /* Ticks since last update_bullets */
 } gun_system_bullet_info_t;
 
 typedef struct

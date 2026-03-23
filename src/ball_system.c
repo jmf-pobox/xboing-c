@@ -818,7 +818,10 @@ static void animate_ball_create(ball_system_t *ctx, const ball_system_env_t *env
     int paddle_y = env->play_height - DIST_BALL_OF_PADDLE;
     if (b->bally == paddle_y)
     {
+        b->render_from_x = b->ballx;
+        b->render_from_y = b->bally;
         b->ballx = env->paddle_pos;
+        b->last_move_frame = env->frame;
     }
 
     if (env->frame == b->nextFrame)

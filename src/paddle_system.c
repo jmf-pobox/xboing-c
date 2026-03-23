@@ -104,6 +104,7 @@ paddle_system_t *paddle_system_create(int play_width, int play_height, int main_
 
     /* Initial state: centered, HUGE, flags off */
     ctx->pos = play_width / 2;
+    ctx->prev_pos = ctx->pos;
     ctx->size_type = PADDLE_SIZE_HUGE;
     ctx->reverse_on = 0;
     ctx->sticky_on = 0;
@@ -254,6 +255,7 @@ void paddle_system_reset(paddle_system_t *ctx)
     }
 
     ctx->pos = ctx->play_width / 2;
+    ctx->prev_pos = ctx->pos;
     ctx->dx = 0;
     ctx->moving = 0;
     ctx->old_mouse_x = 0;
@@ -290,6 +292,8 @@ void paddle_system_change_size(paddle_system_t *ctx, int shrink)
             ctx->size_type = PADDLE_SIZE_HUGE;
         }
     }
+
+    ctx->prev_pos = ctx->pos;
 }
 
 void paddle_system_set_size(paddle_system_t *ctx, int size_type)
@@ -305,6 +309,7 @@ void paddle_system_set_size(paddle_system_t *ctx, int size_type)
         case PADDLE_SIZE_MEDIUM:
         case PADDLE_SIZE_HUGE:
             ctx->size_type = size_type;
+            ctx->prev_pos = ctx->pos;
             break;
         default:
             /* Ignore invalid size_type values. */

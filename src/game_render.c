@@ -173,6 +173,8 @@ void game_render_balls(const game_ctx_t *ctx)
          * is the sub-tick fraction from the game loop. */
         double move_alpha =
             ((double)info.ticks_since_move + ctx->render_alpha) / (double)BALL_FRAME_RATE;
+        if (move_alpha < 0.0)
+            move_alpha = 0.0;
         if (move_alpha > 1.0)
             move_alpha = 1.0;
         int rx = info.from_x + (int)((double)(info.x - info.from_x) * move_alpha);
@@ -351,9 +353,18 @@ void game_render_bullets(const game_ctx_t *ctx)
 
         if (have_bullet_tex)
         {
+            /* Interpolate bullet Y across GUN_BULLET_FRAME_RATE interval */
+            double move_alpha =
+                ((double)info.ticks_since_move + ctx->render_alpha) / (double)GUN_BULLET_FRAME_RATE;
+            if (move_alpha < 0.0)
+                move_alpha = 0.0;
+            if (move_alpha > 1.0)
+                move_alpha = 1.0;
+            int ry = info.from_y + (int)((double)(info.y - info.from_y) * move_alpha);
+
             SDL_Rect dst = {
                 .x = PLAY_AREA_X + info.x - GUN_BULLET_WC,
-                .y = PLAY_AREA_Y + info.y - GUN_BULLET_HC,
+                .y = PLAY_AREA_Y + ry - GUN_BULLET_HC,
                 .w = GUN_BULLET_WIDTH,
                 .h = GUN_BULLET_HEIGHT,
             };
