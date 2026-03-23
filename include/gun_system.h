@@ -129,7 +129,7 @@ typedef struct
     int x;                /* Center X position */
     int y;                /* Center Y position */
     int from_y;           /* Y before last movement (for interpolation) */
-    int ticks_since_move; /* Ticks since last update_bullets */
+    int ticks_since_move; /* Ticks since last position change or spawn */
 } gun_system_bullet_info_t;
 
 typedef struct

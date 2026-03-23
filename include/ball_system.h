@@ -123,7 +123,7 @@ typedef struct
     int y;                 /* Ball center y (current tick) */
     int from_x;            /* Ball center x before last movement */
     int from_y;            /* Ball center y before last movement */
-    int ticks_since_move;  /* Ticks elapsed since last update_a_ball */
+    int ticks_since_move;  /* Ticks elapsed since last position change */
     int slide;             /* Animation frame index */
     enum BallStates state; /* Current ball state */
 } ball_system_render_info_t;

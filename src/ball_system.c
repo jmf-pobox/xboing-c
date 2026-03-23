@@ -371,13 +371,14 @@ void ball_system_update(ball_system_t *ctx, const ball_system_env_t *env)
                 break;
 
             case BALL_READY:
+                /* Snapshot before overwriting for interpolation */
+                ctx->balls[i].render_from_x = ctx->balls[i].ballx;
+                ctx->balls[i].render_from_y = ctx->balls[i].bally;
                 /* Follow paddle position */
                 ctx->balls[i].ballx = env->paddle_pos;
                 ctx->balls[i].bally = env->play_height - DIST_BALL_OF_PADDLE;
                 ctx->balls[i].oldx = ctx->balls[i].ballx;
                 ctx->balls[i].oldy = ctx->balls[i].bally;
-                ctx->balls[i].render_from_x = ctx->balls[i].ballx;
-                ctx->balls[i].render_from_y = ctx->balls[i].bally;
                 ctx->balls[i].last_move_frame = env->frame;
 
                 /* Animate ball on paddle — legacy MoveBall() does this */

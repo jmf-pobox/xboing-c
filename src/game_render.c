@@ -167,12 +167,21 @@ void game_render_balls(const game_ctx_t *ctx)
         if (sdl2_texture_get(ctx->texture, key, &tex) != SDL2T_OK)
             continue;
 
-        /* Interpolate ball position across the BALL_FRAME_RATE interval.
-         * The ball moves every BALL_FRAME_RATE ticks; ticks_since_move counts
-         * how many ticks have elapsed since the last movement, and render_alpha
-         * is the sub-tick fraction from the game loop. */
-        double move_alpha =
-            ((double)info.ticks_since_move + ctx->render_alpha) / (double)BALL_FRAME_RATE;
+        /* Interpolate ball position.
+         * BALL_ACTIVE/BALL_DIE move every BALL_FRAME_RATE ticks — interpolate
+         * across that interval. Other states update every tick — use raw alpha. */
+        double move_alpha;
+        switch (info.state)
+        {
+            case BALL_ACTIVE:
+            case BALL_DIE:
+                move_alpha =
+                    ((double)info.ticks_since_move + ctx->render_alpha) / (double)BALL_FRAME_RATE;
+                break;
+            default:
+                move_alpha = ctx->render_alpha;
+                break;
+        }
         if (move_alpha < 0.0)
             move_alpha = 0.0;
         if (move_alpha > 1.0)
