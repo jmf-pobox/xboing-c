@@ -229,6 +229,9 @@ ball_system_status_t ball_system_change_mode(ball_system_t *ctx, const ball_syst
     /* Set up pop animation when entering BALL_POP */
     if (mode == BALL_POP)
     {
+        ctx->balls[index].render_from_x = ctx->balls[index].ballx;
+        ctx->balls[index].render_from_y = ctx->balls[index].bally;
+        ctx->balls[index].last_move_frame = env->frame;
         ctx->balls[index].slide = BIRTH_SLIDES + 1;
         ctx->balls[index].nextFrame = env->frame + BIRTH_FRAME_RATE;
     }
