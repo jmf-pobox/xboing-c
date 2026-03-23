@@ -21,11 +21,11 @@
 
 typedef struct
 {
-    int xpos;           /* Center X position (-1 = inactive) */
-    int ypos;           /* Center Y position */
-    int oldypos;        /* Previous Y position (for erase) */
-    int dy;             /* Velocity (negative = upward) */
-    int render_from_y;  /* Y before last movement (for interpolation) */
+    int xpos;            /* Center X position (-1 = inactive) */
+    int ypos;            /* Center Y position */
+    int oldypos;         /* Previous Y position (for erase) */
+    int dy;              /* Velocity (negative = upward) */
+    int render_from_y;   /* Y before last movement (for interpolation) */
     int last_move_frame; /* Frame of last movement */
 } bullet_slot_t;
 
