@@ -247,6 +247,11 @@ int ball_system_activate_waiting(ball_system_t *ctx, const ball_system_env_t *en
     {
         if (ctx->balls[i].ballState == BALL_READY)
         {
+            /* Snap interpolation origin before switching to BALL_ACTIVE rate */
+            ctx->balls[i].render_from_x = ctx->balls[i].ballx;
+            ctx->balls[i].render_from_y = ctx->balls[i].bally;
+            ctx->balls[i].last_move_frame = env->frame;
+
             ctx->balls[i].ballState = BALL_ACTIVE;
             ctx->balls[i].lastPaddleHitFrame = env->frame + PADDLE_BALL_FRAME_TILT;
 
@@ -394,6 +399,11 @@ void ball_system_update(ball_system_t *ctx, const ball_system_env_t *env)
                 /* Auto-activate after delay */
                 if (env->frame == ctx->balls[i].nextFrame)
                 {
+                    /* Snap interpolation origin before switching to BALL_ACTIVE rate */
+                    ctx->balls[i].render_from_x = ctx->balls[i].ballx;
+                    ctx->balls[i].render_from_y = ctx->balls[i].bally;
+                    ctx->balls[i].last_move_frame = env->frame;
+
                     ctx->balls[i].ballState = BALL_ACTIVE;
                     ctx->balls[i].lastPaddleHitFrame = env->frame + PADDLE_BALL_FRAME_TILT;
 
@@ -1173,7 +1183,10 @@ ball_system_status_t ball_system_get_render_info(const ball_system_t *ctx, int i
     info->y = b->bally;
     info->from_x = b->render_from_x;
     info->from_y = b->render_from_y;
-    info->ticks_since_move = ctx->last_update_frame - b->last_move_frame;
+    {
+        int ticks = ctx->last_update_frame - b->last_move_frame;
+        info->ticks_since_move = ticks > 0 ? ticks : 0;
+    }
     info->slide = b->slide;
     info->state = b->ballState;
 

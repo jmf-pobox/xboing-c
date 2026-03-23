@@ -469,7 +469,10 @@ gun_system_status_t gun_system_get_bullet_info(const gun_system_t *ctx, int inde
         info->x = ctx->bullets[index].xpos;
         info->y = ctx->bullets[index].ypos;
         info->from_y = ctx->bullets[index].render_from_y;
-        info->ticks_since_move = ctx->last_update_frame - ctx->bullets[index].last_move_frame;
+        {
+            int ticks = ctx->last_update_frame - ctx->bullets[index].last_move_frame;
+            info->ticks_since_move = ticks > 0 ? ticks : 0;
+        }
     }
     return GUN_SYS_OK;
 }
