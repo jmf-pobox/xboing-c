@@ -119,8 +119,11 @@ typedef struct
 typedef struct
 {
     int active;            /* Nonzero if this slot is in use */
-    int x;                 /* Ball center x */
-    int y;                 /* Ball center y */
+    int x;                 /* Ball center x (current tick) */
+    int y;                 /* Ball center y (current tick) */
+    int from_x;            /* Ball center x before last movement */
+    int from_y;            /* Ball center y before last movement */
+    int ticks_since_move;  /* Ticks elapsed since last update_a_ball */
     int slide;             /* Animation frame index */
     enum BallStates state; /* Current ball state */
 } ball_system_render_info_t;

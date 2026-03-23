@@ -23,8 +23,9 @@
 struct ball_system
 {
     BALL balls[MAX_BALLS];
-    int guide_pos; /* 0-10, guide direction indicator */
-    int guide_inc; /* +1 or -1, guide animation direction */
+    int guide_pos;         /* 0-10, guide direction indicator */
+    int guide_inc;         /* +1 or -1, guide animation direction */
+    int last_update_frame; /* Most recent env->frame from ball_system_update */
     float machine_eps;
     ball_system_callbacks_t callbacks;
     void *user_data;
@@ -131,6 +132,9 @@ int ball_system_add(ball_system_t *ctx, const ball_system_env_t *env, int x, int
             ctx->balls[i].bally = y;
             ctx->balls[i].oldx = x;
             ctx->balls[i].oldy = y;
+            ctx->balls[i].render_from_x = x;
+            ctx->balls[i].render_from_y = y;
+            ctx->balls[i].last_move_frame = env->frame;
             ctx->balls[i].dx = dx;
             ctx->balls[i].dy = dy;
             ctx->balls[i].ballState = BALL_CREATE;
@@ -176,6 +180,9 @@ ball_system_status_t ball_system_clear(ball_system_t *ctx, int index)
     b->oldy = 0;
     b->ballx = 0;
     b->bally = 0;
+    b->render_from_x = 0;
+    b->render_from_y = 0;
+    b->last_move_frame = 0;
     b->dx = 0;
     b->dy = 0;
     b->slide = 0;
@@ -280,6 +287,9 @@ int ball_system_reset_start(ball_system_t *ctx, const ball_system_env_t *env)
         ctx->balls[i].bally = env->play_height - DIST_BALL_OF_PADDLE;
         ctx->balls[i].oldx = ctx->balls[i].ballx;
         ctx->balls[i].oldy = ctx->balls[i].bally;
+        ctx->balls[i].render_from_x = ctx->balls[i].ballx;
+        ctx->balls[i].render_from_y = ctx->balls[i].bally;
+        ctx->balls[i].last_move_frame = env->frame;
 
         /* Set up BALL_WAIT → BALL_CREATE sequence — matches ball.c:1802 */
         ctx->balls[i].waitingFrame = env->frame + 1;
@@ -332,6 +342,8 @@ void ball_system_update(ball_system_t *ctx, const ball_system_env_t *env)
         return;
     }
 
+    ctx->last_update_frame = env->frame;
+
     /* Update guide animation once per tick (not per-ball) */
     if (ball_system_is_ball_waiting(ctx) && (env->frame % BALL_FRAME_RATE) == 0)
     {
@@ -364,6 +376,9 @@ void ball_system_update(ball_system_t *ctx, const ball_system_env_t *env)
                 ctx->balls[i].bally = env->play_height - DIST_BALL_OF_PADDLE;
                 ctx->balls[i].oldx = ctx->balls[i].ballx;
                 ctx->balls[i].oldy = ctx->balls[i].bally;
+                ctx->balls[i].render_from_x = ctx->balls[i].ballx;
+                ctx->balls[i].render_from_y = ctx->balls[i].bally;
+                ctx->balls[i].last_move_frame = env->frame;
 
                 /* Animate ball on paddle — legacy MoveBall() does this */
                 if ((env->frame % BALL_ANIM_RATE) == 0)
@@ -436,6 +451,10 @@ static void update_a_ball(ball_system_t *ctx, const ball_system_env_t *env, int 
 
     BALL *b = &ctx->balls[i];
 
+    /* Snapshot position before movement for render interpolation */
+    b->render_from_x = b->ballx;
+    b->render_from_y = b->bally;
+
     /* Update ball position using dx and dy values */
     b->ballx = b->oldx + b->dx;
     b->bally = b->oldy + b->dy;
@@ -460,6 +479,9 @@ static void update_a_ball(ball_system_t *ctx, const ball_system_env_t *env, int 
         b->ballx = env->play_width - BALL_WC;
         b->oldx = b->ballx;
         b->oldy = b->bally;
+        b->render_from_x = b->ballx;
+        b->render_from_y = b->bally;
+        b->last_move_frame = env->frame;
         return;
     }
 
@@ -477,6 +499,9 @@ static void update_a_ball(ball_system_t *ctx, const ball_system_env_t *env, int 
         b->ballx = BALL_WC;
         b->oldx = b->ballx;
         b->oldy = b->bally;
+        b->render_from_x = b->ballx;
+        b->render_from_y = b->bally;
+        b->last_move_frame = env->frame;
         return;
     }
 
@@ -529,6 +554,9 @@ static void update_a_ball(ball_system_t *ctx, const ball_system_env_t *env, int 
                 b->nextFrame = env->frame + BALL_AUTO_ACTIVE_DELAY;
                 b->oldx = b->ballx;
                 b->oldy = b->bally;
+                b->render_from_x = b->ballx;
+                b->render_from_y = b->bally;
+                b->last_move_frame = env->frame;
                 return;
             }
         }
@@ -559,6 +587,9 @@ static void update_a_ball(ball_system_t *ctx, const ball_system_env_t *env, int 
     /* Update old positions — replaces MoveBall() position tracking */
     b->oldx = b->ballx;
     b->oldy = b->bally;
+
+    /* Record frame of this movement for render interpolation */
+    b->last_move_frame = env->frame;
 
     /* Ball animation slide — replaces MoveBall() animation, ball.c:417-422 */
     if ((env->frame % BALL_ANIM_RATE) == 0)
@@ -804,6 +835,9 @@ static void animate_ball_create(ball_system_t *ctx, const ball_system_env_t *env
             b->bally = env->play_height - DIST_BALL_OF_PADDLE;
             b->oldx = b->ballx;
             b->oldy = b->bally;
+            b->render_from_x = b->ballx;
+            b->render_from_y = b->bally;
+            b->last_move_frame = env->frame;
 
             /* Transition to BALL_READY */
             b->ballState = BALL_READY;
@@ -974,6 +1008,9 @@ static void teleport_ball(ball_system_t *ctx, const ball_system_env_t *env, int 
             ctx->balls[i].bally = r * env->row_height;
             ctx->balls[i].oldx = ctx->balls[i].ballx;
             ctx->balls[i].oldy = ctx->balls[i].bally;
+            ctx->balls[i].render_from_x = ctx->balls[i].ballx;
+            ctx->balls[i].render_from_y = ctx->balls[i].bally;
+            ctx->balls[i].last_move_frame = env->frame;
             ctx->balls[i].lastPaddleHitFrame = env->frame + PADDLE_BALL_FRAME_TILT;
             return;
         }
@@ -984,6 +1021,9 @@ static void teleport_ball(ball_system_t *ctx, const ball_system_env_t *env, int 
     ctx->balls[i].bally = env->play_height - DIST_BALL_OF_PADDLE;
     ctx->balls[i].oldx = ctx->balls[i].ballx;
     ctx->balls[i].oldy = ctx->balls[i].bally;
+    ctx->balls[i].render_from_x = ctx->balls[i].ballx;
+    ctx->balls[i].render_from_y = ctx->balls[i].bally;
+    ctx->balls[i].last_move_frame = env->frame;
 }
 
 /* =========================================================================
@@ -1127,6 +1167,9 @@ ball_system_status_t ball_system_get_render_info(const ball_system_t *ctx, int i
     info->active = b->active;
     info->x = b->ballx;
     info->y = b->bally;
+    info->from_x = b->render_from_x;
+    info->from_y = b->render_from_y;
+    info->ticks_since_move = ctx->last_update_frame - b->last_move_frame;
     info->slide = b->slide;
     info->state = b->ballState;
 

@@ -61,6 +61,7 @@ typedef enum
 typedef struct
 {
     int pos;       /* Center X position in play-area coordinates */
+    int prev_pos;  /* Previous tick position (for render interpolation) */
     int y;         /* Top Y position (play_height - PADDLE_DIST_BASE) */
     int width;     /* Pixel width (40 / 50 / 70) */
     int height;    /* Render height (15) */

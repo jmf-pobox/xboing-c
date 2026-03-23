@@ -167,10 +167,21 @@ void game_render_balls(const game_ctx_t *ctx)
         if (sdl2_texture_get(ctx->texture, key, &tex) != SDL2T_OK)
             continue;
 
+        /* Interpolate ball position across the BALL_FRAME_RATE interval.
+         * The ball moves every BALL_FRAME_RATE ticks; ticks_since_move counts
+         * how many ticks have elapsed since the last movement, and render_alpha
+         * is the sub-tick fraction from the game loop. */
+        double move_alpha =
+            ((double)info.ticks_since_move + ctx->render_alpha) / (double)BALL_FRAME_RATE;
+        if (move_alpha > 1.0)
+            move_alpha = 1.0;
+        int rx = info.from_x + (int)((double)(info.x - info.from_x) * move_alpha);
+        int ry = info.from_y + (int)((double)(info.y - info.from_y) * move_alpha);
+
         /* Ball position is center — convert to top-left */
         SDL_Rect dst = {
-            .x = PLAY_AREA_X + info.x - BALL_WC,
-            .y = PLAY_AREA_Y + info.y - BALL_HC,
+            .x = PLAY_AREA_X + rx - BALL_WC,
+            .y = PLAY_AREA_Y + ry - BALL_HC,
             .w = BALL_WIDTH,
             .h = BALL_HEIGHT,
         };
@@ -187,8 +198,8 @@ void game_render_balls(const game_ctx_t *ctx)
                 /* Legacy top-left: (ballx-14, bally-22) for 29x12 sprite.
                  * X: center on ball. Y: 16px gap + half sprite height above ball. */
                 SDL_Rect gdst = {
-                    .x = PLAY_AREA_X + info.x - gtex.width / 2,
-                    .y = PLAY_AREA_Y + info.y - 16 - gtex.height / 2,
+                    .x = PLAY_AREA_X + rx - gtex.width / 2,
+                    .y = PLAY_AREA_Y + ry - 16 - gtex.height / 2,
                     .w = gtex.width,
                     .h = gtex.height,
                 };
@@ -215,10 +226,14 @@ void game_render_paddle(const game_ctx_t *ctx)
 
     SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
 
+    /* Interpolate paddle position between previous and current physics tick */
+    double a = ctx->render_alpha;
+    int rx = info.prev_pos + (int)((double)(info.pos - info.prev_pos) * a);
+
     /* Paddle position is center X in play-area coordinates.
      * Convert to top-left corner for SDL_RenderCopy. */
     SDL_Rect dst = {
-        .x = PLAY_AREA_X + info.pos - info.width / 2,
+        .x = PLAY_AREA_X + rx - info.width / 2,
         .y = PLAY_AREA_Y + info.y,
         .w = info.width,
         .h = info.height,
