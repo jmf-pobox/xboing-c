@@ -21,10 +21,12 @@
 
 typedef struct
 {
-    int xpos;    /* Center X position (-1 = inactive) */
-    int ypos;    /* Center Y position */
-    int oldypos; /* Previous Y position (for erase) */
-    int dy;      /* Velocity (negative = upward) */
+    int xpos;            /* Center X position (-1 = inactive) */
+    int ypos;            /* Center Y position */
+    int oldypos;         /* Previous Y position (for erase) */
+    int dy;              /* Velocity (negative = upward) */
+    int render_from_y;   /* Y before last movement (for interpolation) */
+    int last_move_frame; /* Frame of last movement */
 } bullet_slot_t;
 
 typedef struct
@@ -39,7 +41,8 @@ struct gun_system
     tink_slot_t tinks[GUN_MAX_TINKS];
     int ammo;
     int unlimited;
-    int bullet_start_y; /* play_height - GUN_BULLET_START_OFFSET */
+    int bullet_start_y;    /* play_height - GUN_BULLET_START_OFFSET */
+    int last_update_frame; /* Most recent env->frame from gun_system_update */
     gun_system_callbacks_t callbacks;
     void *user_data;
 };
@@ -54,6 +57,8 @@ static void clear_bullet(gun_system_t *ctx, int i)
     ctx->bullets[i].ypos = ctx->bullet_start_y;
     ctx->bullets[i].oldypos = ctx->bullet_start_y;
     ctx->bullets[i].dy = GUN_BULLET_DY;
+    ctx->bullets[i].render_from_y = ctx->bullet_start_y;
+    ctx->bullets[i].last_move_frame = 0;
 }
 
 static void clear_all_bullets(gun_system_t *ctx)
@@ -113,13 +118,14 @@ static void check_tinks(gun_system_t *ctx, int frame)
  * In fast gun mode, searches all slots.
  * Returns nonzero on success.
  */
-static int start_a_bullet(gun_system_t *ctx, int xpos, int fast_gun)
+static int start_a_bullet(gun_system_t *ctx, int xpos, int frame, int fast_gun)
 {
     for (int i = 0; i < GUN_MAX_BULLETS; i++)
     {
         if (ctx->bullets[i].xpos == -1)
         {
             ctx->bullets[i].xpos = xpos;
+            ctx->bullets[i].last_move_frame = frame;
             return 1;
         }
 
@@ -142,6 +148,9 @@ static void update_bullets(gun_system_t *ctx, const gun_system_env_t *env)
         {
             continue;
         }
+
+        /* Snapshot for render interpolation */
+        ctx->bullets[i].render_from_y = ctx->bullets[i].ypos;
 
         /* Update position */
         ctx->bullets[i].ypos = ctx->bullets[i].oldypos + ctx->bullets[i].dy;
@@ -212,6 +221,7 @@ static void update_bullets(gun_system_t *ctx, const gun_system_env_t *env)
 
         /* Keep track of old position */
         ctx->bullets[i].oldypos = ctx->bullets[i].ypos;
+        ctx->bullets[i].last_move_frame = env->frame;
     }
 }
 
@@ -269,6 +279,8 @@ void gun_system_update(gun_system_t *ctx, const gun_system_env_t *env)
         return;
     }
 
+    ctx->last_update_frame = env->frame;
+
     /* Move bullets and check collisions every BULLET_FRAME_RATE frames */
     if ((env->frame % GUN_BULLET_FRAME_RATE) == 0)
     {
@@ -306,13 +318,13 @@ int gun_system_shoot(gun_system_t *ctx, const gun_system_env_t *env)
         if (env->fast_gun)
         {
             /* Dual fire: two bullets at ±(paddle_size/3) from center */
-            int s1 = start_a_bullet(ctx, env->paddle_pos - (env->paddle_size / 3), 1);
-            int s2 = start_a_bullet(ctx, env->paddle_pos + (env->paddle_size / 3), 1);
+            int s1 = start_a_bullet(ctx, env->paddle_pos - (env->paddle_size / 3), env->frame, 1);
+            int s2 = start_a_bullet(ctx, env->paddle_pos + (env->paddle_size / 3), env->frame, 1);
             status = s1 || s2;
         }
         else
         {
-            status = start_a_bullet(ctx, env->paddle_pos, 0);
+            status = start_a_bullet(ctx, env->paddle_pos, env->frame, 0);
         }
 
         if (status)
@@ -448,12 +460,19 @@ gun_system_status_t gun_system_get_bullet_info(const gun_system_t *ctx, int inde
         info->active = 0;
         info->x = 0;
         info->y = 0;
+        info->from_y = 0;
+        info->ticks_since_move = 0;
     }
     else
     {
         info->active = 1;
         info->x = ctx->bullets[index].xpos;
         info->y = ctx->bullets[index].ypos;
+        info->from_y = ctx->bullets[index].render_from_y;
+        {
+            int ticks = ctx->last_update_frame - ctx->bullets[index].last_move_frame;
+            info->ticks_since_move = ticks > 0 ? ticks : 0;
+        }
     }
     return GUN_SYS_OK;
 }

@@ -74,6 +74,9 @@ typedef struct ball
     int oldy;                  /* Old y coord of ball centre */
     int ballx;                 /* Current x coord of ball centre */
     int bally;                 /* Current y coord of ball centre */
+    int render_from_x;         /* Position before last movement (for interpolation) */
+    int render_from_y;         /* Position before last movement (for interpolation) */
+    int last_move_frame;       /* Frame number of last position change (for interpolation) */
     int dx;                    /* Change in x axis increment */
     int dy;                    /* Change in y axis increment */
     int slide;                 /* Current pixmap visible */

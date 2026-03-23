@@ -589,8 +589,8 @@ static void stub_tick(void *user_data)
 
 static void stub_render(double alpha, void *user_data)
 {
-    (void)alpha;
     game_ctx_t *ctx = user_data;
+    ctx->render_alpha = alpha;
     game_render_frame(ctx);
 }
 

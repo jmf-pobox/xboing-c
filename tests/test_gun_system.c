@@ -526,6 +526,21 @@ static void test_bullet_moves_upward(void **state)
     gun_system_get_bullet_info(ctx, 0, &info);
     assert_int_equal(info.active, 1);
     assert_int_equal(info.y, 540);
+    assert_int_equal(info.from_y, 540);         /* from == pos at spawn */
+    assert_int_equal(info.ticks_since_move, 0); /* just spawned */
+
+    /* Non-movement frames: ticks_since_move increments */
+    env.frame = 1;
+    gun_system_update(ctx, &env);
+    gun_system_get_bullet_info(ctx, 0, &info);
+    assert_int_equal(info.y, 540); /* hasn't moved yet */
+    assert_int_equal(info.ticks_since_move, 1);
+
+    env.frame = 2;
+    gun_system_update(ctx, &env);
+    gun_system_get_bullet_info(ctx, 0, &info);
+    assert_int_equal(info.y, 540);
+    assert_int_equal(info.ticks_since_move, 2);
 
     /* Update on frame 3 (3 % 3 == 0): ypos = 540 + (-7) = 533 */
     env.frame = 3;
@@ -534,6 +549,8 @@ static void test_bullet_moves_upward(void **state)
     gun_system_get_bullet_info(ctx, 0, &info);
     assert_int_equal(info.active, 1);
     assert_int_equal(info.y, 533);
+    assert_int_equal(info.from_y, 540);         /* from == position before move */
+    assert_int_equal(info.ticks_since_move, 0); /* just moved */
 
     gun_system_destroy(ctx);
 }

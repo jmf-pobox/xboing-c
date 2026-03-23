@@ -523,6 +523,7 @@ static void test_render_info_values(void **state)
 
     assert_int_equal(st, PADDLE_SYS_OK);
     assert_int_equal(info.pos, PLAY_WIDTH / 2);
+    assert_int_equal(info.prev_pos, PLAY_WIDTH / 2); /* prev_pos == pos after create */
     assert_int_equal(info.y, PLAY_HEIGHT - PADDLE_DIST_BASE);
     assert_int_equal(info.width, PADDLE_WIDTH_HUGE);
     assert_int_equal(info.height, PADDLE_RENDER_HEIGHT);
@@ -542,6 +543,43 @@ static void test_render_info_after_size_change(void **state)
 
     assert_int_equal(info.width, PADDLE_WIDTH_MEDIUM);
     assert_int_equal(info.size_type, PADDLE_SIZE_MEDIUM);
+    assert_int_equal(info.prev_pos, info.pos); /* prev_pos snapped on size change */
+
+    paddle_system_destroy(ctx);
+}
+
+static void test_render_info_prev_pos_after_reset(void **state)
+{
+    (void)state;
+    paddle_system_t *ctx = paddle_system_create(PLAY_WIDTH, PLAY_HEIGHT, MAIN_WIDTH, NULL);
+    paddle_system_render_info_t info;
+
+    /* Move paddle via keyboard, then reset */
+    paddle_system_update(ctx, PADDLE_DIR_RIGHT, 0);
+    paddle_system_reset(ctx);
+    paddle_system_get_render_info(ctx, &info);
+
+    assert_int_equal(info.pos, PLAY_WIDTH / 2);
+    assert_int_equal(info.prev_pos, PLAY_WIDTH / 2); /* prev_pos == pos after reset */
+
+    paddle_system_destroy(ctx);
+}
+
+static void test_render_info_prev_pos_tracks_prior_tick(void **state)
+{
+    (void)state;
+    paddle_system_t *ctx = paddle_system_create(PLAY_WIDTH, PLAY_HEIGHT, MAIN_WIDTH, NULL);
+    paddle_system_render_info_t info;
+
+    int initial_pos = PLAY_WIDTH / 2;
+
+    /* Move right for one tick */
+    paddle_system_update(ctx, PADDLE_DIR_RIGHT, 0);
+    paddle_system_get_render_info(ctx, &info);
+
+    /* prev_pos should be the position before the move (initial center) */
+    assert_int_equal(info.prev_pos, initial_pos);
+    assert_true(info.pos != initial_pos); /* pos moved */
 
     paddle_system_destroy(ctx);
 }
@@ -601,6 +639,8 @@ int main(void)
         /* Group 9: Render info */
         cmocka_unit_test(test_render_info_values),
         cmocka_unit_test(test_render_info_after_size_change),
+        cmocka_unit_test(test_render_info_prev_pos_after_reset),
+        cmocka_unit_test(test_render_info_prev_pos_tracks_prior_tick),
     };
 
     return cmocka_run_group_tests(tests, NULL, NULL);

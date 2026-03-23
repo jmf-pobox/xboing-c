@@ -119,6 +119,9 @@ typedef struct game_ctx
     /* Tilt state */
     int user_tilts; /* Remaining tilts this level */
 
+    /* Render interpolation */
+    double render_alpha; /* 0.0–1.0, fraction of tick elapsed since last physics step */
+
     /* Debug / control flags */
     bool debug_mode;
 

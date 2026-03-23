@@ -69,6 +69,7 @@ static int pixel_width_for_size(int size_type)
 struct paddle_system
 {
     int pos;         /* Center X position in play-area coordinates */
+    int prev_pos;    /* Previous tick position (for render interpolation) */
     int size_type;   /* PADDLE_SIZE_SMALL / MEDIUM / HUGE */
     int reverse_on;  /* Reverse controls flag */
     int sticky_on;   /* Sticky bat flag */
@@ -103,6 +104,7 @@ paddle_system_t *paddle_system_create(int play_width, int play_height, int main_
 
     /* Initial state: centered, HUGE, flags off */
     ctx->pos = play_width / 2;
+    ctx->prev_pos = ctx->pos;
     ctx->size_type = PADDLE_SIZE_HUGE;
     ctx->reverse_on = 0;
     ctx->sticky_on = 0;
@@ -137,6 +139,7 @@ void paddle_system_update(paddle_system_t *ctx, int direction, int mouse_x)
         return;
     }
 
+    ctx->prev_pos = ctx->pos;
     old_pos = ctx->pos;
     half = half_width_for_size(ctx->size_type);
 
@@ -252,6 +255,7 @@ void paddle_system_reset(paddle_system_t *ctx)
     }
 
     ctx->pos = ctx->play_width / 2;
+    ctx->prev_pos = ctx->pos;
     ctx->dx = 0;
     ctx->moving = 0;
     ctx->old_mouse_x = 0;
@@ -288,6 +292,8 @@ void paddle_system_change_size(paddle_system_t *ctx, int shrink)
             ctx->size_type = PADDLE_SIZE_HUGE;
         }
     }
+
+    ctx->prev_pos = ctx->pos;
 }
 
 void paddle_system_set_size(paddle_system_t *ctx, int size_type)
@@ -303,6 +309,7 @@ void paddle_system_set_size(paddle_system_t *ctx, int size_type)
         case PADDLE_SIZE_MEDIUM:
         case PADDLE_SIZE_HUGE:
             ctx->size_type = size_type;
+            ctx->prev_pos = ctx->pos;
             break;
         default:
             /* Ignore invalid size_type values. */
@@ -423,6 +430,7 @@ paddle_system_status_t paddle_system_get_render_info(const paddle_system_t *ctx,
     }
 
     info->pos = ctx->pos;
+    info->prev_pos = ctx->prev_pos;
     info->y = ctx->play_height - PADDLE_DIST_BASE;
     info->width = pixel_width_for_size(ctx->size_type);
     info->height = PADDLE_RENDER_HEIGHT;
