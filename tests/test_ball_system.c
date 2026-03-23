@@ -389,8 +389,49 @@ static void test_render_info_active_ball(void **state)
     assert_int_equal(info.active, 1);
     assert_int_equal(info.x, 150);
     assert_int_equal(info.y, 250);
+    assert_int_equal(info.from_x, 150); /* from == pos at creation */
+    assert_int_equal(info.from_y, 250);
+    assert_int_equal(info.ticks_since_move, 0); /* just created */
     assert_int_equal(info.slide, 0);
     assert_int_equal(info.state, BALL_CREATE);
+
+    ball_system_destroy(ctx);
+}
+
+/* TC-12b: Interpolation fields track movement across BALL_FRAME_RATE cadence. */
+static void test_render_info_interpolation_fields(void **state)
+{
+    (void)state;
+    ball_system_t *ctx = ball_system_create(NULL, NULL, NULL);
+    ball_system_env_t env = make_env(0);
+
+    /* Add a ball and force it to BALL_ACTIVE */
+    ball_system_add(ctx, &env, 200, 300, 4, -3, NULL);
+    ball_system_change_mode(ctx, &env, 0, BALL_ACTIVE);
+
+    /* Run updates for frames 1-4 (non-movement ticks, BALL_FRAME_RATE=5) */
+    ball_system_render_info_t info;
+    for (int f = 1; f < BALL_FRAME_RATE; f++)
+    {
+        env.frame = f;
+        ball_system_update(ctx, &env);
+        ball_system_get_render_info(ctx, 0, &info);
+
+        /* Ball hasn't moved yet — position unchanged, ticks_since_move grows */
+        assert_int_equal(info.x, 200);
+        assert_int_equal(info.y, 300);
+        assert_int_equal(info.ticks_since_move, f);
+    }
+
+    /* Frame 5 (5 % 5 == 0): ball moves — from should be pre-move position */
+    env.frame = BALL_FRAME_RATE;
+    ball_system_update(ctx, &env);
+    ball_system_get_render_info(ctx, 0, &info);
+
+    assert_int_equal(info.from_x, 200); /* snapshot of position before move */
+    assert_int_equal(info.from_y, 300);
+    assert_int_equal(info.ticks_since_move, 0);  /* just moved this frame */
+    assert_true(info.x != 200 || info.y != 300); /* position changed */
 
     ball_system_destroy(ctx);
 }
@@ -1471,6 +1512,7 @@ int main(void)
         cmocka_unit_test(test_auto_tilt_fires),
         /* Group 10: Render state queries */
         cmocka_unit_test(test_render_info_active_ball),
+        cmocka_unit_test(test_render_info_interpolation_fields),
         cmocka_unit_test(test_render_info_inactive_slot),
         cmocka_unit_test(test_render_info_invalid_index),
         cmocka_unit_test(test_guide_info_initial),
