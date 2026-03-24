@@ -854,8 +854,14 @@ void game_render_frame(const game_ctx_t *ctx)
             break;
 
         case SDL2ST_DIALOGUE:
+        {
+            /* Render the underlying mode behind the dialogue overlay */
+            sdl2_state_mode_t saved = sdl2_state_saved_mode(ctx->state);
+            if (saved == SDL2ST_HIGHSCORE)
+                game_render_highscore(ctx);
             game_render_dialogue(ctx);
             break;
+        }
 
         case SDL2ST_GAME:
         case SDL2ST_PAUSE:

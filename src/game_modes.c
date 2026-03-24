@@ -64,6 +64,9 @@
 #define PLAY_AREA_X 35
 #define PLAY_AREA_Y 60
 
+/* Flag for boing master "words of wisdom" dialogue flow */
+static int wisdom_pending;
+
 static void start_new_game(game_ctx_t *ctx)
 {
     /* Reset game state */
@@ -71,6 +74,7 @@ static void start_new_game(game_ctx_t *ctx)
     ctx->lives_left = 3;
     ctx->game_active = true;
     ctx->score_submitted = false;
+    wisdom_pending = 0;
     ctx->game_start = time(NULL);
     ctx->paused_seconds = 0;
     ctx->bonus_block_active = false;
@@ -539,6 +543,8 @@ static void mode_bonus_update(sdl2_state_mode_t mode, void *ud)
 
 static const char *get_player_name(const game_ctx_t *ctx)
 {
+    static char fullname[80];
+
     /* Prefer configured nickname */
     if (ctx->config.nickname[0] != '\0')
         return ctx->config.nickname;
@@ -548,7 +554,6 @@ static const char *get_player_name(const game_ctx_t *ctx)
     if (pw != NULL && pw->pw_gecos != NULL && pw->pw_gecos[0] != '\0')
     {
         /* pw_gecos may contain comma-separated fields; use only the name */
-        static char fullname[80];
         strncpy(fullname, pw->pw_gecos, sizeof(fullname) - 1);
         fullname[sizeof(fullname) - 1] = '\0';
         char *comma = strchr(fullname, ',');
@@ -558,17 +563,24 @@ static const char *get_player_name(const game_ctx_t *ctx)
             return fullname;
     }
 
-    /* Fall back to login name */
+    /* Fall back to login name (copy — getpwuid returns static buffer) */
     if (pw != NULL && pw->pw_name != NULL && pw->pw_name[0] != '\0')
-        return pw->pw_name;
+    {
+        strncpy(fullname, pw->pw_name, sizeof(fullname) - 1);
+        fullname[sizeof(fullname) - 1] = '\0';
+        return fullname;
+    }
 
     /* Last resort */
     const char *user = getenv("USER");
-    return (user != NULL && user[0] != '\0') ? user : "Player";
+    if (user != NULL && user[0] != '\0')
+    {
+        strncpy(fullname, user, sizeof(fullname) - 1);
+        fullname[sizeof(fullname) - 1] = '\0';
+        return fullname;
+    }
+    return "Player";
 }
-
-/* Flag for boing master "words of wisdom" dialogue flow */
-static int wisdom_pending;
 
 /* =========================================================================
  * MODE_HIGHSCORE — high score table display (attract mode cycling)
@@ -614,8 +626,11 @@ static void mode_highscore_enter(sdl2_state_mode_t mode, void *ud)
         {
             unsigned long game_time = 0;
             if (ctx->game_start > 0)
-                game_time = (unsigned long)(time(NULL) - ctx->game_start) -
-                            (unsigned long)ctx->paused_seconds;
+            {
+                unsigned long elapsed = (unsigned long)(time(NULL) - ctx->game_start);
+                unsigned long paused = (unsigned long)ctx->paused_seconds;
+                game_time = (elapsed > paused) ? elapsed - paused : 0;
+            }
 
             const char *name = get_player_name(ctx);
 
@@ -632,11 +647,13 @@ static void mode_highscore_enter(sdl2_state_mode_t mode, void *ud)
             /* New boing master — ask for words of wisdom */
             if (rank == 1)
             {
-                wisdom_pending = 1;
                 dialogue_system_open(ctx->dialogue, "Words of wisdom Boing Master?",
                                      DIALOGUE_ICON_TEXT, DIALOGUE_VALIDATION_TEXT);
-                sdl2_state_push_dialogue(ctx->state);
-                return; /* Don't start display yet — wait for dialogue */
+                if (sdl2_state_push_dialogue(ctx->state) == SDL2ST_OK)
+                {
+                    wisdom_pending = 1;
+                    return; /* Don't start display yet — wait for dialogue */
+                }
             }
         }
     }
@@ -696,7 +713,6 @@ static void mode_dialogue_update(sdl2_state_mode_t mode, void *ud)
 
     if (dialogue_system_is_finished(ctx->dialogue))
     {
-        SDL_StopTextInput();
         sdl2_state_pop_dialogue(ctx->state);
     }
 }

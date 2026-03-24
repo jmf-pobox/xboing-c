@@ -619,12 +619,14 @@ void game_render_highscore(const game_ctx_t *ctx)
 
         unsigned long current = highscore_system_get_current_score(ctx->highscore_display);
 
+        int row = 0;
         for (int i = 0; i < HIGHSCORE_NUM_ENTRIES; i++)
         {
             if (table->entries[i].score == 0)
                 continue;
 
-            int y = ym + i * 32;
+            int y = ym + row * 32;
+            row++;
 
             /* Highlight the player's score */
             SDL_Color clr = (table->entries[i].score == current) ? green : white;
