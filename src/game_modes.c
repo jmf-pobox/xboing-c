@@ -639,21 +639,23 @@ static void mode_highscore_enter(sdl2_state_mode_t mode, void *ud)
 
             int rank = highscore_io_get_ranking(&ctx->hs_personal, final_score);
 
-            highscore_io_insert(&ctx->hs_personal, final_score, (unsigned long)ctx->level_number,
-                                game_time, (unsigned long)time(NULL), name);
+            highscore_io_result_t ins = highscore_io_insert(
+                &ctx->hs_personal, final_score, (unsigned long)ctx->level_number, game_time,
+                (unsigned long)time(NULL), name);
             ctx->score_submitted = true;
 
-            char score_path[PATHS_MAX_PATH];
-            if (paths_score_file_personal(&ctx->paths, score_path, sizeof(score_path)) == PATHS_OK)
-                highscore_io_write(score_path, &ctx->hs_personal);
-
-            /* New boing master — ask for words of wisdom */
-            if (rank == 1)
+            if (ins == HIGHSCORE_IO_OK)
             {
-                dialogue_system_open(ctx->dialogue, "Words of wisdom Boing Master?",
-                                     DIALOGUE_ICON_TEXT, DIALOGUE_VALIDATION_TEXT);
-                if (sdl2_state_push_dialogue(ctx->state) == SDL2ST_OK)
+                char score_path[PATHS_MAX_PATH];
+                if (paths_score_file_personal(&ctx->paths, score_path, sizeof(score_path)) ==
+                    PATHS_OK)
+                    highscore_io_write(score_path, &ctx->hs_personal);
+
+                /* New boing master — ask for words of wisdom */
+                if (rank == 1 && sdl2_state_push_dialogue(ctx->state) == SDL2ST_OK)
                 {
+                    dialogue_system_open(ctx->dialogue, "Words of wisdom Boing Master?",
+                                         DIALOGUE_ICON_TEXT, DIALOGUE_VALIDATION_TEXT);
                     wisdom_pending = 1;
                     return; /* Don't start display yet — wait for dialogue */
                 }
@@ -702,9 +704,8 @@ static void mode_highscore_update(sdl2_state_mode_t mode, void *ud)
 static void mode_dialogue_enter(sdl2_state_mode_t mode, void *ud)
 {
     (void)mode;
-    game_ctx_t *ctx = ud;
+    (void)ud;
     SDL_StartTextInput();
-    (void)ctx;
 }
 
 static void mode_dialogue_update(sdl2_state_mode_t mode, void *ud)

@@ -597,9 +597,9 @@ void game_render_highscore(const game_ctx_t *ctx)
 
         /* Boing master name and words of wisdom (above table) */
         int ym = PLAY_AREA_Y + 55;
-        if (table->entries[0].score > 0)
+        if (table->master_name[0] != '\0')
         {
-            sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TITLE, table->entries[0].name, ym,
+            sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TITLE, table->master_name, ym,
                                           yellow, PLAY_AREA_W);
             ym += 25;
 
