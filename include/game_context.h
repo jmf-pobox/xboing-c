@@ -100,12 +100,13 @@ typedef struct game_ctx
     highscore_table_t hs_personal;
 
     /* --- Game state (replaces legacy globals from main.c) ---------------- */
-    int level_number;   /* Current level (1-based) */
-    int lives_left;     /* Remaining lives */
-    int start_level;    /* Level to start from (CLI or config) */
-    bool game_active;   /* True while a game session is running */
-    time_t game_start;  /* Timestamp when game session began */
-    int paused_seconds; /* Total seconds spent paused */
+    int level_number;     /* Current level (1-based) */
+    int lives_left;       /* Remaining lives */
+    int start_level;      /* Level to start from (CLI or config) */
+    bool game_active;     /* True while a game session is running */
+    bool score_submitted; /* True after score inserted into highscore table */
+    time_t game_start;    /* Timestamp when game session began */
+    int paused_seconds;   /* Total seconds spent paused */
 
     /* Bonus spawning state (from main.c:handleGameMode) */
     bool bonus_block_active; /* True while a bonus block is on the grid */

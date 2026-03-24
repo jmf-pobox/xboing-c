@@ -11,6 +11,11 @@
 #include "game_modes.h"
 
 #include <stdio.h>
+#include <string.h>
+#include <time.h>
+
+#include <pwd.h>
+#include <unistd.h>
 
 #include <SDL2/SDL.h>
 
@@ -18,6 +23,7 @@
 #include "block_system.h"
 #include "bonus_system.h"
 #include "demo_system.h"
+#include "dialogue_system.h"
 #include "editor_system.h"
 #include "eyedude_system.h"
 #include "game_callbacks.h"
@@ -64,6 +70,9 @@ static void start_new_game(game_ctx_t *ctx)
     ctx->level_number = ctx->start_level;
     ctx->lives_left = 3;
     ctx->game_active = true;
+    ctx->score_submitted = false;
+    ctx->game_start = time(NULL);
+    ctx->paused_seconds = 0;
     ctx->bonus_block_active = false;
     ctx->next_bonus_frame = 0;
     ctx->user_tilts = 0;
@@ -126,6 +135,9 @@ static void mode_game_enter(sdl2_state_mode_t mode, void *ud)
         /* Play-test from editor — use existing blocks, just place ball */
         ctx->lives_left = 3;
         ctx->game_active = true;
+        ctx->score_submitted = false;
+        ctx->game_start = time(NULL);
+        ctx->paused_seconds = 0;
         paddle_system_reset(ctx->paddle);
         paddle_system_set_size(ctx->paddle, PADDLE_SIZE_HUGE);
         ball_system_clear_all(ctx->ball);
@@ -522,6 +534,43 @@ static void mode_bonus_update(sdl2_state_mode_t mode, void *ud)
 }
 
 /* =========================================================================
+ * Player name resolution — matches legacy getUsersFullName() in misc.c
+ * ========================================================================= */
+
+static const char *get_player_name(const game_ctx_t *ctx)
+{
+    /* Prefer configured nickname */
+    if (ctx->config.nickname[0] != '\0')
+        return ctx->config.nickname;
+
+    /* Try real name from passwd gecos field */
+    const struct passwd *pw = getpwuid(getuid());
+    if (pw != NULL && pw->pw_gecos != NULL && pw->pw_gecos[0] != '\0')
+    {
+        /* pw_gecos may contain comma-separated fields; use only the name */
+        static char fullname[80];
+        strncpy(fullname, pw->pw_gecos, sizeof(fullname) - 1);
+        fullname[sizeof(fullname) - 1] = '\0';
+        char *comma = strchr(fullname, ',');
+        if (comma != NULL)
+            *comma = '\0';
+        if (fullname[0] != '\0')
+            return fullname;
+    }
+
+    /* Fall back to login name */
+    if (pw != NULL && pw->pw_name != NULL && pw->pw_name[0] != '\0')
+        return pw->pw_name;
+
+    /* Last resort */
+    const char *user = getenv("USER");
+    return (user != NULL && user[0] != '\0') ? user : "Player";
+}
+
+/* Flag for boing master "words of wisdom" dialogue flow */
+static int wisdom_pending;
+
+/* =========================================================================
  * MODE_HIGHSCORE — high score table display (attract mode cycling)
  * ========================================================================= */
 
@@ -534,6 +583,63 @@ static void mode_highscore_enter(sdl2_state_mode_t mode, void *ud)
     /* Restore cursor when leaving gameplay */
     if (ctx->cursor)
         sdl2_cursor_set(ctx->cursor, SDL2CUR_POINT);
+
+    /* Returning from "words of wisdom" dialogue — save master text */
+    if (wisdom_pending)
+    {
+        wisdom_pending = 0;
+        if (!dialogue_system_was_cancelled(ctx->dialogue))
+        {
+            const char *wisdom = dialogue_system_get_input(ctx->dialogue);
+            if (wisdom != NULL && wisdom[0] != '\0')
+            {
+                strncpy(ctx->hs_personal.master_text, wisdom,
+                        sizeof(ctx->hs_personal.master_text) - 1);
+                ctx->hs_personal.master_text[sizeof(ctx->hs_personal.master_text) - 1] = '\0';
+
+                /* Re-save with updated master text */
+                char score_path[PATHS_MAX_PATH];
+                if (paths_score_file_personal(&ctx->paths, score_path, sizeof(score_path)) ==
+                    PATHS_OK)
+                    highscore_io_write(score_path, &ctx->hs_personal);
+            }
+        }
+        /* Fall through to display */
+    }
+    else if (!ctx->score_submitted)
+    {
+        /* Insert the player's score into the personal table and save to disk */
+        unsigned long final_score = score_system_get(ctx->score);
+        if (final_score > 0)
+        {
+            unsigned long game_time = 0;
+            if (ctx->game_start > 0)
+                game_time = (unsigned long)(time(NULL) - ctx->game_start) -
+                            (unsigned long)ctx->paused_seconds;
+
+            const char *name = get_player_name(ctx);
+
+            int rank = highscore_io_get_ranking(&ctx->hs_personal, final_score);
+
+            highscore_io_insert(&ctx->hs_personal, final_score, (unsigned long)ctx->level_number,
+                                game_time, (unsigned long)time(NULL), name);
+            ctx->score_submitted = true;
+
+            char score_path[PATHS_MAX_PATH];
+            if (paths_score_file_personal(&ctx->paths, score_path, sizeof(score_path)) == PATHS_OK)
+                highscore_io_write(score_path, &ctx->hs_personal);
+
+            /* New boing master — ask for words of wisdom */
+            if (rank == 1)
+            {
+                wisdom_pending = 1;
+                dialogue_system_open(ctx->dialogue, "Words of wisdom Boing Master?",
+                                     DIALOGUE_ICON_TEXT, DIALOGUE_VALIDATION_TEXT);
+                sdl2_state_push_dialogue(ctx->state);
+                return; /* Don't start display yet — wait for dialogue */
+            }
+        }
+    }
 
     highscore_system_set_table(ctx->highscore_display, &ctx->hs_personal);
     highscore_system_set_current_score(ctx->highscore_display, score_system_get(ctx->score));
@@ -567,6 +673,39 @@ static void mode_highscore_update(sdl2_state_mode_t mode, void *ud)
     }
 
     /* on_finished callback handles auto-cycle */
+}
+
+/* =========================================================================
+ * MODE_DIALOGUE — modal text input overlay (push/pop)
+ * ========================================================================= */
+
+static void mode_dialogue_enter(sdl2_state_mode_t mode, void *ud)
+{
+    (void)mode;
+    game_ctx_t *ctx = ud;
+    SDL_StartTextInput();
+    (void)ctx;
+}
+
+static void mode_dialogue_update(sdl2_state_mode_t mode, void *ud)
+{
+    (void)mode;
+    game_ctx_t *ctx = ud;
+
+    dialogue_system_update(ctx->dialogue);
+
+    if (dialogue_system_is_finished(ctx->dialogue))
+    {
+        SDL_StopTextInput();
+        sdl2_state_pop_dialogue(ctx->state);
+    }
+}
+
+static void mode_dialogue_exit(sdl2_state_mode_t mode, void *ud)
+{
+    (void)mode;
+    (void)ud;
+    SDL_StopTextInput();
 }
 
 /* =========================================================================
@@ -820,5 +959,15 @@ void game_modes_register(game_ctx_t *ctx)
             .on_update = mode_edit_update,
         };
         sdl2_state_register(ctx->state, SDL2ST_EDIT, &def);
+    }
+
+    /* MODE_DIALOGUE */
+    {
+        sdl2_state_mode_def_t def = {
+            .on_enter = mode_dialogue_enter,
+            .on_update = mode_dialogue_update,
+            .on_exit = mode_dialogue_exit,
+        };
+        sdl2_state_register(ctx->state, SDL2ST_DIALOGUE, &def);
     }
 }

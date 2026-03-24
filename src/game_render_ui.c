@@ -595,6 +595,28 @@ void game_render_highscore(const game_ctx_t *ctx)
         if (!table)
             return;
 
+        /* Boing master name and words of wisdom (above table) */
+        int ym = PLAY_AREA_Y + 55;
+        if (table->entries[0].score > 0)
+        {
+            sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TITLE, table->entries[0].name, ym,
+                                          yellow, PLAY_AREA_W);
+            ym += 25;
+
+            if (table->master_text[0] != '\0')
+            {
+                sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_DATA, table->master_text, ym,
+                                              green, PLAY_AREA_W);
+            }
+        }
+        ym += 25;
+
+        /* Column positions for fixed alignment */
+        int col_rank = PLAY_AREA_X + 20;
+        int col_name = PLAY_AREA_X + 55;
+        int col_score = PLAY_AREA_X + 280;
+        int col_level = PLAY_AREA_X + 380;
+
         unsigned long current = highscore_system_get_current_score(ctx->highscore_display);
 
         for (int i = 0; i < HIGHSCORE_NUM_ENTRIES; i++)
@@ -602,14 +624,32 @@ void game_render_highscore(const game_ctx_t *ctx)
             if (table->entries[i].score == 0)
                 continue;
 
+            int y = ym + i * 32;
+
             /* Highlight the player's score */
             SDL_Color clr = (table->entries[i].score == current) ? green : white;
 
-            char line[128];
-            snprintf(line, sizeof(line), "%2d. %-20s %7lu  Lv.%lu", i + 1, table->entries[i].name,
-                     table->entries[i].score, table->entries[i].level);
-            sdl2_font_draw(ctx->font, SDL2F_FONT_DATA, line, PLAY_AREA_X + 30,
-                           PLAY_AREA_Y + 90 + i * 38, clr);
+            /* Rank */
+            char rank_buf[8];
+            snprintf(rank_buf, sizeof(rank_buf), "%2d.", i + 1);
+            sdl2_font_draw(ctx->font, SDL2F_FONT_DATA, rank_buf, col_rank, y, clr);
+
+            /* Name (truncated to fit) */
+            sdl2_font_draw(ctx->font, SDL2F_FONT_DATA, table->entries[i].name, col_name, y, clr);
+
+            /* Score (right-aligned) */
+            char score_buf[16];
+            snprintf(score_buf, sizeof(score_buf), "%lu", table->entries[i].score);
+            sdl2_font_metrics_t sm;
+            int score_w = 0;
+            if (sdl2_font_measure(ctx->font, SDL2F_FONT_DATA, score_buf, &sm) == SDL2F_OK)
+                score_w = sm.width;
+            sdl2_font_draw(ctx->font, SDL2F_FONT_DATA, score_buf, col_score + 80 - score_w, y, clr);
+
+            /* Level */
+            char level_buf[16];
+            snprintf(level_buf, sizeof(level_buf), "Lv.%lu", table->entries[i].level);
+            sdl2_font_draw(ctx->font, SDL2F_FONT_DATA, level_buf, col_level, y, clr);
         }
     }
 
