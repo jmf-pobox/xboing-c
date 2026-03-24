@@ -63,7 +63,8 @@ int main(int argc, char *argv[])
                     break;
             }
 
-            /* Route text/key events to dialogue when active */
+            /* Route text/key events to dialogue when active — swallow them
+             * so global actions (quit, fullscreen) don't fire while typing. */
             if (sdl2_state_current(ctx->state) == SDL2ST_DIALOGUE && ctx->dialogue != NULL)
             {
                 if (event.type == SDL_TEXTINPUT)
@@ -71,8 +72,9 @@ int main(int argc, char *argv[])
                     for (int ci = 0; event.text.text[ci] != '\0'; ci++)
                         dialogue_system_key_input(ctx->dialogue, DIALOGUE_KEY_CHAR,
                                                   event.text.text[ci]);
+                    continue;
                 }
-                else if (event.type == SDL_KEYDOWN && !event.key.repeat)
+                if (event.type == SDL_KEYDOWN && !event.key.repeat)
                 {
                     switch (event.key.keysym.sym)
                     {
@@ -88,6 +90,7 @@ int main(int argc, char *argv[])
                         default:
                             break;
                     }
+                    continue;
                 }
             }
 

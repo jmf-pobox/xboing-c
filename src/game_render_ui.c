@@ -636,11 +636,11 @@ void game_render_highscore(const game_ctx_t *ctx)
             snprintf(rank_buf, sizeof(rank_buf), "%2d.", i + 1);
             sdl2_font_draw(ctx->font, SDL2F_FONT_DATA, rank_buf, col_rank, y, clr);
 
-            /* Name (truncated to fit) */
+            /* Name */
             sdl2_font_draw(ctx->font, SDL2F_FONT_DATA, table->entries[i].name, col_name, y, clr);
 
             /* Score (right-aligned) */
-            char score_buf[16];
+            char score_buf[24];
             snprintf(score_buf, sizeof(score_buf), "%lu", table->entries[i].score);
             sdl2_font_metrics_t sm;
             int score_w = 0;

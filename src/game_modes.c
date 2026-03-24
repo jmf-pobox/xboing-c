@@ -11,6 +11,7 @@
 #include "game_modes.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <time.h>
 
@@ -627,7 +628,9 @@ static void mode_highscore_enter(sdl2_state_mode_t mode, void *ud)
             unsigned long game_time = 0;
             if (ctx->game_start > 0)
             {
-                unsigned long elapsed = (unsigned long)(time(NULL) - ctx->game_start);
+                time_t now = time(NULL);
+                unsigned long elapsed =
+                    (now >= ctx->game_start) ? (unsigned long)(now - ctx->game_start) : 0;
                 unsigned long paused = (unsigned long)ctx->paused_seconds;
                 game_time = (elapsed > paused) ? elapsed - paused : 0;
             }

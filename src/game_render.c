@@ -762,7 +762,7 @@ static void game_render_dialogue(const game_ctx_t *ctx)
     int by = (SDL2R_LOGICAL_HEIGHT - bh) / 2;
 
     /* Dark background */
-    SDL_SetRenderDrawColor(sdl, 20, 20, 40, 240);
+    SDL_SetRenderDrawColor(sdl, 20, 20, 40, 255);
     SDL_Rect bg = {bx, by, bw, bh};
     SDL_RenderFillRect(sdl, &bg);
 
