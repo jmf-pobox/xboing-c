@@ -615,6 +615,7 @@ void game_render_highscore(const game_ctx_t *ctx)
         int col_rank = PLAY_AREA_X + 20;
         int col_name = PLAY_AREA_X + 55;
         int col_score = PLAY_AREA_X + 280;
+        int col_score_w = 80; /* right-edge offset for score right-alignment */
         int col_level = PLAY_AREA_X + 380;
 
         unsigned long current = highscore_system_get_current_score(ctx->highscore_display);
@@ -646,7 +647,8 @@ void game_render_highscore(const game_ctx_t *ctx)
             int score_w = 0;
             if (sdl2_font_measure(ctx->font, SDL2F_FONT_DATA, score_buf, &sm) == SDL2F_OK)
                 score_w = sm.width;
-            sdl2_font_draw(ctx->font, SDL2F_FONT_DATA, score_buf, col_score + 80 - score_w, y, clr);
+            sdl2_font_draw(ctx->font, SDL2F_FONT_DATA, score_buf, col_score + col_score_w - score_w,
+                           y, clr);
 
             /* Level */
             char level_buf[16];
