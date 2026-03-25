@@ -8,7 +8,7 @@
 
 CC = gcc
 CFLAGS = -O2 -Wall -Wno-unused-result -Wno-format-overflow -Wno-format-truncation \
-         -I./include -I../include -I/usr/include/X11 \
+         -I./include -I/usr/include/X11 \
          -DHIGH_SCORE_FILE=\"./.xboing.scr\" \
          -DLEVEL_INSTALL_DIR=\"../levels\" \
          -DSOUNDS_DIR=\"../sounds\" \

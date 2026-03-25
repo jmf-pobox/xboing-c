@@ -10,10 +10,10 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 find_package(PkgConfig REQUIRED)
 
 # SDL2 libraries — required for the modernized game binary.
-pkg_check_modules(SDL2       sdl2)
-pkg_check_modules(SDL2_IMAGE SDL2_image)
-pkg_check_modules(SDL2_MIXER SDL2_mixer)
-pkg_check_modules(SDL2_TTF   SDL2_ttf)
+pkg_check_modules(SDL2       REQUIRED sdl2)
+pkg_check_modules(SDL2_IMAGE REQUIRED SDL2_image)
+pkg_check_modules(SDL2_MIXER REQUIRED SDL2_mixer)
+pkg_check_modules(SDL2_TTF   REQUIRED SDL2_ttf)
 
 # --- Compiler warning policy ------------------------------------------------
 
