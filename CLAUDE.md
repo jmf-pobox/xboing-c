@@ -4,7 +4,35 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is a C game modernization project. The original codebase has not been actively maintained in over 20 years. Every change must be deliberate, tested, and reversible. We are not rewriting — we are modernizing incrementally while preserving the game's behavior.
 
-I am a principal engineer. Every change I make leaves the codebase in a better state than I found it. I do not excuse new problems by pointing at existing ones. I do not defer quality to a future ticket. I do not create tech debt.
+I am a principal engineer. Every change I make leaves the codebase in a better state than I found it. I do not excuse new problems by pointing at existing ones. I do not defer quality to a future ticket. I do not create tech debt. Root causes are provable — present facts, data, and tests, not "likely" theories.
+
+## Communication
+
+### Core rules
+
+- Answer the question asked. Lead with yes, no, a number, or "I don't know" — then elaborate.
+- Replace adjectives with data. "Much faster" → "3x faster" or "reduced from 10ms to 1ms."
+- Calibrate confidence to evidence: "This works" (verified) vs "This should work" (high confidence) vs "I don't know, but..." (unknown). Pick one hedge and commit.
+- Every statement must pass the "so what" test. If it doesn't add information, cut it.
+- Keep sentences under 30 words. Match response length to question complexity.
+- When correcting the user, be direct, not harsh. Explain *why* something won't work.
+- Flag important information the user hasn't asked about but needs (torpedo alerts). Use sparingly.
+
+### Banned patterns
+
+- **Performative validation**: "Great question!", "Excellent observation!", "You're absolutely right to ask..."
+- **False confidence**: "I've completely fixed the bug", "This is exactly what you need", "Perfect!"
+- **Weasel words**: "significantly better", "nearly all", "in many cases", "quite impressive"
+- **Hollow adjectives**: "very large", "much faster", "recently" — replace with numbers or dates
+- **Hedge stacking**: "I think it might possibly be the case that perhaps..." — pick one qualifier
+- **Sycophantic openers and filler transitions**: "Let's dive in!", "I'd be happy to help!", "Absolutely!"
+- **Inflated phrases**: "Due to the fact that" → "Because". "In order to" → "To". "It is important to note that" → delete.
+
+### Clarification
+
+- Ask when ambiguity would lead to significantly different answers or wasted work.
+- Don't ask when you can make a reasonable assumption and state it, or when the clarification is minor.
+- Be specific: "Are you asking about X or Y?" not "Could you provide more details?"
 
 ## Project Overview
 
@@ -62,8 +90,8 @@ ctest --test-dir build --output-on-failure
 ## Toolchain
 
 | Tool | Purpose | Install |
-|------|---------|---------|
-| **gcc / clang** | Compilation with strict warnings | System package manager |
+| ------ | --------- | --------- |
+| **gcc / clang** | Compilation with strict warnings | `apt install gcc clang` |
 | **CMake** | Build system | `apt install cmake` |
 | **clang-format** | Code formatting | `apt install clang-format` |
 | **clang-tidy** | Deep semantic static analysis | `apt install clang-tidy` |
@@ -72,6 +100,29 @@ ctest --test-dir build --output-on-failure
 | **Valgrind** | Memory debugging | `apt install valgrind` |
 | **shellcheck** | Shell script linting | `apt install shellcheck` |
 | **bd** | Issue tracking with dependency chains | [github.com/steveyegge/beads](https://github.com/steveyegge/beads) |
+
+## Tool Usage
+
+- Never chain multiple commands in a single Bash call using `&&`, `||`, `;`, `$()`, `|`, or `for` loops. Each Bash call must be exactly ONE command. Use absolute paths instead of `cd && command`.
+- Use `.tmp/` in the project root for scratch files — never `/tmp`. Keeps temp files visible, gitignored, and pre-approved for writes.
+- Use MCP GitHub tools (`mcp__github__*`) instead of `gh api graphql` for structured GitHub operations.
+- CronCreate is a session-scoped scheduler (standard 5-field cron, local timezone). Jobs are session-only, auto-expire after 3 days, fire only when idle. One-shot via `recurring: false`. The /loop skill wraps CronCreate with natural intervals like `5m` or `2h`.
+
+## Plugins and MCP Servers
+
+### MCP servers (loaded on-demand)
+
+- **github** — PRs, issues, reviews, branches. Prefer over `gh` CLI for structured operations.
+- **biff** (`tty`) — team messaging, presence, session naming (`/who`, `/finger`, `/talk`, `/write`)
+- **vox** (`mic`) — text-to-speech, voice control, spoken notifications (`/unmute`, `/vibe`, `/recap`)
+- **lux** (`lux`) — visual display surface: diagrams, dashboards, tables, interactive elements
+- **quarry** — semantic search over the codebase (`/find`, `/ingest`, `/explain`, `/source`)
+- **z-spec** (`zspec`) — type-check Z specs with fuzz, model-check with probcli, display in lux
+
+### Plugins
+
+- **feature-dev** — guided feature development with code-explorer, code-architect, code-reviewer agents
+- **prfaq-dev** — Amazon Working Backwards PR/FAQ process with meeting personas and peer review
 
 ## Codebase Knowledge Base (Quarry)
 
@@ -148,7 +199,7 @@ For legacy files not yet modernized, suppress specific warnings per-file in CMak
 ### Sanitizer Builds
 
 | Sanitizer | What it catches | Flag |
-|-----------|----------------|------|
+| ----------- | ---------------- | ------ |
 | AddressSanitizer (ASan) | Buffer overflows, use-after-free, double-free, stack overflow | `-fsanitize=address` |
 | UndefinedBehaviorSanitizer (UBSan) | Integer overflow, null deref, alignment, shift errors | `-fsanitize=undefined` |
 | MemorySanitizer (MSan) | Reads of uninitialized memory (clang only, Linux only) | `-fsanitize=memory` |
@@ -240,7 +291,7 @@ Feed malformed data to parsers and deserializers.
 **Key modules (each a .c/.h pair):**
 
 | Module | Role |
-|--------|------|
+| -------- | ------ |
 | `main.c` | Event loop, state machine, input dispatch |
 | `init.c` | X11 display/window setup, colormap, pixmap loading |
 | `ball.c` | Ball physics, collision detection (up to 5 simultaneous balls) |
@@ -308,14 +359,58 @@ Matrix build: Debug and Sanitizers (ASan + UBSan). Runs CMocka tests via ctest.
 
 Runs markdownlint on all `.md` files.
 
-## Development Workflow
+## Development Lifecycle
 
-### Workflow Tiers
+Every code change follows this pipeline. Steps are ordered — do not skip ahead.
+
+### Phase 1: Claim
+
+1. Check `bd ready` or `bd list --status=open` for an existing bead. Create one with `bd create` if none exists.
+2. `bd update <id> --status=in_progress` to claim it.
+3. If biff is enabled: `/plan` with a 1-line summary of the work.
+4. If `/who` shows more than 1 user active in this repo (human or agent), use a worktree (`git worktree add` or `--worktree` flag) to avoid conflicts.
+
+### Phase 2: Branch
+
+1. Create a feature branch from master: `git checkout -b <prefix>/short-description master`. Use branch prefixes from Branch Discipline below.
+
+### Phase 3: Implement (TDD when feasible)
+
+1. Write failing tests first when feasible — new functions, behavior changes, bug reproductions. Not required for docs-only, config, or template changes.
+2. Write the code that makes the tests pass.
+3. Run quality gates after each logical change. Zero violations before moving on.
+
+### Phase 4: Document
+
+1. Add an ADR to `docs/DESIGN.md` if the change involves a design decision with rejected alternatives.
+2. Update `README.md` if user-facing behavior changed (new commands, flags, defaults, config).
+
+### Phase 5: Local Review
+
+1. Run `feature-dev:code-reviewer` agent on the diff.
+2. Fix all valid findings. Repeat until reviews produce minor or no comments.
+
+### Phase 6: Ship
+
+1. Commit with conventional message format (`type(scope): description`). Quality gates must pass.
+2. Push branch, create PR via `mcp__github__create_pull_request`.
+3. Request Copilot review via `mcp__github__request_copilot_review`.
+4. `gh pr checks <number> --watch` in background. Wait for Copilot review (1–3 min after CI).
+5. Read all comments via `mcp__github__pull_request_read`. Address every finding — no "pre-existing" excuses. Re-push.
+6. Repeat 16–17 until the latest review cycle has zero new comments and all checks green.
+7. Merge via `mcp__github__merge_pull_request`.
+
+### Phase 7: Close
+
+1. `bd close <id>` for completed beads.
+2. `bd sync` to sync beads state.
+
+## Workflow Tiers
 
 Match the workflow to the scope. The deciding factor is **design ambiguity**, not size.
 
 | Tier | Tool | When | Tracking |
-|------|------|------|----------|
+| ------ | ------ | ------ | ---------- |
 | **T1: Forge** | `/feature-forge` | Epics, cross-cutting work, competing design approaches | Beads with dependencies |
 | **T2: Feature Dev** | `/feature-dev` | Features, multi-file, clear goal but needs exploration | Beads + TodoWrite (internal) |
 | **T3: Direct** | Plan mode or manual | Tasks, bugs, obvious implementation path | Beads |
@@ -334,12 +429,12 @@ Match the workflow to the scope. The deciding factor is **design ambiguity**, no
 - Adding CMocka tests to the save/load subsystem (multi-file, needs code exploration) → **T2: Feature Dev**
 - Fixing a buffer overflow found by ASan (single root cause, obvious fix) → **T3: Direct**
 
-### Expert Agents
+## Expert Agents
 
 Four project-specific agents in `.claude/agents/` provide domain expertise. Consult them via the Task tool or as hive-mind participants in `/feature-forge`.
 
 | Agent | Expertise | Consult when... |
-|-------|-----------|-----------------|
+| ------- | ----------- | ----------------- |
 | `xboing-author` | Original author persona (Justin C. Kibell). Game vision, feel, design intent. | Any change touches gameplay mechanics, physics, scoring, level design, constants, or player experience. **Must approve** gameplay-affecting changes. |
 | `c-modernization-expert` | Modern C (C11/C17/C23), sanitizers, static analysis, safe refactoring. | Modernizing legacy code, fixing compiler warnings, resolving sanitizer findings, reviewing unsafe patterns. |
 | `av-platform-expert` | SDL2, legacy X11/Xlib, ALSA/PulseAudio, asset pipeline (XPM→PNG, .au→WAV). | Porting rendering or audio subsystems, designing the SDL2 abstraction layer, converting assets. |
@@ -351,24 +446,25 @@ Four project-specific agents in `.claude/agents/` provide domain expertise. Cons
 - **T2: Feature Dev** — delegate to the relevant expert(s) as subagents for exploration and review.
 - **T3: Direct** — consult `xboing-author` if the change could affect game feel; consult `c-modernization-expert` for any C code changes.
 
-### Branch Discipline
+## Branch Discipline
 
-Feature work goes on feature branches. Never commit directly to main.
+Feature work goes on feature branches. Never commit directly to master.
 
 | Prefix | Use |
-|--------|-----|
+| -------- | ----- |
 | `feat/` | New features, new systems |
 | `fix/` | Bug fixes |
 | `refactor/` | Modernization, restructuring (no behavior change) |
 | `port/` | Platform porting work |
 | `docs/` | Documentation only |
+| `test/` | Test additions or infrastructure |
 
-### Commit Message Format
+## Commit Message Format
 
 `type(scope): description`
 
 | Prefix | Use |
-|--------|-----|
+| -------- | ----- |
 | `feat:` | New feature or capability |
 | `fix:` | Bug fix |
 | `refactor:` | Code modernization, no behavior change |
@@ -377,13 +473,13 @@ Feature work goes on feature branches. Never commit directly to main.
 | `build:` | CMake, CI, dependency changes |
 | `docs:` | Documentation |
 
-### Issue Tracking (bd)
+## Issue Tracking (bd)
 
 This project uses **bd** (beads) for issue tracking. The database lives in `.beads/` and auto-syncs with git.
 
 **NEVER hand-edit `.beads/issues.jsonl`.** Always use `bd` commands.
 
-#### Finding work
+### Finding work
 
 ```bash
 bd ready                          # Show unblocked work (no dependencies pending)
@@ -396,7 +492,7 @@ bd graph --all                    # Visualize all dependency chains
 bd status                         # Project health overview (open/closed/blocked counts)
 ```
 
-#### Creating issues
+### Creating issues
 
 ```bash
 bd create "Fix the frobnicator" --type=bug --priority=1
@@ -408,7 +504,7 @@ Issue types: `bug`, `feature`, `task`, `epic`, `chore`. Priority: 0-4 (0=critica
 
 Use `--parent=<id>` to create children under an epic. Use `--deps=<id>` to declare blocking dependencies at creation time.
 
-#### Working on issues
+### Working on issues
 
 ```bash
 bd update <id> --status=in_progress   # Claim it
@@ -416,7 +512,7 @@ bd update <id> --claim                # Atomic claim (fails if already taken)
 bd comments add <id> "Found the root cause in ball.c:1744"
 ```
 
-#### Completing work
+### Completing work
 
 ```bash
 bd close <id> -r "Merged PR #5"       # Close with reason
@@ -424,7 +520,7 @@ bd close <id1> <id2> -r "Fixed in PR #6"  # Close multiple at once
 bd epic close-eligible                 # Auto-close epics with all children done
 ```
 
-#### Dependencies
+### Dependencies
 
 ```bash
 bd dep add <blocked> <blocker>    # <blocked> depends on <blocker>
@@ -433,7 +529,7 @@ bd dep tree <id>                  # Visualize dependency tree
 bd dep cycles                     # Detect circular dependencies
 ```
 
-#### Sync and session end
+### Sync and session end
 
 ```bash
 bd sync                           # Pull, merge, export, commit, push beads data
@@ -442,7 +538,7 @@ bd preflight                      # Pre-PR checklist
 
 Always run `bd sync` before ending a session. See AGENTS.md for the full landing-the-plane workflow.
 
-### Session Close Protocol
+## Session Close Protocol
 
 Before ending any session, follow AGENTS.md landing-the-plane workflow. Work is **not** complete until `git push` succeeds.
 
