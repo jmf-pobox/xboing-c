@@ -1,13 +1,17 @@
-# Makefile for XBoing - Modern Linux version
+# Makefile for XBoing - Original Xlib version
 # Original: Justin C. Kibell, 1993-1997
 # Modernized for current Linux systems
+#
+# Build from this directory:  make
+# Run from this directory:    ./xboing
+# Assets (levels/, sounds/) are in the parent directory.
 
 CC = gcc
 CFLAGS = -O2 -Wall -Wno-unused-result -Wno-format-overflow -Wno-format-truncation \
-         -I./include -I/usr/include/X11 \
+         -I./include -I../include -I/usr/include/X11 \
          -DHIGH_SCORE_FILE=\"./.xboing.scr\" \
-         -DLEVEL_INSTALL_DIR=\"./levels\" \
-         -DSOUNDS_DIR=\"./sounds\" \
+         -DLEVEL_INSTALL_DIR=\"../levels\" \
+         -DSOUNDS_DIR=\"../sounds\" \
          -DREADMEP_FILE=\"./docs/problems.doc\" \
          -DAUDIO_AVAILABLE=\"True\" \
          -DAUDIO_FILE=\"audio/LINUXaudio.c\"

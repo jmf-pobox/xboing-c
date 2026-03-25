@@ -8,8 +8,7 @@ function(xboing_add_test NAME)
     add_executable(${NAME} ${NAME}.c)
     target_include_directories(${NAME} PRIVATE
         ${CMAKE_SOURCE_DIR}/include
-        ${X11_INCLUDE_DIRS}
-        ${XPM_INCLUDE_DIRS}
+        ${CMAKE_SOURCE_DIR}/original/include
     )
     target_compile_options(${NAME} PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
     target_link_libraries(${NAME} PRIVATE ${CMOCKA_LIBRARIES})
@@ -22,7 +21,7 @@ xboing_add_test(test_skeleton)
 
 # Ball physics characterization tests (bead n9e.1)
 # Links ball_math.c directly — no X11, no game binary.
-add_executable(test_ball_math test_ball_math.c ${CMAKE_SOURCE_DIR}/ball_math.c)
+add_executable(test_ball_math test_ball_math.c ${CMAKE_SOURCE_DIR}/src/ball_math.c)
 target_include_directories(test_ball_math PRIVATE
     ${CMAKE_SOURCE_DIR}/include
 )
@@ -43,17 +42,16 @@ add_test(NAME test_score COMMAND test_score)
 add_executable(test_level_parse
     test_level_parse.c
     stubs_x11_xboing.c
-    ${CMAKE_SOURCE_DIR}/file.c
-    ${CMAKE_SOURCE_DIR}/blocks.c
-    ${CMAKE_SOURCE_DIR}/level.c
-    ${CMAKE_SOURCE_DIR}/error.c
+    ${CMAKE_SOURCE_DIR}/original/file.c
+    ${CMAKE_SOURCE_DIR}/original/blocks.c
+    ${CMAKE_SOURCE_DIR}/original/level.c
+    ${CMAKE_SOURCE_DIR}/original/error.c
 )
 target_include_directories(test_level_parse PRIVATE
+    ${CMAKE_SOURCE_DIR}/original/include
     ${CMAKE_SOURCE_DIR}/include
-    ${CMAKE_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/original
     /usr/include/X11
-    ${X11_INCLUDE_DIRS}
-    ${XPM_INCLUDE_DIRS}
 )
 target_compile_definitions(test_level_parse PRIVATE
     LEVELS_DIR="${CMAKE_SOURCE_DIR}/levels"
@@ -69,11 +67,11 @@ target_compile_options(test_level_parse PRIVATE ${XBOING_STRICT_WARNINGS} -Werro
 # Legacy production sources compiled into this test get the full suppression
 # list and -Wno-error so they don't block the build.
 set_source_files_properties(
-    ${CMAKE_SOURCE_DIR}/file.c
-    ${CMAKE_SOURCE_DIR}/blocks.c
-    ${CMAKE_SOURCE_DIR}/level.c
-    ${CMAKE_SOURCE_DIR}/error.c
-    PROPERTIES COMPILE_OPTIONS "${XBOING_LEGACY_SUPPRESSIONS};-Wno-error"
+    ${CMAKE_SOURCE_DIR}/original/file.c
+    ${CMAKE_SOURCE_DIR}/original/blocks.c
+    ${CMAKE_SOURCE_DIR}/original/level.c
+    ${CMAKE_SOURCE_DIR}/original/error.c
+    PROPERTIES COMPILE_OPTIONS "-Wno-conversion;-Wno-sign-conversion;-Wno-unused-parameter;-Wno-shadow;-Wno-double-promotion;-Wno-float-conversion;-Wno-misleading-indentation;-Wno-sign-compare;-Wno-unused-but-set-variable;-Wno-unused-variable;-Wno-implicit-function-declaration;-Wno-format-y2k;-Wno-return-type;-Wno-pointer-compare;-Wno-overflow;-Wno-stringop-overread;-Wno-unused-function;-Wno-error"
 )
 
 target_link_libraries(test_level_parse PRIVATE ${CMOCKA_LIBRARIES} m)
@@ -85,14 +83,13 @@ add_test(NAME test_level_parse COMMAND test_level_parse)
 add_executable(test_blocks
     test_blocks.c
     stubs_x11_xboing.c
-    ${CMAKE_SOURCE_DIR}/blocks.c
+    ${CMAKE_SOURCE_DIR}/original/blocks.c
 )
 target_include_directories(test_blocks PRIVATE
+    ${CMAKE_SOURCE_DIR}/original/include
     ${CMAKE_SOURCE_DIR}/include
-    ${CMAKE_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/original
     /usr/include/X11
-    ${X11_INCLUDE_DIRS}
-    ${XPM_INCLUDE_DIRS}
 )
 target_compile_definitions(test_blocks PRIVATE
     LEVELS_DIR="${CMAKE_SOURCE_DIR}/levels"
@@ -112,8 +109,8 @@ target_compile_options(test_blocks PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
 # xboing executable is built from the parent CMakeLists.txt in a different
 # directory scope and is unaffected.
 set_source_files_properties(
-    ${CMAKE_SOURCE_DIR}/blocks.c
-    PROPERTIES COMPILE_OPTIONS "${XBOING_LEGACY_SUPPRESSIONS};-Wno-error"
+    ${CMAKE_SOURCE_DIR}/original/blocks.c
+    PROPERTIES COMPILE_OPTIONS "-Wno-conversion;-Wno-sign-conversion;-Wno-unused-parameter;-Wno-shadow;-Wno-double-promotion;-Wno-float-conversion;-Wno-misleading-indentation;-Wno-sign-compare;-Wno-unused-but-set-variable;-Wno-unused-variable;-Wno-implicit-function-declaration;-Wno-format-y2k;-Wno-return-type;-Wno-pointer-compare;-Wno-overflow;-Wno-stringop-overread;-Wno-unused-function;-Wno-error"
 )
 
 target_link_libraries(test_blocks PRIVATE ${CMOCKA_LIBRARIES} m)

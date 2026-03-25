@@ -27,7 +27,6 @@
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release",
                 "CMAKE_INSTALL_PREFIX": "/usr",
-                "XBOING_USE_INSTALLED_PATHS": "ON",
                 "BUILD_TESTING": "OFF"
             }
         }
