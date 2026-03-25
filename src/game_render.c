@@ -21,6 +21,7 @@
 #include "ball_types.h"
 #include "block_system.h"
 #include "block_types.h"
+#include "dialogue_system.h"
 #include "editor_system.h"
 #include "eyedude_system.h"
 #include "game_context.h"
@@ -742,6 +743,68 @@ void game_render_timer(const game_ctx_t *ctx)
     sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_TITLE, buf, TIMER_AREA_X, TIMER_AREA_Y + 5, color);
 }
 
+/* =========================================================================
+ * Dialogue overlay — modal text input box
+ * ========================================================================= */
+
+static void game_render_dialogue(const game_ctx_t *ctx)
+{
+    SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
+
+    dialogue_state_t state = dialogue_system_get_state(ctx->dialogue);
+    if (state == DIALOGUE_STATE_NONE || state == DIALOGUE_STATE_FINISHED)
+        return;
+
+    /* Center a box on screen */
+    int bw = DIALOGUE_WIDTH;
+    int bh = DIALOGUE_HEIGHT;
+    int bx = (SDL2R_LOGICAL_WIDTH - bw) / 2;
+    int by = (SDL2R_LOGICAL_HEIGHT - bh) / 2;
+
+    /* Dark background */
+    SDL_SetRenderDrawColor(sdl, 20, 20, 40, 255);
+    SDL_Rect bg = {bx, by, bw, bh};
+    SDL_RenderFillRect(sdl, &bg);
+
+    /* Border */
+    SDL_SetRenderDrawColor(sdl, 200, 200, 50, 255);
+    SDL_Rect border = {bx, by, bw, bh};
+    SDL_RenderDrawRect(sdl, &border);
+
+    /* Message text */
+    const char *msg = dialogue_system_get_message(ctx->dialogue);
+    if (msg != NULL && msg[0] != '\0')
+    {
+        SDL_Color yellow = {255, 255, 50, 255};
+        sdl2_font_draw(ctx->font, SDL2F_FONT_COPY, msg, bx + 15, by + 15, yellow);
+    }
+
+    /* Input text with cursor */
+    const char *input = dialogue_system_get_input(ctx->dialogue);
+    if (input != NULL)
+    {
+        SDL_Color white = {255, 255, 255, 255};
+        sdl2_font_draw(ctx->font, SDL2F_FONT_COPY, input, bx + 15, by + 55, white);
+
+        /* Measure actual text width for cursor placement */
+        int cursor_x = bx + 15;
+        if (input[0] != '\0')
+        {
+            sdl2_font_metrics_t m;
+            if (sdl2_font_measure(ctx->font, SDL2F_FONT_COPY, input, &m) == SDL2F_OK)
+                cursor_x += m.width;
+        }
+        SDL_SetRenderDrawColor(sdl, 255, 255, 255, 255);
+        SDL_Rect cursor = {cursor_x, by + 55, 2, 16};
+        SDL_RenderFillRect(sdl, &cursor);
+    }
+
+    /* Prompt */
+    SDL_Color grey = {160, 160, 160, 255};
+    sdl2_font_draw(ctx->font, SDL2F_FONT_COPY, "Enter to confirm, Esc to cancel", bx + 15,
+                   by + bh - 25, grey);
+}
+
 void game_render_frame(const game_ctx_t *ctx)
 {
     sdl2_renderer_clear(ctx->renderer);
@@ -789,6 +852,16 @@ void game_render_frame(const game_ctx_t *ctx)
         case SDL2ST_HIGHSCORE:
             game_render_highscore(ctx);
             break;
+
+        case SDL2ST_DIALOGUE:
+        {
+            /* Render the underlying mode behind the dialogue overlay */
+            sdl2_state_mode_t saved = sdl2_state_saved_mode(ctx->state);
+            if (saved == SDL2ST_HIGHSCORE)
+                game_render_highscore(ctx);
+            game_render_dialogue(ctx);
+            break;
+        }
 
         case SDL2ST_GAME:
         case SDL2ST_PAUSE:

@@ -16,6 +16,8 @@
 
 #include <SDL2/SDL.h>
 
+#include "dialogue_system.h"
+#include "game_context.h"
 #include "sdl2_input.h"
 #include "sdl2_loop.h"
 #include "sdl2_renderer.h"
@@ -59,6 +61,37 @@ int main(int argc, char *argv[])
 
                 default:
                     break;
+            }
+
+            /* Route text/key events to dialogue when active — swallow them
+             * so global actions (quit, fullscreen) don't fire while typing. */
+            if (sdl2_state_current(ctx->state) == SDL2ST_DIALOGUE && ctx->dialogue != NULL)
+            {
+                if (event.type == SDL_TEXTINPUT)
+                {
+                    for (int ci = 0; event.text.text[ci] != '\0'; ci++)
+                        dialogue_system_key_input(ctx->dialogue, DIALOGUE_KEY_CHAR,
+                                                  event.text.text[ci]);
+                    continue;
+                }
+                if (event.type == SDL_KEYDOWN && !event.key.repeat)
+                {
+                    switch (event.key.keysym.sym)
+                    {
+                        case SDLK_RETURN:
+                            dialogue_system_key_input(ctx->dialogue, DIALOGUE_KEY_RETURN, '\0');
+                            break;
+                        case SDLK_BACKSPACE:
+                            dialogue_system_key_input(ctx->dialogue, DIALOGUE_KEY_BACKSPACE, '\0');
+                            break;
+                        case SDLK_ESCAPE:
+                            dialogue_system_key_input(ctx->dialogue, DIALOGUE_KEY_ESCAPE, '\0');
+                            break;
+                        default:
+                            break;
+                    }
+                    continue;
+                }
             }
 
             /* Feed every event to the input module */
