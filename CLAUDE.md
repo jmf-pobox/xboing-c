@@ -90,7 +90,7 @@ ctest --test-dir build --output-on-failure
 ## Toolchain
 
 | Tool | Purpose | Install |
-|------|---------|---------|
+| ------ | --------- | --------- |
 | **gcc / clang** | Compilation with strict warnings | `apt install gcc clang` |
 | **CMake** | Build system | `apt install cmake` |
 | **clang-format** | Code formatting | `apt install clang-format` |
@@ -199,7 +199,7 @@ For legacy files not yet modernized, suppress specific warnings per-file in CMak
 ### Sanitizer Builds
 
 | Sanitizer | What it catches | Flag |
-|-----------|----------------|------|
+| ----------- | ---------------- | ------ |
 | AddressSanitizer (ASan) | Buffer overflows, use-after-free, double-free, stack overflow | `-fsanitize=address` |
 | UndefinedBehaviorSanitizer (UBSan) | Integer overflow, null deref, alignment, shift errors | `-fsanitize=undefined` |
 | MemorySanitizer (MSan) | Reads of uninitialized memory (clang only, Linux only) | `-fsanitize=memory` |
@@ -291,7 +291,7 @@ Feed malformed data to parsers and deserializers.
 **Key modules (each a .c/.h pair):**
 
 | Module | Role |
-|--------|------|
+| -------- | ------ |
 | `main.c` | Event loop, state machine, input dispatch |
 | `init.c` | X11 display/window setup, colormap, pixmap loading |
 | `ball.c` | Ball physics, collision detection (up to 5 simultaneous balls) |
@@ -372,45 +372,45 @@ Every code change follows this pipeline. Steps are ordered — do not skip ahead
 
 ### Phase 2: Branch
 
-5. Create a feature branch from master: `git checkout -b <prefix>/short-description master`. Use branch prefixes from Branch Discipline below.
+1. Create a feature branch from master: `git checkout -b <prefix>/short-description master`. Use branch prefixes from Branch Discipline below.
 
 ### Phase 3: Implement (TDD when feasible)
 
-6. Write failing tests first when feasible — new functions, behavior changes, bug reproductions. Not required for docs-only, config, or template changes.
-7. Write the code that makes the tests pass.
-8. Run quality gates after each logical change. Zero violations before moving on.
+1. Write failing tests first when feasible — new functions, behavior changes, bug reproductions. Not required for docs-only, config, or template changes.
+2. Write the code that makes the tests pass.
+3. Run quality gates after each logical change. Zero violations before moving on.
 
 ### Phase 4: Document
 
-9. Add an ADR to `docs/DESIGN.md` if the change involves a design decision with rejected alternatives.
-10. Update `README.md` if user-facing behavior changed (new commands, flags, defaults, config).
+1. Add an ADR to `docs/DESIGN.md` if the change involves a design decision with rejected alternatives.
+2. Update `README.md` if user-facing behavior changed (new commands, flags, defaults, config).
 
 ### Phase 5: Local Review
 
-11. Run `feature-dev:code-reviewer` agent on the diff.
-12. Fix all valid findings. Repeat until reviews produce minor or no comments.
+1. Run `feature-dev:code-reviewer` agent on the diff.
+2. Fix all valid findings. Repeat until reviews produce minor or no comments.
 
 ### Phase 6: Ship
 
-13. Commit with conventional message format (`type(scope): description`). Quality gates must pass.
-14. Push branch, create PR via `mcp__github__create_pull_request`.
-15. Request Copilot review via `mcp__github__request_copilot_review`.
-16. `gh pr checks <number> --watch` in background. Wait for Copilot review (1–3 min after CI).
-17. Read all comments via `mcp__github__pull_request_read`. Address every finding — no "pre-existing" excuses. Re-push.
-18. Repeat 16–17 until the latest review cycle has zero new comments and all checks green.
-19. Merge via `mcp__github__merge_pull_request`.
+1. Commit with conventional message format (`type(scope): description`). Quality gates must pass.
+2. Push branch, create PR via `mcp__github__create_pull_request`.
+3. Request Copilot review via `mcp__github__request_copilot_review`.
+4. `gh pr checks <number> --watch` in background. Wait for Copilot review (1–3 min after CI).
+5. Read all comments via `mcp__github__pull_request_read`. Address every finding — no "pre-existing" excuses. Re-push.
+6. Repeat 16–17 until the latest review cycle has zero new comments and all checks green.
+7. Merge via `mcp__github__merge_pull_request`.
 
 ### Phase 7: Close
 
-20. `bd close <id>` for completed beads.
-21. `bd sync` to sync beads state.
+1. `bd close <id>` for completed beads.
+2. `bd sync` to sync beads state.
 
 ## Workflow Tiers
 
 Match the workflow to the scope. The deciding factor is **design ambiguity**, not size.
 
 | Tier | Tool | When | Tracking |
-|------|------|------|----------|
+| ------ | ------ | ------ | ---------- |
 | **T1: Forge** | `/feature-forge` | Epics, cross-cutting work, competing design approaches | Beads with dependencies |
 | **T2: Feature Dev** | `/feature-dev` | Features, multi-file, clear goal but needs exploration | Beads + TodoWrite (internal) |
 | **T3: Direct** | Plan mode or manual | Tasks, bugs, obvious implementation path | Beads |
@@ -434,7 +434,7 @@ Match the workflow to the scope. The deciding factor is **design ambiguity**, no
 Four project-specific agents in `.claude/agents/` provide domain expertise. Consult them via the Task tool or as hive-mind participants in `/feature-forge`.
 
 | Agent | Expertise | Consult when... |
-|-------|-----------|-----------------|
+| ------- | ----------- | ----------------- |
 | `xboing-author` | Original author persona (Justin C. Kibell). Game vision, feel, design intent. | Any change touches gameplay mechanics, physics, scoring, level design, constants, or player experience. **Must approve** gameplay-affecting changes. |
 | `c-modernization-expert` | Modern C (C11/C17/C23), sanitizers, static analysis, safe refactoring. | Modernizing legacy code, fixing compiler warnings, resolving sanitizer findings, reviewing unsafe patterns. |
 | `av-platform-expert` | SDL2, legacy X11/Xlib, ALSA/PulseAudio, asset pipeline (XPM→PNG, .au→WAV). | Porting rendering or audio subsystems, designing the SDL2 abstraction layer, converting assets. |
@@ -451,7 +451,7 @@ Four project-specific agents in `.claude/agents/` provide domain expertise. Cons
 Feature work goes on feature branches. Never commit directly to master.
 
 | Prefix | Use |
-|--------|-----|
+| -------- | ----- |
 | `feat/` | New features, new systems |
 | `fix/` | Bug fixes |
 | `refactor/` | Modernization, restructuring (no behavior change) |
@@ -464,7 +464,7 @@ Feature work goes on feature branches. Never commit directly to master.
 `type(scope): description`
 
 | Prefix | Use |
-|--------|-----|
+| -------- | ----- |
 | `feat:` | New feature or capability |
 | `fix:` | Bug fix |
 | `refactor:` | Code modernization, no behavior change |
