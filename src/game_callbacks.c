@@ -244,7 +244,7 @@ static void ball_cb_on_event(ball_system_event_t event, int ball_index, void *ud
  */
 static int gun_cb_check_block_hit(int bx, int by, int *out_row, int *out_col, void *ud)
 {
-    game_ctx_t *ctx = ud;
+    const game_ctx_t *ctx = ud;
 
     for (int row = 0; row < MAX_ROW; row++)
     {
@@ -293,7 +293,7 @@ static void gun_cb_on_block_hit(int row, int col, void *ud)
 /* Check if bullet hits any active ball (AABB overlap) */
 static int gun_cb_check_ball_hit(int bx, int by, void *ud)
 {
-    game_ctx_t *ctx = ud;
+    const game_ctx_t *ctx = ud;
     for (int i = 0; i < MAX_BALLS; i++)
     {
         ball_system_render_info_t info;
@@ -341,7 +341,7 @@ static void gun_cb_on_sound(const char *name, void *ud)
 
 static int gun_cb_is_ball_waiting(void *ud)
 {
-    game_ctx_t *ctx = ud;
+    const game_ctx_t *ctx = ud;
     return ball_system_is_ball_waiting(ctx->ball);
 }
 
@@ -625,7 +625,7 @@ sfx_system_callbacks_t game_callbacks_sfx(void)
 
 static int eyedude_cb_is_path_clear(void *ud)
 {
-    game_ctx_t *ctx = ud;
+    const game_ctx_t *ctx = ud;
     /* Check if top row has blocks */
     for (int col = 0; col < MAX_COL; col++)
     {
@@ -696,7 +696,7 @@ static void editor_cb_clear_grid(void *ud)
 
 static int editor_cb_query_cell(int row, int col, editor_cell_t *cell, void *ud)
 {
-    game_ctx_t *ctx = ud;
+    const game_ctx_t *ctx = ud;
     if (!block_system_is_occupied(ctx->block, row, col))
         return 0;
     cell->occupied = 1;
@@ -800,7 +800,7 @@ static char block_type_to_char(int block_type)
 
 static int editor_cb_save_level(const char *path, void *ud)
 {
-    game_ctx_t *ctx = ud;
+    const game_ctx_t *ctx = ud;
     FILE *fp = fopen(path, "w");
     if (!fp)
         return 0;
@@ -836,7 +836,7 @@ static const char *editor_cb_input_dialogue(const char *message, int numeric_onl
 {
     (void)message;
     (void)numeric_only;
-    game_ctx_t *ctx = ud;
+    const game_ctx_t *ctx = ud;
     static char buf[16];
     int num = editor_system_get_level_number(ctx->editor);
     if (num <= 0 || num > 80)

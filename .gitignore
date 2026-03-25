@@ -1,14 +1,35 @@
+# Stale root build artifacts (from pre-archive builds)
 *.o
 xboing
-.xboing.scr
 version.c
 audio.c
+
+# Legacy build artifacts (in original/)
+original/*.o
+original/xboing
+original/version.c
+original/audio.c
+
+# Score files
+.xboing.scr
+original/.xboing.scr
+
+# Sound conversion artifacts
 sounds/originals/
 sounds/*.raw
+
+# CMake build directories
 build/
 build-asan/
 build-install/
+build-coverage/
+
+# Claude Code
 .claude/settings.local.json
+
+# direnv
 .envrc
 .direnv
+
+# Biff
 .biff.local

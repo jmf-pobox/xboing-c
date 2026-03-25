@@ -4,8 +4,8 @@
 /*
  * Ball data types and constants — no X11 dependency.
  *
- * Extracted from ball.h so that pure-logic modules (ball_math.c, tests)
- * can work with ball data without pulling in Xlib.
+ * Copy of include/ball_types.h for the legacy original/ build so it
+ * compiles without referencing modern headers.
  */
 
 /*

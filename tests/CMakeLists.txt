@@ -8,8 +8,6 @@ function(xboing_add_test NAME)
     add_executable(${NAME} ${NAME}.c)
     target_include_directories(${NAME} PRIVATE
         ${CMAKE_SOURCE_DIR}/include
-        ${X11_INCLUDE_DIRS}
-        ${XPM_INCLUDE_DIRS}
     )
     target_compile_options(${NAME} PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
     target_link_libraries(${NAME} PRIVATE ${CMOCKA_LIBRARIES})
@@ -22,7 +20,7 @@ xboing_add_test(test_skeleton)
 
 # Ball physics characterization tests (bead n9e.1)
 # Links ball_math.c directly — no X11, no game binary.
-add_executable(test_ball_math test_ball_math.c ${CMAKE_SOURCE_DIR}/ball_math.c)
+add_executable(test_ball_math test_ball_math.c ${CMAKE_SOURCE_DIR}/src/ball_math.c)
 target_include_directories(test_ball_math PRIVATE
     ${CMAKE_SOURCE_DIR}/include
 )
@@ -37,87 +35,8 @@ target_compile_options(test_score PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
 target_link_libraries(test_score PRIVATE score_logic ${CMOCKA_LIBRARIES})
 add_test(NAME test_score COMMAND test_score)
 
-# Level parsing characterization tests (bead n9e.3)
-# Compiles production files (file.c, blocks.c, level.c, error.c) with
-# X11 function stubs. Tests call ReadNextLevel(NULL, 0, path, False).
-add_executable(test_level_parse
-    test_level_parse.c
-    stubs_x11_xboing.c
-    ${CMAKE_SOURCE_DIR}/file.c
-    ${CMAKE_SOURCE_DIR}/blocks.c
-    ${CMAKE_SOURCE_DIR}/level.c
-    ${CMAKE_SOURCE_DIR}/error.c
-)
-target_include_directories(test_level_parse PRIVATE
-    ${CMAKE_SOURCE_DIR}/include
-    ${CMAKE_SOURCE_DIR}
-    /usr/include/X11
-    ${X11_INCLUDE_DIRS}
-    ${XPM_INCLUDE_DIRS}
-)
-target_compile_definitions(test_level_parse PRIVATE
-    LEVELS_DIR="${CMAKE_SOURCE_DIR}/levels"
-    READMEP_FILE="./docs/problems.doc"
-    "HIGH_SCORE_FILE=\"./.xboing.scr\""
-    "LEVEL_INSTALL_DIR=\"./levels\""
-    "SOUNDS_DIR=\"./sounds\""
-    "AUDIO_AVAILABLE=\"True\""
-    "AUDIO_FILE=\"audio/LINUXaudio.c\""
-)
-target_compile_options(test_level_parse PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
-
-# Legacy production sources compiled into this test get the full suppression
-# list and -Wno-error so they don't block the build.
-set_source_files_properties(
-    ${CMAKE_SOURCE_DIR}/file.c
-    ${CMAKE_SOURCE_DIR}/blocks.c
-    ${CMAKE_SOURCE_DIR}/level.c
-    ${CMAKE_SOURCE_DIR}/error.c
-    PROPERTIES COMPILE_OPTIONS "${XBOING_LEGACY_SUPPRESSIONS};-Wno-error"
-)
-
-target_link_libraries(test_level_parse PRIVATE ${CMOCKA_LIBRARIES} m)
-add_test(NAME test_level_parse COMMAND test_level_parse)
-
-# Block grid and type catalog characterization tests (bead n9e.5)
-# Links blocks.c with X11 stubs — tests SetupBlockInfo(), AddNewBlock(draw=False),
-# ClearBlock(), ClearBlockArray(), StillActiveBlocks() directly.
-add_executable(test_blocks
-    test_blocks.c
-    stubs_x11_xboing.c
-    ${CMAKE_SOURCE_DIR}/blocks.c
-)
-target_include_directories(test_blocks PRIVATE
-    ${CMAKE_SOURCE_DIR}/include
-    ${CMAKE_SOURCE_DIR}
-    /usr/include/X11
-    ${X11_INCLUDE_DIRS}
-    ${XPM_INCLUDE_DIRS}
-)
-target_compile_definitions(test_blocks PRIVATE
-    LEVELS_DIR="${CMAKE_SOURCE_DIR}/levels"
-    READMEP_FILE="./docs/problems.doc"
-    "HIGH_SCORE_FILE=\"./.xboing.scr\""
-    "LEVEL_INSTALL_DIR=\"./levels\""
-    "SOUNDS_DIR=\"./sounds\""
-    "AUDIO_AVAILABLE=\"True\""
-    "AUDIO_FILE=\"audio/LINUXaudio.c\""
-)
-target_compile_options(test_blocks PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
-
-# Legacy production source gets full suppression list and -Wno-error.
-# NOTE: set_source_files_properties is directory-scoped, so this applies to
-# blocks.c in ALL targets in this directory (including test_level_parse).
-# This is acceptable here because all consumers are test targets. The main
-# xboing executable is built from the parent CMakeLists.txt in a different
-# directory scope and is unaffected.
-set_source_files_properties(
-    ${CMAKE_SOURCE_DIR}/blocks.c
-    PROPERTIES COMPILE_OPTIONS "${XBOING_LEGACY_SUPPRESSIONS};-Wno-error"
-)
-
-target_link_libraries(test_blocks PRIVATE ${CMOCKA_LIBRARIES} m)
-add_test(NAME test_blocks COMMAND test_blocks)
+# Legacy characterization tests (test_level_parse, test_blocks) moved to
+# original/ — they compile legacy .c files that depend on X11 headers.
 
 # XDG path resolution tests (bead xboing-ifb.2)
 # Links paths.c directly — no X11, no game binary.
@@ -131,15 +50,8 @@ target_link_libraries(test_paths PRIVATE ${CMOCKA_LIBRARIES})
 add_test(NAME test_paths COMMAND test_paths)
 set_tests_properties(test_paths PROPERTIES WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
-# Save/load round-trip characterization tests (bead n9e.4)
-# Pure format tests — no production .c files linked. Tests the binary
-# file format at the byte level using struct definitions from headers.
-xboing_add_test(test_save_load)
-
-# State machine transition characterization tests (bead n9e.6)
-# Pure data-driven tests — no production .c files linked. Characterizes
-# mode constants, auto-cycle sequence, transition graph, and dispatch tables.
-xboing_add_test(test_state_machine)
+# Legacy characterization tests (test_save_load, test_state_machine) moved to
+# original/ — they include X11 headers for legacy struct definitions.
 
 # SDL2 renderer lifecycle tests (bead xboing-oaa.1)
 # Links against the sdl2_renderer static library.
