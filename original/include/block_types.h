@@ -4,8 +4,8 @@
 /*
  * Block type integer constants and grid dimensions.
  *
- * Extracted from blocks.h so that pure-logic modules (score_logic.c,
- * ball_math.c) can reference block types without pulling in X11 headers.
+ * Copy of include/block_types.h for the legacy original/ build so it
+ * compiles without referencing modern headers.
  *
  * ALWAYS change the SetupBlockInfo() function in blocks.c as well if you
  * change these defines.

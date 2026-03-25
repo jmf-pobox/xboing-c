@@ -4,8 +4,8 @@
 /*
  * Ball data types and constants — no X11 dependency.
  *
- * Extracted from ball.h so that pure-logic modules (ball_math.c, tests)
- * can work with ball data without pulling in Xlib.
+ * Copy of include/ball_types.h for the legacy original/ build so it
+ * compiles without referencing modern headers.
  */
 
 /*
@@ -14,8 +14,8 @@
 
 #define BALL_WIDTH 20
 #define BALL_HEIGHT 19
-#define MAX_BALL_MASS 3.0
-#define MIN_BALL_MASS 1.0
+#define MAX_BALL_MASS 3.0f
+#define MIN_BALL_MASS 1.0f
 
 #define BALL_WC (BALL_WIDTH / 2)
 #define BALL_HC (BALL_HEIGHT / 2)
