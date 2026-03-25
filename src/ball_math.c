@@ -42,28 +42,25 @@ int ball_math_will_collide(const BALL *ball1, const BALL *ball2, float *time, fl
      * Replica of ball.c WhenBallsCollide() (line 1656).
      */
 
-    float px, py, vx, vy;
-    float tmp1, tmp2, t1, t2, tmin, v2, r2;
+    float px = (float)(ball1->ballx - ball2->ballx);
+    float py = (float)(ball1->bally - ball2->bally);
+    float vx = (float)(ball1->dx - ball2->dx);
+    float vy = (float)(ball1->dy - ball2->dy);
 
-    px = (float)(ball1->ballx - ball2->ballx);
-    py = (float)(ball1->bally - ball2->bally);
-    vx = (float)(ball1->dx - ball2->dx);
-    vy = (float)(ball1->dy - ball2->dy);
+    float v2 = SQR(vx) + SQR(vy);
+    float r2 = SQR(ball1->radius + ball2->radius);
 
-    v2 = SQR(vx) + SQR(vy);
-    r2 = SQR(ball1->radius + ball2->radius);
-
-    tmp2 = (v2 * r2) - SQR((vx * py) - (vy * px));
+    float tmp2 = (v2 * r2) - SQR((vx * py) - (vy * px));
 
     if (tmp2 >= 0.0f && v2 > machine_eps)
     {
         tmp2 = (float)(sqrt((double)tmp2) / (double)v2);
-        tmp1 = -((px * vx) + (py * vy)) / v2;
+        float tmp1 = -((px * vx) + (py * vy)) / v2;
 
-        t1 = tmp1 - tmp2;
-        t2 = tmp1 + tmp2;
+        float t1 = tmp1 - tmp2;
+        float t2 = tmp1 + tmp2;
 
-        tmin = MIN(t1, t2);
+        float tmin = MIN(t1, t2);
 
         if (tmin >= 0.0f && tmin <= 1.0f)
         {
