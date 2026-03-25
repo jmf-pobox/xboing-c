@@ -11,3 +11,4 @@ build-install/
 .claude/settings.local.json
 .envrc
 .direnv
+.biff.local
