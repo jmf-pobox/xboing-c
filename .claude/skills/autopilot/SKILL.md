@@ -16,7 +16,7 @@ Before writing any code, build a mental model of the current state.
 
 ### 0a. Read the roadmap and existing integration code
 
-```
+```text
 Read docs/INTEGRATION_ROADMAP.md        — phase structure, bead descriptions, dependencies
 Read include/game_context.h             — master context struct
 Read include/game_init.h                — init/destroy API
@@ -95,6 +95,7 @@ roadmap. Each bead should have:
 - `--deps=<predecessor-id>` for sequential dependencies within the phase
 
 Example:
+
 ```bash
 bd create "Bead 2.1: Paddle rendering + input" --type=task --priority=1 \
   --parent=xboing-imr.2 \
@@ -223,7 +224,7 @@ gh pr create --title "<type>(<scope>): Phase N — <one-line summary>" \
 
 Request Copilot review:
 
-```
+```text
 mcp__github__request_copilot_review(owner, repo, pullNumber)
 ```
 

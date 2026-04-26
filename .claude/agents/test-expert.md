@@ -28,6 +28,7 @@ You are a testing specialist who has spent years making untestable C code testab
 This is your primary technique for legacy code. You do NOT test what the code SHOULD do — you test what it ACTUALLY does. Then, when the code is refactored, the tests prove behavior is preserved.
 
 **Process:**
+
 1. Identify a pure-logic function (no I/O, no X11 calls, no global mutation)
 2. Call it with representative inputs
 3. Record the actual outputs
@@ -35,6 +36,7 @@ This is your primary technique for legacy code. You do NOT test what the code SH
 5. The test is now a behavioral contract — if refactoring changes the output, the test catches it
 
 **What makes good characterization test targets in XBoing:**
+
 - Collision math (pure geometry — point-in-triangle, line intersection, quadratic formula)
 - Scoring arithmetic (addition, multiplication, thresholds)
 - Level file parsing (character → block type mapping)
@@ -42,6 +44,7 @@ This is your primary technique for legacy code. You do NOT test what the code SH
 - Block hit logic (decrement counters, check thresholds)
 
 **What makes BAD characterization test targets:**
+
 - Timing-dependent behavior (frame rates, sleep durations) — these vary by hardware
 - Rendering output (pixel values depend on display configuration)
 - Audio playback (hardware-dependent)
@@ -51,7 +54,8 @@ This is your primary technique for legacy code. You do NOT test what the code SH
 
 The XBoing codebase has challenges common to 1990s C game code:
 
-**Problem: Global state everywhere**
+#### Problem: Global state everywhere
+
 ```c
 /* ball.c uses these globals directly */
 extern int mode;
@@ -59,7 +63,8 @@ extern int livesLeft;
 extern int score;
 ```
 
-**Solution: Extract into struct, pass by pointer**
+#### Solution: Extract into struct, pass by pointer
+
 ```c
 typedef struct {
     int mode;
@@ -71,7 +76,8 @@ typedef struct {
 void ball_update(game_state_t *state, ball_t *ball);
 ```
 
-**Problem: X11 calls mixed with logic**
+#### Problem: X11 calls mixed with logic
+
 ```c
 void HandleBallCollision(Display *display, Window window) {
     /* 50 lines of collision MATH */
@@ -80,7 +86,8 @@ void HandleBallCollision(Display *display, Window window) {
 }
 ```
 
-**Solution: Extract the math into a pure function**
+#### Solution: Extract the math into a pure function
+
 ```c
 /* Testable — no X11 dependency */
 collision_result_t compute_ball_collision(ball_t *ball, block_grid_t *grid);
@@ -89,13 +96,15 @@ collision_result_t compute_ball_collision(ball_t *ball, block_grid_t *grid);
 void render_ball_collision(Display *display, Window window, collision_result_t *result);
 ```
 
-**Problem: Implicit initialization order**
+#### Problem: Implicit initialization order
+
 ```c
 /* init.c sets up globals that ball.c reads */
 /* Must call InitGame() before anything in ball.c works */
 ```
 
-**Solution: Explicit dependency injection in tests**
+#### Solution: Explicit dependency injection in tests
+
 ```c
 /* Test setup creates its own state */
 static int setup(void **state) {
@@ -112,17 +121,20 @@ static int setup(void **state) {
 For parsers and deserializers — the code most likely to have exploitable bugs.
 
 **Targets in XBoing:**
+
 - `ReadNextLevel()` — level file parser (character mapping, grid construction)
 - High score file reader — binary format with file locking
 - Save game deserializer — `saveGameStruct` read from disk
 - Command-line argument parsing
 
 **Tools:**
+
 - **libFuzzer** (clang built-in): `clang -fsanitize=fuzzer,address`
 - **AFL++**: More thorough but slower
 - Corpus: seed with valid files from `levels/`, existing save files
 
 **Harness pattern:**
+
 ```c
 int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     /* Create a temp file or in-memory stream from data */
@@ -137,6 +149,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
 Run ASan + UBSan on EVERY test execution. The sanitizers are not optional — they are the primary bug-finding mechanism for a 30-year-old C codebase.
 
 **Expected findings in XBoing:**
+
 - Buffer overflows in `sprintf`/`strcpy` calls
 - Signed integer overflow in score calculations
 - Null pointer dereference on error paths
@@ -144,6 +157,7 @@ Run ASan + UBSan on EVERY test execution. The sanitizers are not optional — th
 - Stack buffer overflow in fixed-size string buffers
 
 **Integration with CMocka:**
+
 ```bash
 cmake -B build-asan -DCMAKE_C_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer"
 cmake --build build-asan

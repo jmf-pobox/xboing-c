@@ -24,6 +24,12 @@ build-asan/
 build-install/
 build-coverage/
 
+# Scratch directory (per CLAUDE.md tool-usage policy)
+.tmp/
+
+# JetBrains IDE
+.idea/
+
 # Claude Code
 .claude/settings.local.json
 
@@ -33,3 +39,8 @@ build-coverage/
 
 # Biff
 .biff.local
+
+# Beads / Dolt files (added by bd init)
+.dolt/
+*.db
+.beads-credential-key

@@ -41,6 +41,7 @@ You are a Linux multimedia systems engineer with deep experience in both legacy 
 ### Asset Pipeline
 
 **Image conversion (XPM to PNG):**
+
 - XPM files are C-compatible ASCII with embedded palette
 - Convert with ImageMagick: `convert sprite.xpm sprite.png`
 - Preserve transparency (XPM `None` color → PNG alpha channel)
@@ -48,6 +49,7 @@ You are a Linux multimedia systems engineer with deep experience in both legacy 
 - Batch conversion script in `scripts/`
 
 **Audio conversion (.au to WAV):**
+
 - `.au` files are Sun audio format (typically 8kHz mu-law mono)
 - Convert with sox: `sox sound.au sound.wav`
 - Consider upsampling to 22050Hz or 44100Hz for quality

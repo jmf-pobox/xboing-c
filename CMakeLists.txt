@@ -550,6 +550,20 @@ if(SDL2_FOUND AND SDL2_IMAGE_FOUND AND SDL2_MIXER_FOUND AND SDL2_TTF_FOUND)
         dialogue_system
         highscore_system
     )
+
+    # Install the executable target so CMake can apply target-aware fixups
+    # (RPATH, runtime dependency handling, component integration).  The
+    # build-tree binary keeps its disambiguating 'xboing_sdl2' name; the
+    # 'xboing' command expected by debian/control and the README is provided
+    # as a symlink alongside it.
+    install(TARGETS xboing_sdl2
+        RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
+    install(CODE "
+        file(REMOVE \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR}/xboing\")
+        file(CREATE_LINK xboing_sdl2
+             \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR}/xboing\"
+             SYMBOLIC)
+    ")
 endif()
 
 # --- Tests ------------------------------------------------------------------
