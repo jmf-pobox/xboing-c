@@ -550,6 +550,14 @@ if(SDL2_FOUND AND SDL2_IMAGE_FOUND AND SDL2_MIXER_FOUND AND SDL2_TTF_FOUND)
         dialogue_system
         highscore_system
     )
+
+    # Install the executable as 'xboing' (the package name in debian/control
+    # and the binary name promised by README install instructions).
+    # Build-tree name stays 'xboing_sdl2'; install(PROGRAMS) with RENAME
+    # is used because install(TARGETS) does not support RENAME.
+    install(PROGRAMS $<TARGET_FILE:xboing_sdl2>
+        DESTINATION "${CMAKE_INSTALL_BINDIR}"
+        RENAME xboing)
 endif()
 
 # --- Tests ------------------------------------------------------------------
