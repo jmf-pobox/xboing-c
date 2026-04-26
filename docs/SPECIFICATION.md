@@ -74,6 +74,7 @@
 ### Version Generation (`version.sh`)
 
 Generates `version.c` with:
+
 - `char *dateString` — build timestamp (from `date`)
 - `char *whoString` — build user (from `$USER` or "root")
 - `char *machineString` — architecture (from `uname -a`)
@@ -133,6 +134,7 @@ Generates `version.c` with:
 ### Visual Selection
 
 Attempted in order (first match wins):
+
 1. **PseudoColor** — indexed color
 2. **DirectColor** — direct RGB with hardware colormap
 3. **TrueColor** — direct RGB without colormap
@@ -169,6 +171,7 @@ Fails if no color visual is available.
 | `TYPE_HEIGHT` | 35 |
 
 **Window manager properties:**
+
 - Window name: "- XBoing II -"
 - Icon name: "XBoing II"
 - WM class: "XBoing"
@@ -213,6 +216,7 @@ Fallback: `"fixed"` font if any load fails.
 | `black` | System BlackPixel |
 
 **Color cycling arrays:**
+
 - `reds[7]` — red shades from `#f00` down to `#300` (7 levels, index 0-6)
 - `greens[7]` — green shades from `#0f0` down to `#030` (7 levels, index 0-6)
 
@@ -243,7 +247,7 @@ Fallback: `"fixed"` font if any load fails.
 
 ### Bitmap Asset Directory Structure
 
-```
+```text
 bitmaps/
   balls/         Ball animation frames (ball1-4.xpm, killer.xpm, bbirth1-8.xpm)
   bgrnds/        Background pixmaps (6 backgrounds + space)
@@ -300,6 +304,7 @@ The `audio.c` symlink in the project root points to the active driver (default: 
 **Sound file format:** Sun `.au` files, located in `SOUNDS_DIR` (or `XBOING_SOUND_DIR` env override). Path construction: `{SOUNDS_DIR}/{filename}.au`.
 
 **Device control:** Uses Linux `<linux/soundcard.h>` ioctls:
+
 - `SNDCTL_DSP_SYNC` — flush audio device after each file
 - `SNDCTL_DSP_RESET` — reset device on exit
 
@@ -349,7 +354,7 @@ The `audio.c` symlink in the project root points to the active driver (default: 
 
 ### Event Loop Architecture
 
-```
+```text
 main()
   -> InitialiseGame() -> Display*
   -> SetGameSpeed(FAST_SPEED)
@@ -398,17 +403,20 @@ Speed keys 1-9 map inversely: key 1 = `SetUserSpeed(9)` (slowest), key 9 = `SetU
 ### State Transitions
 
 **Startup flow:**
-```
+
+```text
 MODE_PRESENTS -> MODE_INTRO
 ```
 
 **Menu cycle** (C key advances):
-```
+
+```text
 INTRO -> INSTRUCT -> DEMO -> KEYS -> KEYSEDIT -> HIGHSCORE -> PREVIEW -> INTRO
 ```
 
 **Gameplay transitions:**
-```
+
+```text
 Any menu mode  --[Space]-->  MODE_GAME
 MODE_GAME      --[P]------>  MODE_PAUSE
 MODE_PAUSE     --[P]------>  MODE_GAME
@@ -435,6 +443,7 @@ Per-frame processing during `MODE_GAME`:
 ### Input Handling
 
 **Paddle control modes:**
+
 - `CONTROL_KEYS` (0): Arrow keys / J, L keys. `paddleMotion` = -1 (left), 0 (stop), 1 (right).
 - `CONTROL_MOUSE` (1): Pointer follow via `ObtainMousePosition()`. Calculates `paddleDx` delta.
 
@@ -565,12 +574,14 @@ Geometric line intersection between ball trajectory and paddle line at `PLAY_HEI
 **Case A — vertical ball (dx == 0):** Check if `ballx` is within paddle bounds.
 
 **Case B — diagonal ball (dx != 0):**
+
 1. Calculate trajectory line: `y = alpha * x + beta`
 2. Find intersection with paddle line: `xH = (paddleLine - beta) / alpha`
 3. Check if `xH` within paddle bounds (with `BALL_WC` margin)
 
 **Bounce angle calculation:**
-```
+
+```text
 Vs = sqrt(Vx^2 + Vy^2)          // Speed magnitude
 alpha = atan(Vx / -Vy)           // Current angle
 beta = atan(hitPos / padSize)    // Reflection angle from hit position
@@ -594,6 +605,7 @@ Each block has 4 triangular X11 Regions (top, bottom, left, right). Collision de
 5. Adjacent block checks before confirming collision direction
 
 **Region constants:**
+
 - `REGION_NONE` = 0
 - `REGION_TOP` = 1
 - `REGION_BOTTOM` = 2
@@ -607,7 +619,7 @@ Each block has 4 triangular X11 Regions (top, bottom, left, right). Collision de
 
 **Detection:** Quadratic equation for collision time prediction.
 
-```
+```text
 p = position_delta (ball1 - ball2)
 v = velocity_delta (ball1 - ball2)
 v2 = v.x^2 + v.y^2
@@ -618,7 +630,8 @@ discriminant = (v2 * r2) - ((v.x * p.y) - (v.y * p.x))^2
 If `discriminant >= 0` and `v2 > MACHINE_EPS`: collision predicted. Calculate `tmin` via quadratic formula; if `0.0 <= tmin <= 1.0`, collision occurs this frame.
 
 **Response:** Elastic collision with mass-based velocity exchange.
-```
+
+```text
 massrate = ball1->mass / ball2->mass
 k = -2.0 * (v dot p) / (1.0 + massrate)
 ball1->dv += k * p_normalized
@@ -910,6 +923,7 @@ Toggle via `G` key. Default: `CONTROL_KEYS` (or `CONTROL_MOUSE` if `-keys` not s
 ### Block Point Values
 
 See [Block System](#6-block-system) table. Notable values:
+
 - Standard colors: 100-150
 - `ROAMER_BLK`: 400
 - `COUNTER_BLK`: 200
@@ -960,6 +974,7 @@ Extra life awarded every 100,000 points.
 ### Bonus Calculation
 
 When a level is completed:
+
 1. **Bonus coins:** if `numBonus > MAX_BONUS(8)`, award `SUPER_BONUS_SCORE(50,000)`; else award `numBonus * BONUS_COIN_SCORE(3,000)`
 2. **Level bonus:** `LEVEL_SCORE(100) * levelNumber`
 3. **Bullet bonus:** `remainingBullets * BULLET_SCORE(500)`
@@ -996,6 +1011,7 @@ When a level is completed:
 | `x4Bonus` | 4x score multiplier | `BONUSX4_BLK` | "x4" |
 
 **Display layout** in `specialWindow` (180x35):
+
 - Row 1: Reverse (x=5), Save (x=55), NoWall (x=110), x2 (x=155)
 - Row 2: Sticky, FastGun, Killer, x4
 - Active: yellow text. Inactive: white text. Font: `copyFont`.
@@ -1046,7 +1062,8 @@ When a level is completed:
 **Location:** `$XBOING_LEVELS_DIR/levelNN.data` (NN = 01-80, zero-padded)
 
 **Structure:**
-```
+
+```text
 Line 1:  Level title (string)
 Line 2:  Time limit (integer seconds)
 Lines 3-17:  Block grid rows (9 characters each, 15 playable rows)
@@ -1054,7 +1071,8 @@ Lines 18-20:  (empty — bottom 3 rows reserved for paddle area)
 ```
 
 **Example** (`level01.data`):
-```
+
+```text
 Genesis
 120
 .........
@@ -1222,7 +1240,7 @@ During `MODE_GAME`, random bonus blocks spawn at intervals of `frame + (rand() %
 
 ### State Transitions
 
-```
+```text
 EDIT_LEVEL -> EDIT_NONE (setup complete)
 EDIT_NONE  -> EDIT_TEST (play test)
 EDIT_TEST  -> EDIT_NONE (test finished)
@@ -1243,7 +1261,7 @@ EDIT_FINISH -> MODE_INTRO
 
 ### File Format
 
-```
+```text
 [highScoreHeader]           84 bytes
   u_long version            4 bytes (network byte order, SCORE_VERSION=2)
   char masterText[80]       80 bytes ("Boing Master" wisdom text)
@@ -1426,7 +1444,7 @@ Random level: `(rand() % (MAX_NUM_LEVELS - 1)) + 1`. Background cycles 2-5.
 
 ### Screen Transition Timing
 
-```
+```text
 Presents  (~4000+ frames)  -> Intro
 Intro     (~3000 frames)   -> Instructions
 Instructions (~7000 frames) -> Demo
@@ -1440,6 +1458,7 @@ Preview   (~5000 frames)   -> Intro (cycle repeats)
 ### Dialogue System
 
 **Types:**
+
 - `TEXT_ENTRY_ONLY` (1): Alphabetic input only
 - `NUMERIC_ENTRY_ONLY` (2): Numeric input only
 - `ALL_ENTRY` (3): All characters
@@ -1544,7 +1563,7 @@ Preview   (~5000 frames)   -> Intro (cycle repeats)
 
 ### Module Interaction Diagram
 
-```
+```text
                           main.c
                      (state machine)
                     /    |    |    \
@@ -1575,6 +1594,7 @@ Preview   (~5000 frames)   -> Intro (cycle repeats)
 ```
 
 **Key cross-module calls:**
+
 - `ball.c` calls `blocks.c` (collision), `paddle.c` (position), `gun.c` (bullet-ball), `score.c` (points), `level.c` (dead ball/game over), `sfx.c` (effects), `special.c` (power-up checks)
 - `blocks.c` calls `score.c` (points), `special.c` (toggle specials), `sfx.c` (explosions), `ball.c` (multiball split)
 - `gun.c` calls `blocks.c` (bullet-block collision), `ball.c` (bullet-ball collision), `eyedude.c` (bullet-eyedude collision)
