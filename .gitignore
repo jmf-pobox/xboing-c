@@ -23,6 +23,8 @@ build/
 build-asan/
 build-install/
 build-coverage/
+# CLion default build dirs
+cmake-build-*/
 
 # Debian packaging build artifacts (dpkg-buildpackage)
 obj-*/
