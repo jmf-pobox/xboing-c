@@ -2062,3 +2062,93 @@ state machines, integer division for pixel coordinates).
   double promotion in 10 math calls).
 - All switch statements now have default cases, preventing silent
   fallthrough on unexpected enum values.
+
+## ADR-037: Asset directory resolution for installed binaries
+
+**Status:** Accepted
+
+**Context:**
+
+The .deb produced by PR #91 installed and lintian-cleaned, but the
+binary failed immediately when launched outside the source tree
+(GNOME launcher, /tmp, $HOME) with `cannot open directory
+'assets/images'`.  Two underlying bugs:
+
+1. `assets/images/` was never installed by CMakeLists.txt — only
+   levels/, sounds/, fonts/, and docs/ were.  /usr/share/xboing/
+   shipped without any image content.
+2. Each asset subsystem hardcoded a cwd-relative default path with
+   no install fallback: sdl2_texture (`assets/images`), sdl2_font
+   (`assets/fonts`), sdl2_audio (`sounds`).  paths.c handled level
+   and sound *files* via XDG_DATA_DIRS lookup, but the subsystem
+   *base directories* bypassed paths.c entirely.
+
+The asymmetry meant the binary worked from a developer's source-tree
+checkout (where ./assets/images exists) and nowhere else.
+
+Three industry patterns considered:
+
+| Pattern | Used by | --prefix override | Notes |
+|---------|---------|-------------------|-------|
+| Compile-time DATADIR (autotools/cmake default) | Most Debian games — frozen-bubble, supertux, gnubg, openttd | No | Fast, simple. Configure-time prefix is final. `cmake --install --prefix <alt>` doesn't propagate to compile defines. |
+| XDG_DATA_DIRS lookup at runtime (freedesktop spec) | GNOME, KDE, GTK/GLib apps, libnotify | Yes (for standard prefixes) | Searches `$XDG_DATA_DIRS` (default `/usr/local/share:/usr/share`) for `<dir>/<app>/<subdir>`. Handles prefix=/usr and /usr/local transparently. |
+| readlink /proc/self/exe + relative | Snap, AppImage, Flatpak | Yes (any prefix) | Bundle-relocatable. Overkill for non-bundle apps. |
+
+**Decision:**
+
+1. **Install the missing asset directory.** CMakeLists.txt adds
+   `install(DIRECTORY assets/images/)` → `${CMAKE_INSTALL_DATADIR}/
+   xboing/images` (PNGs only, *.xcf source files stay in-repo).
+2. **Resolve subsystem base directories via XDG_DATA_DIRS first.**
+   New helper `paths_install_data_dir(cfg, subdir, buf, bufsize)` in
+   paths.c iterates `cfg->xdg_data_dirs` (already populated by
+   `paths_init`) for `<dir>/xboing/<subdir>`.  Returns the first
+   match that opendir() succeeds on (proves it's a readable
+   directory, not just a path that stat()s).  Mirrors the existing
+   `resolve_asset()` pattern paths.c uses for level and sound files.
+3. **Three-level fallback chain in game_init.c.**  For each of the
+   texture, font, and audio subsystems:
+   1. `paths_install_data_dir` XDG lookup (handles prefix=/usr,
+      prefix=/usr/local, and any prefix the user has added to
+      $XDG_DATA_DIRS).
+   2. Compile-time `XBOING_INSTALLED_*_DIR` macros from the new
+      `include/xboing_paths.h` header (safety net for unusual
+      installs not in $XDG_DATA_DIRS).
+   3. Cwd-relative source-tree default already in each
+      subsystem's `*_config_defaults()` (dev mode).
+4. **Compile-time prefix is honored via target_compile_definitions.**
+   CMakeLists.txt sets `XBOING_DATA_DIR="${CMAKE_INSTALL_FULL_DATADIR}/
+   xboing"` for the xboing target, so the safety-net path tracks the
+   configure-time prefix.  Header default of `/usr/share/xboing` is
+   the static-analysis / non-CMake fallback only.
+5. **paths.c left unchanged for level/sound resolution.**  Considered
+   adding XDG lookup to `paths_levels_dir()` / `paths_sounds_dir()`
+   too, but those return cwd-relative strings deterministically (no
+   filesystem stat) and `test_paths.c` asserts that contract.  The
+   filesystem-aware install lookup belongs in the subsystem-init
+   call site (game_init.c), not in the path-resolution layer.
+6. **`asset_dir_exists()` uses opendir, not stat+S_ISDIR.**  opendir
+   succeeds iff the path exists, is a directory, and is read+execute
+   accessible — exactly the precondition the subsystem's directory
+   scan needs.  stat+S_ISDIR alone wouldn't catch a perms-locked
+   dir; the later scan would still fail with a worse error message.
+
+**Consequences:**
+
+- Installed binary launches correctly from any cwd.  Verified:
+  desktop launcher icon, `cd /tmp && xboing`, `xboing` from $HOME.
+- `cmake --install --prefix /usr/local` works without recompiling —
+  /usr/local/share is in default $XDG_DATA_DIRS, so XDG lookup
+  finds the assets at the override prefix.  Same mechanism most
+  Debian-packaged GNOME apps rely on.
+- No regression in dev mode: cwd-relative source-tree paths still
+  win when neither XDG lookup nor compile-time fallback succeeds
+  (e.g., running `./build/xboing` from a fresh checkout with no
+  installed .deb).
+- `paths.c` remains pure / testable.  All filesystem-stat calls for
+  install-vs-cwd selection live in `game_init.c` where the calling
+  context makes the decision deterministic from the test's
+  perspective.
+- For unusual prefixes (`/opt/xboing`), users add to $XDG_DATA_DIRS
+  themselves.  This matches the standard Linux contract — no app
+  handles arbitrary prefixes without env var configuration.
