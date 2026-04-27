@@ -5,7 +5,7 @@
 **Date**: 2026-04-27
 **Verdict**: **approve-with-changes**
 
-All findings have been incorporated into spec v2.
+All findings below have been incorporated. The spec evolved through v2 (this review's incorporation) and v3 (a later revision recording recipe defects found during dogfood verification).
 
 ## Blocking issues
 
