@@ -21,8 +21,10 @@ PREFIX         ?= /usr/local
 .PHONY: help all build configure rebuild test run \
         asan asan-build asan-test \
         clean distclean \
-        install uninstall deb \
-        lint format format-check tidy quality \
+        install uninstall deb deb-lint \
+        lint format format-check \
+        cppcheck cppcheck-src cppcheck-tests \
+        tidy check ci \
         docs
 
 # --- Default ---------------------------------------------------------------
@@ -94,6 +96,10 @@ deb: ## Build a Debian package via dpkg-buildpackage (.deb lands in ../).
 	echo
 	echo "Built: $$(ls -1 ../xboing_*.deb 2>/dev/null | tail -1)"
 
+deb-lint: deb ## Build .deb + run lintian on it (Debian Policy compliance).
+	lintian ../xboing_*.deb
+	echo "lintian: clean"
+
 # --- Cleanup ---------------------------------------------------------------
 
 clean: ## Remove the debug build dir.
@@ -106,20 +112,49 @@ distclean: ## Remove all build artifacts (debug, asan, debian, in-source polluti
 	       debian/xboing debian/xboing-dbgsym
 	rm -rf CMakeCache.txt CMakeFiles cmake_install.cmake
 
-# --- Quality gates ---------------------------------------------------------
+# --- Quality gates (mirror CI exactly) -------------------------------------
 
-lint: ## Lint markdown files (markdownlint-cli2).
+lint: ## Lint markdown files (markdownlint-cli2; mirrors docs.yml).
 	markdownlint-cli2
 
-format: ## Apply clang-format in-place to src/ and include/.
-	find src include -type f \( -name '*.c' -o -name '*.h' \) \
-	  -exec clang-format -i {} +
+format: ## Apply clang-format in-place to src/*.c and include/*.h.
+	clang-format -i src/*.c include/*.h
 
-format-check: ## Check formatting without modifying files (CI-friendly).
-	find src include -type f \( -name '*.c' -o -name '*.h' \) \
-	  -exec clang-format --dry-run --Werror {} +
+format-check: ## Check formatting without modifying files (mirrors lint.yml clang-format job).
+	clang-format --dry-run --Werror src/*.c include/*.h
+
+cppcheck-src: ## Static analysis on src/ (mirrors lint.yml cppcheck (src) step).
+	cppcheck \
+	  --enable=warning,style,performance,portability \
+	  --inline-suppr \
+	  --error-exitcode=1 \
+	  -I include/ \
+	  src/
+
+cppcheck-tests: ## Static analysis on tests/ (mirrors lint.yml cppcheck (tests) step).
+	cppcheck \
+	  --enable=warning,style,performance,portability \
+	  --inline-suppr \
+	  --suppress=missingIncludeSystem \
+	  --error-exitcode=1 \
+	  -I include/ \
+	  tests/
+
+cppcheck: cppcheck-src cppcheck-tests ## Run both cppcheck passes.
 
 tidy: build ## Run clang-tidy across src/ (uses build/compile_commands.json).
 	find src -name '*.c' -exec clang-tidy -p $(BUILD_DIR) {} +
 
-quality: format-check lint test ## Run all quick quality gates.
+# --- One-shot ---------------------------------------------------------------
+
+check: ## Run every CI gate locally (format + cppcheck + lint + debug build/test + asan build/test + .deb lintian).  Use before pushing.
+	$(MAKE) format-check
+	$(MAKE) cppcheck
+	$(MAKE) lint
+	$(MAKE) test
+	$(MAKE) asan-test
+	$(MAKE) deb-lint
+	echo
+	echo "All checks passed."
+
+ci: check ## Alias for 'check'.

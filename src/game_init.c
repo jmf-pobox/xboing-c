@@ -56,6 +56,7 @@
 #include "sdl2_texture.h"
 #include "sfx_system.h"
 #include "special_system.h"
+#include "xboing_version.h"
 
 /* =========================================================================
  * Play area constants (from stage.h, duplicated to avoid legacy headers)
@@ -89,38 +90,33 @@ static void print_scores(const paths_config_t *cfg);
 
 static void print_usage(FILE *out)
 {
-    fprintf(out,
-            "Usage: xboing [OPTIONS]\n"
-            "\n"
-            "Game options:\n"
-            "  -speed <1-9>        Game speed (1=slowest, 9=fastest, default 5)\n"
-            "  -startlevel <1-80>  Start at the given level (default 1)\n"
-            "  -keys               Use keyboard control (default: mouse)\n"
-            "  -nickname <name>    Set high-score nickname\n"
-            "  -debug              Enable debug mode\n"
-            "  -grab               Grab pointer to window\n"
-            "\n"
-            "Audio options:\n"
-            "  -sound              Enable sound (default)\n"
-            "  -nosound            Disable all audio\n"
-            "  -nosfx              Disable sound effects (keep music)\n"
-            "  -maxvol <0-100>     Maximum volume\n"
-            "\n"
-            "Information (these print and exit):\n"
-            "  -help, -usage       Show this help\n"
-            "  -version            Show version\n"
-            "  -setup              Show resolved configuration paths\n"
-            "  -scores             Show the global high-score table\n");
+    fprintf(out, "Usage: xboing [OPTIONS]\n"
+                 "\n"
+                 "Game options:\n"
+                 "  -speed <1-9>        Game speed (1=slowest, 9=fastest, default 5)\n"
+                 "  -startlevel <1-80>  Start at the given level (default 1)\n"
+                 "  -keys               Use keyboard control (default: mouse)\n"
+                 "  -nickname <name>    Set high-score nickname\n"
+                 "  -debug              Enable debug mode\n"
+                 "  -grab               Grab pointer to window\n"
+                 "\n"
+                 "Audio options:\n"
+                 "  -sound              Enable sound (default)\n"
+                 "  -nosound            Disable all audio\n"
+                 "  -nosfx              Disable sound effects (keep music)\n"
+                 "  -maxvol <0-100>     Maximum volume\n"
+                 "\n"
+                 "Information (these print and exit):\n"
+                 "  -help, -usage       Show this help\n"
+                 "  -version            Show version\n"
+                 "  -setup              Show resolved configuration paths\n"
+                 "  -scores             Show the global high-score table\n");
 }
 
 static void print_setup_info(const paths_config_t *cfg)
 {
     char buf[PATHS_MAX_PATH];
-#ifdef XBOING_VERSION
     printf("xboing %s configuration:\n\n", XBOING_VERSION);
-#else
-    printf("xboing configuration:\n\n");
-#endif
     printf("  HOME              = %s\n", cfg->home);
     printf("  XDG_DATA_HOME     = %s\n", cfg->xdg_data_home);
     printf("  XDG_CONFIG_HOME   = %s\n", cfg->xdg_config_home);
@@ -211,17 +207,12 @@ game_ctx_t *game_create(int argc, char *argv[])
     }
     if (cli_status == SDL2C_EXIT_VERSION)
     {
-#ifdef XBOING_VERSION
         printf("xboing %s (SDL2 modernization)\n", XBOING_VERSION);
-#else
-        printf("xboing (SDL2 modernization, version unknown)\n");
-#endif
         free(ctx);
         return NULL;
     }
     /* Only abort on real errors here — SETUP and SCORES need paths first. */
-    if (cli_status != SDL2C_OK && cli_status != SDL2C_EXIT_SETUP &&
-        cli_status != SDL2C_EXIT_SCORES)
+    if (cli_status != SDL2C_OK && cli_status != SDL2C_EXIT_SETUP && cli_status != SDL2C_EXIT_SCORES)
     {
         fprintf(stderr, "Error: %s", sdl2_cli_status_string(cli_status));
         if (bad_option)

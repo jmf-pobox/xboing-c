@@ -508,7 +508,6 @@ if(SDL2_FOUND AND SDL2_IMAGE_FOUND AND SDL2_MIXER_FOUND AND SDL2_TTF_FOUND)
         ${SDL2_INCLUDE_DIRS}
     )
     target_compile_options(xboing PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
-    target_compile_definitions(xboing PRIVATE XBOING_VERSION="${PROJECT_VERSION}")
     target_link_libraries(xboing PRIVATE
         # SDL2 platform
         sdl2_renderer
