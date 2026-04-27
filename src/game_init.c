@@ -23,7 +23,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h> /* access(F_OK) for asset-dir existence checks */
+#include <sys/stat.h> /* stat() + S_ISDIR for asset-dir checks */
 
 #include <SDL2/SDL.h>
 
@@ -85,6 +85,16 @@ static void on_level_add_block(int row, int col, int block_type, int counter_sli
 static void print_usage(FILE *out);
 static void print_setup_info(const paths_config_t *cfg);
 static void print_scores(const paths_config_t *cfg);
+
+/* Return non-zero if path exists and is a readable directory.  Used by the
+ * asset-dir fallback checks below — access(F_OK) would also accept a
+ * regular file at the path, leading to a confusing failure later when
+ * the subsystem tries to scan it as a directory. */
+static int asset_dir_exists(const char *path)
+{
+    struct stat st;
+    return stat(path, &st) == 0 && S_ISDIR(st.st_mode);
+}
 
 /* =========================================================================
  * Informational flag output
@@ -313,7 +323,7 @@ game_ctx_t *game_create(int argc, char *argv[])
     {
         sdl2_texture_config_t tcfg = sdl2_texture_config_defaults();
         tcfg.renderer = sdl2_renderer_get(ctx->renderer);
-        if (access(XBOING_INSTALLED_IMAGES_DIR, F_OK) == 0)
+        if (asset_dir_exists(XBOING_INSTALLED_IMAGES_DIR))
             tcfg.base_dir = XBOING_INSTALLED_IMAGES_DIR;
         sdl2_texture_status_t ts;
         ctx->texture = sdl2_texture_create(&tcfg, &ts);
@@ -330,7 +340,7 @@ game_ctx_t *game_create(int argc, char *argv[])
     {
         sdl2_font_config_t fcfg = sdl2_font_config_defaults();
         fcfg.renderer = sdl2_renderer_get(ctx->renderer);
-        if (access(XBOING_INSTALLED_FONTS_DIR, F_OK) == 0)
+        if (asset_dir_exists(XBOING_INSTALLED_FONTS_DIR))
             fcfg.font_dir = XBOING_INSTALLED_FONTS_DIR;
         sdl2_font_status_t fs;
         ctx->font = sdl2_font_create(&fcfg, &fs);
@@ -346,7 +356,7 @@ game_ctx_t *game_create(int argc, char *argv[])
     if (ctx->config.sound)
     {
         sdl2_audio_config_t acfg = sdl2_audio_config_defaults();
-        if (access(XBOING_INSTALLED_SOUNDS_DIR, F_OK) == 0)
+        if (asset_dir_exists(XBOING_INSTALLED_SOUNDS_DIR))
             acfg.sound_dir = XBOING_INSTALLED_SOUNDS_DIR;
         sdl2_audio_status_t as;
         ctx->audio = sdl2_audio_create(&acfg, &as);
