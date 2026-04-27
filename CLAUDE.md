@@ -49,6 +49,7 @@ XBoing is a classic X11 breakout/blockout game (1993-1996, Justin C. Kibell) mod
 - **Never rewrite from scratch.** Incremental modernization beats big-bang rewrites. Replace one subsystem at a time, prove equivalence with tests, move on.
 - **Separate concerns in commits.** A commit that modernizes code must not also fix a bug or add a feature. Reviewers need to see that behavior is preserved.
 - **Preserve original behavior first.** The game works. Understand why something was done before deciding it was done wrong. Idioms from 20 years ago may look wrong but encode real constraints.
+- **Don't reinvent if the original solved it.** Before proposing a design or API change, read the relevant file in `original/` and ask "did the 1996 author already solve this? How?" Modernization deviates from the original *only when forced* by modern OS, toolchain, security, or standards constraints — and names the constraint explicitly when deviating ("the original wrote levels to `LEVEL_INSTALL_DIR`; modern Linux installs make that dir read-only, so we route writes to `$XDG_DATA_HOME/xboing/levels`"). Cite `original/<file>.c:<line>` when adopting an original solution.
 - **Document architectural decisions.** Use `docs/DESIGN.md` for non-trivial choices (replacing a subsystem, changing a data format, dropping platform support). Log the decision before writing the code.
 
 ## Modernization Roadmap
@@ -438,6 +439,52 @@ Match the workflow to the scope. The deciding factor is **design ambiguity**, no
 - Replacing the renderer with SDL2 (architectural choice, multiple valid approaches) → **T1: Forge**
 - Adding CMocka tests to the save/load subsystem (multi-file, needs code exploration) → **T2: Feature Dev**
 - Fixing a buffer overflow found by ASan (single root cause, obvious fix) → **T3: Direct**
+
+## Specifications and Peer Review
+
+**Every spec is peer-reviewed before any worker is spawned to execute it.** A spec is any written delegation artifact: a mission contract, a design proposal, an RFC, an architectural plan, or a freeform delegation brief that meaningfully constrains how a teammate will implement.
+
+**Specs, peer reviews, and research findings are persisted as files in `docs/`, never just in agent transcripts.** Conversation history disappears; the repo is the audit trail. File layout:
+
+| Folder | Contains |
+| ------ | -------- |
+| `docs/specs/` | Spec / mission contract markdown — one per delegation. Filename: `YYYY-MM-DD-<topic>.md`. Cross-links to its review and any input research. Tracks revision history at the bottom. |
+| `docs/reviews/` | Peer review reports — one per spec review. Filename: `YYYY-MM-DD-<topic>-review.md`. Includes verdict, findings (blocking / non-blocking / test-plan / hermetic / write-set / original-source-alignment), and a "Resolution by leader" section recording how each finding was addressed. |
+| `docs/research/` | Original-source research, exploratory analysis, or other read-only investigations that feed into specs. Filename: `YYYY-MM-DD-<topic>.md`. Cites source files / lines verbatim so claims are auditable. |
+
+The leader (COO) writes the spec to `docs/specs/`, links it from the reviewer's prompt, the reviewer writes the review to `docs/reviews/`, the leader updates the spec to v2 with a revision-history entry, and the worker is delegated with a reference to the file path — not just inline prompt text. Inline prompts are fine for redundancy, but the file is the canonical artifact.
+
+The reviewer is selected by competence and is **not** the worker who will execute the spec — that is a conflict of interest, not peer review. Review focuses on the spec itself (success criteria, write set, root-cause framing, missing constraints, original-source alignment per "Don't reinvent if the original solved it"), not the eventual implementation.
+
+| Reviewer | Reviews specs that... |
+| -------- | --------------------- |
+| `gjm` (test-engineer) | introduce or change observable behavior; need testable success criteria; touch parsers / serialization / state machines |
+| `jck` (vision-keeper) | touch gameplay mechanics, physics, scoring, level format, or any design intent encoded in `original/` (veto on game-feel changes) |
+| `sjl` (av-platform-engineer) | involve SDL2 / X11 / audio / asset pipeline / rendering |
+| `jdc` (c-modernization-engineer) | review another worker's C-modernization spec — never their own |
+
+Multi-domain specs get multiple reviewers in parallel. Skip the formal review only for tiny tasks where wrong-spec rework cost is trivial (one-line edits, doc typos, format-only changes). The bar: would the wrong spec cost real implementation rework? If yes, review.
+
+Workflow shape:
+
+```text
+Research / consult original → Draft spec → Peer review → Revise → Delegate execution → Evaluate
+```
+
+Never `Draft → Delegate → discover spec was wrong → rework`. That is the failure mode this rule exists to prevent.
+
+## Delegation Mode and Background Subagents
+
+The session runs as `claude` (COO/VP Eng). The COO **delegates** — does not implement. Implementation, research, and testing all go to the appropriate specialist subagent (`jck`, `jdc`, `sjl`, `gjm`). The COO synthesizes findings, drafts specs, drives review cycles, and lands PRs.
+
+**Background-by-default.** Every subagent spawn that does not immediately block the COO's next decision **must** run in the background (`run_in_background: true` on the `Agent` / `Task` call). Background spawns enable parallel teamwork: jck reading `original/` while gjm drafts test plans while jdc prototypes API. Foreground is reserved for the narrow case where the COO genuinely cannot proceed without the agent's result.
+
+| Spawn mode | Use when |
+| ---------- | -------- |
+| Background | Research, parallel implementation streams, peer review of specs, long-running test runs, anything the COO can let run while continuing other work |
+| Foreground | The COO's next action depends on the agent's specific finding, no other useful work exists, and the agent is expected to return quickly |
+
+When in doubt, background. The COO's job is responsiveness — spawn, brief the user on what's running, continue.
 
 ## Expert Agents
 

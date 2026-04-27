@@ -104,13 +104,48 @@ paths_status_t paths_save_info(const paths_config_t *cfg, char *buf, size_t bufs
 /* Save-game state: level data. */
 paths_status_t paths_save_level(const paths_config_t *cfg, char *buf, size_t bufsize);
 
-/* --- Directory accessors (for -setup display, mkdir) ---------------------- */
+/* --- Directory accessors -------------------------------------------------- */
 
-/* Base levels directory (without trailing filename). */
-paths_status_t paths_levels_dir(const paths_config_t *cfg, char *buf, size_t bufsize);
+/*
+ * Read-only resolution for the levels directory.
+ *
+ * Resolution order:
+ *   1. XBOING_LEVELS_DIR env override (cfg->xboing_levels_dir if set)
+ *   2. paths_install_data_dir(cfg, "levels")  — XDG_DATA_DIRS lookup
+ *   3. cwd-relative "levels"  — dev mode
+ *
+ * NULL/zero-size args defensively return PATHS_NOT_FOUND.
+ */
+paths_status_t paths_levels_dir_readable(const paths_config_t *cfg, char *buf, size_t bufsize);
 
-/* Base sounds directory (without trailing filename). */
-paths_status_t paths_sounds_dir(const paths_config_t *cfg, char *buf, size_t bufsize);
+/*
+ * Writable resolution for the levels directory (editor save target).
+ *
+ * Resolution order:
+ *   1. XBOING_LEVELS_DIR env override (cfg->xboing_levels_dir if set)
+ *      — applies to both read and write paths; the user setting this
+ *        opts into the 1996 single-dir contract and is responsible for
+ *        ensuring the dir is writable
+ *   2. $XDG_DATA_HOME/xboing/levels  — caller mkdir -p's it before writing
+ *   3. cwd-relative "levels"  — dev mode (source tree is writable)
+ *
+ * The returned directory is NOT required to exist on disk; caller creates it.
+ * NULL/zero-size args defensively return PATHS_NOT_FOUND.
+ */
+paths_status_t paths_levels_dir_writable(const paths_config_t *cfg, char *buf, size_t bufsize);
+
+/*
+ * Read-only resolution for the sounds directory.
+ *
+ * Resolution order:
+ *   1. XBOING_SOUND_DIR env override (cfg->xboing_sound_dir if set)
+ *   2. paths_install_data_dir(cfg, "sounds")  — XDG_DATA_DIRS lookup
+ *   3. cwd-relative "sounds"  — dev mode
+ *
+ * No writable counterpart — the editor does not write sounds.
+ * NULL/zero-size args defensively return PATHS_NOT_FOUND.
+ */
+paths_status_t paths_sounds_dir_readable(const paths_config_t *cfg, char *buf, size_t bufsize);
 
 /* User data directory ($XDG_DATA_HOME/xboing). */
 paths_status_t paths_user_data_dir(const paths_config_t *cfg, char *buf, size_t bufsize);

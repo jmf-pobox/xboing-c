@@ -2121,17 +2121,46 @@ Three industry patterns considered:
    xboing"` for the xboing target, so the safety-net path tracks the
    configure-time prefix.  Header default of `/usr/share/xboing` is
    the static-analysis / non-CMake fallback only.
-5. **paths.c left unchanged for level/sound resolution.**  Considered
-   adding XDG lookup to `paths_levels_dir()` / `paths_sounds_dir()`
-   too, but those return cwd-relative strings deterministically (no
-   filesystem stat) and `test_paths.c` asserts that contract.  The
-   filesystem-aware install lookup belongs in the subsystem-init
-   call site (game_init.c), not in the path-resolution layer.
-6. **`asset_dir_exists()` uses opendir, not stat+S_ISDIR.**  opendir
+5. **Read/write API split for level directory accessors.**  The 1996
+   source (`original/editor.c:857-860, 887-931, 912-915`) used a
+   single `XBOING_DIR` (default `.`) with subdirs `levels/` and
+   `sounds/`, and the `Imakefile` (`original/Imakefile:35-38, 208`)
+   set `LEVEL_INSTALL_DIR`, `SOUNDS_DIR`, and did `chmod a+rw` on
+   installed data files — a single-dir read/write model.  That model
+   is incompatible with modern multi-user Linux installs where system
+   data directories (`/usr/share/xboing/levels`) are read-only;
+   `chmod a+rw` on shared system files is no longer acceptable.
+   The modernized port therefore splits the level directory API into
+   three accessors:
+   - `paths_levels_dir_readable` — for load operations:
+     `XBOING_LEVELS_DIR` env override → `$XDG_DATA_DIRS/xboing/levels`
+     (opendir-based readability check) → cwd-relative `"levels"`.
+   - `paths_levels_dir_writable` — for editor save operations:
+     `XBOING_LEVELS_DIR` env override → `$XDG_DATA_HOME/xboing/levels`
+     (directory not required to exist; editor creates it) → cwd-relative
+     `"levels"`.
+   - `paths_sounds_dir_readable` — for audio load operations (same
+     chain as `paths_levels_dir_readable` but for `sounds/`).  No
+     writable counterpart — the editor does not write sounds.
+   The env override `XBOING_LEVELS_DIR` applies to **both** read and
+   write paths, preserving the 1996 single-dir contract for users who
+   set it.  The user assumes write-permission responsibility when
+   setting this override.
+   The old `paths_levels_dir()` and `paths_sounds_dir()` functions are
+   removed; no backward-compat shim.
+6. **Editor struct and create signature updated.**  `editor_system_t`
+   now has `levels_dir_readable[512]` and `levels_dir_writable[512]`
+   fields.  `editor_system_create` accepts both.  The load path
+   (`do_load_level`, `do_load`) uses `levels_dir_readable`; the save
+   path (`do_save`) uses `levels_dir_writable` and calls `mkdir_p`
+   before the first write.
+7. **`paths_install_data_dir` uses opendir, not stat+S_ISDIR.**  opendir
    succeeds iff the path exists, is a directory, and is read+execute
    accessible — exactly the precondition the subsystem's directory
    scan needs.  stat+S_ISDIR alone wouldn't catch a perms-locked
    dir; the later scan would still fail with a worse error message.
+   This check was switched from stat to opendir in an earlier commit
+   on this branch.
 
 **Consequences:**
 
@@ -2141,14 +2170,16 @@ Three industry patterns considered:
   /usr/local/share is in default $XDG_DATA_DIRS, so XDG lookup
   finds the assets at the override prefix.  Same mechanism most
   Debian-packaged GNOME apps rely on.
+- Editor save under installed mode writes to `$XDG_DATA_HOME/xboing/
+  levels` instead of the read-only `/usr/share/xboing/levels`.  No
+  more EROFS failure on first save.
 - No regression in dev mode: cwd-relative source-tree paths still
   win when neither XDG lookup nor compile-time fallback succeeds
   (e.g., running `./build/xboing` from a fresh checkout with no
   installed .deb).
 - `paths.c` remains pure / testable.  All filesystem-stat calls for
-  install-vs-cwd selection live in `game_init.c` where the calling
-  context makes the decision deterministic from the test's
-  perspective.
+  install-vs-cwd selection live within paths.c's accessors; callers
+  receive resolved strings only.
 - For unusual prefixes (`/opt/xboing`), users add to $XDG_DATA_DIRS
   themselves.  This matches the standard Linux contract — no app
   handles arbitrary prefixes without env var configuration.

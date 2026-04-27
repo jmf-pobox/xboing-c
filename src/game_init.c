@@ -143,9 +143,9 @@ static void print_setup_info(const paths_config_t *cfg)
     if (cfg->xboing_score_file[0])
         printf("  XBOING_SCORE_FILE = %s\n", cfg->xboing_score_file);
     printf("\nResolved paths:\n");
-    if (paths_levels_dir(cfg, buf, sizeof(buf)) == PATHS_OK)
+    if (paths_levels_dir_readable(cfg, buf, sizeof(buf)) == PATHS_OK)
         printf("  Levels dir         = %s\n", buf);
-    if (paths_sounds_dir(cfg, buf, sizeof(buf)) == PATHS_OK)
+    if (paths_sounds_dir_readable(cfg, buf, sizeof(buf)) == PATHS_OK)
         printf("  Sounds dir         = %s\n", buf);
     if (paths_score_file_global(cfg, buf, sizeof(buf)) == PATHS_OK)
         printf("  Score file (global) = %s\n", buf);
@@ -561,9 +561,12 @@ game_ctx_t *game_create(int argc, char *argv[])
     /* Editor system (callbacks wired by game_callbacks.c) */
     {
         editor_system_callbacks_t ecb = game_callbacks_editor();
-        char levels_dir[PATHS_MAX_PATH] = "levels";
-        paths_levels_dir(&ctx->paths, levels_dir, sizeof(levels_dir));
-        ctx->editor = editor_system_create(&ecb, ctx, levels_dir, !ctx->config.sound);
+        char levels_dir_r[PATHS_MAX_PATH] = "levels";
+        char levels_dir_w[PATHS_MAX_PATH] = "levels";
+        paths_levels_dir_readable(&ctx->paths, levels_dir_r, sizeof(levels_dir_r));
+        paths_levels_dir_writable(&ctx->paths, levels_dir_w, sizeof(levels_dir_w));
+        ctx->editor =
+            editor_system_create(&ecb, ctx, levels_dir_r, levels_dir_w, !ctx->config.sound);
         if (!ctx->editor)
         {
             fprintf(stderr, "game_create: editor system creation failed\n");

@@ -7,10 +7,11 @@
 
 #include "paths.h"
 
+#include <dirent.h> /* opendir/closedir for asset-dir readability check */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/stat.h>
+#include <sys/stat.h> /* struct stat, stat() */
 
 /* --- Internal helpers ----------------------------------------------------- */
 
@@ -334,9 +335,52 @@ paths_status_t paths_save_level(const paths_config_t *cfg, char *buf, size_t buf
 
 /* --- Directory accessors -------------------------------------------------- */
 
-paths_status_t paths_levels_dir(const paths_config_t *cfg, char *buf, size_t bufsize)
+/*
+ * Shared read-only resolution chain: env override → XDG_DATA_DIRS install
+ * lookup → cwd-relative dev default.
+ *
+ * NULL cfg/buf or zero bufsize defensively return PATHS_NOT_FOUND.
+ */
+static paths_status_t resolve_readable_dir(const paths_config_t *cfg, const char *subdir,
+                                           const char *legacy_override, const char *cwd_default,
+                                           char *buf, size_t bufsize)
 {
-    /* Legacy override first. */
+    if (cfg == NULL || buf == NULL || bufsize == 0)
+        return PATHS_NOT_FOUND;
+
+    /* 1. Legacy env var override (XBOING_LEVELS_DIR / XBOING_SOUND_DIR). */
+    if (legacy_override != NULL && legacy_override[0] != '\0')
+    {
+        if (safe_copy(buf, bufsize, legacy_override) != 0)
+            return PATHS_TRUNCATED;
+        return PATHS_OK;
+    }
+
+    /* 2. XDG_DATA_DIRS install lookup. */
+    paths_status_t st = paths_install_data_dir(cfg, subdir, buf, bufsize);
+    if (st == PATHS_OK || st == PATHS_TRUNCATED)
+        return st;
+
+    /* 3. CWD fallback — development mode (running from the source tree). */
+    if (safe_copy(buf, bufsize, cwd_default) != 0)
+        return PATHS_TRUNCATED;
+    return PATHS_OK;
+}
+
+paths_status_t paths_levels_dir_readable(const paths_config_t *cfg, char *buf, size_t bufsize)
+{
+    if (cfg == NULL || buf == NULL || bufsize == 0)
+        return PATHS_NOT_FOUND;
+    return resolve_readable_dir(cfg, "levels", cfg->xboing_levels_dir, "levels", buf, bufsize);
+}
+
+paths_status_t paths_levels_dir_writable(const paths_config_t *cfg, char *buf, size_t bufsize)
+{
+    if (cfg == NULL || buf == NULL || bufsize == 0)
+        return PATHS_NOT_FOUND;
+
+    /* 1. Legacy env var override — user opts into 1996 single-dir contract,
+     *    assumes write-permission responsibility. */
     if (cfg->xboing_levels_dir[0] != '\0')
     {
         if (safe_copy(buf, bufsize, cfg->xboing_levels_dir) != 0)
@@ -344,26 +388,19 @@ paths_status_t paths_levels_dir(const paths_config_t *cfg, char *buf, size_t buf
         return PATHS_OK;
     }
 
-    /* CWD fallback — matches development mode. */
-    if (safe_copy(buf, bufsize, "levels") != 0)
-        return PATHS_TRUNCATED;
+    /* 2. $XDG_DATA_HOME/xboing/levels — caller mkdir -p's it before writing.
+     *    Does NOT need to exist on disk. */
+    paths_status_t st = build_path(buf, bufsize, cfg->xdg_data_home, "xboing", "levels", NULL);
+    if (st != PATHS_OK)
+        return st;
     return PATHS_OK;
 }
 
-paths_status_t paths_sounds_dir(const paths_config_t *cfg, char *buf, size_t bufsize)
+paths_status_t paths_sounds_dir_readable(const paths_config_t *cfg, char *buf, size_t bufsize)
 {
-    /* Legacy override first. */
-    if (cfg->xboing_sound_dir[0] != '\0')
-    {
-        if (safe_copy(buf, bufsize, cfg->xboing_sound_dir) != 0)
-            return PATHS_TRUNCATED;
-        return PATHS_OK;
-    }
-
-    /* CWD fallback — matches development mode. */
-    if (safe_copy(buf, bufsize, "sounds") != 0)
-        return PATHS_TRUNCATED;
-    return PATHS_OK;
+    if (cfg == NULL || buf == NULL || bufsize == 0)
+        return PATHS_NOT_FOUND;
+    return resolve_readable_dir(cfg, "sounds", cfg->xboing_sound_dir, "sounds", buf, bufsize);
 }
 
 paths_status_t paths_user_data_dir(const paths_config_t *cfg, char *buf, size_t bufsize)
@@ -382,9 +419,18 @@ paths_status_t paths_install_data_dir(const paths_config_t *cfg, const char *sub
         paths_status_t st = build_path(buf, bufsize, cfg->xdg_data_dirs[i], "xboing", subdir, NULL);
         if (st == PATHS_TRUNCATED)
             return PATHS_TRUNCATED;
-        struct stat sb;
-        if (stat(buf, &sb) == 0 && S_ISDIR(sb.st_mode))
+        /* opendir() succeeds iff the path exists, is a directory, and the
+         * process has read+execute permission on it — exactly the
+         * condition every caller (texture cache, font loader, audio
+         * scanner) needs.  stat()+S_ISDIR would let a perms-locked dir
+         * through, then fail later in the subsystem's directory scan
+         * with a worse error message. */
+        DIR *d = opendir(buf);
+        if (d != NULL)
+        {
+            closedir(d);
             return PATHS_OK;
+        }
     }
     return PATHS_NOT_FOUND;
 }
