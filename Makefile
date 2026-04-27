@@ -21,7 +21,7 @@ PREFIX         ?= /usr/local
 .PHONY: help all build configure rebuild test run \
         asan asan-build asan-test \
         clean distclean \
-        install uninstall deb deb-lint \
+        install uninstall deb deb-lint dogfood \
         lint format format-check \
         cppcheck cppcheck-src cppcheck-tests \
         tidy check ci
@@ -100,6 +100,33 @@ deb: ## Build a Debian package via dpkg-buildpackage (.deb lands in ../).
 deb-lint: deb ## Build .deb + run lintian on it (Debian Policy compliance).
 	lintian ../xboing_*.deb
 	echo "lintian: clean"
+
+dogfood: deb ## Install .deb, launch xboing from .tmp/, verify window opens (requires sudo; skips window check if headless).
+	mkdir -p .tmp
+	cp ../xboing_*_amd64.deb .tmp/
+	sudo dpkg -i .tmp/xboing_*_amd64.deb
+	/usr/games/xboing & echo $$! > .tmp/dogfood.pid
+	sleep 3
+	if [ -n "$$DISPLAY" ] || [ -n "$$WAYLAND_DISPLAY" ]; then \
+	    xwininfo -name xboing > .tmp/dogfood-window.txt 2>&1 || { \
+	        echo "FAIL: xboing window not detected"; \
+	        kill "$$(cat .tmp/dogfood.pid)" 2>/dev/null || true; \
+	        rm -f .tmp/dogfood.pid; \
+	        exit 1; \
+	    }; \
+	    echo "PASS: xboing launched from .tmp/, window detected"; \
+	else \
+	    if kill -0 "$$(cat .tmp/dogfood.pid)" 2>/dev/null; then \
+	        echo "INFO: no display detected ($$DISPLAY/$$WAYLAND_DISPLAY unset); window check skipped"; \
+	        echo "PASS: xboing started from .tmp/ without immediate crash"; \
+	    else \
+	        echo "FAIL: xboing exited before window-detection grace period"; \
+	        rm -f .tmp/dogfood.pid; \
+	        exit 1; \
+	    fi; \
+	fi
+	kill "$$(cat .tmp/dogfood.pid)" 2>/dev/null || true
+	rm -f .tmp/dogfood.pid
 
 # --- Cleanup ---------------------------------------------------------------
 
