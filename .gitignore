@@ -1,6 +1,6 @@
 # Stale root build artifacts (from pre-archive builds)
 *.o
-xboing
+/xboing
 version.c
 audio.c
 
@@ -23,6 +23,18 @@ build/
 build-asan/
 build-install/
 build-coverage/
+# CLion default build dirs
+cmake-build-*/
+
+# Debian packaging build artifacts (dpkg-buildpackage)
+obj-*/
+debian/.debhelper/
+debian/files
+debian/*.substvars
+debian/*.log
+debian/debhelper-build-stamp
+debian/xboing/
+debian/xboing-dbgsym/
 
 # Scratch directory (per CLAUDE.md tool-usage policy)
 .tmp/
@@ -32,6 +44,7 @@ build-coverage/
 
 # Claude Code
 .claude/settings.local.json
+.claude/scheduled_tasks.lock
 
 # direnv
 .envrc

@@ -1,15 +1,51 @@
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: XBoing
-Upstream-Contact: Justin C. Kibell
+Upstream-Contact: Justin Freeman <jmf@pobox.com>
 Source: https://github.com/jmf-pobox/xboing-c
 Comment:
- XBoing was originally written by Justin C. Kibell between 1993 and 1996.
- It is a blockout-style arcade game for the X Window System.
- This modernized version preserves the original game mechanics and all
- 80 levels while updating the build system and platform support.
+ XBoing was originally written by Justin C. Kibell between 1993 and 1996
+ as a blockout-style arcade game for the X Window System (Xlib + XPM).
+ The 1996 sources are preserved verbatim in the original/ directory under
+ their original X Consortium-style license.
+ .
+ The modernized SDL2 port (CMake build, src/, include/, tests/, packaging,
+ documentation) is licensed under the MIT License.
+
+Files: original/*
+Copyright: 1993-1996 Justin C. Kibell
+License: X11
+
+Files: assets/fonts/*
+Copyright: See individual font license files
+License: OFL-1.1 or Apache-2.0
+ The TTF assets are bundled from upstream font projects under either
+ the SIL Open Font License 1.1 or the Apache License 2.0.  Per-file
+ license text is shipped alongside the fonts (see assets/fonts/LICENSE
+ entries for each font directory).
 
 Files: *
-Copyright: 1993-1995 Justin C. Kibell
+Copyright: 2025-2026 J Freeman <jmf@pobox.com>
+License: MIT
+
+License: MIT
+ Permission is hereby granted, free of charge, to any person obtaining a copy
+ of this software and associated documentation files (the "Software"), to deal
+ in the Software without restriction, including without limitation the rights
+ to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ copies of the Software, and to permit persons to whom the Software is
+ furnished to do so, subject to the following conditions:
+ .
+ The above copyright notice and this permission notice shall be included in all
+ copies or substantial portions of the Software.
+ .
+ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ SOFTWARE.
+
 License: X11
  The X Consortium, and any party obtaining a copy of these files from
  the X Consortium, directly or indirectly, is granted, free of charge, a
@@ -32,19 +68,3 @@ License: X11
  purpose.  The software provided hereunder is on an "AS IS" basis, and the
  author has no obligation to provide maintenance, support, updates,
  enhancements, or modifications.
-
-Files: src/* include/* tests/*
-Copyright: 1993-1995 Justin C. Kibell
-           2026 Justin Freeman <jmf@pobox.com>
-License: X11
- Same license as upstream.
-
-Files: debian/*
-Copyright: 2026 Justin Freeman <jmf@pobox.com>
-License: X11
- Same license as upstream.
-
-Files: assets/fonts/*
-Copyright: See individual font license files
-License: OFL-1.1 or Apache-2.0
- See the LICENSE files in each font directory for specific terms.

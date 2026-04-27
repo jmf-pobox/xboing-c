@@ -75,7 +75,7 @@ sudo apt install cmake libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev \
 cmake -B build -DCMAKE_BUILD_TYPE=Debug
 cmake --build build
 ctest --test-dir build --output-on-failure
-./build/xboing_sdl2
+./build/xboing
 ```
 
 Sanitizer build — the primary safety net during modernization of a 20-year-old C codebase:

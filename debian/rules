@@ -1,7 +1,24 @@
 #!/usr/bin/make -f
 
+# Explicit --buildsystem=cmake: required because we ship a top-level
+# convenience Makefile that wraps cmake/ctest.  Without this, debhelper
+# would auto-detect that Makefile, run 'make' directly, and never
+# invoke cmake — installing to /usr/local instead of /usr.
 %:
-	dh $@
+	dh $@ --buildsystem=cmake
 
 override_dh_auto_configure:
-	dh_auto_configure -- -DCMAKE_BUILD_TYPE=Release -DINSTALLED_PATHS=ON
+	# Debian Policy 11.5: games binaries live in /usr/games, not /usr/bin.
+	dh_auto_configure -- -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_BINDIR=games
+
+override_dh_auto_install:
+	dh_auto_install
+	# Replace the bundled Liberation font copies with symlinks into the
+	# system fonts-liberation package so we don't ship duplicate files
+	# (lintian: duplicate-font-file).
+	rm -f debian/xboing/usr/share/xboing/fonts/LiberationSans-Regular.ttf
+	rm -f debian/xboing/usr/share/xboing/fonts/LiberationSans-Bold.ttf
+	ln -s ../../fonts/truetype/liberation/LiberationSans-Regular.ttf \
+	      debian/xboing/usr/share/xboing/fonts/LiberationSans-Regular.ttf
+	ln -s ../../fonts/truetype/liberation/LiberationSans-Bold.ttf \
+	      debian/xboing/usr/share/xboing/fonts/LiberationSans-Bold.ttf

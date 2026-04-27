@@ -65,27 +65,37 @@ When approaching this codebase, work in this order:
 
 **Do not skip to step 7.** Steps 1-6 build the safety net that makes step 7 possible.
 
-## Build Commands (Current — Legacy Xlib)
+## Build Commands
 
 ```bash
-make          # Build (generates audio.c symlink, version.c, compiles all, links)
-make clean    # Remove objects, binary, and generated files
-./xboing      # Run the game (must run from repo root for asset paths)
-./xboing -setup  # Print configuration/path info
-./xboing -help   # Show command-line options
+cmake --preset debug                          # Configure (build/, Debug)
+cmake --build build                           # Build the game and all tests
+ctest --test-dir build --output-on-failure    # Run unit + integration tests
+./build/xboing                                # Run the game
 ```
 
-**Dependencies:** `libxpm-dev`, `libx11-dev`, GCC. Libraries linked: `-lXpm -lX11 -lm`.
-
-## Build Commands (Target — CMake + SDL2)
+**Sanitizer build** (ASan + UBSan):
 
 ```bash
-cmake -B build -DCMAKE_BUILD_TYPE=Debug
-cmake --build build
-ctest --test-dir build --output-on-failure
+cmake --preset asan                           # Configure (build-asan/)
+cmake --build build-asan
+ctest --test-dir build-asan --output-on-failure
 ```
 
-**Target dependencies:** `libsdl2-dev`, `libsdl2-image-dev`, `libsdl2-mixer-dev`, `libsdl2-ttf-dev`, `libcmocka-dev`.
+**Build a Debian package** (Ubuntu/Debian):
+
+```bash
+sudo apt install build-essential devscripts debhelper cmake \
+    libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev libcmocka-dev
+dpkg-buildpackage -us -uc -b
+sudo dpkg -i ../xboing_*.deb        # installs /usr/games/xboing
+```
+
+**Dependencies (source build):** `libsdl2-dev`, `libsdl2-image-dev`, `libsdl2-mixer-dev`, `libsdl2-ttf-dev`, `libcmocka-dev`.
+
+**CLion:** the `debug` and `asan` CMake presets in `CMakePresets.json` are pre-wired — open the project, pick a preset, build. Do **not** run `cmake .` in the repo root (it pollutes the source tree).
+
+The legacy 1996 Xlib build (`original/Makefile`, `original/xboing`) is preserved verbatim in `original/` for reference; it is not the active build. The top-level `Makefile` is the modern wrapper around CMake described above.
 
 ## Toolchain
 

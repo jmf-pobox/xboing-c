@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(xboing C)
+project(xboing VERSION 2.4 LANGUAGES C)
 include(GNUInstallDirs)
 
 # Export compile_commands.json for clang-tidy
@@ -492,7 +492,7 @@ target_compile_options(paths PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
 # platform libraries.  Built only when all required SDL2 libs are available.
 
 if(SDL2_FOUND AND SDL2_IMAGE_FOUND AND SDL2_MIXER_FOUND AND SDL2_TTF_FOUND)
-    add_executable(xboing_sdl2
+    add_executable(xboing
         src/game_callbacks.c
         src/game_init.c
         src/game_input.c
@@ -502,13 +502,13 @@ if(SDL2_FOUND AND SDL2_IMAGE_FOUND AND SDL2_MIXER_FOUND AND SDL2_TTF_FOUND)
         src/game_render_ui.c
         src/game_rules.c
     )
-    target_include_directories(xboing_sdl2 PRIVATE
+    target_include_directories(xboing PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${CMAKE_CURRENT_SOURCE_DIR}/src
         ${SDL2_INCLUDE_DIRS}
     )
-    target_compile_options(xboing_sdl2 PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
-    target_link_libraries(xboing_sdl2 PRIVATE
+    target_compile_options(xboing PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+    target_link_libraries(xboing PRIVATE
         # SDL2 platform
         sdl2_renderer
         sdl2_texture
@@ -542,7 +542,7 @@ if(SDL2_FOUND AND SDL2_IMAGE_FOUND AND SDL2_MIXER_FOUND AND SDL2_TTF_FOUND)
         m
     )
     # UI sequencers
-    target_link_libraries(xboing_sdl2 PRIVATE
+    target_link_libraries(xboing PRIVATE
         presents_system
         intro_system
         demo_system
@@ -551,19 +551,8 @@ if(SDL2_FOUND AND SDL2_IMAGE_FOUND AND SDL2_MIXER_FOUND AND SDL2_TTF_FOUND)
         highscore_system
     )
 
-    # Install the executable target so CMake can apply target-aware fixups
-    # (RPATH, runtime dependency handling, component integration).  The
-    # build-tree binary keeps its disambiguating 'xboing_sdl2' name; the
-    # 'xboing' command expected by debian/control and the README is provided
-    # as a symlink alongside it.
-    install(TARGETS xboing_sdl2
+    install(TARGETS xboing
         RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
-    install(CODE "
-        file(REMOVE \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR}/xboing\")
-        file(CREATE_LINK xboing_sdl2
-             \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR}/xboing\"
-             SYMBOLIC)
-    ")
 endif()
 
 # --- Tests ------------------------------------------------------------------
