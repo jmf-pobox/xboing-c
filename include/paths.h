@@ -115,4 +115,22 @@ paths_status_t paths_sounds_dir(const paths_config_t *cfg, char *buf, size_t buf
 /* User data directory ($XDG_DATA_HOME/xboing). */
 paths_status_t paths_user_data_dir(const paths_config_t *cfg, char *buf, size_t bufsize);
 
+/*
+ * Resolve a system data subdirectory by searching $XDG_DATA_DIRS.
+ *
+ * Iterates cfg->xdg_data_dirs (typically /usr/local/share:/usr/share per
+ * the freedesktop.org spec) for a path of the form <dir>/xboing/<subdir>
+ * that exists as a readable directory.  Used to find install-time asset
+ * dirs (images, fonts, sounds) at runtime in a way that honors the user's
+ * actual install prefix — not just the prefix the binary was compiled for.
+ *
+ * subdir is e.g. "images" / "fonts" / "sounds".
+ *
+ * Returns PATHS_OK and writes the full path to buf on success.
+ * Returns PATHS_NOT_FOUND if no XDG_DATA_DIRS entry contains it.
+ * Returns PATHS_TRUNCATED if the path doesn't fit in buf.
+ */
+paths_status_t paths_install_data_dir(const paths_config_t *cfg, const char *subdir, char *buf,
+                                      size_t bufsize);
+
 #endif /* PATHS_H */

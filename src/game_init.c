@@ -20,10 +20,10 @@
 #include "game_render.h"
 #include "game_rules.h"
 
+#include <dirent.h> /* opendir/closedir for asset-dir readability check */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/stat.h> /* stat() + S_ISDIR for asset-dir checks */
 
 #include <SDL2/SDL.h>
 
@@ -86,14 +86,18 @@ static void print_usage(FILE *out);
 static void print_setup_info(const paths_config_t *cfg);
 static void print_scores(const paths_config_t *cfg);
 
-/* Return non-zero if path exists and is a readable directory.  Used by the
- * asset-dir fallback checks below — access(F_OK) would also accept a
- * regular file at the path, leading to a confusing failure later when
- * the subsystem tries to scan it as a directory. */
+/* Return non-zero if path is a directory we can list.  opendir() succeeds
+ * iff the path exists, is a directory, and is readable + executable for
+ * us — which is exactly the condition the subsequent directory scan
+ * needs.  stat()+S_ISDIR alone wouldn't catch a perms-locked dir; the
+ * later scan would still fail, just with a worse error message. */
 static int asset_dir_exists(const char *path)
 {
-    struct stat st;
-    return stat(path, &st) == 0 && S_ISDIR(st.st_mode);
+    DIR *d = opendir(path);
+    if (d == NULL)
+        return 0;
+    closedir(d);
+    return 1;
 }
 
 /* =========================================================================
@@ -316,16 +320,22 @@ game_ctx_t *game_create(int argc, char *argv[])
         goto fail;
     }
 
-    /* Texture cache.  Primary location is XBOING_INSTALLED_IMAGES_DIR
-     * (typically /usr/share/xboing/images, but the install prefix is
-     * controlled by CMake — see target_compile_definitions in
-     * CMakeLists.txt).  This is the case for every end-user invocation.
-     * Fall back to the cwd-relative source-tree path "assets/images" only
-     * if the install isn't present (dev mode, no .deb installed). */
+    /* Texture cache.  Resolution order (matches paths.c's level/sound
+     * file lookup, freedesktop XDG Base Directory spec):
+     *   1. $XDG_DATA_DIRS/xboing/images  (handles --prefix=/usr,
+     *      /usr/local, etc. transparently — same mechanism Debian
+     *      games and GNOME apps use)
+     *   2. XBOING_INSTALLED_IMAGES_DIR  (compile-time fallback for
+     *      unusual installs not in $XDG_DATA_DIRS)
+     *   3. cwd-relative "assets/images"  (dev mode default in
+     *      sdl2_texture_config_defaults) */
+    char tex_dir[PATHS_MAX_PATH];
     {
         sdl2_texture_config_t tcfg = sdl2_texture_config_defaults();
         tcfg.renderer = sdl2_renderer_get(ctx->renderer);
-        if (asset_dir_exists(XBOING_INSTALLED_IMAGES_DIR))
+        if (paths_install_data_dir(&ctx->paths, "images", tex_dir, sizeof(tex_dir)) == PATHS_OK)
+            tcfg.base_dir = tex_dir;
+        else if (asset_dir_exists(XBOING_INSTALLED_IMAGES_DIR))
             tcfg.base_dir = XBOING_INSTALLED_IMAGES_DIR;
         sdl2_texture_status_t ts;
         ctx->texture = sdl2_texture_create(&tcfg, &ts);
@@ -337,12 +347,14 @@ game_ctx_t *game_create(int argc, char *argv[])
         }
     }
 
-    /* Font.  Install path is primary; cwd-relative source-tree path is
-     * the dev fallback.  Same pattern as the texture cache above. */
+    /* Font.  Same XDG-first resolution as texture cache above. */
+    char font_dir[PATHS_MAX_PATH];
     {
         sdl2_font_config_t fcfg = sdl2_font_config_defaults();
         fcfg.renderer = sdl2_renderer_get(ctx->renderer);
-        if (asset_dir_exists(XBOING_INSTALLED_FONTS_DIR))
+        if (paths_install_data_dir(&ctx->paths, "fonts", font_dir, sizeof(font_dir)) == PATHS_OK)
+            fcfg.font_dir = font_dir;
+        else if (asset_dir_exists(XBOING_INSTALLED_FONTS_DIR))
             fcfg.font_dir = XBOING_INSTALLED_FONTS_DIR;
         sdl2_font_status_t fs;
         ctx->font = sdl2_font_create(&fcfg, &fs);
@@ -353,12 +365,15 @@ game_ctx_t *game_create(int argc, char *argv[])
         }
     }
 
-    /* Audio (optional — game works without sound).  Install path is
-     * primary; cwd-relative is the dev fallback. */
+    /* Audio (optional — game works without sound).  Same XDG-first
+     * resolution as the texture and font subsystems. */
+    char sound_dir[PATHS_MAX_PATH];
     if (ctx->config.sound)
     {
         sdl2_audio_config_t acfg = sdl2_audio_config_defaults();
-        if (asset_dir_exists(XBOING_INSTALLED_SOUNDS_DIR))
+        if (paths_install_data_dir(&ctx->paths, "sounds", sound_dir, sizeof(sound_dir)) == PATHS_OK)
+            acfg.sound_dir = sound_dir;
+        else if (asset_dir_exists(XBOING_INSTALLED_SOUNDS_DIR))
             acfg.sound_dir = XBOING_INSTALLED_SOUNDS_DIR;
         sdl2_audio_status_t as;
         ctx->audio = sdl2_audio_create(&acfg, &as);

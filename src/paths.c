@@ -370,3 +370,21 @@ paths_status_t paths_user_data_dir(const paths_config_t *cfg, char *buf, size_t 
 {
     return build_path(buf, bufsize, cfg->xdg_data_home, "xboing", NULL, NULL);
 }
+
+paths_status_t paths_install_data_dir(const paths_config_t *cfg, const char *subdir, char *buf,
+                                      size_t bufsize)
+{
+    if (cfg == NULL || subdir == NULL || buf == NULL || bufsize == 0)
+        return PATHS_NOT_FOUND;
+
+    for (int i = 0; i < cfg->xdg_data_dirs_count; i++)
+    {
+        paths_status_t st = build_path(buf, bufsize, cfg->xdg_data_dirs[i], "xboing", subdir, NULL);
+        if (st == PATHS_TRUNCATED)
+            return PATHS_TRUNCATED;
+        struct stat sb;
+        if (stat(buf, &sb) == 0 && S_ISDIR(sb.st_mode))
+            return PATHS_OK;
+    }
+    return PATHS_NOT_FOUND;
+}
