@@ -105,10 +105,10 @@ dogfood: deb ## Install .deb, launch xboing from .tmp/, verify window opens (req
 	mkdir -p .tmp
 	cp ../xboing_*_amd64.deb .tmp/
 	sudo dpkg -i .tmp/xboing_*_amd64.deb
-	/usr/games/xboing & echo $$! > .tmp/dogfood.pid
+	( cd .tmp && exec /usr/games/xboing ) & echo $$! > .tmp/dogfood.pid
 	sleep 3
 	if [ -n "$$DISPLAY" ] || [ -n "$$WAYLAND_DISPLAY" ]; then \
-	    xwininfo -name xboing > .tmp/dogfood-window.txt 2>&1 || { \
+	    xwininfo -name XBoing > .tmp/dogfood-window.txt 2>&1 || { \
 	        echo "FAIL: xboing window not detected"; \
 	        kill "$$(cat .tmp/dogfood.pid)" 2>/dev/null || true; \
 	        rm -f .tmp/dogfood.pid; \

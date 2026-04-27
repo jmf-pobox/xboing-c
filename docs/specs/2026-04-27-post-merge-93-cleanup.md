@@ -60,10 +60,10 @@ dogfood: deb
 	@mkdir -p .tmp
 	@cp ../xboing_*_amd64.deb .tmp/
 	@sudo dpkg -i .tmp/xboing_*_amd64.deb
-	@cd .tmp && /usr/games/xboing & echo $$! > .tmp/dogfood.pid
+	@( cd .tmp && exec /usr/games/xboing ) & echo $$! > .tmp/dogfood.pid
 	@sleep 3
 	@if [ -n "$$DISPLAY" ] || [ -n "$$WAYLAND_DISPLAY" ]; then \
-	    xwininfo -name xboing > .tmp/dogfood-window.txt 2>&1 || { \
+	    xwininfo -name XBoing > .tmp/dogfood-window.txt 2>&1 || { \
 	        echo "FAIL: xboing window not detected"; \
 	        kill "$$(cat .tmp/dogfood.pid)" 2>/dev/null || true; \
 	        rm -f .tmp/dogfood.pid; \
@@ -144,3 +144,4 @@ Two commits in this PR (per NB3 resolution):
 - **v1** (2026-04-27): drafted by claude. Sent to gjm for peer review.
 - **v1 review** (2026-04-27): gjm — approve-with-changes; 2 blocking + 3 non-blocking. See [peer review](../reviews/2026-04-27-post-merge-93-cleanup-review.md).
 - **v2** (2026-04-27): claude — incorporated all findings. Recipe rewritten with explicit PID capture and headless-environment guard; success criterion #1 references #7 for behavior preservation; column-alignment requirement added to N3; commit structure split (CLAUDE.md as `chore(docs):`, cleanup as `fix:`). Delegated to jdc.
+- **v3** (2026-04-27): claude — dogfood verification on the implemented Makefile failed with `xwininfo` finding no window. Two recipe defects discovered post-implementation: (1) the launched `xboing` was not `cd`'d into `.tmp/` (jdc's recipe dropped the `cd .tmp` because Make recipe lines run in their own subshell — but that defeats the test, since the repo root has an `assets/` dir that would shadow the install-path lookup); (2) the SDL window title is `XBoing` (capitalized), not `xboing` — my error in the spec recipe. Fixed in the Makefile by wrapping the launch as `( cd .tmp && exec /usr/games/xboing ) & echo $$! > .tmp/dogfood.pid` (the parenthesized subshell forks a backgrounded shell that `cd`s and `exec`s, so `$!` is xboing's actual PID) and changing `xwininfo -name xboing` to `xwininfo -name XBoing`. `make dogfood` now passes end-to-end with window detection. Recorded as a single follow-up commit on the same branch.
