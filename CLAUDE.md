@@ -88,14 +88,14 @@ ctest --test-dir build-asan --output-on-failure
 sudo apt install build-essential devscripts debhelper cmake \
     libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev libcmocka-dev
 dpkg-buildpackage -us -uc -b
-sudo dpkg -i ../xboing_*.deb        # installs /usr/bin/xboing
+sudo dpkg -i ../xboing_*.deb        # installs /usr/games/xboing
 ```
 
 **Dependencies (source build):** `libsdl2-dev`, `libsdl2-image-dev`, `libsdl2-mixer-dev`, `libsdl2-ttf-dev`, `libcmocka-dev`.
 
 **CLion:** the `debug` and `asan` CMake presets in `CMakePresets.json` are pre-wired — open the project, pick a preset, build. Do **not** run `cmake .` in the repo root (it pollutes the source tree).
 
-The legacy 1996 Xlib build (`Makefile`, `./xboing`) is preserved verbatim in `original/` for reference; it is not the active build.
+The legacy 1996 Xlib build (`original/Makefile`, `original/xboing`) is preserved verbatim in `original/` for reference; it is not the active build. The top-level `Makefile` is the modern wrapper around CMake described above.
 
 ## Toolchain
 

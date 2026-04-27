@@ -34,8 +34,8 @@ help: ## Show this help.
 	echo "XBoing convenience Makefile (wraps cmake + ctest)."
 	echo
 	echo "Targets:"
-	awk 'BEGIN {FS = ":.*?## "} \
-	     /^[a-zA-Z_-]+:.*?## / { printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2 }' \
+	awk 'BEGIN {FS = ":[^#]*## "} \
+	     /^[a-zA-Z_-]+:[^#]*## / { printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2 }' \
 	     $(MAKEFILE_LIST)
 	echo
 	echo "Variables (override on command line, e.g. 'make build JOBS=2'):"
@@ -51,7 +51,8 @@ all: build ## Alias for 'build'.
 configure: $(BUILD_DIR)/CMakeCache.txt ## Configure (debug preset) if not done.
 
 $(BUILD_DIR)/CMakeCache.txt:
-	cmake --preset debug
+	# -B overrides the preset's hardcoded binaryDir so BUILD_DIR is honored.
+	cmake --preset debug -B $(BUILD_DIR)
 
 build: configure ## Build the game and all tests (debug).
 	cmake --build $(BUILD_DIR) -j$(JOBS)
@@ -71,7 +72,8 @@ run: build ## Build and run the game.
 asan: asan-build ## Configure + build the sanitizer preset.
 
 $(ASAN_BUILD_DIR)/CMakeCache.txt:
-	cmake --preset asan
+	# -B overrides the preset's hardcoded binaryDir so ASAN_BUILD_DIR is honored.
+	cmake --preset asan -B $(ASAN_BUILD_DIR)
 
 asan-build: $(ASAN_BUILD_DIR)/CMakeCache.txt
 	cmake --build $(ASAN_BUILD_DIR) -j$(JOBS)

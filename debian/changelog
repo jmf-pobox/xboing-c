@@ -1,7 +1,9 @@
 xboing (2.4-2) unstable; urgency=medium
 
-  * Rename the installed binary to /usr/bin/xboing (was xboing_sdl2 with a
-    symlink workaround); CMake now installs the target directly.
+  * Rename the installed binary to /usr/games/xboing (was xboing_sdl2
+    with a symlink workaround in /usr/bin); CMake now installs the target
+    directly, with debian/rules overriding bindir to games per Debian
+    Policy 11.5.
   * Remove debian/compat — duplicated debhelper-compat (= 13) from
     debian/control's Build-Depends and prevented dpkg-buildpackage from
     running.  The .deb is now actually buildable.
