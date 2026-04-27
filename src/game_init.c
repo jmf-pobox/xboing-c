@@ -316,8 +316,10 @@ game_ctx_t *game_create(int argc, char *argv[])
         goto fail;
     }
 
-    /* Texture cache.  Primary location is the installed asset dir
-     * (/usr/share/xboing/images) — the case for every end-user invocation.
+    /* Texture cache.  Primary location is XBOING_INSTALLED_IMAGES_DIR
+     * (typically /usr/share/xboing/images, but the install prefix is
+     * controlled by CMake — see target_compile_definitions in
+     * CMakeLists.txt).  This is the case for every end-user invocation.
      * Fall back to the cwd-relative source-tree path "assets/images" only
      * if the install isn't present (dev mode, no .deb installed). */
     {
