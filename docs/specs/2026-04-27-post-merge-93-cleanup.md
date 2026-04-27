@@ -4,9 +4,11 @@
 **Worker**: jdc (c-modernization-engineer)
 **Reviewer**: gjm (test-engineer) — see [peer review](../reviews/2026-04-27-post-merge-93-cleanup-review.md) (forthcoming)
 **Inputs**:
+
 - [PR #93 spec](2026-04-27-path-api-read-write-split.md) — the merged change
 - [PR #93 spec peer review](../reviews/2026-04-27-path-api-read-write-split-review.md)
 - Post-merge code review (pr-review-toolkit) — 4 findings, 1 warning + 3 notes, no critical
+
 **Branch**: `chore/post-merge-93-cleanup`
 **PR**: TBD
 
