@@ -114,8 +114,10 @@ The legacy 1996 Xlib build (`original/Makefile`, `original/xboing`) is preserved
 
 ## Tool Usage
 
-- Never chain multiple commands in a single Bash call using `&&`, `||`, `;`, `$()`, `|`, or `for` loops. Each Bash call must be exactly ONE command. Use absolute paths instead of `cd && command`.
-- Use `.tmp/` in the project root for scratch files — never `/tmp`. Keeps temp files visible, gitignored, and pre-approved for writes.
+- Never chain multiple commands in a single Bash call using `&&`, `||`, `;`, `$()`, `|`, or `for` loops. Each Bash call must be exactly ONE command. Use absolute paths instead of `cd && command`. For sequenced work, send multiple Bash tool calls — parallel where independent.
+- **Stay inside the repository working tree for all file I/O.** Reads and writes outside the repo (`..`, `/tmp`, `/var`, `/usr/share`, `$HOME`, etc.) trigger per-call approval prompts and are repeatedly rejected. Use `.tmp/` (gitignored, pre-approved for writes) for scratch artifacts. Do not `cd /tmp`, do not `cd ..`, do not `ls ../some-file`, do not `cat $HOME/...`.
+- **Build outputs that land outside the repo** (e.g. `dpkg-buildpackage` writes `.deb` to `../`) get copied into `.tmp/` via a `make` target before any access. Don't reach for them directly — add a wrapper (the user granted blanket `make *` permission, so wrappers avoid the per-call prompt; raw access does not).
+- **Dogfooding installed binaries**: cwd must be inside the repo (typically `.tmp/`), never `/tmp` or `$HOME`. The installed binary at `/usr/games/<binary>` is fine to *invoke as a tool*, but its cwd, arguments, and file reads must stay inside the repo or under `.tmp/`.
 - Use MCP GitHub tools (`mcp__github__*`) instead of `gh api graphql` for structured GitHub operations.
 - CronCreate is a session-scoped scheduler (standard 5-field cron, local timezone). Jobs are session-only, auto-expire after 3 days, fire only when idle. One-shot via `recurring: false`. The /loop skill wraps CronCreate with natural intervals like `5m` or `2h`.
 

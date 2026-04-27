@@ -144,15 +144,17 @@ static void print_setup_info(const paths_config_t *cfg)
         printf("  XBOING_SCORE_FILE = %s\n", cfg->xboing_score_file);
     printf("\nResolved paths:\n");
     if (paths_levels_dir_readable(cfg, buf, sizeof(buf)) == PATHS_OK)
-        printf("  Levels dir         = %s\n", buf);
+        printf("  Levels dir            = %s\n", buf);
+    if (paths_levels_dir_writable(cfg, buf, sizeof(buf)) == PATHS_OK)
+        printf("  Levels dir (editor)   = %s\n", buf);
     if (paths_sounds_dir_readable(cfg, buf, sizeof(buf)) == PATHS_OK)
-        printf("  Sounds dir         = %s\n", buf);
+        printf("  Sounds dir            = %s\n", buf);
     if (paths_score_file_global(cfg, buf, sizeof(buf)) == PATHS_OK)
-        printf("  Score file (global) = %s\n", buf);
+        printf("  Score file (global)   = %s\n", buf);
     if (paths_score_file_personal(cfg, buf, sizeof(buf)) == PATHS_OK)
         printf("  Score file (personal) = %s\n", buf);
     if (paths_user_data_dir(cfg, buf, sizeof(buf)) == PATHS_OK)
-        printf("  User data dir       = %s\n", buf);
+        printf("  User data dir         = %s\n", buf);
 }
 
 static void print_scores(const paths_config_t *cfg)

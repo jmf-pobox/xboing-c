@@ -127,7 +127,6 @@ paths_status_t paths_levels_dir_readable(const paths_config_t *cfg, char *buf, s
  *        opts into the 1996 single-dir contract and is responsible for
  *        ensuring the dir is writable
  *   2. $XDG_DATA_HOME/xboing/levels  — caller mkdir -p's it before writing
- *   3. cwd-relative "levels"  — dev mode (source tree is writable)
  *
  * The returned directory is NOT required to exist on disk; caller creates it.
  * NULL/zero-size args defensively return PATHS_NOT_FOUND.

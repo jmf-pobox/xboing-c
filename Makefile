@@ -21,7 +21,7 @@ PREFIX         ?= /usr/local
 .PHONY: help all build configure rebuild test run \
         asan asan-build asan-test \
         clean distclean \
-        install uninstall deb deb-lint \
+        install uninstall deb deb-lint dogfood \
         lint format format-check \
         cppcheck cppcheck-src cppcheck-tests \
         tidy check ci
@@ -100,6 +100,52 @@ deb: ## Build a Debian package via dpkg-buildpackage (.deb lands in ../).
 deb-lint: deb ## Build .deb + run lintian on it (Debian Policy compliance).
 	lintian ../xboing_*.deb
 	echo "lintian: clean"
+
+dogfood: deb ## Install .deb, launch xboing from .tmp/, verify window opens (requires sudo; skips window check if headless or xwininfo missing).
+	mkdir -p .tmp
+	rm -f .tmp/xboing_*.deb .tmp/dogfood.deb
+	ver="$$(dpkg-parsechangelog -S Version)"; \
+	arch="$$(dpkg --print-architecture)"; \
+	expected="../xboing_$${ver}_$${arch}.deb"; \
+	if [ ! -f "$$expected" ]; then \
+	    echo "FAIL: expected package $$expected not found (did make deb succeed?)"; \
+	    exit 1; \
+	fi; \
+	cp "$$expected" .tmp/dogfood.deb; \
+	sudo dpkg -i .tmp/dogfood.deb
+	( cd .tmp && exec /usr/games/xboing ) & echo $$! > .tmp/dogfood.pid
+	sleep 3
+	if [ -n "$$DISPLAY" ] || [ -n "$$WAYLAND_DISPLAY" ]; then \
+	    if command -v xwininfo >/dev/null 2>&1; then \
+	        xwininfo -name XBoing > .tmp/dogfood-window.txt 2>&1 || { \
+	            echo "FAIL: xboing window not detected"; \
+	            kill "$$(cat .tmp/dogfood.pid)" 2>/dev/null || true; \
+	            rm -f .tmp/dogfood.pid; \
+	            exit 1; \
+	        }; \
+	        echo "PASS: xboing launched from .tmp/, window detected"; \
+	    else \
+	        if kill -0 "$$(cat .tmp/dogfood.pid)" 2>/dev/null; then \
+	            echo "INFO: display detected but xwininfo unavailable; window check skipped"; \
+	            echo "PASS: xboing started from .tmp/ without immediate crash"; \
+	        else \
+	            echo "FAIL: xboing exited before window-detection grace period"; \
+	            rm -f .tmp/dogfood.pid; \
+	            exit 1; \
+	        fi; \
+	    fi; \
+	else \
+	    if kill -0 "$$(cat .tmp/dogfood.pid)" 2>/dev/null; then \
+	        echo "INFO: no display detected ($$DISPLAY/$$WAYLAND_DISPLAY unset); window check skipped"; \
+	        echo "PASS: xboing started from .tmp/ without immediate crash"; \
+	    else \
+	        echo "FAIL: xboing exited before window-detection grace period"; \
+	        rm -f .tmp/dogfood.pid; \
+	        exit 1; \
+	    fi; \
+	fi
+	kill "$$(cat .tmp/dogfood.pid)" 2>/dev/null || true
+	rm -f .tmp/dogfood.pid
 
 # --- Cleanup ---------------------------------------------------------------
 

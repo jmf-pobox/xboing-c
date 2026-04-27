@@ -3,5 +3,6 @@
   "MD033": false,
   "MD041": false,
   "MD060": { "style": "padded" },
-  "MD024": { "siblings_only": true }
+  "MD024": { "siblings_only": true },
+  "MD010": { "code_blocks": false }
 }

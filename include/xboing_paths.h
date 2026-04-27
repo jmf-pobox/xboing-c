@@ -7,19 +7,15 @@
  * unusual installs), then the cwd-relative source-tree default in
  * each subsystem (dev fallback).
  *
- * XBOING_DATA_DIR is overridable at compile time via -D.  Because the
- * derived macros below use string-literal concatenation (e.g.
+ * XBOING_DATA_DIR can be overridden at compile time via -D.  Because
+ * the derived macros below use string-literal concatenation (e.g.
  * XBOING_DATA_DIR "/images"), the override must itself be a quoted C
- * string literal — pass `-DXBOING_DATA_DIR="\"/opt/xboing/share\""` to
+ * string literal — pass `-DXBOING_DATA_DIR='"/opt/xboing/share"'` to
  * a raw compiler invocation, or set it from a CMake string variable
  * (see target_compile_definitions in CMakeLists.txt, which formats
  * the override as XBOING_DATA_DIR="${CMAKE_INSTALL_FULL_DATADIR}/xboing"
- * — the surrounding quotes survive into the preprocessor).
- *
- * XBOING_DATA_DIR can be overridden at compile time via -D so that
- * non-system installs (e.g. a relocatable bundle) point at the right
- * location.  Default matches Debian Policy: data files in
- * /usr/share/<package>/.
+ * — the surrounding quotes survive into the preprocessor).  The
+ * default matches Debian Policy: data files in /usr/share/<package>/.
  *
  * Layout under XBOING_DATA_DIR (matches what CMakeLists.txt installs):
  *   levels/        — 80 .data level files

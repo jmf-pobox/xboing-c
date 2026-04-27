@@ -390,10 +390,7 @@ paths_status_t paths_levels_dir_writable(const paths_config_t *cfg, char *buf, s
 
     /* 2. $XDG_DATA_HOME/xboing/levels — caller mkdir -p's it before writing.
      *    Does NOT need to exist on disk. */
-    paths_status_t st = build_path(buf, bufsize, cfg->xdg_data_home, "xboing", "levels", NULL);
-    if (st != PATHS_OK)
-        return st;
-    return PATHS_OK;
+    return build_path(buf, bufsize, cfg->xdg_data_home, "xboing", "levels", NULL);
 }
 
 paths_status_t paths_sounds_dir_readable(const paths_config_t *cfg, char *buf, size_t bufsize)
