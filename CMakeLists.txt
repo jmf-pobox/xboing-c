@@ -54,6 +54,17 @@ install(DIRECTORY assets/fonts/
         PATTERN "LICENSE"
     PATTERN "CVS" EXCLUDE)
 
+# PNG sprite sheets — needed at runtime for sdl2_texture's directory scan.
+# Without this, an installed binary launched outside the source tree (e.g.
+# from /usr/games/xboing via the GNOME launcher) fails immediately at
+# texture cache init with "cannot open directory 'assets/images'".
+install(DIRECTORY assets/images/
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/xboing/images"
+    FILES_MATCHING
+        PATTERN "*.png"
+        PATTERN "*.xcf"
+    PATTERN "CVS" EXCLUDE)
+
 install(FILES original/docs/problems.doc
     DESTINATION "${CMAKE_INSTALL_DATADIR}/xboing/docs")
 

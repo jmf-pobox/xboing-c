@@ -23,6 +23,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h> /* access(F_OK) for asset-dir existence checks */
 
 #include <SDL2/SDL.h>
 
@@ -56,6 +57,7 @@
 #include "sdl2_texture.h"
 #include "sfx_system.h"
 #include "special_system.h"
+#include "xboing_paths.h"
 #include "xboing_version.h"
 
 /* =========================================================================
@@ -304,10 +306,15 @@ game_ctx_t *game_create(int argc, char *argv[])
         goto fail;
     }
 
-    /* Texture cache */
+    /* Texture cache.  Primary location is the installed asset dir
+     * (/usr/share/xboing/images) — the case for every end-user invocation.
+     * Fall back to the cwd-relative source-tree path "assets/images" only
+     * if the install isn't present (dev mode, no .deb installed). */
     {
         sdl2_texture_config_t tcfg = sdl2_texture_config_defaults();
         tcfg.renderer = sdl2_renderer_get(ctx->renderer);
+        if (access(XBOING_INSTALLED_IMAGES_DIR, F_OK) == 0)
+            tcfg.base_dir = XBOING_INSTALLED_IMAGES_DIR;
         sdl2_texture_status_t ts;
         ctx->texture = sdl2_texture_create(&tcfg, &ts);
         if (!ctx->texture)
@@ -318,10 +325,13 @@ game_ctx_t *game_create(int argc, char *argv[])
         }
     }
 
-    /* Font */
+    /* Font.  Install path is primary; cwd-relative source-tree path is
+     * the dev fallback.  Same pattern as the texture cache above. */
     {
         sdl2_font_config_t fcfg = sdl2_font_config_defaults();
         fcfg.renderer = sdl2_renderer_get(ctx->renderer);
+        if (access(XBOING_INSTALLED_FONTS_DIR, F_OK) == 0)
+            fcfg.font_dir = XBOING_INSTALLED_FONTS_DIR;
         sdl2_font_status_t fs;
         ctx->font = sdl2_font_create(&fcfg, &fs);
         if (!ctx->font)
@@ -331,10 +341,13 @@ game_ctx_t *game_create(int argc, char *argv[])
         }
     }
 
-    /* Audio (optional — game works without sound) */
+    /* Audio (optional — game works without sound).  Install path is
+     * primary; cwd-relative is the dev fallback. */
     if (ctx->config.sound)
     {
         sdl2_audio_config_t acfg = sdl2_audio_config_defaults();
+        if (access(XBOING_INSTALLED_SOUNDS_DIR, F_OK) == 0)
+            acfg.sound_dir = XBOING_INSTALLED_SOUNDS_DIR;
         sdl2_audio_status_t as;
         ctx->audio = sdl2_audio_create(&acfg, &as);
         if (!ctx->audio)
