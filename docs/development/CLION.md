@@ -95,6 +95,20 @@ Two committed configs (the only ones that should be):
 
 Both have `supportsDynamicLaunchOverrides: true`, which means the MCP `execute_run_configuration` tool can pass one-time `programArguments` / `workingDirectory` / `envs` overrides without mutating the config file.
 
+### Troubleshooting: "why is nothing in my run-config dropdown?"
+
+Three traps to know about:
+
+1. **CMake profiles ≠ run configurations.** The selector showing `debug`/`asan`/`install` is the *build profile* — what CLion will compile against. Run configurations live in a separate dropdown (the "Run/Debug Configurations" widget). Confusing the two leads to "I selected a profile, where's my run target?"
+2. **The toolbar dropdown shows only saved run configs.** Auto-detected CMake-target configs (the ones cached in `workspace.xml`) do *not* appear in the dropdown by default — only configs persisted as XML under `.idea/runConfigurations/` show up. So the MCP server reporting 85 configs while your dropdown shows 1 is consistent: 84 of them are auto-detected shadow entries, not saved.
+3. **CLion silently hides run configs whose CMake target can't be resolved.** If a saved XML points at a renamed/deleted target (as `xboing_sdl2.xml` did here), CLion drops it from the dropdown with no warning. After any rename in `CMakeLists.txt`, audit `.idea/runConfigurations/` for `TARGET_NAME` mismatches.
+
+If a freshly committed run-config XML doesn't appear in the dropdown:
+
+> File → Reload All from Disk (Ctrl+Alt+Y), or restart the IDE.
+
+CLion caches the run-config list in memory and only re-reads `.idea/runConfigurations/` on project load or explicit reload.
+
 ## JetBrains MCP server
 
 ### What it is
