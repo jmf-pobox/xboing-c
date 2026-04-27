@@ -1,3 +1,22 @@
+xboing (2.4-2) unstable; urgency=medium
+
+  * Rename the installed binary to /usr/bin/xboing (was xboing_sdl2 with a
+    symlink workaround); CMake now installs the target directly.
+  * Remove debian/compat — duplicated debhelper-compat (= 13) from
+    debian/control's Build-Depends and prevented dpkg-buildpackage from
+    running.  The .deb is now actually buildable.
+  * Add explicit pkg-config Build-Depends (was relied on transitively
+    via libsdl2-dev).
+  * Update debian/copyright: original/ stays under the 1993-1996 X
+    Consortium-style license (Justin C. Kibell); the SDL2 modernization
+    is MIT (J Freeman, 2025-2026).
+  * Implement -help / -version / -setup / -scores in the SDL2 binary
+    (previously they parsed but exited silently with no output).
+  * Add a top-level convenience Makefile wrapping cmake / ctest /
+    dpkg-buildpackage.
+
+ -- J Freeman <jmf@pobox.com>  Sun, 26 Apr 2026 17:00:00 -0700
+
 xboing (2.4-1) unstable; urgency=medium
 
   * Initial Debian packaging.

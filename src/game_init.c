@@ -78,6 +78,110 @@ static void stub_render(double alpha, void *user_data);
 /* Level → block system bridge callback */
 static void on_level_add_block(int row, int col, int block_type, int counter_slide, void *ud);
 
+/* Informational-flag handlers (xboing -help / -version / -setup / -scores). */
+static void print_usage(FILE *out);
+static void print_setup_info(const paths_config_t *cfg);
+static void print_scores(const paths_config_t *cfg);
+
+/* =========================================================================
+ * Informational flag output
+ * ========================================================================= */
+
+static void print_usage(FILE *out)
+{
+    fprintf(out,
+            "Usage: xboing [OPTIONS]\n"
+            "\n"
+            "Game options:\n"
+            "  -speed <1-9>        Game speed (1=slowest, 9=fastest, default 5)\n"
+            "  -startlevel <1-80>  Start at the given level (default 1)\n"
+            "  -keys               Use keyboard control (default: mouse)\n"
+            "  -nickname <name>    Set high-score nickname\n"
+            "  -debug              Enable debug mode\n"
+            "  -grab               Grab pointer to window\n"
+            "\n"
+            "Audio options:\n"
+            "  -sound              Enable sound (default)\n"
+            "  -nosound            Disable all audio\n"
+            "  -nosfx              Disable sound effects (keep music)\n"
+            "  -maxvol <0-100>     Maximum volume\n"
+            "\n"
+            "Information (these print and exit):\n"
+            "  -help, -usage       Show this help\n"
+            "  -version            Show version\n"
+            "  -setup              Show resolved configuration paths\n"
+            "  -scores             Show the global high-score table\n");
+}
+
+static void print_setup_info(const paths_config_t *cfg)
+{
+    char buf[PATHS_MAX_PATH];
+#ifdef XBOING_VERSION
+    printf("xboing %s configuration:\n\n", XBOING_VERSION);
+#else
+    printf("xboing configuration:\n\n");
+#endif
+    printf("  HOME              = %s\n", cfg->home);
+    printf("  XDG_DATA_HOME     = %s\n", cfg->xdg_data_home);
+    printf("  XDG_CONFIG_HOME   = %s\n", cfg->xdg_config_home);
+    if (cfg->xboing_levels_dir[0])
+        printf("  XBOING_LEVELS_DIR = %s\n", cfg->xboing_levels_dir);
+    if (cfg->xboing_sound_dir[0])
+        printf("  XBOING_SOUND_DIR  = %s\n", cfg->xboing_sound_dir);
+    if (cfg->xboing_score_file[0])
+        printf("  XBOING_SCORE_FILE = %s\n", cfg->xboing_score_file);
+    printf("\nResolved paths:\n");
+    if (paths_levels_dir(cfg, buf, sizeof(buf)) == PATHS_OK)
+        printf("  Levels dir         = %s\n", buf);
+    if (paths_sounds_dir(cfg, buf, sizeof(buf)) == PATHS_OK)
+        printf("  Sounds dir         = %s\n", buf);
+    if (paths_score_file_global(cfg, buf, sizeof(buf)) == PATHS_OK)
+        printf("  Score file (global) = %s\n", buf);
+    if (paths_score_file_personal(cfg, buf, sizeof(buf)) == PATHS_OK)
+        printf("  Score file (personal) = %s\n", buf);
+    if (paths_user_data_dir(cfg, buf, sizeof(buf)) == PATHS_OK)
+        printf("  User data dir       = %s\n", buf);
+}
+
+static void print_scores(const paths_config_t *cfg)
+{
+    char path[PATHS_MAX_PATH];
+    if (paths_score_file_global(cfg, path, sizeof(path)) != PATHS_OK)
+    {
+        fprintf(stderr, "xboing -scores: cannot resolve global score file path\n");
+        return;
+    }
+
+    highscore_table_t table;
+    highscore_io_init_table(&table);
+    highscore_io_result_t r = highscore_io_read(path, &table);
+    if (r == HIGHSCORE_IO_ERR_OPEN)
+    {
+        printf("No scores recorded yet (%s does not exist).\n", path);
+        return;
+    }
+    if (r != HIGHSCORE_IO_OK)
+    {
+        fprintf(stderr, "xboing -scores: failed to read %s (code %d)\n", path, (int)r);
+        return;
+    }
+
+    printf("High scores from %s:\n\n", path);
+    if (table.master_name[0])
+        printf("  Master: %s — \"%s\"\n\n", table.master_name, table.master_text);
+    int shown = 0;
+    for (int i = 0; i < HIGHSCORE_NUM_ENTRIES; i++)
+    {
+        if (table.entries[i].score == 0)
+            continue;
+        printf("  %2d. %-20s %10lu  level %2lu\n", i + 1, table.entries[i].name,
+               table.entries[i].score, table.entries[i].level);
+        shown++;
+    }
+    if (shown == 0)
+        printf("  (no scored entries)\n");
+}
+
 /* =========================================================================
  * game_create
  * ========================================================================= */
@@ -98,17 +202,26 @@ game_ctx_t *game_create(int argc, char *argv[])
     const char *bad_option = NULL;
     sdl2_cli_status_t cli_status = sdl2_cli_parse(argc, argv, &cli, &bad_option);
 
-    if (cli_status == SDL2C_EXIT_HELP || cli_status == SDL2C_EXIT_VERSION)
+    /* Handle informational flags that don't need paths first. */
+    if (cli_status == SDL2C_EXIT_HELP)
     {
+        print_usage(stdout);
         free(ctx);
-        return NULL; /* Caller should exit 0 */
+        return NULL;
     }
-    if (cli_status == SDL2C_EXIT_SETUP || cli_status == SDL2C_EXIT_SCORES)
+    if (cli_status == SDL2C_EXIT_VERSION)
     {
+#ifdef XBOING_VERSION
+        printf("xboing %s (SDL2 modernization)\n", XBOING_VERSION);
+#else
+        printf("xboing (SDL2 modernization, version unknown)\n");
+#endif
         free(ctx);
-        return NULL; /* Caller should print info and exit 0 */
+        return NULL;
     }
-    if (cli_status != SDL2C_OK)
+    /* Only abort on real errors here — SETUP and SCORES need paths first. */
+    if (cli_status != SDL2C_OK && cli_status != SDL2C_EXIT_SETUP &&
+        cli_status != SDL2C_EXIT_SCORES)
     {
         fprintf(stderr, "Error: %s", sdl2_cli_status_string(cli_status));
         if (bad_option)
@@ -122,6 +235,20 @@ game_ctx_t *game_create(int argc, char *argv[])
     if (paths_init(&ctx->paths) != PATHS_OK)
     {
         fprintf(stderr, "game_create: failed to initialize paths\n");
+        free(ctx);
+        return NULL;
+    }
+
+    /* Informational flags that depend on resolved paths. */
+    if (cli_status == SDL2C_EXIT_SETUP)
+    {
+        print_setup_info(&ctx->paths);
+        free(ctx);
+        return NULL;
+    }
+    if (cli_status == SDL2C_EXIT_SCORES)
+    {
+        print_scores(&ctx->paths);
         free(ctx);
         return NULL;
     }
