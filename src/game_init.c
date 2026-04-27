@@ -20,6 +20,7 @@
 #include "game_render.h"
 #include "game_rules.h"
 
+#include <dirent.h> /* opendir/closedir for asset-dir readability check */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -56,6 +57,7 @@
 #include "sdl2_texture.h"
 #include "sfx_system.h"
 #include "special_system.h"
+#include "xboing_paths.h"
 #include "xboing_version.h"
 
 /* =========================================================================
@@ -83,6 +85,20 @@ static void on_level_add_block(int row, int col, int block_type, int counter_sli
 static void print_usage(FILE *out);
 static void print_setup_info(const paths_config_t *cfg);
 static void print_scores(const paths_config_t *cfg);
+
+/* Return non-zero if path is a directory we can list.  opendir() succeeds
+ * iff the path exists, is a directory, and is readable + executable for
+ * us — which is exactly the condition the subsequent directory scan
+ * needs.  stat()+S_ISDIR alone wouldn't catch a perms-locked dir; the
+ * later scan would still fail, just with a worse error message. */
+static int asset_dir_exists(const char *path)
+{
+    DIR *d = opendir(path);
+    if (d == NULL)
+        return 0;
+    closedir(d);
+    return 1;
+}
 
 /* =========================================================================
  * Informational flag output
@@ -127,9 +143,9 @@ static void print_setup_info(const paths_config_t *cfg)
     if (cfg->xboing_score_file[0])
         printf("  XBOING_SCORE_FILE = %s\n", cfg->xboing_score_file);
     printf("\nResolved paths:\n");
-    if (paths_levels_dir(cfg, buf, sizeof(buf)) == PATHS_OK)
+    if (paths_levels_dir_readable(cfg, buf, sizeof(buf)) == PATHS_OK)
         printf("  Levels dir         = %s\n", buf);
-    if (paths_sounds_dir(cfg, buf, sizeof(buf)) == PATHS_OK)
+    if (paths_sounds_dir_readable(cfg, buf, sizeof(buf)) == PATHS_OK)
         printf("  Sounds dir         = %s\n", buf);
     if (paths_score_file_global(cfg, buf, sizeof(buf)) == PATHS_OK)
         printf("  Score file (global) = %s\n", buf);
@@ -304,10 +320,23 @@ game_ctx_t *game_create(int argc, char *argv[])
         goto fail;
     }
 
-    /* Texture cache */
+    /* Texture cache.  Resolution order (matches paths.c's level/sound
+     * file lookup, freedesktop XDG Base Directory spec):
+     *   1. $XDG_DATA_DIRS/xboing/images  (handles --prefix=/usr,
+     *      /usr/local, etc. transparently — same mechanism Debian
+     *      games and GNOME apps use)
+     *   2. XBOING_INSTALLED_IMAGES_DIR  (compile-time fallback for
+     *      unusual installs not in $XDG_DATA_DIRS)
+     *   3. cwd-relative "assets/images"  (dev mode default in
+     *      sdl2_texture_config_defaults) */
+    char tex_dir[PATHS_MAX_PATH];
     {
         sdl2_texture_config_t tcfg = sdl2_texture_config_defaults();
         tcfg.renderer = sdl2_renderer_get(ctx->renderer);
+        if (paths_install_data_dir(&ctx->paths, "images", tex_dir, sizeof(tex_dir)) == PATHS_OK)
+            tcfg.base_dir = tex_dir;
+        else if (asset_dir_exists(XBOING_INSTALLED_IMAGES_DIR))
+            tcfg.base_dir = XBOING_INSTALLED_IMAGES_DIR;
         sdl2_texture_status_t ts;
         ctx->texture = sdl2_texture_create(&tcfg, &ts);
         if (!ctx->texture)
@@ -318,10 +347,15 @@ game_ctx_t *game_create(int argc, char *argv[])
         }
     }
 
-    /* Font */
+    /* Font.  Same XDG-first resolution as texture cache above. */
+    char font_dir[PATHS_MAX_PATH];
     {
         sdl2_font_config_t fcfg = sdl2_font_config_defaults();
         fcfg.renderer = sdl2_renderer_get(ctx->renderer);
+        if (paths_install_data_dir(&ctx->paths, "fonts", font_dir, sizeof(font_dir)) == PATHS_OK)
+            fcfg.font_dir = font_dir;
+        else if (asset_dir_exists(XBOING_INSTALLED_FONTS_DIR))
+            fcfg.font_dir = XBOING_INSTALLED_FONTS_DIR;
         sdl2_font_status_t fs;
         ctx->font = sdl2_font_create(&fcfg, &fs);
         if (!ctx->font)
@@ -331,10 +365,16 @@ game_ctx_t *game_create(int argc, char *argv[])
         }
     }
 
-    /* Audio (optional — game works without sound) */
+    /* Audio (optional — game works without sound).  Same XDG-first
+     * resolution as the texture and font subsystems. */
+    char sound_dir[PATHS_MAX_PATH];
     if (ctx->config.sound)
     {
         sdl2_audio_config_t acfg = sdl2_audio_config_defaults();
+        if (paths_install_data_dir(&ctx->paths, "sounds", sound_dir, sizeof(sound_dir)) == PATHS_OK)
+            acfg.sound_dir = sound_dir;
+        else if (asset_dir_exists(XBOING_INSTALLED_SOUNDS_DIR))
+            acfg.sound_dir = XBOING_INSTALLED_SOUNDS_DIR;
         sdl2_audio_status_t as;
         ctx->audio = sdl2_audio_create(&acfg, &as);
         if (!ctx->audio)
@@ -521,9 +561,12 @@ game_ctx_t *game_create(int argc, char *argv[])
     /* Editor system (callbacks wired by game_callbacks.c) */
     {
         editor_system_callbacks_t ecb = game_callbacks_editor();
-        char levels_dir[PATHS_MAX_PATH] = "levels";
-        paths_levels_dir(&ctx->paths, levels_dir, sizeof(levels_dir));
-        ctx->editor = editor_system_create(&ecb, ctx, levels_dir, !ctx->config.sound);
+        char levels_dir_r[PATHS_MAX_PATH] = "levels";
+        char levels_dir_w[PATHS_MAX_PATH] = "levels";
+        paths_levels_dir_readable(&ctx->paths, levels_dir_r, sizeof(levels_dir_r));
+        paths_levels_dir_writable(&ctx->paths, levels_dir_w, sizeof(levels_dir_w));
+        ctx->editor =
+            editor_system_create(&ecb, ctx, levels_dir_r, levels_dir_w, !ctx->config.sound);
         if (!ctx->editor)
         {
             fprintf(stderr, "game_create: editor system creation failed\n");

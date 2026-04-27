@@ -54,6 +54,17 @@ install(DIRECTORY assets/fonts/
         PATTERN "LICENSE"
     PATTERN "CVS" EXCLUDE)
 
+# PNG sprite sheets — needed at runtime for sdl2_texture's directory scan.
+# Without this, an installed binary launched outside the source tree (e.g.
+# from /usr/games/xboing via the GNOME launcher) fails immediately at
+# texture cache init with "cannot open directory 'assets/images'".
+# Only PNGs ship; .xcf source files stay in-repo for the asset pipeline.
+install(DIRECTORY assets/images/
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/xboing/images"
+    FILES_MATCHING
+        PATTERN "*.png"
+    PATTERN "CVS" EXCLUDE)
+
 install(FILES original/docs/problems.doc
     DESTINATION "${CMAKE_INSTALL_DATADIR}/xboing/docs")
 
@@ -508,6 +519,12 @@ if(SDL2_FOUND AND SDL2_IMAGE_FOUND AND SDL2_MIXER_FOUND AND SDL2_TTF_FOUND)
         ${SDL2_INCLUDE_DIRS}
     )
     target_compile_options(xboing PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+    # Override XBOING_DATA_DIR's header default (/usr/share/xboing) so that
+    # 'cmake --install --prefix /usr/local' sees /usr/local/share/xboing,
+    # 'dpkg-buildpackage' sees /usr/share/xboing, and any custom prefix
+    # picks up the corresponding GNUInstallDirs DATADIR.
+    target_compile_definitions(xboing PRIVATE
+        XBOING_DATA_DIR="${CMAKE_INSTALL_FULL_DATADIR}/xboing")
     target_link_libraries(xboing PRIVATE
         # SDL2 platform
         sdl2_renderer
