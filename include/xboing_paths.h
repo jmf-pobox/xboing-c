@@ -1,11 +1,20 @@
 /*
  * xboing_paths.h -- System-wide install paths for xboing data files.
  *
- * The install location is the **primary** path the binary uses at
- * runtime — every end-user invocation (desktop launcher, systemd unit,
- * `xboing` from any shell) resolves here.  The cwd-relative
- * source-tree paths in each subsystem (e.g. "assets/images") are a
- * **dev fallback** used only when the install isn't present.
+ * Asset resolution at runtime tries, in order: $XDG_DATA_DIRS lookup
+ * (handles the common /usr and /usr/local prefixes for free), the
+ * compile-time XBOING_INSTALLED_*_DIR macros below (safety net for
+ * unusual installs), then the cwd-relative source-tree default in
+ * each subsystem (dev fallback).
+ *
+ * XBOING_DATA_DIR is overridable at compile time via -D.  Because the
+ * derived macros below use string-literal concatenation (e.g.
+ * XBOING_DATA_DIR "/images"), the override must itself be a quoted C
+ * string literal — pass `-DXBOING_DATA_DIR="\"/opt/xboing/share\""` to
+ * a raw compiler invocation, or set it from a CMake string variable
+ * (see target_compile_definitions in CMakeLists.txt, which formats
+ * the override as XBOING_DATA_DIR="${CMAKE_INSTALL_FULL_DATADIR}/xboing"
+ * — the surrounding quotes survive into the preprocessor).
  *
  * XBOING_DATA_DIR can be overridden at compile time via -D so that
  * non-system installs (e.g. a relocatable bundle) point at the right
