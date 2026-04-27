@@ -24,8 +24,7 @@ PREFIX         ?= /usr/local
         install uninstall deb deb-lint \
         lint format format-check \
         cppcheck cppcheck-src cppcheck-tests \
-        tidy check ci \
-        docs
+        tidy check ci
 
 # --- Default ---------------------------------------------------------------
 
