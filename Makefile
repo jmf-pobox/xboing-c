@@ -101,20 +101,37 @@ deb-lint: deb ## Build .deb + run lintian on it (Debian Policy compliance).
 	lintian ../xboing_*.deb
 	echo "lintian: clean"
 
-dogfood: deb ## Install .deb, launch xboing from .tmp/, verify window opens (requires sudo; skips window check if headless).
+dogfood: deb ## Install .deb, launch xboing from .tmp/, verify window opens (requires sudo; skips window check if headless or xwininfo missing).
 	mkdir -p .tmp
-	cp ../xboing_*_amd64.deb .tmp/
-	sudo dpkg -i .tmp/xboing_*_amd64.deb
+	rm -f .tmp/xboing_*.deb .tmp/dogfood.deb
+	deb_file="$$(ls -1t ../xboing_*.deb 2>/dev/null | head -n 1)"; \
+	if [ -z "$$deb_file" ]; then \
+	    echo "FAIL: no Debian package found in .."; \
+	    exit 1; \
+	fi; \
+	cp "$$deb_file" .tmp/dogfood.deb; \
+	sudo dpkg -i .tmp/dogfood.deb
 	( cd .tmp && exec /usr/games/xboing ) & echo $$! > .tmp/dogfood.pid
 	sleep 3
 	if [ -n "$$DISPLAY" ] || [ -n "$$WAYLAND_DISPLAY" ]; then \
-	    xwininfo -name XBoing > .tmp/dogfood-window.txt 2>&1 || { \
-	        echo "FAIL: xboing window not detected"; \
-	        kill "$$(cat .tmp/dogfood.pid)" 2>/dev/null || true; \
-	        rm -f .tmp/dogfood.pid; \
-	        exit 1; \
-	    }; \
-	    echo "PASS: xboing launched from .tmp/, window detected"; \
+	    if command -v xwininfo >/dev/null 2>&1; then \
+	        xwininfo -name XBoing > .tmp/dogfood-window.txt 2>&1 || { \
+	            echo "FAIL: xboing window not detected"; \
+	            kill "$$(cat .tmp/dogfood.pid)" 2>/dev/null || true; \
+	            rm -f .tmp/dogfood.pid; \
+	            exit 1; \
+	        }; \
+	        echo "PASS: xboing launched from .tmp/, window detected"; \
+	    else \
+	        if kill -0 "$$(cat .tmp/dogfood.pid)" 2>/dev/null; then \
+	            echo "INFO: display detected but xwininfo unavailable; window check skipped"; \
+	            echo "PASS: xboing started from .tmp/ without immediate crash"; \
+	        else \
+	            echo "FAIL: xboing exited before window-detection grace period"; \
+	            rm -f .tmp/dogfood.pid; \
+	            exit 1; \
+	        fi; \
+	    fi; \
 	else \
 	    if kill -0 "$$(cat .tmp/dogfood.pid)" 2>/dev/null; then \
 	        echo "INFO: no display detected ($$DISPLAY/$$WAYLAND_DISPLAY unset); window check skipped"; \
