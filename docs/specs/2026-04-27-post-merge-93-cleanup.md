@@ -61,12 +61,14 @@ CLAUDE.md Phase 5 requires installing the `.deb` and walking the launch journey 
 dogfood: deb
 	@mkdir -p .tmp
 	@rm -f .tmp/xboing_*.deb .tmp/dogfood.deb
-	@deb_file="$$(ls -1t ../xboing_*.deb 2>/dev/null | head -n 1)"; \
-	if [ -z "$$deb_file" ]; then \
-	    echo "FAIL: no Debian package found in .."; \
+	@ver="$$(dpkg-parsechangelog -S Version)"; \
+	arch="$$(dpkg --print-architecture)"; \
+	expected="../xboing_$${ver}_$${arch}.deb"; \
+	if [ ! -f "$$expected" ]; then \
+	    echo "FAIL: expected package $$expected not found (did make deb succeed?)"; \
 	    exit 1; \
 	fi; \
-	cp "$$deb_file" .tmp/dogfood.deb; \
+	cp "$$expected" .tmp/dogfood.deb; \
 	sudo dpkg -i .tmp/dogfood.deb
 	@( cd .tmp && exec /usr/games/xboing ) & echo $$! > .tmp/dogfood.pid
 	@sleep 3
