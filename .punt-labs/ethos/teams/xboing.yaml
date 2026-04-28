@@ -1,0 +1,32 @@
+name: xboing
+repositories:
+  - jmf-pobox/xboing-c
+members:
+  - identity: jmf-pobox
+    role: maintainer
+  - identity: claude
+    role: coo
+  - identity: jck
+    role: vision-keeper
+  - identity: jdc
+    role: c-modernization-engineer
+  - identity: sjl
+    role: av-platform-engineer
+  - identity: gjm
+    role: test-engineer
+collaborations:
+  - from: coo
+    to: maintainer
+    type: reports_to
+  - from: vision-keeper
+    to: coo
+    type: reports_to
+  - from: c-modernization-engineer
+    to: vision-keeper
+    type: reports_to
+  - from: av-platform-engineer
+    to: vision-keeper
+    type: reports_to
+  - from: test-engineer
+    to: vision-keeper
+    type: reports_to

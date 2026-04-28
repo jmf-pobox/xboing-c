@@ -1,0 +1,7 @@
+name: John D. Carmack
+handle: jdc
+kind: agent
+personality: carmack
+talents:
+  - c-modernization
+  - game-systems

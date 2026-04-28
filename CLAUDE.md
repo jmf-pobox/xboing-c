@@ -42,6 +42,67 @@ XBoing is a classic X11 breakout/blockout game (1993-1996, Justin C. Kibell) mod
 
 - `docs/SPECIFICATION.md` — comprehensive technical spec of all 16 subsystems
 - `docs/MODERNIZATION.md` — from-to architectural changes for SDL2-based modernization
+- `dev-loop.md` — phase-by-phase autonomous development loop (used by `/autopilot`)
+- `docs/DESIGN.md` — append ADRs here for any non-trivial decision (status / context / decision / consequences)
+
+## Operating Principles (ethos-aligned)
+
+These are non-negotiable rules for working in this repo. The ethos
+framework (`ethos@punt-labs`, see `ethos doctor`) governs identity and
+mission scoping; the rules below govern day-to-day execution.
+
+- **`make` is the source of truth.** Run `make help` to see every quality
+  gate. Don't re-derive flag combinations from CI YAML — call the wrapper.
+  `make check` runs the full local CI parity (format-check + cppcheck +
+  markdownlint + ctest debug + ctest asan + dpkg-buildpackage + lintian).
+- **Dogfood before shipping.** `make check` passing is necessary but not
+  sufficient. Build the binary, install it, run the user journey
+  (including from a desktop launcher, not just from a terminal in the
+  source tree). A "exits 0" smoke test is not the same as "the user can
+  use this." Don't add stabilizing flags (e.g. `-nosound`) that bias the
+  test away from what real users invoke.
+- **Don't defer obvious work.** A one-line fix you can do now does not
+  belong in a follow-up bd. File only what genuinely needs separate
+  consideration.
+- **Single source of truth wins.** When two places encode the same fact
+  (e.g. version, install path), drive one from the other. Fight drift
+  before it starts.
+- **Read before writing.** Before modifying any file, read the current
+  contents. Before calling into any module, read its header. Existing
+  patterns get followed, not re-derived.
+
+## Session Start
+
+Before writing any code or claiming work, run this checklist:
+
+1. `git status` and `git log --oneline -5` — am I on master, on a stale
+   branch, with uncommitted work?
+2. `bd ready` and `bd list --status=in_progress` — what's claim-able,
+   what did I leave mid-flight?
+3. `make help` — refresh the wrapper inventory for this repo. Don't
+   call raw `cppcheck` / `lintian` / `dpkg-buildpackage` when a target
+   wraps them.
+4. `ethos doctor` — must report all PASS. If a check fails (typically
+   "Human identity"), fix before proceeding.
+
+## Stop and Ask — actions that warrant explicit confirmation
+
+The following modify shared state in ways that are hard or impossible
+to reverse cleanly. **Stop and ask the user before doing any of them**,
+regardless of how confident the rest of the workflow feels:
+
+- `git push --force` / `--force-with-lease` on a branch with an open PR
+  (rewrites SHAs, orphans every reviewer's in-flight comments)
+- `git rebase` on a branch with an open PR (same problem)
+- `git reset --hard` anywhere except a worktree just created
+- Closing or re-opening a PR
+- Deleting a branch the user may not have pulled
+- Pushing to `master` directly (branch protection should reject this,
+  but don't try)
+
+**Default rule when in doubt about a shared-state action:** stop and
+ask. The cost of pausing for one message is trivial; the cost of an
+unwanted action is hours of recovery and trust.
 
 ## Modernization Principles
 
@@ -111,6 +172,7 @@ The legacy 1996 Xlib build (`original/Makefile`, `original/xboing`) is preserved
 | **Valgrind** | Memory debugging | `apt install valgrind` |
 | **shellcheck** | Shell script linting | `apt install shellcheck` |
 | **bd** | Issue tracking with dependency chains | [github.com/steveyegge/beads](https://github.com/steveyegge/beads) |
+| **ethos** | Identity / mission / pipeline framework. `ethos doctor` must report all PASS at session start. | [github.com/punt-labs/ethos](https://github.com/punt-labs/ethos) |
 
 ## Tool Usage
 
@@ -398,25 +460,59 @@ Every code change follows this pipeline. Steps are ordered — do not skip ahead
 1. Add an ADR to `docs/DESIGN.md` if the change involves a design decision with rejected alternatives.
 2. Update `README.md` if user-facing behavior changed (new commands, flags, defaults, config).
 
-### Phase 5: Local Review
+### Phase 5: Local Review (incl. dogfood) — *before* opening the PR
 
-1. Run `feature-dev:code-reviewer` agent on the diff.
-2. Fix all valid findings. Repeat until reviews produce minor or no comments.
+This phase reduces remote-review round-trips. Don't skip it.
 
-### Phase 6: Ship
+1. Run a local code-reviewer agent on the diff: `pr-review-toolkit:code-reviewer`
+   or `feature-dev:code-reviewer`. Address every valid finding before
+   pushing. Repeat until the agent's review produces no substantive
+   findings (just style nits at most).
+2. **Dogfood the change.** For UI / packaging / runtime-path changes,
+   install the binary and walk the user journey from the same starting
+   point a real user would (desktop launcher, fresh terminal in `$HOME`,
+   `cd /tmp && <cmd>`). Don't rely on running from the source tree.
+3. `make check` must pass.
 
-1. Commit with conventional message format (`type(scope): description`). Quality gates must pass.
-2. Push branch, create PR via `mcp__github__create_pull_request`.
-3. Request Copilot review via `mcp__github__request_copilot_review`.
-4. `gh pr checks <number> --watch` in background. Wait for Copilot review (1–3 min after CI).
-5. Read all comments via `mcp__github__pull_request_read`. Address every finding — no "pre-existing" excuses. Re-push.
-6. Repeat 16–17 until the latest review cycle has zero new comments and all checks green.
-7. Merge via `mcp__github__merge_pull_request`.
+### Phase 6: Ship (active monitoring; merge on review convergence)
+
+1. Commit with conventional message format (`type(scope): description`). `make check` must pass.
+2. `git push -u origin <branch>` then create the PR (`mcp__plugin_github_github__create_pull_request` or `gh pr create`).
+3. **Arm active monitoring immediately:**
+   - `gh pr checks <number> --watch` in the background.
+   - A 2-minute cron polling `gh pr view <number> --json reviews,comments,reviewDecision,state,mergeable`.
+4. Request Copilot review (`mcp__plugin_github_github__request_copilot_review`).
+5. **For each new finding on the latest commit:** address it inline in
+   this PR — no follow-up bds, no "pre-existing" excuses. Run `make check`.
+   Plain `git push` (not force, not rebase). Resolve the corresponding
+   conversation thread via `gh api graphql` `resolveReviewThread` mutation.
+6. **Handle base conflicts via merge, never via rebase.** If the branch
+   goes `CONFLICTING`: click "Update branch" in the PR UI, or
+   `git fetch origin master && git merge origin/master` then `git push`.
+   This preserves commit SHAs and keeps reviewer state attached. **Never
+   `git rebase` or `git push --force` on a branch with an open PR.**
+7. **Merge when reviews converge — when the last round produces no new
+   substantive findings.** A large change typically goes through 3–5
+   rounds before reviews stop adding value. The merge gate is:
+   - All CI checks green on the latest commit.
+   - The most recent reviewer pass produced no actionable findings (an
+     empty review, a "no high-confidence vulnerabilities" Cursor pass,
+     a Copilot summary with zero new comments — *not* lingering threads
+     from earlier rounds that are still open).
+   - Every conversation thread is resolved.
+   That's the convergence signal. When it's met: merge. Don't wait for
+   explicit human approval — the convergence *is* the approval.
+8. Merge: `gh pr merge <number> --squash --delete-branch`.
 
 ### Phase 7: Close
 
 1. `bd close <id>` for completed beads.
 2. `bd sync` to sync beads state.
+3. **Clean up remote branches.** `gh pr merge --delete-branch` deletes
+   the merged branch on origin. Locally: `git checkout master && git
+   pull origin master && git branch -d <branch>` to drop the local
+   tracking branch. Periodically: `git fetch --prune origin` to clear
+   stale remote-tracking refs for branches deleted upstream.
 
 ## Workflow Tiers
 
@@ -490,20 +586,22 @@ When in doubt, background. The COO's job is responsiveness — spawn, brief the 
 
 ## Expert Agents
 
-Four project-specific agents in `.claude/agents/` provide domain expertise. Consult them via the Task tool or as hive-mind participants in `/feature-forge`.
+Four project-specific agents are defined as ethos identities under `.punt-labs/ethos/` and auto-installed into `.claude/agents/` by the SessionStart hook. Consult them via the Task tool or as hive-mind participants in `/feature-forge`. Each handle is a famous practitioner whose work informs the role.
 
-| Agent | Expertise | Consult when... |
-| ------- | ----------- | ----------------- |
-| `xboing-author` | Original author persona (Justin C. Kibell). Game vision, feel, design intent. | Any change touches gameplay mechanics, physics, scoring, level design, constants, or player experience. **Must approve** gameplay-affecting changes. |
-| `c-modernization-expert` | Modern C (C11/C17/C23), sanitizers, static analysis, safe refactoring. | Modernizing legacy code, fixing compiler warnings, resolving sanitizer findings, reviewing unsafe patterns. |
-| `av-platform-expert` | SDL2, legacy X11/Xlib, ALSA/PulseAudio, asset pipeline (XPM→PNG, .au→WAV). | Porting rendering or audio subsystems, designing the SDL2 abstraction layer, converting assets. |
-| `test-expert` | CMocka, characterization testing, fuzz testing, creating testability seams. | Writing tests for legacy code, designing test harness, extracting pure functions from coupled modules. |
+| Agent | Persona | Expertise | Consult when... |
+| ----- | ------- | --------- | --------------- |
+| `jck` | Justin C. Kibell | Original XBoing author. Game vision, feel, design intent. | Any change touches gameplay mechanics, physics, scoring, level design, constants, or player experience. **Must approve** gameplay-affecting changes. |
+| `jdc` | John D. Carmack | Modern C, sanitizers, frame-time discipline, modernize-without-rewriting (Doom 3 BFG). | Modernizing legacy code, fixing compiler warnings, resolving sanitizer findings, reviewing unsafe patterns. Also the **primary implementer** for general C work. |
+| `sjl` | Sam J. Lantinga | SDL2 author. Xlib internals, ALSA/PulseAudio/PipeWire, asset pipeline (XPM→PNG, .au→WAV). | Porting rendering or audio subsystems, designing the SDL2 abstraction layer, converting assets. |
+| `gjm` | Glenford J. Myers | *The Art of Software Testing* (1979). Characterization testing, fuzz testing, testability seams. | Writing tests for legacy code, designing test harness, extracting pure functions from coupled modules. |
+
+The session itself runs as `claude` (Claude Agento, COO/VP Engineering) — the generalist primary. Switch the active persona for a turn with `ethos session iam <handle>`.
 
 **Workflow integration:**
 
-- **T1: Forge** — all four agents participate as hive-mind experts. `xboing-author` has veto power on gameplay changes.
+- **T1: Forge** — all four agents participate as hive-mind experts. `jck` has veto power on gameplay changes.
 - **T2: Feature Dev** — delegate to the relevant expert(s) as subagents for exploration and review.
-- **T3: Direct** — consult `xboing-author` if the change could affect game feel; consult `c-modernization-expert` for any C code changes.
+- **T3: Direct** — consult `jck` if the change could affect game feel; consult `jdc` for any C code changes.
 
 ## Branch Discipline
 
@@ -517,6 +615,17 @@ Feature work goes on feature branches. Never commit directly to master.
 | `port/` | Platform porting work |
 | `docs/` | Documentation only |
 | `test/` | Test additions or infrastructure |
+| `chore/` | Tooling, packaging, dotfiles, bd state sync |
+| `style/` | Format-only or lint-only passes |
+
+**Never `git rebase` or `git push --force` on a branch with an open
+PR.** Force-push rewrites commit SHAs, which orphans every reviewer's
+in-flight comments (Copilot/Cursor anchor reviews to SHAs). Resolve
+base conflicts via merge — `git merge origin/master` or "Update branch"
+in the PR UI — both preserve SHAs.
+
+**Plain English over git internals.** In PR discussion, say "the latest
+commit" or paste the SHA. Avoid "HEAD" in user-facing prose.
 
 ## Commit Message Format
 
