@@ -522,43 +522,107 @@ This phase reduces remote-review round-trips. Don't skip it.
 
 ## Workflow Tiers
 
-Match the workflow to the scope. The deciding factor is **design ambiguity**, not size.
+Match the workflow to the scope. The deciding factor is **design ambiguity**, not size. Each tier maps to one or more ethos pipelines (see "Mission Archetypes and Pipelines" below) — pipelines are the concrete primitive; tiers are the planning shorthand.
 
-| Tier | Tool | When | Tracking |
+| Tier | Pipeline | When | Tracking |
 | ------ | ------ | ------ | ---------- |
-| **T1: Forge** | `/feature-forge` | Epics, cross-cutting work, competing design approaches | Beads with dependencies |
-| **T2: Feature Dev** | `/feature-dev` | Features, multi-file, clear goal but needs exploration | Beads + TodoWrite (internal) |
-| **T3: Direct** | Plan mode or manual | Tasks, bugs, obvious implementation path | Beads |
+| **T1: Forge** | `full` or `formal` | Epics, cross-cutting work, competing design approaches | Pipeline + beads |
+| **T2: Feature Dev** | `standard` (or `coverage` / `coe`) | Features, multi-file, clear goal but needs exploration | Pipeline + beads |
+| **T3: Direct** | `quick` or single contract | Tasks, bugs, obvious implementation path | Single mission + beads |
 
 **Decision flow:**
 
-1. Is there design ambiguity needing multi-perspective input? → **T1: Forge**
-2. Does it touch multiple files and benefit from codebase exploration? → **T2: Feature Dev**
-3. Otherwise → **T3: Direct** (plan mode if >3 files, manual if fewer)
+1. Is there design ambiguity needing multi-perspective input? → **T1: Forge** (`full` if cross-cutting, `formal` if it touches a state machine or protocol)
+2. Does it touch multiple files and benefit from codebase exploration? → **T2: Feature Dev** (`standard`; `coverage` for test gaps; `coe` for recurring bugs)
+3. Otherwise → **T3: Direct** (`quick` pipeline or a single `implement`-archetype mission)
 
 **Escalation only goes up.** If T3 reveals unexpected scope, escalate to T2. If T2 reveals competing design approaches, escalate to T1. Never demote mid-flight.
 
 **Game modernization examples:**
 
-- Replacing the renderer with SDL2 (architectural choice, multiple valid approaches) → **T1: Forge**
-- Adding CMocka tests to the save/load subsystem (multi-file, needs code exploration) → **T2: Feature Dev**
-- Fixing a buffer overflow found by ASan (single root cause, obvious fix) → **T3: Direct**
+- Replacing the renderer with SDL2 (architectural choice, multiple valid approaches) → **T1: `full` pipeline**
+- The 16-mode game state machine (protocol-shaped) → **T1: `formal` pipeline** (Z-Spec first)
+- Adding CMocka tests to the save/load subsystem (multi-file, needs code exploration) → **T2: `standard` pipeline**
+- Test gap closure for an existing module → **T2: `coverage` pipeline**
+- Recurring bug or data-corruption investigation → **T2: `coe` pipeline**
+- Fixing a buffer overflow found by ASan (single root cause, obvious fix) → **T3: `quick` or single `implement` mission**
+- Doc-only change (README, ADR) → **`docs` pipeline** at any tier
+
+## Mission Archetypes and Pipelines
+
+**Every non-trivial delegation goes through an ethos mission contract — not a freeform `Agent()` prompt.** The contract is the trust boundary: the worker's write-set is admitted, the evaluator is content-hash-pinned at create time, rounds are bounded, and every transition lands in an append-only event log. This replaces "draft a spec markdown then send it to a reviewer in prose" with a typed primitive the runtime enforces (DES-031 through DES-037 in the ethos repo).
+
+The user-invocable `mission` skill scaffolds contracts. Read `~/.claude/skills/mission/SKILL.md` for the step-by-step. The CLI is **nested under `mission`**: `ethos mission pipeline list` (not `ethos pipelines list`), `ethos mission pipeline show <name>`, `ethos mission pipeline instantiate <name> --leader claude --worker <h> --evaluator <h> --var feature=<slug> --var target=<path>`.
+
+### Archetypes
+
+Ten archetypes ship with ethos (run `ls ~/.punt-labs/ethos/archetypes/`). Most-used in this repo:
+
+| Archetype | When | Default budget | Write-set |
+| --------- | ---- | -------------- | --------- |
+| `implement` | C code change with a specific outcome | 3 rounds | Any path |
+| `design` | Produce a design doc | 2 rounds | `*.md`, `docs/**` |
+| `test` | Add or improve tests | 2 rounds | `tests/**`, `testdata/**` |
+| `review` | Read code/specs; produce a findings artifact (no source modification) | 1 round | `*.md`, `*.yaml`, `.tmp/**` |
+| `report` | Gather info and summarize (empty write-set OK) | 1 round | empty allowed |
+| `task` | Execute a specific instruction | 3 rounds | Any path |
+| `investigate` | Root-cause an incident (read-only) | 1 round | empty allowed |
+
+Set `type: <archetype>` on a contract; ethos applies the archetype's constraints on top of base validation and rejects misuse (e.g. a `design` contract whose write-set contains `src/foo.c`).
+
+### Pipelines
+
+Eight pipelines compose archetype-typed stages with `depends_on` edges. Pick by **nature** of the work, not size:
+
+| Pipeline | Stages | Use when |
+| -------- | ------ | -------- |
+| `quick` | implement → review | Single-bead bug fix, well-understood path |
+| `standard` | design → implement → test → review → document | Default feature work — what most non-trivial PRs should be |
+| `full` | prfaq → spec → design → implement → test → coverage → review → document → retro | Cross-cutting modernization (e.g. SDL2 renderer replacement) |
+| `formal` | spec → design → implement → test → coverage → review → document | Stateful systems and protocols — the 16-mode game state machine, level file format |
+| `product` | prfaq → design → implement → test → review → document | New user-facing feature (PR/FAQ first) |
+| `coe` | investigate → root-cause → fix → test → document | Recurring bug, data corruption, "fixed before" |
+| `coverage` | measure → test → verify | Targeted test-coverage improvement |
+| `docs` | design → review | Documentation-only change |
+
+Built-in pipelines expect two template variables: `{feature}` (doc paths, e.g. `walk-diff`) and `{target}` (code area, e.g. `src/sdl2_renderer/`). Pass both at instantiation. Each stage becomes a mission with `depends_on` pointing at the upstream stage; query the cohort with `ethos mission list --pipeline <id>`.
+
+### Worker / evaluator pairing for this team
+
+The runtime requires worker ≠ evaluator and forbids same-role pairing (DES-033). Defaults that satisfy both:
+
+| Worker | Default evaluator | Reasoning |
+| ------ | ----------------- | --------- |
+| `jdc` (c-modernization) | `gjm` (test-engineer) | Tests evaluate implementer's behavior |
+| `sjl` (av-platform) | `jdc` (c-modernization) | C-systems eye on the SDL2/X11 boundary |
+| `gjm` (test-engineer) | `jdc` (c-modernization) | C-systems eye on the test infrastructure |
+| `jck` (vision-keeper, design-only) | `jmf-pobox` (maintainer) | Maintainer signs off on game-feel design |
+
+`jck` is read-only by role (Read/Grep/Glob/WebFetch only) — he can be the worker for `design` / `report` / `investigate` archetypes that produce docs, never `implement` or `test`. His role explicitly requires reading `original/<file>.c:<line>` before answering anything about gameplay, physics, scoring, or design intent.
+
+### Traceability
+
+Three layers, all kept:
+
+1. **`~/.punt-labs/ethos/missions/<id>.jsonl`** — typed event log (per machine; events: `create`, `result`, `reflect`, `advance`, `close`).
+2. **`<repo>/.ethos/missions.jsonl`** — auto-appended one-line summary per closed mission. Commit-ready; lands in PRs as part of the audit trail.
+3. **`docs/specs/`, `docs/reviews/`, `docs/research/`** — human-readable narrative artifacts. These are the **outputs** of `design` / `review` / `report` archetype missions, not pre-existing handcrafted documents. The mission's write-set targets the doc; closing the mission means the doc lands.
 
 ## Specifications and Peer Review
 
-**Every spec is peer-reviewed before any worker is spawned to execute it.** A spec is any written delegation artifact: a mission contract, a design proposal, an RFC, an architectural plan, or a freeform delegation brief that meaningfully constrains how a teammate will implement.
+**Every spec is peer-reviewed before any worker is spawned to execute it.** A spec is any written delegation artifact: a mission contract YAML, a design proposal under `docs/specs/`, an RFC, an architectural plan, or any other freeform brief that meaningfully constrains how a teammate will implement. The mission contract IS the spec for typed delegations — peer review of the contract happens before `ethos mission create`, not after.
 
 **Specs, peer reviews, and research findings are persisted as files in `docs/`, never just in agent transcripts.** Conversation history disappears; the repo is the audit trail. File layout:
 
 | Folder | Contains |
 | ------ | -------- |
-| `docs/specs/` | Spec / mission contract markdown — one per delegation. Filename: `YYYY-MM-DD-<topic>.md`. Cross-links to its review and any input research. Tracks revision history at the bottom. |
+| `docs/specs/` | Spec / mission contract markdown — one per delegation. Filename: `YYYY-MM-DD-<topic>.md`. Cross-links to its review and any input research. Tracks revision history at the bottom. For typed delegations, the canonical artifact lives in the ethos store at `~/.punt-labs/ethos/missions/<id>.yaml` (per-machine, registered via `ethos mission create`) plus the auto-appended summary in `<repo>/.ethos/missions.jsonl` (commit-ready audit trail); `.tmp/missions/<slug>.yaml` is just the scratch draft consumed at create time. |
 | `docs/reviews/` | Peer review reports — one per spec review. Filename: `YYYY-MM-DD-<topic>-review.md`. Includes verdict, findings (blocking / non-blocking / test-plan / hermetic / write-set / original-source-alignment), and a "Resolution by leader" section recording how each finding was addressed. |
 | `docs/research/` | Original-source research, exploratory analysis, or other read-only investigations that feed into specs. Filename: `YYYY-MM-DD-<topic>.md`. Cites source files / lines verbatim so claims are auditable. |
 
-The leader (COO) writes the spec to `docs/specs/`, links it from the reviewer's prompt, the reviewer writes the review to `docs/reviews/`, the leader updates the spec to v2 with a revision-history entry, and the worker is delegated with a reference to the file path — not just inline prompt text. Inline prompts are fine for redundancy, but the file is the canonical artifact.
+The leader (COO) drafts the contract YAML to a `.tmp/missions/<slug>.yaml` scratch path, links it from the reviewer's prompt (or runs `report`-archetype review missions for parallel multi-domain review), the reviewer writes the review to `docs/reviews/`, the leader revises the contract YAML and records the revision in the spec markdown, then runs `ethos mission create --file .tmp/missions/<slug>.yaml` — the store registers it at `~/.punt-labs/ethos/missions/<id>.yaml`, which is the canonical version from then on. Inline prompts to the worker are fine for redundancy, but the registered contract is the canonical artifact — the worker reads it via `ethos mission show <id>` as their first action.
 
-The reviewer is selected by competence and is **not** the worker who will execute the spec — that is a conflict of interest, not peer review. Review focuses on the spec itself (success criteria, write set, root-cause framing, missing constraints, original-source alignment per "Don't reinvent if the original solved it"), not the eventual implementation.
+The reviewer is selected by competence and is **not** the worker who will execute the spec — that is a conflict of interest, not peer review (and the runtime refuses it: DES-033). Review focuses on the spec itself (success criteria, write set, root-cause framing, missing constraints, original-source alignment per "Don't reinvent if the original solved it"), not the eventual implementation.
 
 | Reviewer | Reviews specs that... |
 | -------- | --------------------- |
@@ -572,20 +636,30 @@ Multi-domain specs get multiple reviewers in parallel. Skip the formal review on
 Workflow shape:
 
 ```text
-Research / consult original → Draft spec → Peer review → Revise → Delegate execution → Evaluate
+Research / consult original → Draft contract YAML → Peer review → Revise → ethos mission create → Spawn worker → Evaluate → Close or reflect+advance
 ```
 
 Never `Draft → Delegate → discover spec was wrong → rework`. That is the failure mode this rule exists to prevent.
 
 ## Delegation Mode and Background Subagents
 
-The session runs as `claude` (COO/VP Eng). The COO **delegates** — does not implement. Implementation, research, and testing all go to the appropriate specialist subagent (`jck`, `jdc`, `sjl`, `gjm`). The COO synthesizes findings, drafts specs, drives review cycles, and lands PRs.
+The session runs as `claude` (COO/VP Eng). The COO **delegates** — does not implement. Implementation, research, and testing all go through mission contracts to the appropriate specialist subagent (`jck`, `jdc`, `sjl`, `gjm`). The COO scaffolds the contract, picks the evaluator, spawns the worker via `Agent`, and drives close-or-advance after the result lands.
 
-**Background-by-default.** Every subagent spawn that does not immediately block the COO's next decision **must** run in the background (`run_in_background: true` on the `Agent` / `Task` call). Background spawns enable parallel teamwork: jck reading `original/` while gjm drafts test plans while jdc prototypes API. Foreground is reserved for the narrow case where the COO genuinely cannot proceed without the agent's result.
+**Mission flow (per the `mission` skill at `~/.claude/skills/mission/SKILL.md`):**
+
+```text
+Resolve worker by archetype/domain → Scaffold contract YAML → Confirm with leader →
+  ethos mission create --file .tmp/missions/<slug>.yaml → Agent(subagent_type=<worker>, prompt="Mission <id> is yours...", run_in_background=true) →
+  Monitor via ethos mission log/show → Read result via ethos mission results <id> → Close or reflect+advance
+```
+
+The worker reads the contract from the store via `ethos mission show <id>` as their first action — the prompt points at the contract, not restates it. The Phase 3 runtime enforces the write-set, the bounded rounds, and the result/reflection gates.
+
+**Background-by-default.** Every subagent spawn that does not immediately block the COO's next decision **must** run in the background (`run_in_background: true` on the `Agent` call). Background spawns enable parallel teamwork: jck reading `original/` while gjm drafts test plans while jdc prototypes API. Foreground is reserved for the narrow case where the COO genuinely cannot proceed without the agent's result.
 
 | Spawn mode | Use when |
 | ---------- | -------- |
-| Background | Research, parallel implementation streams, peer review of specs, long-running test runs, anything the COO can let run while continuing other work |
+| Background | Mission workers, research, parallel implementation streams, peer review, long-running test runs |
 | Foreground | The COO's next action depends on the agent's specific finding, no other useful work exists, and the agent is expected to return quickly |
 
 When in doubt, background. The COO's job is responsiveness — spawn, brief the user on what's running, continue.
