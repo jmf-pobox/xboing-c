@@ -258,12 +258,12 @@ Go to Step 1. Stop when all phases are complete.
 
 Consult project-specific agents for domain expertise:
 
-| When | Agent |
-|------|-------|
-| Gameplay mechanics, physics, constants, scoring | `xboing-author` |
-| C code quality, sanitizer findings, safe patterns | `c-modernization-expert` |
-| SDL2 rendering/audio, asset pipeline, X11 porting | `av-platform-expert` |
-| Test strategy, making legacy code testable | `test-expert` |
+| When | Agent | Persona |
+|------|-------|---------|
+| Gameplay mechanics, physics, constants, scoring | `jck` | Justin C. Kibell |
+| C code quality, sanitizer findings, safe patterns | `jdc` | John D. Carmack |
+| SDL2 rendering/audio, asset pipeline, X11 porting | `sjl` | Sam J. Lantinga |
+| Test strategy, making legacy code testable | `gjm` | Glenford J. Myers |
 
-**Always consult `xboing-author`** before changing any gameplay-affecting
+**Always consult `jck`** before changing any gameplay-affecting
 constant, physics formula, or scoring rule.

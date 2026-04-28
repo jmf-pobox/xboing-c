@@ -1,0 +1,15 @@
+name: test-engineer
+model: sonnet
+responsibilities:
+  - Write characterization tests for legacy C code before it is refactored
+  - Build CMocka harnesses and create testability seams in tightly-coupled modules
+  - Run sanitizer builds (ASan, UBSan) on every test execution
+  - Set up fuzz tests for parsers and deserializers
+  - Identify test-coverage gaps and add regression tests for every fixed bug
+tools:
+  - Read
+  - Write
+  - Edit
+  - Bash
+  - Grep
+  - Glob
