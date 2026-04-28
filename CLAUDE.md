@@ -512,13 +512,27 @@ This phase reduces remote-review round-trips. Don't skip it.
 
 ### Phase 7: Close
 
+**Cleanup is mandatory after every merge — no asking, no waiting for the
+user to confirm.** A merged PR with the local branch left behind is
+unfinished work.
+
 1. `bd close <id>` for completed beads.
 2. `bd sync` to sync beads state.
-3. **Clean up remote branches.** `gh pr merge --delete-branch` deletes
-   the merged branch on origin. Locally: `git checkout master && git
-   pull origin master && git branch -d <branch>` to drop the local
-   tracking branch. Periodically: `git fetch --prune origin` to clear
-   stale remote-tracking refs for branches deleted upstream.
+3. **Clean up local and remote.** Run all four steps in sequence after
+   `gh pr merge --squash --delete-branch` returns success:
+   1. `git checkout master`
+   2. `git pull --ff-only origin master` — fast-forward to the merge
+      commit (refuse to pull non-fast-forward; investigate if it does)
+   3. `git branch -d <branch>` — drop the local tracking branch (use
+      `-D` only if the branch was rebased and `-d` warns; never on a
+      branch with unpushed commits without checking)
+   4. `git fetch --prune origin` — clear stale remote-tracking refs
+      for branches deleted upstream (covers branches deleted by other
+      contributors / agents, not just yours)
+
+   The `--delete-branch` flag on the merge already deletes the remote
+   branch; the local branch and stale refs need explicit cleanup. Do
+   all four every time — it's four commands, not a judgment call.
 
 ## Workflow Tiers
 
