@@ -563,7 +563,7 @@ Ten archetypes ship with ethos (run `ls ~/.punt-labs/ethos/archetypes/`). Most-u
 | `implement` | C code change with a specific outcome | 3 rounds | Any path |
 | `design` | Produce a design doc | 2 rounds | `*.md`, `docs/**` |
 | `test` | Add or improve tests | 2 rounds | `tests/**`, `testdata/**` |
-| `review` | Read and report findings (read-only) | 1 round | `*.md`, `*.yaml`, `.tmp/**` |
+| `review` | Read code/specs; produce a findings artifact (no source modification) | 1 round | `*.md`, `*.yaml`, `.tmp/**` |
 | `report` | Gather info and summarize (empty write-set OK) | 1 round | empty allowed |
 | `task` | Execute a specific instruction | 3 rounds | Any path |
 | `investigate` | Root-cause an incident (read-only) | 1 round | empty allowed |
@@ -616,11 +616,11 @@ Three layers, all kept:
 
 | Folder | Contains |
 | ------ | -------- |
-| `docs/specs/` | Spec / mission contract markdown — one per delegation. Filename: `YYYY-MM-DD-<topic>.md`. Cross-links to its review and any input research. Tracks revision history at the bottom. For typed delegations, the canonical artifact is the mission YAML in `.tmp/missions/<slug>.yaml`; the markdown in `docs/specs/` is the human-readable narrative. |
+| `docs/specs/` | Spec / mission contract markdown — one per delegation. Filename: `YYYY-MM-DD-<topic>.md`. Cross-links to its review and any input research. Tracks revision history at the bottom. For typed delegations, the canonical artifact lives in the ethos store at `~/.punt-labs/ethos/missions/<id>.yaml` (per-machine, registered via `ethos mission create`) plus the auto-appended summary in `<repo>/.ethos/missions.jsonl` (commit-ready audit trail); `.tmp/missions/<slug>.yaml` is just the scratch draft consumed at create time. |
 | `docs/reviews/` | Peer review reports — one per spec review. Filename: `YYYY-MM-DD-<topic>-review.md`. Includes verdict, findings (blocking / non-blocking / test-plan / hermetic / write-set / original-source-alignment), and a "Resolution by leader" section recording how each finding was addressed. |
 | `docs/research/` | Original-source research, exploratory analysis, or other read-only investigations that feed into specs. Filename: `YYYY-MM-DD-<topic>.md`. Cites source files / lines verbatim so claims are auditable. |
 
-The leader (COO) drafts the contract, links it from the reviewer's prompt (or runs `report`-archetype review missions for parallel multi-domain review), the reviewer writes the review to `docs/reviews/`, the leader revises the contract YAML to v2 and records the revision in the spec markdown, then runs `ethos mission create --file .tmp/missions/<slug>.yaml`. Inline prompts to the worker are fine for redundancy, but the contract YAML is the canonical artifact — the worker reads it via `ethos mission show <id>` as their first action.
+The leader (COO) drafts the contract YAML to a `.tmp/missions/<slug>.yaml` scratch path, links it from the reviewer's prompt (or runs `report`-archetype review missions for parallel multi-domain review), the reviewer writes the review to `docs/reviews/`, the leader revises the contract YAML and records the revision in the spec markdown, then runs `ethos mission create --file .tmp/missions/<slug>.yaml` — the store registers it at `~/.punt-labs/ethos/missions/<id>.yaml`, which is the canonical version from then on. Inline prompts to the worker are fine for redundancy, but the registered contract is the canonical artifact — the worker reads it via `ethos mission show <id>` as their first action.
 
 The reviewer is selected by competence and is **not** the worker who will execute the spec — that is a conflict of interest, not peer review (and the runtime refuses it: DES-033). Review focuses on the spec itself (success criteria, write set, root-cause framing, missing constraints, original-source alignment per "Don't reinvent if the original solved it"), not the eventual implementation.
 
