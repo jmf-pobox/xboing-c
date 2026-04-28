@@ -70,30 +70,43 @@ Two concrete defects:
 
 ### What was fixed
 
+Round 1 (initial CLION.md commit, 2026-04-27):
+
 - Deleted `.idea/runConfigurations/xboing_sdl2.xml`.
 - Added `.idea/runConfigurations/xboing.xml` pointing at the real `xboing` target, with `WORKING_DIR=$PROJECT_DIR$` and build-before-run enabled.
 - The `All CTest` config (already correct) is unchanged.
 
-### What's still untidy
+Round 2 (same day, follow-up cleanup):
 
-The auto-generated library configs in `workspace.xml` are local user state and not committed. They stay until disabled at the IDE level:
+- Disabled the IDE-global toggle "Create run configurations for all targets when CMake project is loaded" (Settings → Advanced Settings).
+- Closed CLion, then surgically rewrote the `RunManager` and `CMakeRunConfigurationManager` blocks in `.idea/workspace.xml` to drop the 83 cached phantom configs (one per static library and test executable). Both blocks now reference only the real `xboing` target. workspace.xml shrank 747 → 158 lines.
+- Added two more committed configs under `.idea/runConfigurations/`: `xboing-asan.xml` and `All_CTest_asan.xml` — same targets as the debug-pinned configs but `CONFIG_NAME="asan"`, so sanitizer runs are one-click without flipping the global build profile.
 
-> Settings → Advanced Settings → "Create run configurations for all targets when CMake project is loaded" → uncheck.
->
-> Then: Run → Edit Configurations → delete the phantom library entries.
+### How to keep it clean
 
-If you don't disable that toggle, every fresh CMake reload regenerates the noise.
+The phantom regeneration is driven by one IDE-global setting. Keep it off:
+
+> Settings → Advanced Settings → "Create run configurations for all targets when CMake project is loaded" → **off**.
+
+If that toggle is on, every CMake reload re-creates one auto-detected run config per CMake target (~80 of them in this repo). They cache in `.idea/workspace.xml`, which is gitignored, so the noise stays per-user — but the dropdown gets unusable and `get_run_configurations` returns junk.
+
+Two failure modes worth knowing:
+
+1. **The toggle is per-IDE-installation, not per-project.** It lives in `~/.config/JetBrains/CLion*/options/advancedSettings.xml`. Once flipped, every project benefits; until flipped, every project regenerates phantoms.
+2. **CLion writes `advancedSettings.xml` on shutdown.** If you flip the toggle and *then* edit `workspace.xml` from outside, CLion's auto-save will overwrite both. Always close CLion before any direct workspace.xml surgery.
 
 ### Run configurations after the fix
 
-Two committed configs (the only ones that should be):
+Four committed configs:
 
 | File | Purpose |
 | --- | --- |
-| `.idea/runConfigurations/xboing.xml` | Run the SDL2 game (target `xboing`, `WORKING_DIR=$PROJECT_DIR$`, build-before-run) |
-| `.idea/runConfigurations/All_CTest.xml` | Run the full test suite (`--output-on-failure`, working dir `$CMakeCurrentLocalGenerationDir$`) |
+| `.idea/runConfigurations/xboing.xml` | Run the SDL2 game on profile `debug` (`WORKING_DIR=$PROJECT_DIR$`, build-before-run) |
+| `.idea/runConfigurations/xboing-asan.xml` | Same target as above but pinned to profile `asan` — one-click sanitizer run from the IDE |
+| `.idea/runConfigurations/All_CTest.xml` | Full test suite on profile `debug` (`--output-on-failure`, working dir `$CMakeCurrentLocalGenerationDir$`, `TEST_MODE="SUITE_TEST"`, `EXPLICIT_BUILD_TARGET_NAME="all"`) |
+| `.idea/runConfigurations/All_CTest_asan.xml` | Same as above but profile `asan` — runs the entire CMocka suite under ASan + UBSan |
 
-Both have `supportsDynamicLaunchOverrides: true`, which means the MCP `execute_run_configuration` tool can pass one-time `programArguments` / `workingDirectory` / `envs` overrides without mutating the config file.
+All four expose `supportsDynamicLaunchOverrides: true`, which means the MCP `execute_run_configuration` tool can pass one-time `programArguments` / `workingDirectory` / `envs` overrides without mutating the config file.
 
 ### Troubleshooting: "why is nothing in my run-config dropdown?"
 
@@ -187,6 +200,6 @@ The MCP server is a *companion* to shell tools, not a replacement. Use it for ID
 
 - `CMakePresets.json` — source of truth for CLion's CMake profiles
 - `.clang-format` — formatting rules CLion's project-level style should mirror
-- `.idea/runConfigurations/{xboing,All_CTest}.xml` — the only two run configs persisted as files
+- `.idea/runConfigurations/{xboing,xboing-asan,All_CTest,All_CTest_asan}.xml` — the four run configs persisted as files (debug + asan pairs for game and test suite)
 - `.idea/.gitignore` — excludes per-user state from the now-tracked `.idea/` directory
 - `CLAUDE.md` "Toolchain" and "Build Commands" sections — shell-side equivalents
