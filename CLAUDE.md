@@ -519,16 +519,26 @@ unfinished work.
 1. `bd close <id>` for completed beads.
 2. `bd sync` to sync beads state.
 3. **Clean up local and remote.** Run all four steps in sequence after
-   `gh pr merge --squash --delete-branch` returns success:
+   `gh pr merge <number> --squash --delete-branch` returns success:
    1. `git checkout master`
    2. `git pull --ff-only origin master` — fast-forward to the merge
       commit (refuse to pull non-fast-forward; investigate if it does)
-   3. `git branch -d <branch>` — drop the local tracking branch (use
-      `-D` only if the branch was rebased and `-d` warns; never on a
-      branch with unpushed commits without checking)
+   3. `git branch -d <branch>` — drop the local tracking branch.
+      **Order matters here**: do this *before* the prune in step 4.
+      A squash-merge creates a new SHA on master, so the local
+      branch's tip is not reachable from master post-merge. `git
+      branch -d` only succeeds because the remote-tracking ref
+      `refs/remotes/origin/<branch>` still exists and points at the
+      same SHA — git counts that as "merged into an upstream." You
+      will see a warning ("not yet merged to HEAD") — that warning
+      is expected and harmless; the branch is deleted. If the order
+      gets reversed (prune before delete) `-d` will refuse, and
+      `-D` is the right escape hatch *only* after verifying the
+      branch has no commits beyond `origin/<branch>` via
+      `git log <branch> ^master`.
    4. `git fetch --prune origin` — clear stale remote-tracking refs
-      for branches deleted upstream (covers branches deleted by other
-      contributors / agents, not just yours)
+      for branches deleted upstream (covers branches deleted by
+      other contributors / agents, not just yours)
 
    The `--delete-branch` flag on the merge already deletes the remote
    branch; the local branch and stale refs need explicit cleanup. Do
