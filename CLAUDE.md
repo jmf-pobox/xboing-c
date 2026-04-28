@@ -471,21 +471,27 @@ This phase reduces remote-review round-trips. Don't skip it.
 2. **Dogfood the change.** For UI / packaging / runtime-path changes,
    install the binary and walk the user journey from the same starting
    point a real user would (desktop launcher, fresh terminal in `$HOME`,
-   `cd /tmp && <cmd>`). Don't rely on running from the source tree.
+   `cd .tmp && <cmd>` from the repo, or a `make dogfood`-style wrapper
+   when one exists). Use `.tmp/` (gitignored, inside the repo) — never
+   `/tmp` — per the Tool Usage stay-inside-repo rule. Don't rely on
+   running from the source-tree cwd.
 3. `make check` must pass.
 
 ### Phase 6: Ship (active monitoring; merge on review convergence)
 
 1. Commit with conventional message format (`type(scope): description`). `make check` must pass.
-2. `git push -u origin <branch>` then create the PR (`mcp__plugin_github_github__create_pull_request` or `gh pr create`).
+2. `git push -u origin <branch>` then create the PR via the MCP GitHub tools (`mcp__github__create_pull_request`) or `gh pr create`.
 3. **Arm active monitoring immediately:**
    - `gh pr checks <number> --watch` in the background.
    - A 2-minute cron polling `gh pr view <number> --json reviews,comments,reviewDecision,state,mergeable`.
-4. Request Copilot review (`mcp__plugin_github_github__request_copilot_review`).
+4. Request Copilot review (`mcp__github__request_copilot_review`).
 5. **For each new finding on the latest commit:** address it inline in
    this PR — no follow-up bds, no "pre-existing" excuses. Run `make check`.
    Plain `git push` (not force, not rebase). Resolve the corresponding
-   conversation thread via `gh api graphql` `resolveReviewThread` mutation.
+   conversation thread. Thread resolution is the one workflow operation
+   without a structured MCP tool today; use `gh api graphql`
+   `resolveReviewThread` mutation as the documented exception to the
+   "prefer MCP over `gh api graphql`" Tool Usage rule.
 6. **Handle base conflicts via merge, never via rebase.** If the branch
    goes `CONFLICTING`: click "Update branch" in the PR UI, or
    `git fetch origin master && git merge origin/master` then `git push`.

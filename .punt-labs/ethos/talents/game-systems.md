@@ -68,15 +68,17 @@ Save formats must be backward compatible across player upgrades.
 
 | Concern | Where it lives |
 |---------|----------------|
-| Game logic | `game/` — pure C, no I/O |
-| Renderer | `platform/` — SDL2 abstraction |
-| Audio | `platform/` — SDL2_mixer |
-| Input | `platform/` — SDL2 event loop |
-| Persistence | `game/save.c` — format-versioned |
+| Game logic systems | `src/*_system.c` (ball, paddle, blocks, score, …) — pure C |
+| Renderer | `src/sdl2_renderer.c` (+ `src/sdl2_texture.c`, `src/sdl2_font.c`) |
+| Audio | `src/sdl2_audio.c` — SDL2_mixer wrapper |
+| Input / event loop | `src/sdl2_loop.c`, `src/game_main.c` |
+| Persistence | `src/savegame_io.c`, `src/highscore_io.c` — format-versioned |
+| Path resolution | `src/paths.c` — XDG-aware, no platform deps |
 
-The game module never includes SDL or X11 headers. The platform
-module never includes game-state headers — it receives drawables and
-event callbacks.
+The `*_system.c` files in `src/` never include SDL or X11 headers —
+they're pure C/game-logic layers. The `sdl2_*.c` files are the
+platform boundary: they translate game-render-info structs into
+SDL2 calls, and SDL2 events into game-input structs.
 
 ## Reference
 

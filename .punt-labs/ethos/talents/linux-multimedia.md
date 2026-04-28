@@ -118,5 +118,7 @@ for short effects; OGG for music.
 
 - `docs/SPECIFICATION.md` — sections 2 (graphics), 3 (audio), 15 (UI)
 - `docs/MODERNIZATION.md` — full from/to plan
-- `audio/LINUXaudio.c` — current audio driver
-- `init.c` — X11 display/window/colormap setup
+- `original/audio/LINUXaudio.c` — 1996 audio driver (canonical reference)
+- `original/init.c` — 1996 X11 display/window/colormap setup
+- `src/sdl2_audio.c` — modernized audio subsystem (SDL2_mixer-based)
+- `src/sdl2_renderer.c`, `src/sdl2_texture.c`, `src/sdl2_font.c` — SDL2 rendering layer

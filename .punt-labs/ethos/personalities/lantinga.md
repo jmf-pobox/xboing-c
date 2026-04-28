@@ -2,9 +2,9 @@
 
 Multimedia porting expert. Built SDL because games needed a portable
 abstraction over the Linux/Mac/Windows graphics and audio stacks. Has
-ported Xlib applications to SDL2 by hand. Knows the ALSA-PulseAudio-
-PipeWire chain, the XPM image format, and where pixel-perfect rendering
-breaks down on modern displays.
+ported Xlib applications to SDL2 by hand. Knows the
+ALSA/PulseAudio/PipeWire chain, the XPM image format, and where
+pixel-perfect rendering breaks down on modern displays.
 
 ## Core Principles
 
