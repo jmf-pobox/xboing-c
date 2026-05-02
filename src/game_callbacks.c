@@ -65,7 +65,6 @@ static int ball_cb_check_region(int row, int col, int bx, int by, int bdx, void 
  */
 static int ball_cb_on_block_hit(int row, int col, int ball_index, void *ud)
 {
-    (void)ball_index;
     game_ctx_t *ctx = ud;
 
     int block_type = block_system_get_type(ctx->block, row, col);
@@ -88,7 +87,14 @@ static int ball_cb_on_block_hit(int row, int col, int ball_index, void *ud)
     {
         case DEATH_BLK:
             block_system_clear(ctx->block, row, col);
-            return 1; /* Kill the ball */
+            /* Kill the ball: transition to BALL_POP so the pop animation
+             * runs and BALL_EVT_DIED fires.  ball_index must be live here.
+             * Matches original/ball.c:851 — ClearBallNow(display, window, i). */
+            {
+                ball_system_env_t benv = game_callbacks_ball_env(ctx);
+                ball_system_change_mode(ctx->ball, &benv, ball_index, BALL_POP);
+            }
+            return 1;
 
         case BOMB_BLK:
             block_system_clear(ctx->block, row, col);

@@ -211,8 +211,10 @@ void game_rules_next_level(game_ctx_t *ctx)
     if (title)
         message_system_set_default(ctx->message, title);
 
-    /* Reset paddle to center, place new ball */
+    /* Reset paddle to center, clear reverse, place new ball.
+     * Matches original/file.c:122 — SetReverseOff() inside SetupStage. */
     paddle_system_reset(ctx->paddle);
+    paddle_system_set_reverse(ctx->paddle, 0);
     paddle_system_set_size(ctx->paddle, PADDLE_SIZE_HUGE);
 
     ball_system_env_t env = game_callbacks_ball_env(ctx);
@@ -255,10 +257,13 @@ void game_rules_ball_died(game_ctx_t *ctx)
         return;
     }
 
-    /* Still have lives — reset ball on paddle */
+    /* Still have lives — reset ball on paddle.
+     * Clear reverse here: matches original/level.c:492 — SetReverseOff()
+     * inside DeadBall, before ResetBallStart. */
     if (ctx->audio)
         sdl2_audio_play(ctx->audio, "balllost");
 
+    paddle_system_set_reverse(ctx->paddle, 0);
     ball_system_env_t env = game_callbacks_ball_env(ctx);
     ball_system_reset_start(ctx->ball, &env);
 }

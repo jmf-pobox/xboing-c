@@ -611,32 +611,43 @@ int block_system_check_region(int row, int col, int bx, int by, int bdx, void *u
     /*
      * Step 3: Adjacency filter.
      * Suppress the region hit if the neighboring cell in that direction
-     * is occupied.  This prevents phantom bounces at block junctions
-     * where two blocks share an edge.
-     * Matches legacy CheckRegions() (ball.c:1387-1448).
+     * is occupied AND the ball is in the phantom case (ball center is
+     * already inside this block on the axis being tested).
+     *
+     * The gap case (ball in the inter-block gap, genuinely approaching
+     * the face) must NOT be suppressed.  The distinction:
+     *
+     *   TOP:    phantom when by >= bp->y  (ball center inside block top)
+     *           gap case when by < bp->y  (ball above block top edge — real hit)
+     *   BOTTOM: phantom when by <= bp->y + bp->height
+     *   LEFT:   phantom when bx >= bp->x
+     *   RIGHT:  phantom when bx <= bp->x + bp->width
+     *
+     * Fix for xboing-c-895: the original check suppressed on occupancy alone,
+     * firing in both the phantom and gap cases and causing 2-row tunneling.
      */
     switch (region)
     {
         case BLOCK_REGION_TOP:
-            if (row > 0 && ctx->blocks[row - 1][col].occupied)
+            if (row > 0 && ctx->blocks[row - 1][col].occupied && by >= bp->y)
             {
                 return BLOCK_REGION_NONE;
             }
             break;
         case BLOCK_REGION_BOTTOM:
-            if (row < MAX_ROW - 1 && ctx->blocks[row + 1][col].occupied)
+            if (row < MAX_ROW - 1 && ctx->blocks[row + 1][col].occupied && by <= bp->y + bp->height)
             {
                 return BLOCK_REGION_NONE;
             }
             break;
         case BLOCK_REGION_LEFT:
-            if (col > 0 && ctx->blocks[row][col - 1].occupied)
+            if (col > 0 && ctx->blocks[row][col - 1].occupied && bx >= bp->x)
             {
                 return BLOCK_REGION_NONE;
             }
             break;
         case BLOCK_REGION_RIGHT:
-            if (col < MAX_COL - 1 && ctx->blocks[row][col + 1].occupied)
+            if (col < MAX_COL - 1 && ctx->blocks[row][col + 1].occupied && bx <= bp->x + bp->width)
             {
                 return BLOCK_REGION_NONE;
             }

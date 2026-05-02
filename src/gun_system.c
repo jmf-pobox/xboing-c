@@ -311,7 +311,7 @@ int gun_system_shoot(gun_system_t *ctx, const gun_system_env_t *env)
         }
     }
 
-    if (gun_system_get_ammo(ctx) > 0)
+    if (gun_system_get_ammo(ctx) > 0 || ctx->unlimited)
     {
         int status = 0;
 

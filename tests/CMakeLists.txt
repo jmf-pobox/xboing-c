@@ -544,6 +544,14 @@ if(SDL2_FOUND AND SDL2_IMAGE_FOUND AND SDL2_MIXER_FOUND AND SDL2_TTF_FOUND)
     # ball/paddle state, and extended gameplay ticking.
     xboing_add_integration_test(test_integration_gameplay)
 
+    # Game rules regression tests (xboing-c-qnk)
+    # Verifies reverse clears at level advance and ball death.
+    xboing_add_integration_test(test_game_rules)
+
+    # Game callbacks regression tests (xboing-c-6x0)
+    # Verifies DEATH_BLK clears block and transitions correct ball to BALL_POP.
+    xboing_add_integration_test(test_game_callbacks)
+
     # Editor integration test (bead xboing-3w5.1.4)
     # Enters EDIT mode, draws blocks, clears grid, tests play-test
     # transitions and editor key commands through the full stack.
