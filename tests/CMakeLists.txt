@@ -58,6 +58,17 @@ target_include_directories(test_sprite_catalog PRIVATE
 target_compile_options(test_sprite_catalog PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
 target_link_libraries(test_sprite_catalog PRIVATE ${CMOCKA_LIBRARIES})
 add_test(NAME test_sprite_catalog COMMAND test_sprite_catalog)
+
+# Game render geometry tests (basket 2 PR #103 Copilot review F1: composite text
+# centering math had no automated coverage). Tests block_overlay_text_pos which
+# is a static inline in include/game_render.h.
+add_executable(test_game_render_geometry test_game_render_geometry.c)
+target_include_directories(test_game_render_geometry PRIVATE
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_compile_options(test_game_render_geometry PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+target_link_libraries(test_game_render_geometry PRIVATE ${CMOCKA_LIBRARIES})
+add_test(NAME test_game_render_geometry COMMAND test_game_render_geometry)
 add_test(NAME test_paths COMMAND test_paths)
 set_tests_properties(test_paths PROPERTIES WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 

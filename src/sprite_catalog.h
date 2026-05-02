@@ -308,7 +308,7 @@ static inline const char *sprite_block_key(int block_type)
         case PURPLE_BLK:
             return SPR_BLOCK_PURPLE;
         case BULLET_BLK:
-            return SPR_BLOCK_LOTSAMMO;
+            return SPR_BLOCK_YELLOW; /* Bullet block base is yellow; 4 bullet sprites composited on top (original/blocks.c:1681-1685) */
         case BLACK_BLK:
             return SPR_BLOCK_BLACK;
         case COUNTER_BLK:
@@ -336,7 +336,7 @@ static inline const char *sprite_block_key(int block_type)
         case PAD_EXPAND_BLK:
             return SPR_BLOCK_PAD_EXPAND;
         case DROP_BLK:
-            return SPR_BLOCK_RED; /* Drop uses row-dependent coloring */
+            return SPR_BLOCK_GREEN; /* Drop block renders as green (original/blocks.c:1728) */
         case MAXAMMO_BLK:
             return SPR_BLOCK_LOTSAMMO;
         case ROAMER_BLK:
@@ -344,7 +344,7 @@ static inline const char *sprite_block_key(int block_type)
         case TIMER_BLK:
             return SPR_BLOCK_CLOCK;
         case RANDOM_BLK:
-            return SPR_BLOCK_BONUS_1; /* Random uses animated bonus frames */
+            return SPR_BLOCK_RED; /* Random block renders as red with "- R -" text overlay (original/blocks.c:1700-1708) */
         case DYNAMITE_BLK:
             return SPR_BLOCK_DYNAMITE;
         case BONUSX2_BLK:

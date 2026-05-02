@@ -182,6 +182,36 @@ static void test_animated_key_negative_slide_extraball(void **state)
 }
 
 /* =========================================================================
+ * Group 7 — sprite_block_key base-sprite corrections (basket 2)
+ *
+ * Verifies the three sprite key fixes from beads xboing-c-t96, xboing-c-nk9,
+ * and xboing-c-oz1.  The composite overlays (digit, "- R -", bullet sprites)
+ * are render-side and verified by visual dogfood; the key selection is pure
+ * logic and fully unit-testable.
+ * ========================================================================= */
+
+static void test_block_key_drop_blk_is_green(void **state)
+{
+    /* DROP_BLK must map to green base sprite — original/blocks.c:1728 */
+    (void)state;
+    assert_string_equal(sprite_block_key(DROP_BLK), SPR_BLOCK_GREEN);
+}
+
+static void test_block_key_random_blk_is_red(void **state)
+{
+    /* RANDOM_BLK must map to red base sprite — original/blocks.c:1701 */
+    (void)state;
+    assert_string_equal(sprite_block_key(RANDOM_BLK), SPR_BLOCK_RED);
+}
+
+static void test_block_key_bullet_blk_is_yellow(void **state)
+{
+    /* BULLET_BLK must map to yellow base sprite — original/blocks.c:1681 */
+    (void)state;
+    assert_string_equal(sprite_block_key(BULLET_BLK), SPR_BLOCK_YELLOW);
+}
+
+/* =========================================================================
  * Test runner
  * ========================================================================= */
 
@@ -213,6 +243,11 @@ int main(void)
         cmocka_unit_test(test_animated_key_negative_slide_bonusx2),
         cmocka_unit_test(test_animated_key_negative_slide_death),
         cmocka_unit_test(test_animated_key_negative_slide_extraball),
+
+        /* Group 7 — sprite_block_key base-sprite corrections */
+        cmocka_unit_test(test_block_key_drop_blk_is_green),
+        cmocka_unit_test(test_block_key_random_blk_is_red),
+        cmocka_unit_test(test_block_key_bullet_blk_is_yellow),
     };
 
     return cmocka_run_group_tests(tests, NULL, NULL);
