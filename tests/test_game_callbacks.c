@@ -33,6 +33,7 @@
 #include "game_callbacks.h"
 #include "game_context.h"
 #include "game_init.h"
+#include "gun_system.h"
 #include "sdl2_state.h"
 
 /* =========================================================================
@@ -144,6 +145,197 @@ static void test_death_blk_clears_block_and_kills_ball(void **vstate)
 }
 
 /* =========================================================================
+ * Gap 1: BULLET_BLK bullet-hit adds 4 ammo and plays sound
+ *
+ * original/blocks.c:1581-1585 — AddABullet × NUMBER_OF_BULLETS_NEW_LEVEL (4).
+ * ========================================================================= */
+
+static void test_bullet_blk_gun_hit_adds_ammo(void **vstate)
+{
+    fixture_t *f = (fixture_t *)*vstate;
+    game_ctx_t *ctx = f->ctx;
+
+    block_system_clear_all(ctx->block);
+
+    /* Place BULLET_BLK — counterSlide=0 means no multi-hit protection */
+    block_system_status_t bst = block_system_add(ctx->block, 2, 3, BULLET_BLK, 0, 0);
+    assert_int_equal(bst, BLOCK_SYS_OK);
+
+    /* Start at 2 ammo */
+    gun_system_set_ammo(ctx->gun, 2);
+    gun_system_set_unlimited(ctx->gun, 0);
+
+    /* Simulate bullet hit via gun_cb_on_block_hit (indirectly through game_callbacks_gun) */
+    gun_system_callbacks_t cbs = game_callbacks_gun();
+    cbs.on_block_hit(2, 3, ctx);
+
+    /* Block must be cleared */
+    assert_int_equal(block_system_is_occupied(ctx->block, 2, 3), 0);
+    /* Ammo must be 2 + 4 = 6 */
+    assert_int_equal(gun_system_get_ammo(ctx->gun), 6);
+}
+
+/* =========================================================================
+ * Gap 2: MAXAMMO_BLK bullet-hit sets unlimited + GUN_MAX_AMMO+1 ammo
+ *
+ * original/blocks.c:1588-1593 — SetUnlimitedBullets + SetNumberBullets(MAX+1).
+ * ========================================================================= */
+
+static void test_maxammo_blk_gun_hit_sets_unlimited(void **vstate)
+{
+    fixture_t *f = (fixture_t *)*vstate;
+    game_ctx_t *ctx = f->ctx;
+
+    block_system_clear_all(ctx->block);
+
+    block_system_status_t bst = block_system_add(ctx->block, 1, 0, MAXAMMO_BLK, 0, 0);
+    assert_int_equal(bst, BLOCK_SYS_OK);
+
+    gun_system_set_ammo(ctx->gun, 0);
+    gun_system_set_unlimited(ctx->gun, 0);
+
+    gun_system_callbacks_t cbs = game_callbacks_gun();
+    cbs.on_block_hit(1, 0, ctx);
+
+    /* Block cleared */
+    assert_int_equal(block_system_is_occupied(ctx->block, 1, 0), 0);
+    /* Unlimited flag set */
+    assert_int_equal(gun_system_get_unlimited(ctx->gun), 1);
+    /* Ammo set to GUN_MAX_AMMO + 1 */
+    assert_int_equal(gun_system_get_ammo(ctx->gun), GUN_MAX_AMMO + 1);
+}
+
+/* =========================================================================
+ * Gap 3/4: HYPERSPACE_BLK and BLACK_BLK absorb bullets — remain occupied
+ *
+ * original/gun.c:341-350 — just redraws, never killed by bullet.
+ * ========================================================================= */
+
+static void test_hyperspace_blk_absorbs_bullet(void **vstate)
+{
+    fixture_t *f = (fixture_t *)*vstate;
+    game_ctx_t *ctx = f->ctx;
+
+    block_system_clear_all(ctx->block);
+    block_system_add(ctx->block, 0, 4, HYPERSPACE_BLK, 0, 0);
+
+    gun_system_callbacks_t cbs = game_callbacks_gun();
+    cbs.on_block_hit(0, 4, ctx);
+
+    /* Block must remain occupied after bullet hit */
+    assert_int_equal(block_system_is_occupied(ctx->block, 0, 4), 1);
+}
+
+static void test_black_blk_absorbs_bullet(void **vstate)
+{
+    fixture_t *f = (fixture_t *)*vstate;
+    game_ctx_t *ctx = f->ctx;
+
+    block_system_clear_all(ctx->block);
+    block_system_add(ctx->block, 1, 5, BLACK_BLK, 0, 0);
+
+    gun_system_callbacks_t cbs = game_callbacks_gun();
+    cbs.on_block_hit(1, 5, ctx);
+
+    assert_int_equal(block_system_is_occupied(ctx->block, 1, 5), 1);
+}
+
+/* =========================================================================
+ * Gap 5: Multi-hit special block requires 3 bullet hits before clear
+ *
+ * original/gun.c:325-340 — counterSlide decrements per hit.
+ * ========================================================================= */
+
+static void test_mgun_blk_requires_three_gun_hits(void **vstate)
+{
+    fixture_t *f = (fixture_t *)*vstate;
+    game_ctx_t *ctx = f->ctx;
+
+    block_system_clear_all(ctx->block);
+    /* counterSlide=3 = BLOCK_SHOTS_TO_KILL_SPECIAL */
+    block_system_add(ctx->block, 3, 3, MGUN_BLK, 3, 0);
+
+    gun_system_callbacks_t cbs = game_callbacks_gun();
+
+    /* Hit 1 — still occupied */
+    cbs.on_block_hit(3, 3, ctx);
+    assert_int_equal(block_system_is_occupied(ctx->block, 3, 3), 1);
+
+    /* Hit 2 — still occupied */
+    cbs.on_block_hit(3, 3, ctx);
+    assert_int_equal(block_system_is_occupied(ctx->block, 3, 3), 1);
+
+    /* Hit 3 — cleared */
+    cbs.on_block_hit(3, 3, ctx);
+    assert_int_equal(block_system_is_occupied(ctx->block, 3, 3), 0);
+}
+
+/* =========================================================================
+ * Gap 6: MGUN_BLK ball-hit must NOT set unlimited
+ *
+ * original/blocks.c MGUN_BLK case — only fastGun; unlimited is MAXAMMO only.
+ * ========================================================================= */
+
+static void test_mgun_blk_ball_hit_no_unlimited(void **vstate)
+{
+    fixture_t *f = (fixture_t *)*vstate;
+    game_ctx_t *ctx = f->ctx;
+
+    block_system_clear_all(ctx->block);
+    ball_system_clear_all(ctx->ball);
+
+    /* Place MGUN_BLK */
+    block_system_add(ctx->block, 5, 2, MGUN_BLK, 0, 0);
+
+    gun_system_set_unlimited(ctx->gun, 0);
+    gun_system_set_ammo(ctx->gun, 4);
+
+    /* Add a ball positioned on the MGUN_BLK center so ball_system_update fires on_block_hit.
+     * MGUN_BLK at (5,2): col_width=55, row_height=32, block width=35, height=15.
+     * x = 2*55 + (55-35)/2 = 110 + 10 = 120
+     * y = 5*32 + (32-15)/2 = 160 + 8 = 168
+     * center: (120+17, 168+7) = (137, 175) */
+    ball_system_env_t env = game_callbacks_ball_env(ctx);
+    int idx = ball_system_add(ctx->ball, &env, 137, 175, 0, 0, NULL);
+    assert_int_not_equal(idx, -1);
+    ball_system_change_mode(ctx->ball, &env, idx, BALL_ACTIVE);
+
+    ball_system_update(ctx->ball, &env);
+
+    /* Block cleared by ball hit */
+    assert_int_equal(block_system_is_occupied(ctx->block, 5, 2), 0);
+    /* unlimited must NOT have been set */
+    assert_int_equal(gun_system_get_unlimited(ctx->gun), 0);
+}
+
+/* =========================================================================
+ * Gap 7: Bullet hitting active ball transitions it to BALL_POP
+ *
+ * original/gun.c:284 — ClearBallNow → BALL_POP → BALL_EVT_DIED.
+ * ========================================================================= */
+
+static void test_bullet_kills_ball_transitions_to_ball_pop(void **vstate)
+{
+    fixture_t *f = (fixture_t *)*vstate;
+    game_ctx_t *ctx = f->ctx;
+
+    block_system_clear_all(ctx->block);
+    ball_system_clear_all(ctx->ball);
+
+    ball_system_env_t env = game_callbacks_ball_env(ctx);
+    int idx = ball_system_add(ctx->ball, &env, 200, 300, 1, -3, NULL);
+    assert_int_not_equal(idx, -1);
+    ball_system_change_mode(ctx->ball, &env, idx, BALL_ACTIVE);
+
+    /* Invoke on_ball_hit directly */
+    gun_system_callbacks_t cbs = game_callbacks_gun();
+    cbs.on_ball_hit(idx, ctx);
+
+    enum BallStates st = ball_system_get_state(ctx->ball, idx);
+    assert_int_equal(st, BALL_POP);
+}
+
+/* =========================================================================
  * Main
  * ========================================================================= */
 
@@ -152,6 +344,20 @@ int main(void)
     const struct CMUnitTest tests[] = {
         cmocka_unit_test_setup_teardown(
             test_death_blk_clears_block_and_kills_ball, setup, teardown),
+        /* Gap 1 */
+        cmocka_unit_test_setup_teardown(test_bullet_blk_gun_hit_adds_ammo, setup, teardown),
+        /* Gap 2 */
+        cmocka_unit_test_setup_teardown(test_maxammo_blk_gun_hit_sets_unlimited, setup, teardown),
+        /* Gaps 3, 4 */
+        cmocka_unit_test_setup_teardown(test_hyperspace_blk_absorbs_bullet, setup, teardown),
+        cmocka_unit_test_setup_teardown(test_black_blk_absorbs_bullet, setup, teardown),
+        /* Gap 5 */
+        cmocka_unit_test_setup_teardown(test_mgun_blk_requires_three_gun_hits, setup, teardown),
+        /* Gap 6 */
+        cmocka_unit_test_setup_teardown(test_mgun_blk_ball_hit_no_unlimited, setup, teardown),
+        /* Gap 7 */
+        cmocka_unit_test_setup_teardown(
+            test_bullet_kills_ball_transitions_to_ball_pop, setup, teardown),
     };
 
     return cmocka_run_group_tests(tests, NULL, NULL);

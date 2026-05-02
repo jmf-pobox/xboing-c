@@ -151,6 +151,32 @@ block_system_status_t block_system_clear(block_system_t *ctx, int row, int col);
 /* Clear all blocks in the grid. */
 block_system_status_t block_system_clear_all(block_system_t *ctx);
 
+/*
+ * Handle a bullet hit on the block at (row, col).
+ *
+ * Encapsulates the per-block-type hit logic from original/gun.c:318-350.
+ *
+ * Returns 1 if the bullet was absorbed (block still occupied):
+ *   - HYPERSPACE_BLK and BLACK_BLK always absorb (original/gun.c:341-350).
+ *   - Multi-hit specials (REVERSE_BLK, MGUN_BLK, STICKY_BLK, WALLOFF_BLK,
+ *     MULTIBALL_BLK, PAD_EXPAND_BLK, PAD_SHRINK_BLK, DEATH_BLK, COUNTER_BLK)
+ *     decrement counterSlide; absorb while counterSlide > 0 after decrement
+ *     (original/gun.c:325-340).
+ *
+ * Returns 0 in any of the following cases:
+ *   - Block was cleared (all other types, or multi-hit specials whose
+ *     counterSlide reached 0). Caller must NOT call block_system_clear
+ *     separately — it has already cleared the block.
+ *   - ctx is NULL.
+ *   - (row, col) is out of bounds.
+ *   - The cell is already unoccupied.
+ *
+ * The four 0-return cases are not distinguishable from the function's
+ * return value alone. Callers needing to distinguish should check
+ * block_system_is_occupied before invoking.
+ */
+int block_system_decrement_gun_hit(block_system_t *ctx, int row, int col);
+
 /* =========================================================================
  * Collision detection — designed as ball_system callbacks
  *

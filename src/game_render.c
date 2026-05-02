@@ -457,6 +457,56 @@ void game_render_lives(const game_ctx_t *ctx)
         SDL_Rect dst = {LEVEL_AREA_X + 27, LEVEL_AREA_Y + 5, 20, 25};
         SDL_RenderCopy(sdl, dtex.texture, NULL, &dst);
     }
+
+    /* Ammo belt — bullet strip in the level panel */
+    game_render_ammo_belt(ctx);
+}
+
+/* =========================================================================
+ * Ammo belt rendering — horizontal strip of bullet sprites in the level panel
+ * ========================================================================= */
+
+/*
+ * Render the current ammo count as a row of bullet sprites.
+ *
+ * X formula from original/level.c:AddABullet:
+ *   strip_start_x = 192 - (ammo_count * 9)   (window-relative)
+ *   bullet i at LEVEL_AREA_X + strip_start_x + (i * 9)
+ * Y: LEVEL_AREA_Y + 43  (original/level.c:316)
+ *
+ * At max ammo (20 bullets): strip width = 180px, leftmost bullet at
+ * window-relative x=12, rightmost at x=183.  Fits within level window (w=286).
+ * Skipped when unlimited ammo is active (no belt shown).
+ */
+void game_render_ammo_belt(const game_ctx_t *ctx)
+{
+    if (gun_system_get_unlimited(ctx->gun))
+        return;
+
+    int ammo_count = gun_system_get_ammo(ctx->gun);
+    if (ammo_count <= 0)
+        return;
+    if (ammo_count > GUN_MAX_AMMO)
+        ammo_count = GUN_MAX_AMMO;
+
+    sdl2_texture_info_t btex;
+    if (sdl2_texture_get(ctx->texture, SPR_BULLET, &btex) != SDL2T_OK)
+        return;
+
+    SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
+    int strip_start_x = 192 - (ammo_count * 9);
+    int belt_y = LEVEL_AREA_Y + 43;
+
+    for (int i = 0; i < ammo_count; i++)
+    {
+        SDL_Rect dst = {
+            .x = LEVEL_AREA_X + strip_start_x + (i * 9),
+            .y = belt_y,
+            .w = btex.width,
+            .h = btex.height,
+        };
+        SDL_RenderCopy(sdl, btex.texture, NULL, &dst);
+    }
 }
 
 /* =========================================================================

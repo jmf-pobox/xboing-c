@@ -41,6 +41,7 @@ struct sdl2_input
     int mouse_x;
     int mouse_y;
     Uint32 mouse_buttons;
+    Uint32 mouse_just_pressed; /* Buttons pressed this frame (edge trigger). */
 
     /* Modifier state. */
     SDL_Keymod modifiers;
@@ -194,6 +195,7 @@ void sdl2_input_begin_frame(sdl2_input_t *ctx)
     }
 
     memset(ctx->just_pressed, 0, sizeof(ctx->just_pressed));
+    ctx->mouse_just_pressed = 0;
 }
 
 void sdl2_input_process_event(sdl2_input_t *ctx, const SDL_Event *event)
@@ -254,6 +256,7 @@ void sdl2_input_process_event(sdl2_input_t *ctx, const SDL_Event *event)
             if (button >= SDL_BUTTON_LEFT && button <= SDL_BUTTON_X2)
             {
                 ctx->mouse_buttons |= (Uint32)SDL_BUTTON(button);
+                ctx->mouse_just_pressed |= (Uint32)SDL_BUTTON(button);
             }
             ctx->mouse_x = event->button.x;
             ctx->mouse_y = event->button.y;
@@ -335,6 +338,15 @@ bool sdl2_input_mouse_pressed(const sdl2_input_t *ctx, int button)
         return false;
     }
     return (ctx->mouse_buttons & SDL_BUTTON((unsigned)button)) != 0;
+}
+
+bool sdl2_input_mouse_just_pressed(const sdl2_input_t *ctx, int button)
+{
+    if (ctx == NULL || button < 1 || button > 5)
+    {
+        return false;
+    }
+    return (ctx->mouse_just_pressed & SDL_BUTTON((unsigned)button)) != 0;
 }
 
 /* =========================================================================

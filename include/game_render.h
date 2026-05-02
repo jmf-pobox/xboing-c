@@ -35,6 +35,9 @@ void game_render_score(const game_ctx_t *ctx);
 /* Render lives remaining and level number. */
 void game_render_lives(const game_ctx_t *ctx);
 
+/* Render the ammo belt (bullet strip) in the level panel. */
+void game_render_ammo_belt(const game_ctx_t *ctx);
+
 /* Render the EyeDude character. */
 void game_render_eyedude(const game_ctx_t *ctx);
 

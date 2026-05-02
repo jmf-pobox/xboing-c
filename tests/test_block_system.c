@@ -618,6 +618,120 @@ static void test_status_strings(void **state)
 }
 
 /* =========================================================================
+ * Group 9: block_system_decrement_gun_hit (gun-feature gaps 3, 4, 5)
+ *
+ * original/gun.c:318-350 — multi-hit logic for bullet-block collisions.
+ * ========================================================================= */
+
+/* TC-29: Regular block cleared on first bullet hit (returns 0) */
+static void test_gun_hit_regular_block_cleared(void **state)
+{
+    (void)state;
+    block_system_t *ctx = make_ctx();
+
+    block_system_add(ctx, 2, 3, RED_BLK, 0, 0);
+    assert_int_equal(block_system_is_occupied(ctx, 2, 3), 1);
+
+    int absorbed = block_system_decrement_gun_hit(ctx, 2, 3);
+    assert_int_equal(absorbed, 0);
+    assert_int_equal(block_system_is_occupied(ctx, 2, 3), 0);
+
+    block_system_destroy(ctx);
+}
+
+/* TC-30: HYPERSPACE_BLK absorbs bullet — block still occupied (Gap 3)
+ * original/gun.c:341-345 — just redraws, never killed. */
+static void test_gun_hit_hyperspace_absorbed(void **state)
+{
+    (void)state;
+    block_system_t *ctx = make_ctx();
+
+    block_system_add(ctx, 1, 0, HYPERSPACE_BLK, 0, 0);
+    assert_int_equal(block_system_is_occupied(ctx, 1, 0), 1);
+
+    int absorbed = block_system_decrement_gun_hit(ctx, 1, 0);
+    assert_int_equal(absorbed, 1);
+    assert_int_equal(block_system_is_occupied(ctx, 1, 0), 1);
+
+    block_system_destroy(ctx);
+}
+
+/* TC-31: BLACK_BLK absorbs bullet — block still occupied (Gap 4)
+ * original/gun.c:346-350 — just redraws, never killed. */
+static void test_gun_hit_black_absorbed(void **state)
+{
+    (void)state;
+    block_system_t *ctx = make_ctx();
+
+    block_system_add(ctx, 0, 5, BLACK_BLK, 0, 0);
+    assert_int_equal(block_system_is_occupied(ctx, 0, 5), 1);
+
+    int absorbed = block_system_decrement_gun_hit(ctx, 0, 5);
+    assert_int_equal(absorbed, 1);
+    assert_int_equal(block_system_is_occupied(ctx, 0, 5), 1);
+
+    block_system_destroy(ctx);
+}
+
+/* TC-32: Multi-hit special block requires 3 hits — MGUN_BLK (Gap 5)
+ * original/gun.c:325-340: counterSlide initialized to SHOTS_TO_KILL_SPECIAL=3.
+ * Hits 1 and 2 absorb; hit 3 clears. */
+static void test_gun_hit_mgun_requires_three_hits(void **state)
+{
+    (void)state;
+    block_system_t *ctx = make_ctx();
+
+    block_system_add(ctx, 3, 4, MGUN_BLK, BLOCK_SHOTS_TO_KILL_SPECIAL, 0);
+    assert_int_equal(block_system_is_occupied(ctx, 3, 4), 1);
+
+    /* Hit 1: absorbed, still occupied */
+    int r1 = block_system_decrement_gun_hit(ctx, 3, 4);
+    assert_int_equal(r1, 1);
+    assert_int_equal(block_system_is_occupied(ctx, 3, 4), 1);
+
+    /* Hit 2: absorbed, still occupied */
+    int r2 = block_system_decrement_gun_hit(ctx, 3, 4);
+    assert_int_equal(r2, 1);
+    assert_int_equal(block_system_is_occupied(ctx, 3, 4), 1);
+
+    /* Hit 3: cleared */
+    int r3 = block_system_decrement_gun_hit(ctx, 3, 4);
+    assert_int_equal(r3, 0);
+    assert_int_equal(block_system_is_occupied(ctx, 3, 4), 0);
+
+    block_system_destroy(ctx);
+}
+
+/* TC-33: COUNTER_BLK also requires 3 hits via counterSlide */
+static void test_gun_hit_counter_blk_requires_three_hits(void **state)
+{
+    (void)state;
+    block_system_t *ctx = make_ctx();
+
+    block_system_add(ctx, 2, 2, COUNTER_BLK, BLOCK_SHOTS_TO_KILL_SPECIAL, 0);
+    assert_int_equal(block_system_is_occupied(ctx, 2, 2), 1);
+
+    /* Hits 1 and 2 absorbed */
+    assert_int_equal(block_system_decrement_gun_hit(ctx, 2, 2), 1);
+    assert_int_equal(block_system_is_occupied(ctx, 2, 2), 1);
+    assert_int_equal(block_system_decrement_gun_hit(ctx, 2, 2), 1);
+    assert_int_equal(block_system_is_occupied(ctx, 2, 2), 1);
+
+    /* Hit 3 clears */
+    assert_int_equal(block_system_decrement_gun_hit(ctx, 2, 2), 0);
+    assert_int_equal(block_system_is_occupied(ctx, 2, 2), 0);
+
+    block_system_destroy(ctx);
+}
+
+/* TC-34: NULL ctx returns 0 safely */
+static void test_gun_hit_null_ctx(void **state)
+{
+    (void)state;
+    assert_int_equal(block_system_decrement_gun_hit(NULL, 0, 0), 0);
+}
+
+/* =========================================================================
  * Test runner
  * ========================================================================= */
 
@@ -669,6 +783,14 @@ int main(void)
 
         /* Group 8: Status strings */
         cmocka_unit_test(test_status_strings),
+
+        /* Group 9: block_system_decrement_gun_hit */
+        cmocka_unit_test(test_gun_hit_regular_block_cleared),
+        cmocka_unit_test(test_gun_hit_hyperspace_absorbed),
+        cmocka_unit_test(test_gun_hit_black_absorbed),
+        cmocka_unit_test(test_gun_hit_mgun_requires_three_hits),
+        cmocka_unit_test(test_gun_hit_counter_blk_requires_three_hits),
+        cmocka_unit_test(test_gun_hit_null_ctx),
     };
 
     return cmocka_run_group_tests(tests, NULL, NULL);
