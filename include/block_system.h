@@ -152,6 +152,20 @@ block_system_status_t block_system_clear(block_system_t *ctx, int row, int col);
 block_system_status_t block_system_clear_all(block_system_t *ctx);
 
 /*
+ * Advance per-block animation slides for animated block types based on the
+ * current frame counter.  Updates `bonus_slide` for BONUSX2/X4/BONUS_BLK
+ * (4-frame cycle, BLOCK_BONUS_DELAY interval), DEATH_BLK (5-frame cycle,
+ * BLOCK_DEATH_DELAY1 interval), EXTRABALL_BLK (2-frame cycle,
+ * BLOCK_EXTRABALL_DELAY interval), and ROAMER_BLK (5-direction cycle,
+ * BLOCK_ROAM_EYES_DELAY interval).
+ *
+ * Call once per game tick (typically from game_modes after gun_system_update).
+ * Without this, sprite_block_animated_key sees a static bonus_slide=0 and
+ * all animated blocks render as frame 1 forever.
+ */
+void block_system_advance_animations(block_system_t *ctx, int frame);
+
+/*
  * Handle a bullet hit on the block at (row, col).
  *
  * Encapsulates the per-block-type hit logic from original/gun.c:318-350.

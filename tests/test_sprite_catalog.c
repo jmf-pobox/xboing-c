@@ -145,6 +145,43 @@ static void test_animated_key_roamer_out_of_range_clamps_to_neutral(void **state
 }
 
 /* =========================================================================
+ * Group 6 — Negative slide handling for cycling cases
+ *
+ * C `%` preserves the sign of the dividend, so `negative % N` can be < 0.
+ * The helper must normalize to a non-negative index for the cycling cases
+ * (BONUSX2/X4/BONUS/DEATH/EXTRABALL).
+ * ========================================================================= */
+
+static void test_animated_key_negative_slide_bonusx2(void **state)
+{
+    (void)state;
+    /* slide=-1 → ((-1 % 4) + 4) % 4 = 3 (last frame) */
+    assert_string_equal(sprite_block_animated_key(BONUSX2_BLK, -1), SPR_BLOCK_X2_4);
+    /* slide=-4 → 0 */
+    assert_string_equal(sprite_block_animated_key(BONUSX2_BLK, -4), SPR_BLOCK_X2_1);
+    /* slide=-5 → 3 */
+    assert_string_equal(sprite_block_animated_key(BONUSX2_BLK, -5), SPR_BLOCK_X2_4);
+}
+
+static void test_animated_key_negative_slide_death(void **state)
+{
+    (void)state;
+    /* slide=-1 → ((-1 % 5) + 5) % 5 = 4 (last frame) */
+    assert_string_equal(sprite_block_animated_key(DEATH_BLK, -1), SPR_BLOCK_DEATH_5);
+    /* slide=-5 → 0 */
+    assert_string_equal(sprite_block_animated_key(DEATH_BLK, -5), SPR_BLOCK_DEATH_1);
+}
+
+static void test_animated_key_negative_slide_extraball(void **state)
+{
+    (void)state;
+    /* slide=-1 → 1 (second frame) */
+    assert_string_equal(sprite_block_animated_key(EXTRABALL_BLK, -1), SPR_BLOCK_EXTRABALL_2);
+    /* slide=-2 → 0 */
+    assert_string_equal(sprite_block_animated_key(EXTRABALL_BLK, -2), SPR_BLOCK_EXTRABALL);
+}
+
+/* =========================================================================
  * Test runner
  * ========================================================================= */
 
@@ -171,6 +208,11 @@ int main(void)
         /* Group 5 — ROAMER directional + clamp */
         cmocka_unit_test(test_animated_key_roamer_directions),
         cmocka_unit_test(test_animated_key_roamer_out_of_range_clamps_to_neutral),
+
+        /* Group 6 — Negative slide handling for cycling cases */
+        cmocka_unit_test(test_animated_key_negative_slide_bonusx2),
+        cmocka_unit_test(test_animated_key_negative_slide_death),
+        cmocka_unit_test(test_animated_key_negative_slide_extraball),
     };
 
     return cmocka_run_group_tests(tests, NULL, NULL);

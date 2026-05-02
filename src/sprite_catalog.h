@@ -558,31 +558,31 @@ static inline const char *sprite_block_animated_key(int block_type, int slide)
         {
             static const char *const k[] = {SPR_BLOCK_X2_1, SPR_BLOCK_X2_2, SPR_BLOCK_X2_3,
                                             SPR_BLOCK_X2_4};
-            return k[slide % 4];
+            return k[((slide % 4) + 4) % 4];
         }
         case BONUSX4_BLK:
         {
             static const char *const k[] = {SPR_BLOCK_X4_1, SPR_BLOCK_X4_2, SPR_BLOCK_X4_3,
                                             SPR_BLOCK_X4_4};
-            return k[slide % 4];
+            return k[((slide % 4) + 4) % 4];
         }
         case BONUS_BLK:
         {
             static const char *const k[] = {SPR_BLOCK_BONUS_1, SPR_BLOCK_BONUS_2,
                                             SPR_BLOCK_BONUS_3, SPR_BLOCK_BONUS_4};
-            return k[slide % 4];
+            return k[((slide % 4) + 4) % 4];
         }
         case DEATH_BLK:
         {
             static const char *const k[] = {SPR_BLOCK_DEATH_1, SPR_BLOCK_DEATH_2,
                                             SPR_BLOCK_DEATH_3, SPR_BLOCK_DEATH_4,
                                             SPR_BLOCK_DEATH_5};
-            return k[slide % 5];
+            return k[((slide % 5) + 5) % 5];
         }
         case EXTRABALL_BLK:
         {
             static const char *const k[] = {SPR_BLOCK_EXTRABALL, SPR_BLOCK_EXTRABALL_2};
-            return k[slide % 2];
+            return k[((slide % 2) + 2) % 2];
         }
         case ROAMER_BLK:
         {
