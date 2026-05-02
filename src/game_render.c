@@ -35,6 +35,7 @@
 #include "sdl2_state.h"
 #include "sdl2_texture.h"
 #include "sfx_system.h"
+#include "special_system.h"
 #include "sprite_catalog.h"
 
 /* =========================================================================
@@ -744,6 +745,44 @@ void game_render_timer(const game_ctx_t *ctx)
 }
 
 /* =========================================================================
+ * Specials panel rendering — 8 power-up labels below the play area
+ * ========================================================================= */
+
+/* specialWindow: x=292, y=655, w=180, h=35 — original/stage.c:263 */
+#define SPECIAL_PANEL_ORIGIN_X 292
+#define SPECIAL_PANEL_ORIGIN_Y 655
+
+void game_render_specials_coords(int lh, const special_label_info_t *labels, int i, int *abs_x,
+                                 int *abs_y)
+{
+    *abs_x = SPECIAL_PANEL_ORIGIN_X + labels[i].col_x;
+    *abs_y = SPECIAL_PANEL_ORIGIN_Y + SPECIAL_ROW0_Y + labels[i].row * (lh + SPECIAL_GAP);
+}
+
+void game_render_specials(const game_ctx_t *ctx)
+{
+    if (ctx->special == NULL || ctx->paddle == NULL)
+        return;
+
+    int reverse_on = paddle_system_get_reverse(ctx->paddle);
+    special_label_info_t labels[SPECIAL_COUNT];
+    special_system_get_labels(ctx->special, reverse_on, labels);
+
+    int lh = sdl2_font_line_height(ctx->font, SDL2F_FONT_COPY);
+    SDL_Color yellow = {255, 255, 50, 255};
+    SDL_Color white = {255, 255, 255, 255};
+
+    for (int i = 0; i < SPECIAL_COUNT; i++)
+    {
+        int abs_x;
+        int abs_y;
+        game_render_specials_coords(lh, labels, i, &abs_x, &abs_y);
+        SDL_Color color = labels[i].active ? yellow : white;
+        sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_COPY, labels[i].label, abs_x, abs_y, color);
+    }
+}
+
+/* =========================================================================
  * Dialogue overlay — modal text input box
  * ========================================================================= */
 
@@ -882,6 +921,8 @@ void game_render_frame(const game_ctx_t *ctx)
             /* Message bar and timer */
             game_render_messages(ctx);
             game_render_timer(ctx);
+            /* Specials panel */
+            game_render_specials(ctx);
             break;
 
         case SDL2ST_EDIT:

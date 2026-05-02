@@ -571,6 +571,12 @@ if(SDL2_FOUND AND SDL2_IMAGE_FOUND AND SDL2_MIXER_FOUND AND SDL2_TTF_FOUND)
     xboing_add_integration_test(test_integration_all_levels)
     set_tests_properties(test_integration_all_levels PROPERTIES TIMEOUT 120)
 
+    # Specials panel coordinate and NULL-guard tests (bead xboing-dze)
+    # Exercises game_render_specials_coords() (pure, no SDL2) and the NULL-ctx
+    # guard in game_render_specials().  Uses SDL_VIDEODRIVER=dummy for headless
+    # operation — the coord tests never touch the renderer.
+    xboing_add_integration_test(test_game_render_specials)
+
     # Convenience target: cmake --build build-coverage --target test-coverage
     # Requires: build with --coverage flags:
     #   cmake -B build-coverage -DCMAKE_BUILD_TYPE=Debug \
