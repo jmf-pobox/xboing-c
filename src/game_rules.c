@@ -265,9 +265,15 @@ void game_rules_ball_died(game_ctx_t *ctx)
     if (ctx->audio)
         sdl2_audio_play(ctx->audio, "balllost");
 
-    /* Grant +2 ammo as consolation — original/ball.c:1803-1805. */
-    gun_system_add_ammo(ctx->gun);
-    gun_system_add_ammo(ctx->gun);
+    /* Grant +2 ammo as consolation — original/ball.c:1803-1805.
+     * Skip when unlimited is active: MAXAMMO_BLK sets ammo to GUN_MAX_AMMO+1
+     * as a sentinel, but gun_system_add_ammo clamps to GUN_MAX_AMMO, so the
+     * +2 here would silently reduce 21→20. */
+    if (!gun_system_get_unlimited(ctx->gun))
+    {
+        gun_system_add_ammo(ctx->gun);
+        gun_system_add_ammo(ctx->gun);
+    }
 
     paddle_system_set_reverse(ctx->paddle, 0);
     ball_system_env_t env = game_callbacks_ball_env(ctx);

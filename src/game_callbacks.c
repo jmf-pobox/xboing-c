@@ -308,9 +308,15 @@ static void gun_cb_on_block_hit(int row, int col, void *ud)
     switch (block_type)
     {
         case BULLET_BLK:
-            /* original/blocks.c:1581-1585 — AddABullet x NUMBER_OF_BULLETS_NEW_LEVEL (4) */
-            for (int i = 0; i < BLOCK_NUMBER_OF_BULLETS_NEW_LEVEL; i++)
-                gun_system_add_ammo(ctx->gun);
+            /* original/blocks.c:1581-1585 — AddABullet x NUMBER_OF_BULLETS_NEW_LEVEL (4).
+             * Skip when unlimited is active: MAXAMMO_BLK uses GUN_MAX_AMMO+1 as
+             * a sentinel; gun_system_add_ammo clamps to GUN_MAX_AMMO, so adding
+             * here would silently reduce 21→20. */
+            if (!gun_system_get_unlimited(ctx->gun))
+            {
+                for (int i = 0; i < BLOCK_NUMBER_OF_BULLETS_NEW_LEVEL; i++)
+                    gun_system_add_ammo(ctx->gun);
+            }
             if (ctx->audio)
                 sdl2_audio_play(ctx->audio, "ammo");
             message_system_set(ctx->message, "More ammunition, cool!", 1, (int)frame);
