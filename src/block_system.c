@@ -624,7 +624,8 @@ int block_system_check_region(int row, int col, int bx, int by, int bdx, void *u
      *   RIGHT:  phantom when bx <= bp->x + bp->width
      *
      * Fix for xboing-c-895: the original check suppressed on occupancy alone,
-     * firing in both the phantom and gap cases and causing 2-row tunneling.
+     * suppressing hits in both the phantom and gap cases and causing 2-row
+     * tunneling.
      */
     switch (region)
     {

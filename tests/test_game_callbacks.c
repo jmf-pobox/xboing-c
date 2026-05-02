@@ -10,9 +10,11 @@
  *
  * Strategy: enter GAME mode, clear the block grid, add a DEATH_BLK at a
  * known grid cell, add a ball in BALL_ACTIVE state positioned directly on
- * the block center with no velocity (dx=dy=0) so block_system_check_region
- * fires on the first ball_system_update call.  Use ball_index=2 (non-zero)
- * to confirm it's the correct slot that transitions.
+ * the block center.  ball_system_update normalizes (0, 0) velocity to
+ * MIN_DX_BALL/MIN_DY_BALL before the ray-march, but since the ball is
+ * already overlapping the block, block_system_check_region fires on the
+ * first update regardless.  Use ball_index=2 (non-zero) to confirm it's
+ * the correct slot that transitions.
  *
  * Requires: SDL_VIDEODRIVER=dummy, SDL_AUDIODRIVER=dummy
  */
@@ -113,8 +115,10 @@ static void test_death_blk_clears_block_and_kills_ball(void **vstate)
 
     /* Slot 2: the test ball — position at block center, dx=0, dy=0.
      * The block is at (row=3, col=4).  Ball center at (247, 112).
-     * With dx=dy=0 the ball doesn't move; on the very first check_for_collision
-     * the 9-cell neighborhood scan picks up the DEATH_BLK at (3,4). */
+     * ball_system_update will normalize (0, 0) to MIN_DX_BALL/MIN_DY_BALL
+     * but the ball is already on top of the block, so the 9-cell
+     * neighborhood scan picks up the DEATH_BLK at (3, 4) on the first
+     * check regardless of step direction. */
     int idx2 = ball_system_add(ctx->ball, &env, 247, 112, 0, 0, NULL);
     assert_int_equal(idx2, 2);
 
