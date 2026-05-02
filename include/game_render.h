@@ -73,4 +73,27 @@ void game_render_specials(const game_ctx_t *ctx);
 void game_render_specials_coords(int lh, const special_label_info_t *labels, int i, int *abs_x,
                                  int *abs_y);
 
+/*
+ * Pure helper — compute the top-left position to center a text glyph within a
+ * block-sized bounding box. Used for DROP_BLK hit-points digit, RANDOM_BLK
+ * "- R -" overlay, and any future composite text rendering that needs to
+ * center within a block.
+ *
+ *   *out_x = block_x + (block_w / 2) - (text_w / 2)
+ *   *out_y = block_y + (block_h / 2) - (text_h / 2)
+ *
+ * Matches original/blocks.c:1706 and original/blocks.c:1733 centering math.
+ *
+ * Static inline — no SDL2 dependency, safe to call from CMocka tests.
+ * NULL out_x or out_y skips that axis (allows partial use).
+ */
+static inline void block_overlay_text_pos(int block_x, int block_y, int block_w, int block_h,
+                                          int text_w, int text_h, int *out_x, int *out_y)
+{
+    if (out_x)
+        *out_x = block_x + (block_w / 2) - (text_w / 2);
+    if (out_y)
+        *out_y = block_y + (block_h / 2) - (text_h / 2);
+}
+
 #endif /* GAME_RENDER_H */

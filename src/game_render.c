@@ -67,6 +67,10 @@
  * Block rendering
  * ========================================================================= */
 
+/* Forward declaration — definition follows game_render_blocks. */
+static void render_block_composite(const game_ctx_t *ctx, SDL_Renderer *sdl, int block_x,
+                                   int block_y, int block_type, int hit_points);
+
 void game_render_blocks(const game_ctx_t *ctx)
 {
     SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
@@ -118,62 +122,91 @@ void game_render_blocks(const game_ctx_t *ctx)
             };
             SDL_RenderCopy(sdl, tex.texture, NULL, &dst);
 
-            /* Composite overlays — rendered on top of the base sprite */
+            /* Composite overlays — rendered on top of the base sprite.
+             * Shared with game_render_editor_palette so editor previews
+             * also show DROP/RANDOM/BULLET composites. */
             if (!info.exploding)
             {
-                int block_x = PLAY_AREA_X + info.x;
-                int block_y = PLAY_AREA_Y + info.y;
-
-                if (info.drop)
-                {
-                    /* DROP_BLK: centered hit-points digit in black
-                     * Matches original/blocks.c:1729-1735 */
-                    char hp_buf[8];
-                    snprintf(hp_buf, sizeof(hp_buf), "%d", info.hit_points);
-                    sdl2_font_metrics_t m = {0, 0};
-                    if (sdl2_font_measure(ctx->font, SDL2F_FONT_DATA, hp_buf, &m) == SDL2F_OK)
-                    {
-                        int tx = block_x + (BLOCK_WIDTH / 2) - (m.width / 2);
-                        int ty = block_y + (BLOCK_HEIGHT / 2) - (m.height / 2);
-                        SDL_Color black = {0, 0, 0, 255};
-                        sdl2_font_draw(ctx->font, SDL2F_FONT_DATA, hp_buf, tx, ty, black);
-                    }
-                }
-                else if (info.random)
-                {
-                    /* RANDOM_BLK: centered "- R -" text in black
-                     * Matches original/blocks.c:1702-1708 */
-                    sdl2_font_metrics_t m = {0, 0};
-                    if (sdl2_font_measure(ctx->font, SDL2F_FONT_DATA, "- R -", &m) == SDL2F_OK)
-                    {
-                        int tx = block_x + (BLOCK_WIDTH / 2) - (m.width / 2);
-                        int ty = block_y + (BLOCK_HEIGHT / 2) - (m.height / 2);
-                        SDL_Color black = {0, 0, 0, 255};
-                        sdl2_font_draw(ctx->font, SDL2F_FONT_DATA, "- R -", tx, ty, black);
-                    }
-                }
-                else if (info.block_type == BULLET_BLK)
-                {
-                    /* BULLET_BLK: 4 bullet sprites at offsets (6,10),(15,10),(24,10),(33,10)
-                     * Matches original/blocks.c:1682-1685 */
-                    sdl2_texture_info_t btex;
-                    if (sdl2_texture_get(ctx->texture, SPR_BULLET, &btex) == SDL2T_OK)
-                    {
-                        static const int bullet_offsets_x[] = {6, 15, 24, 33};
-                        for (int b = 0; b < 4; b++)
-                        {
-                            SDL_Rect bdst = {
-                                .x = block_x + bullet_offsets_x[b],
-                                .y = block_y + 10,
-                                .w = btex.width,
-                                .h = btex.height,
-                            };
-                            SDL_RenderCopy(sdl, btex.texture, NULL, &bdst);
-                        }
-                    }
-                }
+                render_block_composite(ctx, sdl, PLAY_AREA_X + info.x, PLAY_AREA_Y + info.y,
+                                       info.block_type, info.hit_points);
             }
         }
+    }
+}
+
+/*
+ * Render the composite overlay (text or sprite) on top of a base block sprite.
+ * Used by game_render_blocks (playfield) and game_render_editor_palette
+ * (editor sidebar). Hit_points only matters for DROP_BLK.
+ *
+ * Per Copilot review F2: caches "- R -" text metrics across calls (the string
+ * is constant — sizing it every frame for every RANDOM_BLK is wasteful).
+ */
+static void render_block_composite(const game_ctx_t *ctx, SDL_Renderer *sdl, int block_x,
+                                   int block_y, int block_type, int hit_points)
+{
+    SDL_Color black = {0, 0, 0, 255};
+
+    switch (block_type)
+    {
+        case DROP_BLK:
+        {
+            /* DROP_BLK: centered hit-points digit (original/blocks.c:1729-1735) */
+            char hp_buf[8];
+            snprintf(hp_buf, sizeof(hp_buf), "%d", hit_points);
+            sdl2_font_metrics_t m = {0, 0};
+            if (sdl2_font_measure(ctx->font, SDL2F_FONT_DATA, hp_buf, &m) == SDL2F_OK)
+            {
+                int tx, ty;
+                block_overlay_text_pos(block_x, block_y, BLOCK_WIDTH, BLOCK_HEIGHT, m.width,
+                                       m.height, &tx, &ty);
+                sdl2_font_draw(ctx->font, SDL2F_FONT_DATA, hp_buf, tx, ty, black);
+            }
+            break;
+        }
+        case RANDOM_BLK:
+        {
+            /* RANDOM_BLK: centered "- R -" text (original/blocks.c:1702-1708).
+             * String is constant — cache the metrics across calls. */
+            static sdl2_font_metrics_t r_metrics = {0, 0};
+            static int r_metrics_valid = 0;
+            if (!r_metrics_valid)
+            {
+                if (sdl2_font_measure(ctx->font, SDL2F_FONT_DATA, "- R -", &r_metrics) == SDL2F_OK)
+                    r_metrics_valid = 1;
+            }
+            if (r_metrics_valid)
+            {
+                int tx, ty;
+                block_overlay_text_pos(block_x, block_y, BLOCK_WIDTH, BLOCK_HEIGHT, r_metrics.width,
+                                       r_metrics.height, &tx, &ty);
+                sdl2_font_draw(ctx->font, SDL2F_FONT_DATA, "- R -", tx, ty, black);
+            }
+            break;
+        }
+        case BULLET_BLK:
+        {
+            /* BULLET_BLK: 4 bullet sprites at offsets (6,10),(15,10),(24,10),(33,10)
+             * (original/blocks.c:1682-1685). */
+            sdl2_texture_info_t btex;
+            if (sdl2_texture_get(ctx->texture, SPR_BULLET, &btex) == SDL2T_OK)
+            {
+                static const int bullet_offsets_x[] = {6, 15, 24, 33};
+                for (int b = 0; b < 4; b++)
+                {
+                    SDL_Rect bdst = {
+                        .x = block_x + bullet_offsets_x[b],
+                        .y = block_y + 10,
+                        .w = btex.width,
+                        .h = btex.height,
+                    };
+                    SDL_RenderCopy(sdl, btex.texture, NULL, &bdst);
+                }
+            }
+            break;
+        }
+        default:
+            break;
     }
 }
 
@@ -677,6 +710,11 @@ void game_render_editor_palette(const game_ctx_t *ctx)
                 SDL_RenderCopy(sdl, tex.texture, NULL, &dst);
             }
         }
+
+        /* Composite overlay (DROP digit, RANDOM "- R -", BULLET 4-bullets)
+         * shared with game_render_blocks per Copilot review F3.
+         * hit_points=1 is a sentinel for editor preview — DROP_BLK shows "1". */
+        render_block_composite(ctx, sdl, PALETTE_X, ey, entry->block_type, 1);
     }
 
     /* Editor status text */
