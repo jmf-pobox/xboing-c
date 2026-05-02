@@ -507,6 +507,93 @@ static void test_fast_gun_one_slot_free(void **state)
 }
 
 /* =========================================================================
+ * Group 3b: Shooting — unlimited ammo gate (Fix 1: xboing-jm8 direction-2)
+ *
+ * The (ammo, unlimited) matrix:
+ *   (0, 0) → no fire (click)
+ *   (0, 1) → fires (unlimited bypasses empty ammo)
+ *   (4, 0) → fires and decrements
+ *   (4, 1) → fires and ammo stays at 4
+ * ========================================================================= */
+
+static void test_shoot_ammo0_unlimited0_no_fire(void **state)
+{
+    (void)state;
+    stub_state_t s;
+    gun_system_t *ctx = create_test_ctx(&s);
+    gun_system_env_t env = make_env(0, 200, 50, 0);
+
+    /* ammo=0, unlimited=0 → click, no bullet */
+    gun_system_set_ammo(ctx, 0);
+    gun_system_set_unlimited(ctx, 0);
+
+    int fired = gun_system_shoot(ctx, &env);
+    assert_int_equal(fired, 0);
+    assert_int_equal(gun_system_get_active_bullet_count(ctx), 0);
+    assert_string_equal(s.last_sound, "click");
+
+    gun_system_destroy(ctx);
+}
+
+static void test_shoot_ammo0_unlimited1_fires(void **state)
+{
+    (void)state;
+    stub_state_t s;
+    gun_system_t *ctx = create_test_ctx(&s);
+    gun_system_env_t env = make_env(0, 200, 50, 0);
+
+    /* ammo=0, unlimited=1 → fires despite zero ammo */
+    gun_system_set_ammo(ctx, 0);
+    gun_system_set_unlimited(ctx, 1);
+
+    int fired = gun_system_shoot(ctx, &env);
+    assert_int_equal(fired, 1);
+    assert_int_equal(gun_system_get_active_bullet_count(ctx), 1);
+    assert_string_equal(s.last_sound, "shotgun");
+    assert_int_equal(gun_system_get_ammo(ctx), 0); /* no decrement in unlimited mode */
+
+    gun_system_destroy(ctx);
+}
+
+static void test_shoot_ammo4_unlimited0_fires_decrements(void **state)
+{
+    (void)state;
+    stub_state_t s;
+    gun_system_t *ctx = create_test_ctx(&s);
+    gun_system_env_t env = make_env(0, 200, 50, 0);
+
+    /* ammo=4, unlimited=0 → fires and ammo decrements to 3 */
+    gun_system_set_ammo(ctx, 4);
+    gun_system_set_unlimited(ctx, 0);
+
+    int fired = gun_system_shoot(ctx, &env);
+    assert_int_equal(fired, 1);
+    assert_int_equal(gun_system_get_active_bullet_count(ctx), 1);
+    assert_int_equal(gun_system_get_ammo(ctx), 3);
+
+    gun_system_destroy(ctx);
+}
+
+static void test_shoot_ammo4_unlimited1_fires_no_decrement(void **state)
+{
+    (void)state;
+    stub_state_t s;
+    gun_system_t *ctx = create_test_ctx(&s);
+    gun_system_env_t env = make_env(0, 200, 50, 0);
+
+    /* ammo=4, unlimited=1 → fires and ammo stays at 4 */
+    gun_system_set_ammo(ctx, 4);
+    gun_system_set_unlimited(ctx, 1);
+
+    int fired = gun_system_shoot(ctx, &env);
+    assert_int_equal(fired, 1);
+    assert_int_equal(gun_system_get_active_bullet_count(ctx), 1);
+    assert_int_equal(gun_system_get_ammo(ctx), 4); /* not decremented */
+
+    gun_system_destroy(ctx);
+}
+
+/* =========================================================================
  * Group 5: Bullet movement and top-wall tinks
  * ========================================================================= */
 
@@ -994,6 +1081,12 @@ int main(void)
         cmocka_unit_test(test_shoot_no_ammo_plays_click),
         cmocka_unit_test(test_shoot_ball_waiting_blocked),
         cmocka_unit_test(test_shoot_normal_one_bullet_at_a_time),
+
+        /* Group 3b: Shooting — unlimited ammo gate */
+        cmocka_unit_test(test_shoot_ammo0_unlimited0_no_fire),
+        cmocka_unit_test(test_shoot_ammo0_unlimited1_fires),
+        cmocka_unit_test(test_shoot_ammo4_unlimited0_fires_decrements),
+        cmocka_unit_test(test_shoot_ammo4_unlimited1_fires_no_decrement),
 
         /* Group 4: Shooting — fast gun mode */
         cmocka_unit_test(test_fast_gun_spawns_two_bullets),

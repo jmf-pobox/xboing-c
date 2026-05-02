@@ -547,7 +547,63 @@ static void test_render_info_empty(void **state)
 }
 
 /* =========================================================================
- * Group 7: Status string utility (1 test)
+ * Group 7: Adjacency-filter gap reproducer (xboing-c-895)
+ *
+ * Two adjacent rows at (5,4) and (6,4).  Ball in the inter-block gap
+ * at x=247, y=192, dx=1, dy=-5 (moving upward).
+ *
+ * Block geometry:
+ *   Row 5, col 4: x=227, y=166, w=40, h=20 (center: 247, 176)
+ *   Row 6, col 4: x=227, y=198, w=40, h=20 (center: 247, 208)
+ *   Gap between them: y=187..197.  Ball center at y=192 is in the gap.
+ *
+ * Before the fix: both block hits suppressed (ball tunnels).
+ * After the fix: row 6 hit is NOT suppressed (by=192 < bp->y=198).
+ *
+ * The test asserts that block_system_check_region returns non-NONE for
+ * at least one of the two blocks — meaning a hit registers.
+ *
+ * Citation: src/block_system.c:618-646 (adjacency filter).
+ * ========================================================================= */
+
+/* TC-28b: Gap-zone ball is not suppressed on both faces after fix */
+static void test_adjacency_filter_gap_not_suppressed(void **state)
+{
+    (void)state;
+    block_system_t *ctx = make_ctx();
+
+    /* Place RED_BLK at row 5 and row 6, column 4 */
+    block_system_add(ctx, 5, 4, RED_BLK, 0, 0);
+    block_system_add(ctx, 6, 4, RED_BLK, 0, 0);
+
+    /*
+     * Ball center at x=247, y=192, dx=1, dy=-5.
+     * Row 5 block: x=227, y=166, w=40, h=20.
+     * Row 6 block: x=227, y=198, w=40, h=20.
+     * y=192 is in the gap (row 5 block bottom = 186, row 6 block top = 198).
+     * Ball AABB: left=237, top=183, right=257, bottom=201.
+     * Overlaps row 5 AABB [166,186]: ball_bottom=201 > 166, ball_top=183 < 186 YES.
+     * Overlaps row 6 AABB [198,218]: ball_bottom=201 > 198, ball_top=183 < 218 YES.
+     */
+    int ball_x = 247;
+    int ball_y = 192;
+    int ball_dx = 1;
+
+    int r5 = block_system_check_region(5, 4, ball_x, ball_y, ball_dx, ctx);
+    int r6 = block_system_check_region(6, 4, ball_x, ball_y, ball_dx, ctx);
+
+    /*
+     * With the fix: row 6 hit is real (by=192 < bp->y=198 — ball above
+     * block top edge, in the gap) so r6 != BLOCK_REGION_NONE.
+     * At least one block must register a hit.
+     */
+    assert_true(r5 != BLOCK_REGION_NONE || r6 != BLOCK_REGION_NONE);
+
+    block_system_destroy(ctx);
+}
+
+/* =========================================================================
+ * Group 8: Status string utility (1 test)
  * ========================================================================= */
 
 /* TC-28: Status strings are non-NULL */
@@ -591,6 +647,7 @@ int main(void)
         cmocka_unit_test(test_check_region_empty),
         cmocka_unit_test(test_check_region_out_of_bounds),
         cmocka_unit_test(test_check_region_adjacency_filter),
+        cmocka_unit_test(test_adjacency_filter_gap_not_suppressed),
 
         /* Group 4: Non-standard block sizes */
         cmocka_unit_test(test_check_region_bomb_block),
@@ -607,7 +664,10 @@ int main(void)
         cmocka_unit_test(test_render_info_occupied),
         cmocka_unit_test(test_render_info_empty),
 
-        /* Group 7: Status strings */
+        /* Group 7: Adjacency-filter gap reproducer */
+        /* (registered above, inline with Group 3) */
+
+        /* Group 8: Status strings */
         cmocka_unit_test(test_status_strings),
     };
 
