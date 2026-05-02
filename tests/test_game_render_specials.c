@@ -41,7 +41,8 @@ static void make_labels_all_inactive(special_label_info_t *labels)
 static void make_labels_all_active(special_label_info_t *labels)
 {
     special_system_t *sys = special_system_create(NULL, NULL);
-    /* Activate all 7 owned specials */
+    /* Activate all owned specials except x4 (x4 and x2 are mutually exclusive;
+     * keeping x2 active means x4 stays inactive in this fixture). */
     special_system_set(sys, SPECIAL_STICKY, 1);
     special_system_set(sys, SPECIAL_SAVING, 1);
     special_system_set(sys, SPECIAL_FAST_GUN, 1);
@@ -216,13 +217,23 @@ static void test_coords_label7_x4(void **state)
 }
 
 /* =========================================================================
- * Group 2: Color-selection branch
+ * Group 2: Label-activity flags (input to game_render_specials' color branch)
+ * =========================================================================
+ *
+ * These tests verify that special_system_get_labels() produces the expected
+ * .active flag for each label across realistic state combinations.
+ * game_render_specials() selects color via the 2-line conditional
+ * `labels[i].active ? yellow : white`, which is verifiable by source
+ * inspection; the non-trivial logic — mutual exclusion (x2/x4),
+ * reverse_on injection from the paddle system, ownership boundaries —
+ * lives in the label-data path these tests exercise.
  * ========================================================================= */
 
 /*
- * Test: inactive labels have active==0 (white branch).
+ * Test: with all specials off + reverse_on=0, every label.active == 0
+ * (drives game_render_specials' white-color branch).
  */
-static void test_color_inactive_produces_white(void **state)
+static void test_label_activity_all_inactive(void **state)
 {
     (void)state;
     special_label_info_t labels[SPECIAL_COUNT];
@@ -235,12 +246,11 @@ static void test_color_inactive_produces_white(void **state)
 }
 
 /*
- * Test: active labels have active==1 (yellow branch).
- * Uses the all-active fixture: reverse_on=1, all 7 owned specials set.
- * (x4 is not set in make_labels_all_active to avoid clearing x2,
- *  so x4 stays inactive — verify x2 is active and x4 is inactive.)
+ * Test: all-active-except-x4 fixture (reverse_on=1, every owned special set
+ * except x4 since x2 and x4 are mutually exclusive). Drives
+ * game_render_specials' yellow branch for every label except x4.
  */
-static void test_color_active_produces_yellow(void **state)
+static void test_label_activity_all_active_except_x4(void **state)
 {
     (void)state;
     special_label_info_t labels[SPECIAL_COUNT];
@@ -265,9 +275,10 @@ static void test_color_active_produces_yellow(void **state)
 }
 
 /*
- * Test: mixed state — only Killer active.
+ * Test: mixed state — only Killer active. Verifies per-label activity
+ * tracking across a non-uniform state.
  */
-static void test_color_mixed_state(void **state)
+static void test_label_activity_mixed_state(void **state)
 {
     (void)state;
     special_system_t *sys = special_system_create(NULL, NULL);
@@ -346,10 +357,10 @@ int main(void)
         cmocka_unit_test(test_coords_label6_killer),
         cmocka_unit_test(test_coords_label7_x4),
 
-        /* Group 2: Color-selection branch */
-        cmocka_unit_test(test_color_inactive_produces_white),
-        cmocka_unit_test(test_color_active_produces_yellow),
-        cmocka_unit_test(test_color_mixed_state),
+        /* Group 2: Label-activity flags (input to game_render_specials' color branch) */
+        cmocka_unit_test(test_label_activity_all_inactive),
+        cmocka_unit_test(test_label_activity_all_active_except_x4),
+        cmocka_unit_test(test_label_activity_mixed_state),
 
         /* Group 3: NULL-context safety */
         cmocka_unit_test(test_null_ctx_special_does_not_crash),
