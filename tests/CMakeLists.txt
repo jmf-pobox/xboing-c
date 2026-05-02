@@ -47,6 +47,17 @@ target_include_directories(test_paths PRIVATE
 )
 target_compile_options(test_paths PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
 target_link_libraries(test_paths PRIVATE ${CMOCKA_LIBRARIES})
+
+# Sprite catalog header-only tests (basket 1: block animation frame selection — beads ejn, qe2, ax9, agi)
+# sprite_catalog.h is header-only static inline; depends on block_types.h.
+add_executable(test_sprite_catalog test_sprite_catalog.c)
+target_include_directories(test_sprite_catalog PRIVATE
+    ${CMAKE_SOURCE_DIR}/include
+    ${CMAKE_SOURCE_DIR}/src
+)
+target_compile_options(test_sprite_catalog PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+target_link_libraries(test_sprite_catalog PRIVATE ${CMOCKA_LIBRARIES})
+add_test(NAME test_sprite_catalog COMMAND test_sprite_catalog)
 add_test(NAME test_paths COMMAND test_paths)
 set_tests_properties(test_paths PROPERTIES WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
