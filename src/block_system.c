@@ -829,6 +829,63 @@ const block_system_info_t *block_system_get_info(const block_system_t *ctx, int 
 }
 
 /* =========================================================================
+ * Gun hit handler
+ * ========================================================================= */
+
+/*
+ * Multi-hit special block types — original/gun.c:325-340.
+ * A bullet decrements counterSlide; the block dies when it reaches zero.
+ */
+static int is_multi_hit_special(int block_type)
+{
+    switch (block_type)
+    {
+        case REVERSE_BLK:
+        case MGUN_BLK:
+        case STICKY_BLK:
+        case WALLOFF_BLK:
+        case MULTIBALL_BLK:
+        case PAD_EXPAND_BLK:
+        case PAD_SHRINK_BLK:
+        case DEATH_BLK:
+        case COUNTER_BLK:
+            return 1;
+        default:
+            return 0;
+    }
+}
+
+int block_system_decrement_gun_hit(block_system_t *ctx, int row, int col)
+{
+    if (ctx == NULL || row < 0 || row >= MAX_ROW || col < 0 || col >= MAX_COL)
+        return 0;
+
+    block_entry_t *bp = &ctx->blocks[row][col];
+    if (!bp->occupied)
+        return 0;
+
+    int block_type = bp->block_type;
+
+    /* HYPERSPACE_BLK and BLACK_BLK always absorb — original/gun.c:341-350. */
+    if (block_type == HYPERSPACE_BLK || block_type == BLACK_BLK)
+        return 1;
+
+    /* Multi-hit specials: decrement counterSlide — original/gun.c:325-340. */
+    if (is_multi_hit_special(block_type))
+    {
+        if (bp->counter_slide > 0)
+            bp->counter_slide--;
+        if (bp->counter_slide > 0)
+            return 1; /* Still has hits remaining — bullet absorbed */
+        /* counterSlide reached zero — fall through to clear */
+    }
+
+    /* Regular block or multi-hit special exhausted: clear the block. */
+    block_system_clear(ctx, row, col);
+    return 0;
+}
+
+/* =========================================================================
  * Utility
  * ========================================================================= */
 

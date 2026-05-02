@@ -161,6 +161,14 @@ void sdl2_input_get_mouse(const sdl2_input_t *ctx, int *x, int *y);
 /* True if the given mouse button is currently pressed (1=left, 2=mid, 3=right). */
 bool sdl2_input_mouse_pressed(const sdl2_input_t *ctx, int button);
 
+/*
+ * True if the given mouse button was pressed this frame (edge trigger).
+ * Matches the semantics of sdl2_input_just_pressed for keyboard actions.
+ * Cleared by sdl2_input_begin_frame each frame.
+ * button: 1=left, 2=middle, 3=right.
+ */
+bool sdl2_input_mouse_just_pressed(const sdl2_input_t *ctx, int button);
+
 /* =========================================================================
  * Modifier queries
  * ========================================================================= */

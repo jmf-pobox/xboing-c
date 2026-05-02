@@ -22,6 +22,7 @@
 #include "editor_system.h"
 #include "game_context.h"
 #include "game_rules.h"
+#include "gun_system.h"
 #include "intro_system.h"
 #include "keys_system.h"
 #include "level_system.h"
@@ -137,9 +138,10 @@ static int ball_cb_on_block_hit(int row, int col, int ball_index, void *ud)
             return 0;
 
         case MGUN_BLK:
+            /* original/blocks.c MGUN_BLK case: only enables fastGun.
+             * Unlimited is exclusively MAXAMMO_BLK's effect. */
             block_system_clear(ctx->block, row, col);
             special_system_set(ctx->special, SPECIAL_FAST_GUN, 1);
-            gun_system_set_unlimited(ctx->gun, 1);
             return 0;
 
         case WALLOFF_BLK:
@@ -276,7 +278,7 @@ static int gun_cb_check_block_hit(int bx, int by, int *out_row, int *out_col, vo
     return 0;
 }
 
-/* Handle bullet-block hit: clear block and award points */
+/* Handle bullet-block hit: decrement/absorb per block type, award points. */
 static void gun_cb_on_block_hit(int row, int col, void *ud)
 {
     game_ctx_t *ctx = ud;
@@ -284,6 +286,7 @@ static void gun_cb_on_block_hit(int row, int col, void *ud)
     if (block_type == NONE_BLK)
         return;
 
+    /* Award points — even on an absorb hit (original awards on every bullet hit) */
     int points = score_block_hit_points(block_type, row);
     if (points > 0)
     {
@@ -293,7 +296,38 @@ static void gun_cb_on_block_hit(int row, int col, void *ud)
         };
         score_system_add(ctx->score, (unsigned long)points, &senv);
     }
-    block_system_clear(ctx->block, row, col);
+
+    /* Delegate clear/absorb logic to block_system — original/gun.c:318-350.
+     * Returns 1 if bullet absorbed (block still occupied), 0 if block cleared. */
+    int absorbed = block_system_decrement_gun_hit(ctx->block, row, col);
+    if (absorbed)
+        return;
+
+    /* Block was cleared — handle pickup effects. */
+    unsigned long frame = sdl2_state_frame(ctx->state);
+    switch (block_type)
+    {
+        case BULLET_BLK:
+            /* original/blocks.c:1581-1585 — AddABullet x NUMBER_OF_BULLETS_NEW_LEVEL (4) */
+            for (int i = 0; i < BLOCK_NUMBER_OF_BULLETS_NEW_LEVEL; i++)
+                gun_system_add_ammo(ctx->gun);
+            if (ctx->audio)
+                sdl2_audio_play(ctx->audio, "ammo");
+            message_system_set(ctx->message, "More ammunition, cool!", 1, (int)frame);
+            break;
+
+        case MAXAMMO_BLK:
+            /* original/blocks.c:1588-1593 — SetUnlimitedBullets + SetNumberBullets(MAX+1) */
+            gun_system_set_unlimited(ctx->gun, 1);
+            gun_system_set_ammo(ctx->gun, GUN_MAX_AMMO + 1);
+            if (ctx->audio)
+                sdl2_audio_play(ctx->audio, "ammo");
+            message_system_set(ctx->message, "Unlimited bullets!", 1, (int)frame);
+            break;
+
+        default:
+            break;
+    }
 }
 
 /* Check if bullet hits any active ball (AABB overlap) */
@@ -316,12 +350,14 @@ static int gun_cb_check_ball_hit(int bx, int by, void *ud)
     return -1;
 }
 
-/* Bullet hit ball: activate it (wake up from stun) */
+/* Bullet hit ball: kill the ball — original/gun.c:284 ClearBallNow. */
 static void gun_cb_on_ball_hit(int ball_index, void *ud)
 {
-    (void)ball_index;
-    (void)ud;
-    /* Ball activation on bullet hit — simplified for now */
+    game_ctx_t *ctx = ud;
+    /* Use the existing factory — it captures no_walls, killer, and all
+     * other fields that an inline construction might miss. */
+    ball_system_env_t env = game_callbacks_ball_env(ctx);
+    ball_system_change_mode(ctx->ball, &env, ball_index, BALL_POP);
 }
 
 /* Check if bullet hits eyedude — stub until bead 4.2 */

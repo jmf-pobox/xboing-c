@@ -464,8 +464,84 @@ static void test_get_binding_null(void **state)
 }
 
 /* =========================================================================
- * Group 8: Action names and status strings
+ * Group 8 (new): sdl2_input_mouse_just_pressed edge-trigger API
+ *
+ * Gap 12 — original/main.c:357-366 fires once per ButtonPress event.
+ * sdl2_input_mouse_just_pressed must behave like sdl2_input_just_pressed:
+ * fires only on the first frame of a button-down, cleared by begin_frame.
  * ========================================================================= */
+
+/* Mouse just-pressed: set on button-down, cleared by begin_frame */
+static void test_mouse_just_pressed_edge_trigger(void **state)
+{
+    sdl2_input_t *ctx = (sdl2_input_t *)*state;
+
+    sdl2_input_begin_frame(ctx);
+    assert_false(sdl2_input_mouse_just_pressed(ctx, SDL_BUTTON_LEFT));
+
+    SDL_Event down = make_mouse_button(SDL_MOUSEBUTTONDOWN, SDL_BUTTON_LEFT, 100, 200);
+    sdl2_input_process_event(ctx, &down);
+    assert_true(sdl2_input_mouse_just_pressed(ctx, SDL_BUTTON_LEFT));
+    /* Level trigger also set */
+    assert_true(sdl2_input_mouse_pressed(ctx, SDL_BUTTON_LEFT));
+
+    /* begin_frame clears edge, but level trigger persists */
+    sdl2_input_begin_frame(ctx);
+    assert_false(sdl2_input_mouse_just_pressed(ctx, SDL_BUTTON_LEFT));
+    assert_true(sdl2_input_mouse_pressed(ctx, SDL_BUTTON_LEFT));
+}
+
+/* Mouse just-pressed: not re-triggered while button held across frames */
+static void test_mouse_just_pressed_not_repeated(void **state)
+{
+    sdl2_input_t *ctx = (sdl2_input_t *)*state;
+
+    sdl2_input_begin_frame(ctx);
+    SDL_Event down = make_mouse_button(SDL_MOUSEBUTTONDOWN, SDL_BUTTON_LEFT, 0, 0);
+    sdl2_input_process_event(ctx, &down);
+    assert_true(sdl2_input_mouse_just_pressed(ctx, SDL_BUTTON_LEFT));
+
+    /* Second frame — no new button-down event — edge cleared */
+    sdl2_input_begin_frame(ctx);
+    assert_false(sdl2_input_mouse_just_pressed(ctx, SDL_BUTTON_LEFT));
+    /* Third frame — still no new down event */
+    sdl2_input_begin_frame(ctx);
+    assert_false(sdl2_input_mouse_just_pressed(ctx, SDL_BUTTON_LEFT));
+}
+
+/* Mouse just-pressed: independent per button */
+static void test_mouse_just_pressed_independent_buttons(void **state)
+{
+    sdl2_input_t *ctx = (sdl2_input_t *)*state;
+
+    sdl2_input_begin_frame(ctx);
+    SDL_Event right_down = make_mouse_button(SDL_MOUSEBUTTONDOWN, SDL_BUTTON_RIGHT, 0, 0);
+    sdl2_input_process_event(ctx, &right_down);
+
+    assert_false(sdl2_input_mouse_just_pressed(ctx, SDL_BUTTON_LEFT));
+    assert_false(sdl2_input_mouse_just_pressed(ctx, SDL_BUTTON_MIDDLE));
+    assert_true(sdl2_input_mouse_just_pressed(ctx, SDL_BUTTON_RIGHT));
+}
+
+/* Mouse just-pressed: NULL ctx returns false safely */
+static void test_mouse_just_pressed_null_ctx(void **state)
+{
+    (void)state;
+    assert_false(sdl2_input_mouse_just_pressed(NULL, SDL_BUTTON_LEFT));
+}
+
+/* Mouse just-pressed: invalid button returns false */
+static void test_mouse_just_pressed_invalid_button(void **state)
+{
+    const sdl2_input_t *ctx = (const sdl2_input_t *)*state;
+    assert_false(sdl2_input_mouse_just_pressed(ctx, 0));
+    assert_false(sdl2_input_mouse_just_pressed(ctx, 6));
+}
+
+/* =========================================================================
+ * Group 9: Action names and status strings
+ * ========================================================================= */
+
 
 static void test_all_actions_have_names(void **state)
 {
@@ -586,6 +662,18 @@ int main(void)
         cmocka_unit_test(test_unknown_status_string),
     };
 
+    const struct CMUnitTest mouse_just_pressed_tests[] = {
+        cmocka_unit_test_setup_teardown(test_mouse_just_pressed_edge_trigger, setup_input,
+                                        teardown_input),
+        cmocka_unit_test_setup_teardown(test_mouse_just_pressed_not_repeated, setup_input,
+                                        teardown_input),
+        cmocka_unit_test_setup_teardown(test_mouse_just_pressed_independent_buttons, setup_input,
+                                        teardown_input),
+        cmocka_unit_test(test_mouse_just_pressed_null_ctx),
+        cmocka_unit_test_setup_teardown(test_mouse_just_pressed_invalid_button, setup_input,
+                                        teardown_input),
+    };
+
     int failed = 0;
     failed += cmocka_run_group_tests_name("lifecycle", lifecycle_tests, NULL, NULL);
     failed += cmocka_run_group_tests_name("default bindings", binding_tests, NULL, NULL);
@@ -595,5 +683,7 @@ int main(void)
     failed += cmocka_run_group_tests_name("rebinding", rebind_tests, NULL, NULL);
     failed += cmocka_run_group_tests_name("error handling", error_tests, NULL, NULL);
     failed += cmocka_run_group_tests_name("names and strings", name_tests, NULL, NULL);
+    failed += cmocka_run_group_tests_name("mouse just-pressed", mouse_just_pressed_tests, NULL,
+                                          NULL);
     return failed;
 }

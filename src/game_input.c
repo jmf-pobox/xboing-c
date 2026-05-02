@@ -294,11 +294,31 @@ void game_input_update(game_ctx_t *ctx)
             input_update_paddle(ctx);
             input_launch_ball(ctx);
 
-            /* K key shoots a bullet */
+            /* K key: dual-use — activate waiting ball first, then shoot.
+             * original/main.c:490-494: ActivateWaitingBall first; if no
+             * ball is waiting (returns -1), shootBullet. */
             if (sdl2_input_just_pressed(ctx->input, SDL2I_SHOOT))
             {
-                gun_system_env_t genv = game_callbacks_gun_env(ctx);
-                gun_system_shoot(ctx->gun, &genv);
+                ball_system_env_t benv = game_callbacks_ball_env(ctx);
+                if (ball_system_activate_waiting(ctx->ball, &benv) == -1)
+                {
+                    gun_system_env_t genv = game_callbacks_gun_env(ctx);
+                    gun_system_shoot(ctx->gun, &genv);
+                }
+            }
+
+            /* Mouse click: same dual-use as K — original/main.c:357-366.
+             * Uses edge-trigger to fire once per click, not once per frame. */
+            if (sdl2_input_mouse_just_pressed(ctx->input, SDL_BUTTON_LEFT) ||
+                sdl2_input_mouse_just_pressed(ctx->input, SDL_BUTTON_MIDDLE) ||
+                sdl2_input_mouse_just_pressed(ctx->input, SDL_BUTTON_RIGHT))
+            {
+                ball_system_env_t benv = game_callbacks_ball_env(ctx);
+                if (ball_system_activate_waiting(ctx->ball, &benv) == -1)
+                {
+                    gun_system_env_t genv = game_callbacks_gun_env(ctx);
+                    gun_system_shoot(ctx->gun, &genv);
+                }
             }
 
             /* P key pauses */

@@ -220,7 +220,9 @@ void game_rules_next_level(game_ctx_t *ctx)
     ball_system_env_t env = game_callbacks_ball_env(ctx);
     ball_system_reset_start(ctx->ball, &env);
 
-    /* Give ammo for the new level */
+    /* Reset unlimited and give ammo for the new level.
+     * original/file.c:115 — SetUnlimitedBullets(False) before SetNumberBullets. */
+    gun_system_set_unlimited(ctx->gun, 0);
     gun_system_set_ammo(ctx->gun, GUN_AMMO_PER_LEVEL);
 
     /* Reset bonus spawning state */
@@ -262,6 +264,10 @@ void game_rules_ball_died(game_ctx_t *ctx)
      * inside DeadBall, before ResetBallStart. */
     if (ctx->audio)
         sdl2_audio_play(ctx->audio, "balllost");
+
+    /* Grant +2 ammo as consolation — original/ball.c:1803-1805. */
+    gun_system_add_ammo(ctx->gun);
+    gun_system_add_ammo(ctx->gun);
 
     paddle_system_set_reverse(ctx->paddle, 0);
     ball_system_env_t env = game_callbacks_ball_env(ctx);
