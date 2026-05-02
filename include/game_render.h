@@ -6,6 +6,7 @@
 #define GAME_RENDER_H
 
 #include "game_context.h"
+#include "special_system.h"
 
 /* Render the complete game frame (background + playfield + blocks + UI). */
 void game_render_frame(const game_ctx_t *ctx);
@@ -51,5 +52,22 @@ void game_render_messages(const game_ctx_t *ctx);
 
 /* Render the timer display (seconds remaining). */
 void game_render_timer(const game_ctx_t *ctx);
+
+/* Render the specials panel (8 power-up labels, active=yellow / inactive=white). */
+void game_render_specials(const game_ctx_t *ctx);
+
+/*
+ * Pure coordinate helper — compute absolute pixel position of specials label i.
+ *
+ * lh:     line height from sdl2_font_line_height (used as the row y-step).
+ * labels: array of SPECIAL_COUNT entries from special_system_get_labels().
+ * i:      label index in [0, SPECIAL_COUNT).
+ * abs_x:  receives SPECIAL_PANEL_ORIGIN_X + labels[i].col_x.
+ * abs_y:  receives SPECIAL_PANEL_ORIGIN_Y + SPECIAL_ROW0_Y + labels[i].row * (lh + SPECIAL_GAP).
+ *
+ * No SDL2 dependency — safe to call from CMocka tests without a renderer.
+ */
+void game_render_specials_coords(int lh, const special_label_info_t *labels, int i, int *abs_x,
+                                 int *abs_y);
 
 #endif /* GAME_RENDER_H */
