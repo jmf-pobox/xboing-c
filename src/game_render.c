@@ -96,8 +96,10 @@ void game_render_blocks(const game_ctx_t *ctx)
             }
             else
             {
-                /* Normal static block sprite */
-                key = sprite_block_key(info.block_type);
+                /* Animated block types use bonus_slide to select frame */
+                key = sprite_block_animated_key(info.block_type, info.bonus_slide);
+                if (!key)
+                    key = sprite_block_key(info.block_type);
             }
 
             if (!key)

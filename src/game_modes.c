@@ -180,6 +180,9 @@ static void mode_game_update(sdl2_state_mode_t mode, void *ud)
     gun_system_env_t genv = game_callbacks_gun_env(ctx);
     gun_system_update(ctx->gun, &genv);
 
+    /* Block animation slides (BONUS/DEATH/EXTRABALL/ROAMER cycling) */
+    block_system_advance_animations(ctx->block, (int)sdl2_state_frame(ctx->state));
+
     /* EyeDude character */
     eyedude_system_update(ctx->eyedude, (int)sdl2_state_frame(ctx->state), GAME_PLAY_WIDTH);
 

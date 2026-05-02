@@ -520,6 +520,50 @@ block_system_status_t block_system_clear_all(block_system_t *ctx)
     return BLOCK_SYS_OK;
 }
 
+void block_system_advance_animations(block_system_t *ctx, int frame)
+{
+    if (ctx == NULL)
+        return;
+
+    for (int r = 0; r < MAX_ROW; r++)
+    {
+        for (int c = 0; c < MAX_COL; c++)
+        {
+            block_entry_t *bp = &ctx->blocks[r][c];
+            if (!bp->occupied)
+                continue;
+
+            switch (bp->block_type)
+            {
+                case BONUSX2_BLK:
+                case BONUSX4_BLK:
+                case BONUS_BLK:
+                    /* 4-frame spin cycle at BLOCK_BONUS_DELAY interval */
+                    bp->bonus_slide = (frame / BLOCK_BONUS_DELAY) % 4;
+                    break;
+
+                case DEATH_BLK:
+                    /* 5-frame winking pirate cycle */
+                    bp->bonus_slide = (frame / BLOCK_DEATH_DELAY1) % 5;
+                    break;
+
+                case EXTRABALL_BLK:
+                    /* 2-frame flip */
+                    bp->bonus_slide = (frame / BLOCK_EXTRABALL_DELAY) % 2;
+                    break;
+
+                case ROAMER_BLK:
+                    /* 5 directions: neutral, L, R, U, D */
+                    bp->bonus_slide = (frame / BLOCK_ROAM_EYES_DELAY) % 5;
+                    break;
+
+                default:
+                    break;
+            }
+        }
+    }
+}
+
 /* =========================================================================
  * Collision detection
  * ========================================================================= */
