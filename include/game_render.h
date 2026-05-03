@@ -6,6 +6,7 @@
 #define GAME_RENDER_H
 
 #include "game_context.h"
+#include "score_system.h" /* SCORE_DIGIT_STRIDE — shared with level number layout */
 #include "special_system.h"
 
 /* Render the complete game frame (background + playfield + blocks + UI). */
@@ -118,13 +119,12 @@ static inline void level_life_position(int level_area_x, int level_area_y, int i
  */
 #define LEVEL_NUM_ANCHOR_X 260
 #define LEVEL_NUM_ANCHOR_Y 5
-#define LEVEL_NUM_STRIDE 32
 
 static inline void level_number_digit_position(int level_area_x, int level_area_y, int digit_index,
                                                int *out_x, int *out_y)
 {
     if (out_x)
-        *out_x = level_area_x + LEVEL_NUM_ANCHOR_X - (digit_index + 1) * LEVEL_NUM_STRIDE;
+        *out_x = level_area_x + LEVEL_NUM_ANCHOR_X - (digit_index + 1) * SCORE_DIGIT_STRIDE;
     if (out_y)
         *out_y = level_area_y + LEVEL_NUM_ANCHOR_Y;
 }

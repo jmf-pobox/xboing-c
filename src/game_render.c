@@ -527,11 +527,6 @@ void game_render_bullets(const game_ctx_t *ctx)
 #define LEVEL_AREA_X 284
 #define LEVEL_AREA_Y 5
 
-/* Level-number digit dimensions — match the 30x40 RenderShape call at
- * original/score.c:152.  Score digits use the same family. */
-#define LEVEL_NUM_DIGIT_W 30
-#define LEVEL_NUM_DIGIT_H 40
-
 void game_render_lives(const game_ctx_t *ctx)
 {
     SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
@@ -570,7 +565,7 @@ void game_render_lives(const game_ctx_t *ctx)
         sdl2_texture_info_t dtex;
         if (sdl2_texture_get(ctx->texture, sprite_digit_key(digit), &dtex) == SDL2T_OK)
         {
-            SDL_Rect dst = {.w = LEVEL_NUM_DIGIT_W, .h = LEVEL_NUM_DIGIT_H};
+            SDL_Rect dst = {.w = SCORE_DIGIT_WIDTH, .h = SCORE_DIGIT_HEIGHT};
             level_number_digit_position(LEVEL_AREA_X, LEVEL_AREA_Y, digit_index, &dst.x, &dst.y);
             SDL_RenderCopy(sdl, dtex.texture, NULL, &dst);
         }
