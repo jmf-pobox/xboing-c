@@ -130,8 +130,11 @@ static void test_death_blk_clears_block_and_kills_ball(void **vstate)
     /* Tick one ball_system_update — on_block_hit fires for ball_index=2 */
     ball_system_update(ctx->ball, &env);
 
-    /* (a) Block must be cleared */
-    assert_int_equal(block_system_is_occupied(ctx->block, 3, 4), 0);
+    /* (a) Block must be in explosion lifecycle (exploding=1, occupied=1
+     * for ~40 ticks).  Basket 3: blocks no longer vanish instantly. */
+    block_system_render_info_t bri;
+    assert_int_equal(block_system_get_render_info(ctx->block, 3, 4, &bri), BLOCK_SYS_OK);
+    assert_int_equal(bri.exploding, 1);
 
     /* (b) Ball at index 2 must be in BALL_POP (not BALL_ACTIVE) */
     enum BallStates state2 = ball_system_get_state(ctx->ball, 2);
@@ -302,8 +305,11 @@ static void test_mgun_blk_ball_hit_no_unlimited(void **vstate)
 
     ball_system_update(ctx->ball, &env);
 
-    /* Block cleared by ball hit */
-    assert_int_equal(block_system_is_occupied(ctx->block, 5, 2), 0);
+    /* Block now in explosion lifecycle — exploding=1 but still occupied
+     * (basket 3: blocks animate before disappearing). */
+    block_system_render_info_t bri;
+    assert_int_equal(block_system_get_render_info(ctx->block, 5, 2, &bri), BLOCK_SYS_OK);
+    assert_int_equal(bri.exploding, 1);
     /* unlimited must NOT have been set */
     assert_int_equal(gun_system_get_unlimited(ctx->gun), 0);
 }

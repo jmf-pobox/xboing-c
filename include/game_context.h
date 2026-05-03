@@ -120,6 +120,10 @@ typedef struct game_ctx
     /* Tilt state */
     int user_tilts; /* Remaining tilts this level */
 
+    /* Bonus block counter — incremented on BONUS_BLK explosion finalize.
+     * At count == 10, killer mode activates (matches original/blocks.c:1607). */
+    int bonus_count;
+
     /* Render interpolation */
     double render_alpha; /* 0.0–1.0, fraction of tick elapsed since last physics step */
 

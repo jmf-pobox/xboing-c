@@ -90,8 +90,21 @@ void game_render_blocks(const game_ctx_t *ctx)
 
             if (info.exploding)
             {
-                /* Explosion animation overrides normal appearance */
-                key = sprite_block_explode_key(info.block_type, info.explode_slide);
+                /* Explosion animation overrides normal appearance.
+                 *
+                 * Stage 4 is a clear-only frame (matches XClearArea path
+                 * at original/blocks.c:1528-1530) — skip drawing
+                 * entirely.  sprite_block_explode_key never returns NULL
+                 * on its default case, so the if-key-NULL guard below
+                 * does NOT fire here; the explicit branch is required.
+                 *
+                 * For stages 1..3, pass slide-1 to map to 0-based sprite
+                 * frame indices (matches original
+                 * ExplodeBlockType(..., 0/1/2) at original/blocks.c:1512,
+                 * 1521, 1525). */
+                if (info.explode_slide >= 4)
+                    continue;
+                key = sprite_block_explode_key(info.block_type, info.explode_slide - 1);
             }
             else if (info.block_type == COUNTER_BLK && info.counter_slide > 0)
             {

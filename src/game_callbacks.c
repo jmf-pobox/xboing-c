@@ -35,6 +35,7 @@
 #include "sdl2_audio.h"
 #include "sdl2_loop.h"
 #include "sdl2_state.h"
+#include "sfx_system.h"
 #include "special_system.h"
 
 /* Play area constants */
@@ -72,22 +73,23 @@ static int ball_cb_on_block_hit(int row, int col, int ball_index, void *ud)
     if (block_type == NONE_BLK)
         return 0;
 
-    /* Award points based on block type */
-    int points = score_block_hit_points(block_type, row);
-    if (points > 0)
-    {
-        score_system_env_t senv = {
-            .x2_active = special_system_is_active(ctx->special, SPECIAL_X2_BONUS),
-            .x4_active = special_system_is_active(ctx->special, SPECIAL_X4_BONUS),
-        };
-        score_system_add(ctx->score, (unsigned long)points, &senv);
-    }
+    int frame = (int)sdl2_state_frame(ctx->state);
 
-    /* Handle block-type-specific behavior */
+    /*
+     * Hit-time effects only.  Score, BOMB chain, BONUSX2/X4 toggles, and
+     * BULLET/MAXAMMO/TIMER/BONUS pickups defer to the explosion finalize
+     * callback — matches original/blocks.c:1547 (AddToScore) and the
+     * per-type switch at original/blocks.c:1550-1637.
+     *
+     * Hit-time effects below match original/ball.c call sites: paddle
+     * toggles (:896, :915, :930, :959), ball split (:974), extra life
+     * (:945).  Sound continues at hit time per
+     * original/blocks.c:1868 (PlaySoundForBlock inside DrawBlock(KILL_BLK)).
+     */
     switch (block_type)
     {
         case DEATH_BLK:
-            block_system_clear(ctx->block, row, col);
+            (void)block_system_explode(ctx->block, row, col, frame);
             /* Kill the ball: transition to BALL_POP so the pop animation
              * runs and BALL_EVT_DIED fires.  ball_index must be live here.
              * Matches original/ball.c:851 — ClearBallNow(display, window, i). */
@@ -98,79 +100,163 @@ static int ball_cb_on_block_hit(int row, int col, int ball_index, void *ud)
             return 1;
 
         case BOMB_BLK:
-            block_system_clear(ctx->block, row, col);
-            for (int dr = -1; dr <= 1; dr++)
-                for (int dc = -1; dc <= 1; dc++)
-                    if (!(dr == 0 && dc == 0) &&
-                        block_system_is_occupied(ctx->block, row + dr, col + dc))
-                        block_system_clear(ctx->block, row + dr, col + dc);
+            /* Source detonation — chain reaction is at finalize, not hit time. */
+            (void)block_system_explode(ctx->block, row, col, frame);
             if (ctx->audio)
                 sdl2_audio_play(ctx->audio, "bomb");
             return 0;
 
         case REVERSE_BLK:
-            block_system_clear(ctx->block, row, col);
+            (void)block_system_explode(ctx->block, row, col, frame);
             paddle_system_toggle_reverse(ctx->paddle);
             return 0;
 
         case MULTIBALL_BLK:
         {
-            block_system_clear(ctx->block, row, col);
+            (void)block_system_explode(ctx->block, row, col, frame);
             ball_system_env_t env = game_callbacks_ball_env(ctx);
             ball_system_split(ctx->ball, &env);
             return 0;
         }
 
         case STICKY_BLK:
-            block_system_clear(ctx->block, row, col);
+            (void)block_system_explode(ctx->block, row, col, frame);
             special_system_set(ctx->special, SPECIAL_STICKY, 1);
             paddle_system_set_sticky(ctx->paddle, 1);
             return 0;
 
         case PAD_SHRINK_BLK:
-            block_system_clear(ctx->block, row, col);
+            (void)block_system_explode(ctx->block, row, col, frame);
             paddle_system_change_size(ctx->paddle, 1); /* shrink */
             return 0;
 
         case PAD_EXPAND_BLK:
-            block_system_clear(ctx->block, row, col);
+            (void)block_system_explode(ctx->block, row, col, frame);
             paddle_system_change_size(ctx->paddle, 0); /* expand */
             return 0;
 
         case MGUN_BLK:
             /* original/blocks.c MGUN_BLK case: only enables fastGun.
              * Unlimited is exclusively MAXAMMO_BLK's effect. */
-            block_system_clear(ctx->block, row, col);
+            (void)block_system_explode(ctx->block, row, col, frame);
             special_system_set(ctx->special, SPECIAL_FAST_GUN, 1);
             return 0;
 
         case WALLOFF_BLK:
-            block_system_clear(ctx->block, row, col);
+            (void)block_system_explode(ctx->block, row, col, frame);
             special_system_set(ctx->special, SPECIAL_NO_WALLS, 1);
             return 0;
 
         case EXTRABALL_BLK:
-            block_system_clear(ctx->block, row, col);
+            (void)block_system_explode(ctx->block, row, col, frame);
             ctx->lives_left++;
             return 0;
 
-        case BONUSX2_BLK:
-            block_system_clear(ctx->block, row, col);
-            special_system_set(ctx->special, SPECIAL_X2_BONUS, 1);
-            return 0;
-
-        case BONUSX4_BLK:
-            block_system_clear(ctx->block, row, col);
-            special_system_set(ctx->special, SPECIAL_X4_BONUS, 1);
-            return 0;
-
         case HYPERSPACE_BLK:
+            /* Immune to explosion (original/blocks.c:1821-1822) — clear
+             * directly to absorb the ball. */
             block_system_clear(ctx->block, row, col);
             return 1; /* Absorb ball (teleport in full impl) */
 
         default:
-            block_system_clear(ctx->block, row, col);
+            /* Includes BONUSX2_BLK, BONUSX4_BLK, BULLET_BLK, MAXAMMO_BLK,
+             * TIMER_BLK, BONUS_BLK, BLACK_BLK, ROAMER_BLK, and all colored
+             * blocks — all of these defer to finalize-time effects via
+             * game_callbacks_on_block_finalize. */
+            (void)block_system_explode(ctx->block, row, col, frame);
             return 0;
+    }
+}
+
+/*
+ * Block explosion finalize handler — fires once per block reaching the
+ * end of its KILL_BLK animation (~40 ticks after trigger).  Applies score
+ * and per-type finalize-only side effects, matching the per-type switch
+ * at original/blocks.c:1550-1637.
+ *
+ * The cell is already unoccupied when this callback fires.
+ */
+void game_callbacks_on_block_finalize(int row, int col, int block_type, int hit_points, void *ud)
+{
+    game_ctx_t *ctx = ud;
+    int frame = (int)sdl2_state_frame(ctx->state);
+
+    /* Score deferred from hit time (original/blocks.c:1547). */
+    if (hit_points > 0)
+    {
+        score_system_env_t senv = {
+            .x2_active = special_system_is_active(ctx->special, SPECIAL_X2_BONUS),
+            .x4_active = special_system_is_active(ctx->special, SPECIAL_X4_BONUS),
+        };
+        score_system_add(ctx->score, (unsigned long)hit_points, &senv);
+    }
+
+    switch (block_type)
+    {
+        case BOMB_BLK:
+            /* 8-neighbor chain reaction (original/blocks.c:1559-1566).
+             * Return value intentionally discarded — overlapping chains
+             * may try to re-arm an already-exploding neighbor and the
+             * silent skip matches original/blocks.c:1825. */
+            for (int dr = -1; dr <= 1; dr++)
+            {
+                for (int dc = -1; dc <= 1; dc++)
+                {
+                    if (dr == 0 && dc == 0)
+                        continue;
+                    (void)block_system_explode(ctx->block, row + dr, col + dc,
+                                               frame + BLOCK_EXPLODE_DELAY);
+                }
+            }
+            /* Screen shake — matches original/blocks.c:1571-1572 SFX_SHAKE. */
+            if (ctx->sfx)
+                sfx_system_set_mode(ctx->sfx, SFX_MODE_SHAKE);
+            break;
+
+        case BONUSX2_BLK:
+            /* x2 explicitly disables x4 (original/blocks.c:1619). */
+            special_system_set(ctx->special, SPECIAL_X2_BONUS, 1);
+            special_system_set(ctx->special, SPECIAL_X4_BONUS, 0);
+            break;
+
+        case BONUSX4_BLK:
+            /* x4 explicitly disables x2 (original/blocks.c:1628). */
+            special_system_set(ctx->special, SPECIAL_X4_BONUS, 1);
+            special_system_set(ctx->special, SPECIAL_X2_BONUS, 0);
+            break;
+
+        case TIMER_BLK:
+            /* +20 seconds (original/blocks.c:1576, BLOCK_EXTRA_TIME=20). */
+            if (ctx->time_remaining < 1000000)
+                ctx->time_remaining += BLOCK_EXTRA_TIME;
+            break;
+
+        case BULLET_BLK:
+            /* +4 ammo (original/blocks.c:1584-1585).  Matches the gun-hit
+             * pattern at gun_cb_on_block_hit line 317-319. */
+            if (!gun_system_get_unlimited(ctx->gun))
+            {
+                for (int i = 0; i < BLOCK_NUMBER_OF_BULLETS_NEW_LEVEL; i++)
+                    gun_system_add_ammo(ctx->gun);
+            }
+            break;
+
+        case MAXAMMO_BLK:
+            /* Unlimited bullets (original/blocks.c:1590-1591). */
+            gun_system_set_unlimited(ctx->gun, 1);
+            gun_system_set_ammo(ctx->gun, GUN_MAX_AMMO + 1);
+            break;
+
+        case BONUS_BLK:
+            /* Bonus counter — killer mode at exactly 10
+             * (original/blocks.c:1607). */
+            ctx->bonus_count++;
+            if (ctx->bonus_count == 10)
+                special_system_set(ctx->special, SPECIAL_KILLER, 1);
+            break;
+
+        default:
+            break;
     }
 }
 
