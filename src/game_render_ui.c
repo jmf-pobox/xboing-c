@@ -535,11 +535,44 @@ void game_render_bonus(const game_ctx_t *ctx)
 
     if (state >= BONUS_STATE_BONUS)
     {
-        int coins = bonus_system_get_coins(ctx->bonus);
-        char buf[64];
-        snprintf(buf, sizeof(buf), "Bonus Coins: %d x 3000 = %d", coins, coins * 3000);
-        sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_DATA, buf, PLAY_AREA_Y + 200, green,
-                                      PLAY_AREA_W);
+        /* Animated coin row: draw one BONUS_BLK sprite per coin already
+         * consumed by the state machine (initial_coins - live_coins).
+         * Mirrors original/bonus.c:280-389 DoBonuses centred-row layout.
+         * On super-bonus (>8 coins) or no-coins paths the renderer falls
+         * back to a label since the state machine awards points without
+         * draining individual coins. */
+        int initial = bonus_system_get_initial_coins(ctx->bonus);
+        int live = bonus_system_get_coins(ctx->bonus);
+        int drawn = initial - live;
+        SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
+        int center_x = PLAY_AREA_X + PLAY_AREA_W / 2;
+        int row_y = PLAY_AREA_Y + 200;
+        sdl2_texture_info_t coin_tex;
+        if (initial > 0 && initial <= 8 && drawn > 0 &&
+            sdl2_texture_get(ctx->texture, SPR_BLOCK_BONUS_1, &coin_tex) == SDL2T_OK)
+        {
+            for (int i = 0; i < drawn && i < initial; i++)
+            {
+                SDL_Rect dst = {.x = bonus_row_item_x(center_x, initial, BONUS_COIN_STRIDE, i),
+                                .y = row_y,
+                                .w = coin_tex.width,
+                                .h = coin_tex.height};
+                SDL_RenderCopy(sdl, coin_tex.texture, NULL, &dst);
+            }
+        }
+        else if (initial == 0)
+        {
+            sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_DATA,
+                                          "Sorry, no bonus coins collected.", row_y, green,
+                                          PLAY_AREA_W);
+        }
+        else if (initial > 8)
+        {
+            char buf[64];
+            snprintf(buf, sizeof(buf), "Super Bonus - %d", initial);
+            sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TITLE, buf, row_y, green,
+                                          PLAY_AREA_W);
+        }
     }
 
     if (state >= BONUS_STATE_LEVEL)
@@ -551,8 +584,35 @@ void game_render_bonus(const game_ctx_t *ctx)
     }
 
     if (state >= BONUS_STATE_BULLET)
-        sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_DATA, "Bullet Bonus...",
-                                      PLAY_AREA_Y + 280, green, PLAY_AREA_W);
+    {
+        /* Animated bullet row: same pattern as coins but stride 10.
+         * Mirrors original/bonus.c:431-490 DoBullets. */
+        int initial_b = bonus_system_get_initial_bullets(ctx->bonus);
+        int live_b = bonus_system_get_bullets(ctx->bonus);
+        int drawn_b = initial_b - live_b;
+        SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
+        int center_x = PLAY_AREA_X + PLAY_AREA_W / 2;
+        int row_y = PLAY_AREA_Y + 280;
+        sdl2_texture_info_t bullet_tex;
+        if (initial_b > 0 && drawn_b > 0 &&
+            sdl2_texture_get(ctx->texture, SPR_BULLET, &bullet_tex) == SDL2T_OK)
+        {
+            for (int i = 0; i < drawn_b && i < initial_b; i++)
+            {
+                SDL_Rect dst = {.x = bonus_row_item_x(center_x, initial_b, BONUS_BULLET_STRIDE, i),
+                                .y = row_y,
+                                .w = bullet_tex.width,
+                                .h = bullet_tex.height};
+                SDL_RenderCopy(sdl, bullet_tex.texture, NULL, &dst);
+            }
+        }
+        else if (initial_b == 0)
+        {
+            sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_DATA,
+                                          "You have used all your bullets. No bonus!", row_y, green,
+                                          PLAY_AREA_W);
+        }
+    }
 
     if (state >= BONUS_STATE_TIME)
         sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_DATA, "Time Bonus...",

@@ -130,6 +130,32 @@ static inline void level_number_digit_position(int level_area_x, int level_area_
 }
 
 /*
+ * Pure helper — compute the x-coordinate of one item in a centred sprite
+ * row used by the bonus screen for coin and bullet animations.
+ * Mirrors the formula at original/bonus.c:354-361 and 462-469:
+ *
+ *   max_len = total * stride + 5
+ *   x[i]    = center_x + max_len / 2 - (total - i) * stride
+ *
+ * Layout: items 0..total-1 fill in left-to-right with `stride` pixels
+ * between successive items (so item 0 is leftmost, item total-1 is
+ * rightmost).  The +5 padding matches original's coin-row centering.
+ *
+ * Coin row (BONUS_BLK): stride = 37 (27-px sprite + 10-px gap).
+ * Bullet row: stride = 10 (7-px sprite + 3-px gap).
+ *
+ * Caller selects how many of these positions to actually render based
+ * on the bonus_system live counters: drawn = initial_count - live_count.
+ */
+#define BONUS_COIN_STRIDE 37
+#define BONUS_BULLET_STRIDE 10
+
+static inline int bonus_row_item_x(int center_x, int total_count, int stride, int item_index)
+{
+    return center_x + (total_count * stride + 5) / 2 - (total_count - item_index) * stride;
+}
+
+/*
  * Pure helper — compute the top-left position to center a text glyph within a
  * block-sized bounding box. Used for DROP_BLK hit-points digit, RANDOM_BLK
  * "- R -" overlay, and any future composite text rendering that needs to

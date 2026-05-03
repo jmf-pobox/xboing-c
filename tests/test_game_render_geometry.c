@@ -211,6 +211,60 @@ static void test_level_num_at_origin(void **state)
 }
 
 /* =========================================================================
+ * bonus_row_item_x — coin/bullet centred row for bonus screen
+ * (basket 5, xboing-c-tp4)
+ * ========================================================================= */
+
+static void test_bonus_row_first_item_leftmost(void **state)
+{
+    (void)state;
+    /* total=5 coins at stride 37, center_x=500.
+     * Item 0 (leftmost, first to appear):
+     *   max_len = 5*37 + 5 = 190; max_len/2 = 95
+     *   x = 500 + 95 - (5 - 0) * 37 = 500 + 95 - 185 = 410. */
+    assert_int_equal(bonus_row_item_x(500, 5, 37, 0), 410);
+}
+
+static void test_bonus_row_last_item_rightmost(void **state)
+{
+    (void)state;
+    /* Item N-1 (rightmost):
+     *   x = 500 + 95 - (5 - 4) * 37 = 500 + 95 - 37 = 558. */
+    assert_int_equal(bonus_row_item_x(500, 5, 37, 4), 558);
+}
+
+static void test_bonus_row_stride_between_items(void **state)
+{
+    (void)state;
+    int x0 = bonus_row_item_x(500, 5, 37, 0);
+    int x1 = bonus_row_item_x(500, 5, 37, 1);
+    int x2 = bonus_row_item_x(500, 5, 37, 2);
+    /* Successive items differ by exactly stride. */
+    assert_int_equal(x1 - x0, 37);
+    assert_int_equal(x2 - x1, 37);
+}
+
+static void test_bonus_row_bullet_stride(void **state)
+{
+    (void)state;
+    /* Bullet row: stride=10, total=20 bullets, center=500.
+     *   max_len = 20*10 + 5 = 205; max_len/2 = 102 (int)
+     *   item 0:  500 + 102 - 20*10 = 500 + 102 - 200 = 402
+     *   item 19: 500 + 102 - 1*10  = 592 */
+    assert_int_equal(bonus_row_item_x(500, 20, 10, 0), 402);
+    assert_int_equal(bonus_row_item_x(500, 20, 10, 19), 592);
+}
+
+static void test_bonus_row_single_item_centred(void **state)
+{
+    (void)state;
+    /* Single item at total=1, stride=37:
+     *   max_len = 37 + 5 = 42; max_len/2 = 21
+     *   x = center + 21 - 1*37 = center - 16. */
+    assert_int_equal(bonus_row_item_x(500, 1, 37, 0), 484);
+}
+
+/* =========================================================================
  * Test runner
  * ========================================================================= */
 
@@ -234,6 +288,11 @@ int main(void)
         cmocka_unit_test(test_level_num_hundreds_digit),
         cmocka_unit_test(test_level_num_stride_32),
         cmocka_unit_test(test_level_num_at_origin),
+        cmocka_unit_test(test_bonus_row_first_item_leftmost),
+        cmocka_unit_test(test_bonus_row_last_item_rightmost),
+        cmocka_unit_test(test_bonus_row_stride_between_items),
+        cmocka_unit_test(test_bonus_row_bullet_stride),
+        cmocka_unit_test(test_bonus_row_single_item_centred),
     };
 
     return cmocka_run_group_tests(tests, NULL, NULL);

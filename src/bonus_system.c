@@ -34,6 +34,14 @@ struct bonus_system
     unsigned long display_score; /* Running score counter for display */
     int first_time;              /* Sentinel for multi-call animation states */
 
+    /* Initial counts captured at begin — used by the renderer to draw
+     * coins/bullets at accumulating x positions during the per-frame
+     * decrement animation (basket 5: original/bonus.c:280-389 DoBonuses,
+     * 431-490 DoBullets).  Live counts decrement to 0; renderer draws
+     * `initial - live` sprites. */
+    int initial_coin_count;
+    int initial_bullet_count;
+
     /* Callbacks */
     bonus_system_callbacks_t callbacks;
     void *user_data;
@@ -156,6 +164,11 @@ void bonus_system_begin(bonus_system_t *ctx, const bonus_system_env_t *env, int 
     ctx->display_score = env->score;
     ctx->first_time = 1;
     ctx->finished = 0;
+
+    /* Capture initial counts so the renderer can draw accumulating
+     * sprite rows during the per-frame decrement animation. */
+    ctx->initial_coin_count = ctx->coin_count;
+    ctx->initial_bullet_count = env->bullet_count;
 
     /* Compute and commit total bonus score immediately.
      * Legacy behavior: all bonus points are added to the real score
@@ -427,6 +440,33 @@ int bonus_system_get_coins(const bonus_system_t *ctx)
         return 0;
     }
     return ctx->coin_count;
+}
+
+int bonus_system_get_initial_coins(const bonus_system_t *ctx)
+{
+    if (ctx == NULL)
+    {
+        return 0;
+    }
+    return ctx->initial_coin_count;
+}
+
+int bonus_system_get_bullets(const bonus_system_t *ctx)
+{
+    if (ctx == NULL)
+    {
+        return 0;
+    }
+    return ctx->env.bullet_count;
+}
+
+int bonus_system_get_initial_bullets(const bonus_system_t *ctx)
+{
+    if (ctx == NULL)
+    {
+        return 0;
+    }
+    return ctx->initial_bullet_count;
 }
 
 void bonus_system_reset_coins(bonus_system_t *ctx)
