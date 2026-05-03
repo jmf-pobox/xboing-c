@@ -133,6 +133,16 @@ int noicon;
 static int useDefaultColourmap;
 int noSound, debug;
 
+/*
+ * Visual-fidelity capture support — modern visual-screenshot-testing
+ * methodology Phase 1.  Set via `-snapshot N` on the command line.
+ * When > 0, handleEventLoop runs N frames after MapNotify, then
+ * sleeps 2 seconds (giving an external `import`/`xwd` capture tool
+ * time to grab the window), then exits cleanly.  Default 0 = normal
+ * interactive play.  Does not affect any other code path.
+ */
+int snapshotFrames = 0;
+
 static void InitialiseGraphics(Display *display, Window window)
 {
     XGCValues gcv;
@@ -383,10 +393,12 @@ static void PrintUsage(void)
 
     fprintf(stdout, "%s%s", "Usage: XBoing [-version] [-usage] [-help] [-sync] ",
             "[-display <displayName>]\n");
-    fprintf(stdout, "%s%s\n%s%s\n%s\n",
+    fprintf(stdout, "%s%s\n%s%s\n%s\n%s\n",
             "              [-speed <1-9>] [-scores] [-keys] [-sound] [-setup]", " [-nosfx]",
             "              [-grab] [-maxvol <1-100>] [-startlevel <1-MAX>]", " [-usedefcmap]",
-            "              [-nickname <name>] [-noicon]");
+            "              [-nickname <name>] [-noicon]",
+            "              [-snapshot <frames>]   (visual-fidelity capture, advances N "
+            "frames then sleeps 2s for screenshot, then exits)");
 
     /* Exit now */
     ExitProgramNow(0);
@@ -662,6 +674,29 @@ static void ParseCommandLine(char **argv, int argc)
                 {
                     snprintf(str, sizeof(str), "The starting level range is [1-%d]", MAX_NUM_LEVELS);
                     WarningMessage(str);
+                    PrintUsage();
+                }
+            }
+            else
+                PrintUsage();
+        }
+        else if (!compareArgument(argv[i], "-snapshot", 9))
+        {
+            /* Visual-fidelity capture support — runs N frames after
+             * the initial window map, then sleeps 2 seconds (so an
+             * external X11 capture tool can grab the window) and
+             * exits.  Used by scripts/capture_original.sh during the
+             * one-time golden-image collection.  Has no effect on
+             * normal interactive play. */
+            i++;
+            if (i < argc)
+            {
+                l = atoi(argv[i]);
+                if (l > 0 && l < 100000)
+                    snapshotFrames = l;
+                else
+                {
+                    WarningMessage("Snapshot frame count must be 1..99999");
                     PrintUsage();
                 }
             }

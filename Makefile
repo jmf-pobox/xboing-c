@@ -24,7 +24,8 @@ PREFIX         ?= /usr/local
         install uninstall deb deb-lint dogfood \
         lint format format-check \
         cppcheck cppcheck-src cppcheck-tests \
-        tidy check ci
+        tidy check ci \
+        original-build capture-original
 
 # --- Default ---------------------------------------------------------------
 
@@ -100,6 +101,12 @@ deb: ## Build a Debian package via dpkg-buildpackage (.deb lands in ../).
 deb-lint: deb ## Build .deb + run lintian on it (Debian Policy compliance).
 	lintian ../xboing_*.deb
 	echo "lintian: clean"
+
+original-build: ## Build the legacy 1996 Xlib binary in original/ (used for visual-fidelity reference capture).
+	$(MAKE) -C original
+
+capture-original: original-build ## Capture visual-fidelity reference PNGs from original/xboing under Xvfb (one-time; commits to tests/golden/original/).
+	scripts/capture_original.sh tests/golden/original/
 
 dogfood: deb ## Install .deb, launch xboing from .tmp/, verify window opens (requires sudo; skips window check if headless or xwininfo missing).
 	mkdir -p .tmp

@@ -1238,6 +1238,12 @@ static void handleGameStates(Display *display)
     XFlush(display);
 }
 
+/*
+ * snapshotFrames is set by `-snapshot N` on the command line
+ * (parsed in init.c).  Default 0 = normal interactive play.
+ */
+extern int snapshotFrames;
+
 static void handleEventLoop(Display *display)
 {
     XEvent event;
@@ -1266,6 +1272,38 @@ static void handleEventLoop(Display *display)
 
     /* Grab the pointer to the main window */
     GrabPointer(display, mainWindow);
+
+    /*
+     * Visual-fidelity snapshot mode: advance the game `snapshotFrames`
+     * frames without dispatching input events, then flush, sleep 2 s
+     * (giving an external `import`/`xwd` capture tool time to grab the
+     * window), then exit cleanly.  Used by scripts/capture_original.sh
+     * for the one-time golden-image collection.  Has no effect when
+     * snapshotFrames == 0 (the normal interactive default).
+     */
+    if (snapshotFrames > 0)
+    {
+        int sf;
+        for (sf = 0; sf < snapshotFrames; sf++)
+        {
+            audioDeviceEvents();
+            if (mode == MODE_GAME || mode == MODE_BALL_WAIT)
+                sleepSync(display, speed);
+            else
+                sleepSync(display, 3);
+            handleGameStates(display);
+            frame++;
+        }
+        XFlush(display);
+        /* Emit a stable signal so capture wrappers can synchronise
+         * without polling.  scripts/capture_original.sh reads this
+         * line on stdout to know the 2-second capture window has
+         * begun.  Newline + flush so the wrapper sees it immediately. */
+        printf("XBOING_SNAPSHOT_READY\n");
+        fflush(stdout);
+        sleep(2);
+        exit(0);
+    }
 
     /* Loop forever and ever */
     while (True)
