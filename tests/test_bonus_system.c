@@ -514,6 +514,111 @@ static void test_null_safety(void **state)
 }
 
 /* =========================================================================
+ * Group 7: Renderer-facing accessors (basket 5, xboing-c-tp4)
+ * ========================================================================= */
+
+static void test_initial_counts_captured_at_begin(void **state)
+{
+    (void)state;
+    bonus_system_t *ctx = bonus_system_create(NULL, NULL);
+
+    /* Set up: 5 coins collected, 12 bullets remaining */
+    for (int i = 0; i < 5; i++)
+        bonus_system_inc_coins(ctx);
+
+    bonus_system_env_t env = make_env(0, 1, 1, 30, 12, 0);
+    bonus_system_begin(ctx, &env, 0);
+
+    assert_int_equal(bonus_system_get_initial_coins(ctx), 5);
+    assert_int_equal(bonus_system_get_initial_bullets(ctx), 12);
+    bonus_system_destroy(ctx);
+}
+
+static void test_initial_counts_freeze_during_drain(void **state)
+{
+    (void)state;
+    /* Initial counts must NOT change as the live counts decrement —
+     * the renderer relies on (initial - live) staying meaningful. */
+    bonus_system_t *ctx = bonus_system_create(NULL, NULL);
+    for (int i = 0; i < 3; i++)
+        bonus_system_inc_coins(ctx);
+
+    bonus_system_env_t env = make_env(0, 1, 1, 30, 4, 0);
+    bonus_system_begin(ctx, &env, 0);
+
+    /* Decrement live coins; initial should remain 3. */
+    bonus_system_dec_coins(ctx);
+    bonus_system_dec_coins(ctx);
+    assert_int_equal(bonus_system_get_coins(ctx), 1);
+    assert_int_equal(bonus_system_get_initial_coins(ctx), 3);
+    bonus_system_destroy(ctx);
+}
+
+static void test_initial_counts_refresh_on_second_begin(void **state)
+{
+    (void)state;
+    /* Calling begin() twice with different envs must update the captured
+     * initial counts — stale values across levels would mislead the
+     * renderer. */
+    bonus_system_t *ctx = bonus_system_create(NULL, NULL);
+
+    bonus_system_inc_coins(ctx);
+    bonus_system_inc_coins(ctx);
+    bonus_system_env_t env1 = make_env(0, 1, 1, 30, 7, 0);
+    bonus_system_begin(ctx, &env1, 0);
+    assert_int_equal(bonus_system_get_initial_coins(ctx), 2);
+    assert_int_equal(bonus_system_get_initial_bullets(ctx), 7);
+
+    /* Second sequence — coin count drained to 0 by first sequence */
+    bonus_system_reset_coins(ctx);
+    for (int i = 0; i < 6; i++)
+        bonus_system_inc_coins(ctx);
+    bonus_system_env_t env2 = make_env(0, 2, 1, 0, 15, 0);
+    bonus_system_begin(ctx, &env2, 0);
+    assert_int_equal(bonus_system_get_initial_coins(ctx), 6);
+    assert_int_equal(bonus_system_get_initial_bullets(ctx), 15);
+    bonus_system_destroy(ctx);
+}
+
+static void test_get_bullets_returns_live_env_value(void **state)
+{
+    (void)state;
+    /* get_bullets reads the live env field, which decrements through
+     * BONUS_STATE_BULLET as bullets are consumed.  Initially equals
+     * the initial value. */
+    bonus_system_t *ctx = bonus_system_create(NULL, NULL);
+    bonus_system_env_t env = make_env(0, 1, 1, 30, 8, 0);
+    bonus_system_begin(ctx, &env, 0);
+    assert_int_equal(bonus_system_get_bullets(ctx), 8);
+    assert_int_equal(bonus_system_get_initial_bullets(ctx), 8);
+    bonus_system_destroy(ctx);
+}
+
+static void test_get_time_bonus_secs_returns_env_value(void **state)
+{
+    (void)state;
+    bonus_system_t *ctx = bonus_system_create(NULL, NULL);
+
+    bonus_system_env_t env_void = make_env(0, 1, 1, 0, 5, 0);
+    bonus_system_begin(ctx, &env_void, 0);
+    assert_int_equal(bonus_system_get_time_bonus_secs(ctx), 0);
+
+    bonus_system_env_t env_full = make_env(0, 2, 1, 47, 5, 0);
+    bonus_system_begin(ctx, &env_full, 0);
+    assert_int_equal(bonus_system_get_time_bonus_secs(ctx), 47);
+    bonus_system_destroy(ctx);
+}
+
+static void test_renderer_accessors_null_safe(void **state)
+{
+    (void)state;
+    assert_int_equal(bonus_system_get_initial_coins(NULL), 0);
+    assert_int_equal(bonus_system_get_initial_bullets(NULL), 0);
+    assert_int_equal(bonus_system_get_bullets(NULL), 0);
+    assert_int_equal(bonus_system_get_time_bonus_secs(NULL), 0);
+}
+
+/* =========================================================================
  * Test runner
  * ========================================================================= */
 
@@ -554,6 +659,14 @@ int main(void)
         cmocka_unit_test(test_skip_to_finish),
         cmocka_unit_test(test_display_score),
         cmocka_unit_test(test_null_safety),
+
+        /* Group 7: Renderer-facing accessors (basket 5) */
+        cmocka_unit_test(test_initial_counts_captured_at_begin),
+        cmocka_unit_test(test_initial_counts_freeze_during_drain),
+        cmocka_unit_test(test_initial_counts_refresh_on_second_begin),
+        cmocka_unit_test(test_get_bullets_returns_live_env_value),
+        cmocka_unit_test(test_get_time_bonus_secs_returns_env_value),
+        cmocka_unit_test(test_renderer_accessors_null_safe),
     };
 
     return cmocka_run_group_tests(tests, NULL, NULL);
