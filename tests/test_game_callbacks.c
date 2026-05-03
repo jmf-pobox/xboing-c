@@ -374,22 +374,30 @@ static void test_eyedude_bullet_hit_kills_and_scores(void **vstate)
 
     /* Force eyedude into WALK state at a known position so the AABB
      * collision check fires.  WALK is the only state in which
-     * eyedude_system_check_collision returns 1. */
+     * eyedude_system_check_collision returns 1.  Use render_info.x/.y
+     * (the CURRENT center position) — eyedude_system_get_position
+     * returns oldx/oldy which may differ. */
     eyedude_system_set_state(ctx->eyedude, EYEDUDE_STATE_WALK);
-    int eye_x = 0, eye_y = 0;
-    eyedude_system_get_position(ctx->eyedude, &eye_x, &eye_y);
+    eyedude_render_info_t info = eyedude_system_get_render_info(ctx->eyedude);
 
     unsigned long score_before = score_system_get(ctx->score);
 
     gun_system_callbacks_t cbs = game_callbacks_gun();
     /* Bullet positioned at the eyedude's center triggers the collision. */
-    assert_int_equal(cbs.check_eyedude_hit(eye_x, eye_y, ctx), 1);
+    assert_int_equal(cbs.check_eyedude_hit(info.x, info.y, ctx), 1);
 
     cbs.on_eyedude_hit(ctx);
 
-    /* State transitioned to DIE */
+    /* State transitioned to DIE — score not yet awarded (deferred to
+     * the next eyedude_system_update tick when do_die fires). */
     assert_int_equal(eyedude_system_get_state(ctx->eyedude), EYEDUDE_STATE_DIE);
-    /* Score incremented by 10000 (with multipliers off in fixture, no scaling) */
+    assert_int_equal(score_system_get(ctx->score), score_before);
+
+    /* Drive the update once to process the DIE state.  do_die fires
+     * on_score(EYEDUDE_HIT_BONUS=10000) via the eyedude callback which
+     * routes through eyedude_cb_on_score → score_system_add. */
+    eyedude_system_update(ctx->eyedude, 0, 495);
+    assert_int_equal(eyedude_system_get_state(ctx->eyedude), EYEDUDE_STATE_NONE);
     assert_int_equal(score_system_get(ctx->score), score_before + 10000);
 }
 
@@ -399,12 +407,11 @@ static void test_eyedude_bullet_miss_when_far_away(void **vstate)
     game_ctx_t *ctx = f->ctx;
 
     eyedude_system_set_state(ctx->eyedude, EYEDUDE_STATE_WALK);
-    int eye_x = 0, eye_y = 0;
-    eyedude_system_get_position(ctx->eyedude, &eye_x, &eye_y);
+    eyedude_render_info_t info = eyedude_system_get_render_info(ctx->eyedude);
 
     gun_system_callbacks_t cbs = game_callbacks_gun();
     /* A bullet 1000 pixels away should not register a hit. */
-    assert_int_equal(cbs.check_eyedude_hit(eye_x + 1000, eye_y, ctx), 0);
+    assert_int_equal(cbs.check_eyedude_hit(info.x + 1000, info.y, ctx), 0);
 }
 
 static void test_eyedude_bullet_check_returns_0_when_not_walking(void **vstate)
@@ -416,11 +423,10 @@ static void test_eyedude_bullet_check_returns_0_when_not_walking(void **vstate)
      * Default state after game_create is NONE — even a bullet at the
      * exact position must not register. */
     eyedude_system_set_state(ctx->eyedude, EYEDUDE_STATE_NONE);
-    int eye_x = 0, eye_y = 0;
-    eyedude_system_get_position(ctx->eyedude, &eye_x, &eye_y);
+    eyedude_render_info_t info = eyedude_system_get_render_info(ctx->eyedude);
 
     gun_system_callbacks_t cbs = game_callbacks_gun();
-    assert_int_equal(cbs.check_eyedude_hit(eye_x, eye_y, ctx), 0);
+    assert_int_equal(cbs.check_eyedude_hit(info.x, info.y, ctx), 0);
 }
 
 /* =========================================================================

@@ -372,15 +372,13 @@ void game_render_playfield(const game_ctx_t *ctx)
 {
     SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
 
-    /* Draw play area border — matches legacy playWindow border_width=2.
-     * Color is red by default, GREEN when no-walls mode is active
-     * (matches original/special.c:138-148 ToggleWallsOn).  X11 draws
-     * the border outside the window content area, so we draw a 2px
-     * border around all 4 sides of the play area. */
-    if (special_system_is_active(ctx->special, SPECIAL_NO_WALLS))
-        SDL_SetRenderDrawColor(sdl, 0, 200, 0, 255);
-    else
-        SDL_SetRenderDrawColor(sdl, 200, 0, 0, 255);
+    /* Draw play area border — matches legacy playWindow border_width=2,
+     * color=red.  game_render_border_glow() runs after this and overlays
+     * the cycling glow color (and forces green when SPECIAL_NO_WALLS is
+     * active per original/special.c:138-148 ToggleWallsOn), so the
+     * static red here only shows during the brief window before glow
+     * draws each frame. */
+    SDL_SetRenderDrawColor(sdl, 200, 0, 0, 255);
 
     int bx = PLAY_AREA_X - BORDER_THICKNESS;
     int by = PLAY_AREA_Y - BORDER_THICKNESS;
@@ -819,8 +817,14 @@ void game_render_border_glow(const game_ctx_t *ctx)
     /* Map color_index (0-6) to intensity (100-255) */
     int intensity = 100 + (glow.color_index * 155 / (SFX_GLOW_STEPS - 1));
 
+    /* SPECIAL_NO_WALLS forces a green border (matches
+     * original/special.c:138-148 ToggleWallsOn — XSetWindowBorder green
+     * when no-walls active, red when walls on).  The intensity cycle
+     * still applies, giving a pulsing green for the duration. */
+    int use_green = glow.use_green || special_system_is_active(ctx->special, SPECIAL_NO_WALLS);
+
     SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
-    if (glow.use_green)
+    if (use_green)
         SDL_SetRenderDrawColor(sdl, 0, (Uint8)intensity, 0, 255);
     else
         SDL_SetRenderDrawColor(sdl, (Uint8)intensity, 0, 0, 255);

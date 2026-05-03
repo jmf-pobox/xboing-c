@@ -466,20 +466,15 @@ static int gun_cb_check_eyedude_hit(int bx, int by, void *ud)
                                           EYEDUDE_BULLET_HH);
 }
 
-/* Bullet hit on eyedude: trigger DIE animation + award 10000 points
- * (matches original behavior — bullets can kill the eyedude for a
- * substantial score reward). */
+/* Bullet hit on eyedude: switch to DIE state.  The next
+ * eyedude_system_update tick processes do_die() which fires the
+ * on_score / on_message / on_sound callbacks (eyedude_cb_on_score
+ * adds EYEDUDE_HIT_BONUS=10000 with x2/x4 multiplier env applied),
+ * so we do NOT award points here — that would double-count. */
 static void gun_cb_on_eyedude_hit(void *ud)
 {
     game_ctx_t *ctx = ud;
-
     eyedude_system_set_state(ctx->eyedude, EYEDUDE_STATE_DIE);
-
-    score_system_env_t senv = {
-        .x2_active = special_system_is_active(ctx->special, SPECIAL_X2_BONUS),
-        .x4_active = special_system_is_active(ctx->special, SPECIAL_X4_BONUS),
-    };
-    score_system_add(ctx->score, 10000UL, &senv);
 }
 
 static void gun_cb_on_sound(const char *name, void *ud)
