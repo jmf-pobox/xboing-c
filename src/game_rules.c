@@ -229,6 +229,12 @@ void game_rules_next_level(game_ctx_t *ctx)
     ctx->bonus_block_active = false;
     ctx->next_bonus_frame = 0;
 
+    /* Reset BONUS_BLK pickup counter — original calls ResetNumberBonus
+     * during level load (original/file.c:328-333).  Without this the
+     * killer-mode-at-10 threshold could be tripped by carrying BONUS_BLK
+     * pickups across multiple levels. */
+    ctx->bonus_count = 0;
+
     if (ctx->audio)
         sdl2_audio_play(ctx->audio, "applause");
 }

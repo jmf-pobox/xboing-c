@@ -520,6 +520,87 @@ block_system_status_t block_system_clear_all(block_system_t *ctx)
     return BLOCK_SYS_OK;
 }
 
+block_system_status_t block_system_explode(block_system_t *ctx, int row, int col, int frame)
+{
+    if (ctx == NULL)
+    {
+        return BLOCK_SYS_ERR_NULL_ARG;
+    }
+    if (row < 0 || row >= MAX_ROW || col < 0 || col >= MAX_COL)
+    {
+        return BLOCK_SYS_ERR_OUT_OF_BOUNDS;
+    }
+
+    block_entry_t *bp = &ctx->blocks[row][col];
+
+    /* HYPERSPACE_BLK is immune to explosion (original/blocks.c:1821-1822). */
+    if (bp->block_type == HYPERSPACE_BLK)
+    {
+        return BLOCK_SYS_ERR_INVALID_STATE;
+    }
+
+    /* Re-entry guard: cell must be occupied and not already exploding
+     * (original/blocks.c:1825). */
+    if (!bp->occupied || bp->exploding)
+    {
+        return BLOCK_SYS_ERR_INVALID_STATE;
+    }
+
+    ctx->blocks_exploding++;
+    bp->exploding = 1;
+    bp->explode_start_frame = frame;
+    bp->explode_next_frame = frame;
+    bp->explode_slide = 1;
+
+    return BLOCK_SYS_OK;
+}
+
+void block_system_update_explosions(block_system_t *ctx, int frame, block_system_finalize_cb_t cb,
+                                    void *ud)
+{
+    if (ctx == NULL || ctx->blocks_exploding == 0)
+    {
+        return;
+    }
+
+    for (int r = 0; r < MAX_ROW; r++)
+    {
+        for (int c = 0; c < MAX_COL; c++)
+        {
+            block_entry_t *bp = &ctx->blocks[r][c];
+
+            /* exploding flag is the canonical guard.  Match the equality
+             * check at original/blocks.c:1502 (NOT >=). */
+            if (!bp->exploding || bp->explode_next_frame != frame)
+            {
+                continue;
+            }
+
+            /* Stages 1..4 are rendered by the integration layer reading
+             * exploding + explode_slide from render_info.  Stage 4 is the
+             * clear-only frame; the render path skips drawing.  Always
+             * advance slide and next_frame, then check for finalize. */
+            bp->explode_slide++;
+            bp->explode_next_frame += BLOCK_EXPLODE_DELAY;
+
+            if (bp->explode_slide > 4)
+            {
+                /* Save before clear_entry zeroes the cell. */
+                int saved_block_type = bp->block_type;
+                int saved_hit_points = bp->hit_points;
+
+                clear_entry(bp, &ctx->blocks_exploding);
+
+                /* Callback fires AFTER clear_entry: cell is unoccupied. */
+                if (cb != NULL)
+                {
+                    cb(r, c, saved_block_type, saved_hit_points, ud);
+                }
+            }
+        }
+    }
+}
+
 void block_system_advance_animations(block_system_t *ctx, int frame)
 {
     if (ctx == NULL)
@@ -924,8 +1005,11 @@ int block_system_decrement_gun_hit(block_system_t *ctx, int row, int col)
         /* counterSlide reached zero — fall through to clear */
     }
 
-    /* Regular block or multi-hit special exhausted: clear the block. */
-    block_system_clear(ctx, row, col);
+    /* Regular block or multi-hit special exhausted: caller must arm
+     * explosion via block_system_explode().  This function does NOT
+     * clear or arm — the caller controls the lifecycle so the explosion
+     * is driven from the gameplay tick (with the correct `frame` value)
+     * and routes through game_callbacks_on_block_finalize. */
     return 0;
 }
 
@@ -945,6 +1029,8 @@ const char *block_system_status_string(block_system_status_t status)
             return "allocation failed";
         case BLOCK_SYS_ERR_OUT_OF_BOUNDS:
             return "row/col out of bounds";
+        case BLOCK_SYS_ERR_INVALID_STATE:
+            return "invalid state (cell unoccupied, already exploding, or HYPERSPACE_BLK)";
         default:
             return "unknown status";
     }

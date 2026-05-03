@@ -70,4 +70,17 @@ sfx_system_callbacks_t game_callbacks_sfx(void);
 /* EyeDude system callback table. */
 eyedude_system_callbacks_t game_callbacks_eyedude(void);
 
+/*
+ * Block explosion finalize callback — registered with
+ * block_system_update_explosions().  Fires once per block reaching the
+ * end of its KILL_BLK animation (~40 ticks after trigger).  Applies
+ * score and per-type finalize-only side effects (BOMB chain, BULLET
+ * +4 ammo, BONUS counter, X2/X4 toggles, etc.) — matches the per-type
+ * switch at original/blocks.c:1550-1637.
+ *
+ * `ud` is a game_ctx_t*.  Cell at (row, col) is already unoccupied
+ * when this fires (block_system invariant).
+ */
+void game_callbacks_on_block_finalize(int row, int col, int block_type, int hit_points, void *ud);
+
 #endif /* GAME_CALLBACKS_H */

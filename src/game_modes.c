@@ -81,6 +81,7 @@ static void start_new_game(game_ctx_t *ctx)
     ctx->bonus_block_active = false;
     ctx->next_bonus_frame = 0;
     ctx->user_tilts = 0;
+    ctx->bonus_count = 0;
 
     /* Reset modules */
     score_system_set(ctx->score, 0);
@@ -182,6 +183,13 @@ static void mode_game_update(sdl2_state_mode_t mode, void *ud)
 
     /* Block animation slides (BONUS/DEATH/EXTRABALL/ROAMER cycling) */
     block_system_advance_animations(ctx->block, (int)sdl2_state_frame(ctx->state));
+
+    /* Block explosion state machine — advances exploding blocks one stage
+     * per tick at BLOCK_EXPLODE_DELAY=10 ticks/stage, fires the finalize
+     * callback when the animation completes (matches original
+     * ExplodeBlocksPending at original/blocks.c:1480-1646). */
+    block_system_update_explosions(ctx->block, (int)sdl2_state_frame(ctx->state),
+                                   game_callbacks_on_block_finalize, ctx);
 
     /* EyeDude character */
     eyedude_system_update(ctx->eyedude, (int)sdl2_state_frame(ctx->state), GAME_PLAY_WIDTH);

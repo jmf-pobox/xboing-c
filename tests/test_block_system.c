@@ -623,7 +623,10 @@ static void test_status_strings(void **state)
  * original/gun.c:318-350 — multi-hit logic for bullet-block collisions.
  * ========================================================================= */
 
-/* TC-29: Regular block cleared on first bullet hit (returns 0) */
+/* TC-29: Regular block returns 0 on first bullet hit (destroyed by this hit).
+ * Basket 3: the function no longer clears — the caller arms explosion via
+ * block_system_explode, so the cell remains occupied until the explosion
+ * lifecycle finalizes. */
 static void test_gun_hit_regular_block_cleared(void **state)
 {
     (void)state;
@@ -634,7 +637,8 @@ static void test_gun_hit_regular_block_cleared(void **state)
 
     int absorbed = block_system_decrement_gun_hit(ctx, 2, 3);
     assert_int_equal(absorbed, 0);
-    assert_int_equal(block_system_is_occupied(ctx, 2, 3), 0);
+    /* Block still occupied — caller must arm explosion. */
+    assert_int_equal(block_system_is_occupied(ctx, 2, 3), 1);
 
     block_system_destroy(ctx);
 }
@@ -694,10 +698,13 @@ static void test_gun_hit_mgun_requires_three_hits(void **state)
     assert_int_equal(r2, 1);
     assert_int_equal(block_system_is_occupied(ctx, 3, 4), 1);
 
-    /* Hit 3: cleared */
+    /* Hit 3: returns 0 (destroyed by this hit; caller arms explosion).
+     * Basket 3: cell still occupied — block_system_decrement_gun_hit no
+     * longer clears, the caller is responsible for arming the explosion
+     * lifecycle. */
     int r3 = block_system_decrement_gun_hit(ctx, 3, 4);
     assert_int_equal(r3, 0);
-    assert_int_equal(block_system_is_occupied(ctx, 3, 4), 0);
+    assert_int_equal(block_system_is_occupied(ctx, 3, 4), 1);
 
     block_system_destroy(ctx);
 }
@@ -717,9 +724,10 @@ static void test_gun_hit_counter_blk_requires_three_hits(void **state)
     assert_int_equal(block_system_decrement_gun_hit(ctx, 2, 2), 1);
     assert_int_equal(block_system_is_occupied(ctx, 2, 2), 1);
 
-    /* Hit 3 clears */
+    /* Hit 3 returns 0 (destroyed by this hit; caller arms explosion).
+     * Basket 3: cell still occupied — caller arms the explosion lifecycle. */
     assert_int_equal(block_system_decrement_gun_hit(ctx, 2, 2), 0);
-    assert_int_equal(block_system_is_occupied(ctx, 2, 2), 0);
+    assert_int_equal(block_system_is_occupied(ctx, 2, 2), 1);
 
     block_system_destroy(ctx);
 }

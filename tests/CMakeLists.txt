@@ -204,6 +204,13 @@ target_compile_options(test_block_system PRIVATE ${XBOING_STRICT_WARNINGS} -Werr
 target_link_libraries(test_block_system PRIVATE block_system ${CMOCKA_LIBRARIES})
 add_test(NAME test_block_system COMMAND test_block_system)
 
+# Block explosion state machine tests (basket 3, xboing-c-tmr).
+# Pure logic — no SDL2 link required.
+add_executable(test_block_system_explosion test_block_system_explosion.c)
+target_compile_options(test_block_system_explosion PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+target_link_libraries(test_block_system_explosion PRIVATE block_system ${CMOCKA_LIBRARIES})
+add_test(NAME test_block_system_explosion COMMAND test_block_system_explosion)
+
 # Paddle system tests (bead xboing-1ka.3)
 # Pure logic tests — no SDL2, X11, video, or audio driver needed.
 # Links against paddle_system static library.

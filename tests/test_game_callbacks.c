@@ -130,8 +130,11 @@ static void test_death_blk_clears_block_and_kills_ball(void **vstate)
     /* Tick one ball_system_update — on_block_hit fires for ball_index=2 */
     ball_system_update(ctx->ball, &env);
 
-    /* (a) Block must be cleared */
-    assert_int_equal(block_system_is_occupied(ctx->block, 3, 4), 0);
+    /* (a) Block must be in explosion lifecycle (exploding=1, occupied=1
+     * for ~40 ticks).  Basket 3: blocks no longer vanish instantly. */
+    block_system_render_info_t bri;
+    assert_int_equal(block_system_get_render_info(ctx->block, 3, 4, &bri), BLOCK_SYS_OK);
+    assert_int_equal(bri.exploding, 1);
 
     /* (b) Ball at index 2 must be in BALL_POP (not BALL_ACTIVE) */
     enum BallStates state2 = ball_system_get_state(ctx->ball, 2);
@@ -169,9 +172,16 @@ static void test_bullet_blk_gun_hit_adds_ammo(void **vstate)
     gun_system_callbacks_t cbs = game_callbacks_gun();
     cbs.on_block_hit(2, 3, ctx);
 
-    /* Block must be cleared */
+    /* Basket 3: bullet kill arms explosion lifecycle.  Block stays
+     * occupied through the animation; pickup effects fire at finalize. */
+    assert_int_equal(block_system_is_occupied(ctx->block, 2, 3), 1);
+    /* Drive explosion to finalize (4 update_explosions calls at tick boundaries). */
+    int frame = (int)sdl2_state_frame(ctx->state);
+    for (int i = 0; i <= 3; i++)
+        block_system_update_explosions(ctx->block, frame + i * BLOCK_EXPLODE_DELAY,
+                                       game_callbacks_on_block_finalize, ctx);
+    /* Block now cleared by finalize; pickup effect applied: 2 + 4 = 6. */
     assert_int_equal(block_system_is_occupied(ctx->block, 2, 3), 0);
-    /* Ammo must be 2 + 4 = 6 */
     assert_int_equal(gun_system_get_ammo(ctx->gun), 6);
 }
 
@@ -197,11 +207,14 @@ static void test_maxammo_blk_gun_hit_sets_unlimited(void **vstate)
     gun_system_callbacks_t cbs = game_callbacks_gun();
     cbs.on_block_hit(1, 0, ctx);
 
-    /* Block cleared */
+    /* Basket 3: bullet kill arms explosion; pickup effects fire at finalize. */
+    int frame = (int)sdl2_state_frame(ctx->state);
+    for (int i = 0; i <= 3; i++)
+        block_system_update_explosions(ctx->block, frame + i * BLOCK_EXPLODE_DELAY,
+                                       game_callbacks_on_block_finalize, ctx);
+    /* Block now cleared by finalize. */
     assert_int_equal(block_system_is_occupied(ctx->block, 1, 0), 0);
-    /* Unlimited flag set */
     assert_int_equal(gun_system_get_unlimited(ctx->gun), 1);
-    /* Ammo set to GUN_MAX_AMMO + 1 */
     assert_int_equal(gun_system_get_ammo(ctx->gun), GUN_MAX_AMMO + 1);
 }
 
@@ -265,8 +278,14 @@ static void test_mgun_blk_requires_three_gun_hits(void **vstate)
     cbs.on_block_hit(3, 3, ctx);
     assert_int_equal(block_system_is_occupied(ctx->block, 3, 3), 1);
 
-    /* Hit 3 — cleared */
+    /* Hit 3 — destroyed by this hit; basket 3 arms explosion lifecycle.
+     * Cell stays occupied through the animation, then finalize clears. */
     cbs.on_block_hit(3, 3, ctx);
+    assert_int_equal(block_system_is_occupied(ctx->block, 3, 3), 1);
+    int frame = (int)sdl2_state_frame(ctx->state);
+    for (int i = 0; i <= 3; i++)
+        block_system_update_explosions(ctx->block, frame + i * BLOCK_EXPLODE_DELAY,
+                                       game_callbacks_on_block_finalize, ctx);
     assert_int_equal(block_system_is_occupied(ctx->block, 3, 3), 0);
 }
 
@@ -302,8 +321,11 @@ static void test_mgun_blk_ball_hit_no_unlimited(void **vstate)
 
     ball_system_update(ctx->ball, &env);
 
-    /* Block cleared by ball hit */
-    assert_int_equal(block_system_is_occupied(ctx->block, 5, 2), 0);
+    /* Block now in explosion lifecycle — exploding=1 but still occupied
+     * (basket 3: blocks animate before disappearing). */
+    block_system_render_info_t bri;
+    assert_int_equal(block_system_get_render_info(ctx->block, 5, 2, &bri), BLOCK_SYS_OK);
+    assert_int_equal(bri.exploding, 1);
     /* unlimited must NOT have been set */
     assert_int_equal(gun_system_get_unlimited(ctx->gun), 0);
 }

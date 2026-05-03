@@ -28,7 +28,8 @@ typedef enum
     BLOCK_SYS_OK = 0,
     BLOCK_SYS_ERR_NULL_ARG,
     BLOCK_SYS_ERR_ALLOC_FAILED,
-    BLOCK_SYS_ERR_OUT_OF_BOUNDS /* Row/col out of grid range */
+    BLOCK_SYS_ERR_OUT_OF_BOUNDS, /* Row/col out of grid range */
+    BLOCK_SYS_ERR_INVALID_STATE  /* Pre-condition failed (e.g. unoccupied, already exploding) */
 } block_system_status_t;
 
 /* =========================================================================
@@ -152,6 +153,73 @@ block_system_status_t block_system_clear(block_system_t *ctx, int row, int col);
 block_system_status_t block_system_clear_all(block_system_t *ctx);
 
 /*
+ * Callback invoked at explosion finalize (one tick after stage 4).
+ * Receives the block's saved type and hit_points so the integration layer
+ * can apply score + per-type finalize-only side effects (BOMB chain,
+ * BULLET +4 ammo, BONUS counter, X2/X4 toggles, etc.).
+ *
+ * Matches original/blocks.c:1547 (AddToScore) and the per-type switch at
+ * original/blocks.c:1550-1637 — all of which fire at finalize, not hit time.
+ *
+ * Ordering invariant: clear_entry runs BEFORE the callback, so the cell
+ * is unoccupied AND reusable at callback time
+ * (block_system_is_occupied returns 0; block_system_cell_available returns 1).
+ * Saved block_type and hit_points are passed by parameter — the cell no
+ * longer holds them.
+ */
+typedef void (*block_system_finalize_cb_t)(int row, int col, int block_type, int hit_points,
+                                           void *ud);
+
+/*
+ * Trigger an explosion at (row, col).  Sets exploding=1,
+ * explode_start_frame=frame, explode_next_frame=frame, explode_slide=1.
+ * Increments the global blocks-exploding counter.
+ *
+ * Pre-conditions enforced:
+ *   - Cell occupied AND not already exploding (original/blocks.c:1825).
+ *   - block_type != HYPERSPACE_BLK (original/blocks.c:1821-1822 immunity).
+ *
+ * Returns BLOCK_SYS_OK if armed, BLOCK_SYS_ERR_OUT_OF_BOUNDS for bad
+ * coordinates, BLOCK_SYS_ERR_NULL_ARG for ctx==NULL, or
+ * BLOCK_SYS_ERR_INVALID_STATE if pre-conditions failed.
+ *
+ * Callers in chain-reaction contexts (e.g. BOMB_BLK) intentionally
+ * discard the return value — overlapping chains may try to re-arm an
+ * already-exploding neighbor and silently skip, matching the original
+ * outer-if no-op at original/blocks.c:1825.
+ *
+ * The cell remains "occupied" through the animation.  Do NOT call
+ * block_system_clear on a cell already exploding — occupancy is cleared
+ * at finalize.
+ */
+block_system_status_t block_system_explode(block_system_t *ctx, int row, int col, int frame);
+
+/*
+ * Per-tick driver for the explosion state machine.  Advances every
+ * exploding block one stage if its explode_next_frame matches `frame`.
+ * Calls `cb` (if non-NULL) for every block reaching finalize this tick.
+ * Matches original/blocks.c:1480-1646 ExplodeBlocksPending.
+ *
+ * Stage cadence (slide values 1..4, with BLOCK_EXPLODE_DELAY=10 ticks
+ * between):
+ *   slide=1: render path draws explosion sprite frame 0 (slide-1 offset)
+ *   slide=2: render path draws explosion sprite frame 1
+ *   slide=3: render path draws explosion sprite frame 2
+ *   slide=4: render path SKIPS sprite draw (clear-only frame)
+ *   slide>4: finalize — clear cell, decrement blocks_exploding, fire cb
+ *
+ * Same-tick stage-1 behavior: trigger at frame F sets
+ * explode_next_frame=F.  If block_system_update_explosions is called at
+ * frame=F immediately after arming, stage 1 fires AND slide increments
+ * to 2, next_frame to F+10.  Matches original/blocks.c:1502 equality
+ * comparison and post-switch increment at :1537-1538.
+ *
+ * Call once per game tick from the gameplay update loop.
+ */
+void block_system_update_explosions(block_system_t *ctx, int frame, block_system_finalize_cb_t cb,
+                                    void *ud);
+
+/*
  * Advance per-block animation slides for animated block types based on the
  * current frame counter.  Updates `bonus_slide` for BONUSX2/X4/BONUS_BLK
  * (4-frame cycle, BLOCK_BONUS_DELAY interval), DEATH_BLK (5-frame cycle,
@@ -178,9 +246,12 @@ void block_system_advance_animations(block_system_t *ctx, int frame);
  *     (original/gun.c:325-340).
  *
  * Returns 0 in any of the following cases:
- *   - Block was cleared (all other types, or multi-hit specials whose
- *     counterSlide reached 0). Caller must NOT call block_system_clear
- *     separately — it has already cleared the block.
+ *   - Block was destroyed (all other types, or multi-hit specials whose
+ *     counterSlide reached 0).  Caller must arm the explosion lifecycle
+ *     by calling block_system_explode(ctx, row, col, frame) — this
+ *     function no longer clears the block, so finalize-time effects
+ *     (BULLET +4 ammo, MAXAMMO unlimited, etc.) fire via the
+ *     block-finalize callback rather than at hit time.
  *   - ctx is NULL.
  *   - (row, col) is out of bounds.
  *   - The cell is already unoccupied.

@@ -292,6 +292,7 @@ game_ctx_t *game_create(int argc, char *argv[])
     ctx->level_number = ctx->config.start_level;
     ctx->start_level = ctx->config.start_level;
     ctx->lives_left = 3;
+    ctx->bonus_count = 0;
     ctx->debug_mode = cli.debug;
 
     /* Load high score tables */
