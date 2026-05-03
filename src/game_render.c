@@ -372,10 +372,15 @@ void game_render_playfield(const game_ctx_t *ctx)
 {
     SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
 
-    /* Draw play area border — matches legacy playWindow border_width=2, color=red.
-     * X11 draws the border outside the window content area, so we draw a 2px
+    /* Draw play area border — matches legacy playWindow border_width=2.
+     * Color is red by default, GREEN when no-walls mode is active
+     * (matches original/special.c:138-148 ToggleWallsOn).  X11 draws
+     * the border outside the window content area, so we draw a 2px
      * border around all 4 sides of the play area. */
-    SDL_SetRenderDrawColor(sdl, 200, 0, 0, 255);
+    if (special_system_is_active(ctx->special, SPECIAL_NO_WALLS))
+        SDL_SetRenderDrawColor(sdl, 0, 200, 0, 255);
+    else
+        SDL_SetRenderDrawColor(sdl, 200, 0, 0, 255);
 
     int bx = PLAY_AREA_X - BORDER_THICKNESS;
     int by = PLAY_AREA_Y - BORDER_THICKNESS;

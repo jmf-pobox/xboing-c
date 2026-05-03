@@ -912,10 +912,13 @@ static void update_guide(ball_system_t *ctx, const ball_system_env_t *env)
 {
     /*
      * Animate guide direction indicator.
-     * Matches MoveGuides() in ball.c:425-467 (animation timing only).
+     * Matches MoveGuides() in original/ball.c:456 — guide steps every
+     * BALL_FRAME_RATE * 8 frames (40 frames at BALL_FRAME_RATE=5).
+     * Earlier modern code used `* 3` which sweeps 2.67x too fast and
+     * makes ball-launch aiming feel frantic.
      */
 
-    if ((env->frame % (BALL_FRAME_RATE * 3)) == 0)
+    if ((env->frame % (BALL_FRAME_RATE * 8)) == 0)
     {
         ctx->guide_pos += ctx->guide_inc;
     }

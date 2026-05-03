@@ -126,22 +126,31 @@ void game_render_presents(const game_ctx_t *ctx)
         }
     }
 
-    /* XBOING letter stamps — render if any letters have been placed */
+    /* XBOING letter stamps — render if any letters have been placed.
+     *
+     * Layout matches original/presents.c:319-354: letters start at
+     * window-local x=40, y=220, and each letter advances by
+     * `10 + dists[i]` where dists[] = {71, 73, 83, 41, 85, 88} are
+     * the per-letter widths.  Fixed 80-px stride looked uniformly
+     * spaced but didn't match the original's variable-width XBOING
+     * glyphs. */
     {
         presents_letter_info_t li;
         if (presents_system_get_letter_info(ctx->presents, &li))
         {
             static const char *const letter_keys[] = {SPR_TITLE_X, SPR_TITLE_B, SPR_TITLE_O,
                                                       SPR_TITLE_I, SPR_TITLE_N, SPR_TITLE_G};
+            static const int letter_widths[] = {71, 73, 83, 41, 85, 88};
+            int lx = PLAY_AREA_X + 40;
             for (int i = 0; i <= li.letter_index && i < 6; i++)
             {
                 sdl2_texture_info_t tex;
                 if (sdl2_texture_get(ctx->texture, letter_keys[i], &tex) == SDL2T_OK)
                 {
-                    int lx = PLAY_AREA_X + 10 + i * 80;
-                    SDL_Rect dst = {lx, PLAY_AREA_Y + 250, tex.width, tex.height};
+                    SDL_Rect dst = {lx, PLAY_AREA_Y + 220, tex.width, tex.height};
                     SDL_RenderCopy(sdl, tex.texture, NULL, &dst);
                 }
+                lx += 10 + letter_widths[i];
             }
         }
     }
