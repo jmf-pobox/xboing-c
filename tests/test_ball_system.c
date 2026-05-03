@@ -1465,6 +1465,74 @@ static void test_split_full_shows_message(void **state)
  * Main
  * ========================================================================= */
 
+/* =========================================================================
+ * Group 13: Guide animation rate (basket 6, xboing-c-xny)
+ *
+ * The launch guide oscillator advances only when
+ * env->frame % (BALL_FRAME_RATE * 8) == 0 — every 40 frames.
+ * Earlier modern code used `* 3` (every 15 frames), 2.67x too fast vs
+ * original/ball.c:456.
+ * ========================================================================= */
+
+static void test_guide_advances_only_at_8x_frame_rate(void **state)
+{
+    (void)state;
+    ball_system_t *ctx = ball_system_create(NULL, NULL, NULL);
+    assert_non_null(ctx);
+
+    /* Add a ball using a large starting frame so nextFrame
+     * (env.frame + BIRTH_FRAME_RATE = 1005) sits past the test loop.
+     * Otherwise the BALL_READY auto-activate guard at
+     * src/ball_system.c:403 (`env->frame == nextFrame`) would fire
+     * mid-test and pull the ball out of READY state. */
+    ball_system_env_t env = make_env(1000);
+    int idx = ball_system_add(ctx, &env, 247, 522, 0, 0, NULL);
+    assert_int_not_equal(idx, -1);
+    ball_system_status_t st = ball_system_change_mode(ctx, &env, idx, BALL_READY);
+    assert_int_equal(st, BALL_SYS_OK);
+
+    /* Capture initial guide state. */
+    ball_system_guide_info_t g0 = ball_system_get_guide_info(ctx);
+    int base = 2000; /* multiple of 40, well past nextFrame=1005 */
+
+    /* Drive frames base+1..base+39: outer modulus fires at multiples of
+     * BALL_FRAME_RATE.  None of those are multiples of
+     * BALL_FRAME_RATE * 8 = 40 (since base=2000 is itself a multiple of
+     * 40), so guide.pos must NOT change. */
+    for (int f = 1; f < 40; f++)
+    {
+        env.frame = base + f;
+        ball_system_update(ctx, &env);
+        ball_system_guide_info_t g = ball_system_get_guide_info(ctx);
+        if (g.pos != g0.pos)
+        {
+            fail_msg("guide.pos changed at frame %d (expected change only at multiples of 40)",
+                     env.frame);
+        }
+    }
+
+    /* Frame base+40 IS a multiple of 40 — guide.pos should change. */
+    env.frame = base + 40;
+    ball_system_update(ctx, &env);
+    ball_system_guide_info_t g40 = ball_system_get_guide_info(ctx);
+    assert_int_not_equal(g40.pos, g0.pos);
+
+    /* Frames base+41..base+79 must hold the new value. */
+    for (int f = 41; f < 80; f++)
+    {
+        env.frame = base + f;
+        ball_system_update(ctx, &env);
+        ball_system_guide_info_t g = ball_system_get_guide_info(ctx);
+        if (g.pos != g40.pos)
+        {
+            fail_msg("guide.pos changed at frame %d (expected hold between multiples of 40)",
+                     env.frame);
+        }
+    }
+
+    ball_system_destroy(ctx);
+}
+
 int main(void)
 {
     const struct CMUnitTest tests[] = {
@@ -1532,6 +1600,8 @@ int main(void)
         cmocka_unit_test(test_split_teleports_ball),
         cmocka_unit_test(test_split_adds_ball),
         cmocka_unit_test(test_split_full_shows_message),
+        /* Group 13: Guide animation rate (basket 6, xboing-c-xny) */
+        cmocka_unit_test(test_guide_advances_only_at_8x_frame_rate),
     };
     return cmocka_run_group_tests(tests, NULL, NULL);
 }

@@ -450,18 +450,31 @@ static void gun_cb_on_ball_hit(int ball_index, void *ud)
     ball_system_change_mode(ctx->ball, &env, ball_index, BALL_POP);
 }
 
-/* Check if bullet hits eyedude — stub until bead 4.2 */
+/* Bullet half-dimensions for the eyedude collision check.  The bullet
+ * sprite is 7x10 (original) / 7x16 (modern PNG with alpha padding); we
+ * use 4x5 half-extents for a slightly forgiving AABB. */
+#define EYEDUDE_BULLET_HW 4
+#define EYEDUDE_BULLET_HH 5
+
+/* Check if a bullet at (bx, by) hits the eyedude — AABB overlap when
+ * the eyedude is in WALK state.  Reuses eyedude_system_check_collision
+ * which already enforces the state guard. */
 static int gun_cb_check_eyedude_hit(int bx, int by, void *ud)
 {
-    (void)bx;
-    (void)by;
-    (void)ud;
-    return 0;
+    const game_ctx_t *ctx = ud;
+    return eyedude_system_check_collision(ctx->eyedude, bx, by, EYEDUDE_BULLET_HW,
+                                          EYEDUDE_BULLET_HH);
 }
 
+/* Bullet hit on eyedude: switch to DIE state.  The next
+ * eyedude_system_update tick processes do_die() which fires the
+ * on_score / on_message / on_sound callbacks (eyedude_cb_on_score
+ * adds EYEDUDE_HIT_BONUS=10000 with x2/x4 multiplier env applied),
+ * so we do NOT award points here — that would double-count. */
 static void gun_cb_on_eyedude_hit(void *ud)
 {
-    (void)ud;
+    game_ctx_t *ctx = ud;
+    eyedude_system_set_state(ctx->eyedude, EYEDUDE_STATE_DIE);
 }
 
 static void gun_cb_on_sound(const char *name, void *ud)

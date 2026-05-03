@@ -30,7 +30,9 @@
 #include "ball_types.h"
 #include "block_system.h"
 #include "block_types.h"
+#include "eyedude_system.h"
 #include "game_callbacks.h"
+#include "score_system.h"
 #include "game_context.h"
 #include "game_init.h"
 #include "gun_system.h"
@@ -358,6 +360,76 @@ static void test_bullet_kills_ball_transitions_to_ball_pop(void **vstate)
 }
 
 /* =========================================================================
+ * Basket 6: Eyedude bullet collision (xboing-m0y)
+ *
+ * gun_cb_check_eyedude_hit returns 1 only when bullet AABB overlaps
+ * eyedude in WALK state.  gun_cb_on_eyedude_hit transitions to DIE
+ * state and awards 10000 points (with x2/x4 multiplier).
+ * ========================================================================= */
+
+static void test_eyedude_bullet_hit_kills_and_scores(void **vstate)
+{
+    fixture_t *f = (fixture_t *)*vstate;
+    game_ctx_t *ctx = f->ctx;
+
+    /* Force eyedude into WALK state at a known position so the AABB
+     * collision check fires.  WALK is the only state in which
+     * eyedude_system_check_collision returns 1.  Use render_info.x/.y
+     * (the CURRENT center position) — eyedude_system_get_position
+     * returns oldx/oldy which may differ. */
+    eyedude_system_set_state(ctx->eyedude, EYEDUDE_STATE_WALK);
+    eyedude_render_info_t info = eyedude_system_get_render_info(ctx->eyedude);
+
+    unsigned long score_before = score_system_get(ctx->score);
+
+    gun_system_callbacks_t cbs = game_callbacks_gun();
+    /* Bullet positioned at the eyedude's center triggers the collision. */
+    assert_int_equal(cbs.check_eyedude_hit(info.x, info.y, ctx), 1);
+
+    cbs.on_eyedude_hit(ctx);
+
+    /* State transitioned to DIE — score not yet awarded (deferred to
+     * the next eyedude_system_update tick when do_die fires). */
+    assert_int_equal(eyedude_system_get_state(ctx->eyedude), EYEDUDE_STATE_DIE);
+    assert_int_equal(score_system_get(ctx->score), score_before);
+
+    /* Drive the update once to process the DIE state.  do_die fires
+     * on_score(EYEDUDE_HIT_BONUS=10000) via the eyedude callback which
+     * routes through eyedude_cb_on_score → score_system_add. */
+    eyedude_system_update(ctx->eyedude, 0, 495);
+    assert_int_equal(eyedude_system_get_state(ctx->eyedude), EYEDUDE_STATE_NONE);
+    assert_int_equal(score_system_get(ctx->score), score_before + 10000);
+}
+
+static void test_eyedude_bullet_miss_when_far_away(void **vstate)
+{
+    fixture_t *f = (fixture_t *)*vstate;
+    game_ctx_t *ctx = f->ctx;
+
+    eyedude_system_set_state(ctx->eyedude, EYEDUDE_STATE_WALK);
+    eyedude_render_info_t info = eyedude_system_get_render_info(ctx->eyedude);
+
+    gun_system_callbacks_t cbs = game_callbacks_gun();
+    /* A bullet 1000 pixels away should not register a hit. */
+    assert_int_equal(cbs.check_eyedude_hit(info.x + 1000, info.y, ctx), 0);
+}
+
+static void test_eyedude_bullet_check_returns_0_when_not_walking(void **vstate)
+{
+    fixture_t *f = (fixture_t *)*vstate;
+    game_ctx_t *ctx = f->ctx;
+
+    /* eyedude_system_check_collision only returns 1 in WALK state.
+     * Default state after game_create is NONE — even a bullet at the
+     * exact position must not register. */
+    eyedude_system_set_state(ctx->eyedude, EYEDUDE_STATE_NONE);
+    eyedude_render_info_t info = eyedude_system_get_render_info(ctx->eyedude);
+
+    gun_system_callbacks_t cbs = game_callbacks_gun();
+    assert_int_equal(cbs.check_eyedude_hit(info.x, info.y, ctx), 0);
+}
+
+/* =========================================================================
  * Main
  * ========================================================================= */
 
@@ -380,6 +452,12 @@ int main(void)
         /* Gap 7 */
         cmocka_unit_test_setup_teardown(
             test_bullet_kills_ball_transitions_to_ball_pop, setup, teardown),
+        /* Basket 6 — eyedude bullet collision (xboing-m0y) */
+        cmocka_unit_test_setup_teardown(
+            test_eyedude_bullet_hit_kills_and_scores, setup, teardown),
+        cmocka_unit_test_setup_teardown(test_eyedude_bullet_miss_when_far_away, setup, teardown),
+        cmocka_unit_test_setup_teardown(
+            test_eyedude_bullet_check_returns_0_when_not_walking, setup, teardown),
     };
 
     return cmocka_run_group_tests(tests, NULL, NULL);
