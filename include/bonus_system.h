@@ -174,6 +174,15 @@ int bonus_system_get_bullets(const bonus_system_t *ctx);
  */
 int bonus_system_get_initial_bullets(const bonus_system_t *ctx);
 
+/*
+ * Return the level time-bonus seconds captured at bonus_system_begin.
+ * Renderer uses this to detect the "timer ran out" path: when
+ * time_bonus_secs == 0 the state machine skips coin animation and
+ * the renderer must show "Bonus coins void - Timer ran out!" instead.
+ * Matches original/bonus.c:288-303.
+ */
+int bonus_system_get_time_bonus_secs(const bonus_system_t *ctx);
+
 /* Reset the bonus coin count to 0 */
 void bonus_system_reset_coins(bonus_system_t *ctx);
 

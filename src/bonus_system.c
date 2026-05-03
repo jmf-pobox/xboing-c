@@ -469,6 +469,15 @@ int bonus_system_get_initial_bullets(const bonus_system_t *ctx)
     return ctx->initial_bullet_count;
 }
 
+int bonus_system_get_time_bonus_secs(const bonus_system_t *ctx)
+{
+    if (ctx == NULL)
+    {
+        return 0;
+    }
+    return ctx->env.time_bonus_secs;
+}
+
 void bonus_system_reset_coins(bonus_system_t *ctx)
 {
     if (ctx)

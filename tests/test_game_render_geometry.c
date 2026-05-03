@@ -218,11 +218,11 @@ static void test_level_num_at_origin(void **state)
 static void test_bonus_row_first_item_leftmost(void **state)
 {
     (void)state;
-    /* total=5 coins at stride 37, center_x=500.
+    /* total=5 coins at stride 37 + padding 5, center_x=500.
      * Item 0 (leftmost, first to appear):
      *   max_len = 5*37 + 5 = 190; max_len/2 = 95
      *   x = 500 + 95 - (5 - 0) * 37 = 500 + 95 - 185 = 410. */
-    assert_int_equal(bonus_row_item_x(500, 5, 37, 0), 410);
+    assert_int_equal(bonus_row_item_x(500, 5, 37, 5, 0), 410);
 }
 
 static void test_bonus_row_last_item_rightmost(void **state)
@@ -230,38 +230,40 @@ static void test_bonus_row_last_item_rightmost(void **state)
     (void)state;
     /* Item N-1 (rightmost):
      *   x = 500 + 95 - (5 - 4) * 37 = 500 + 95 - 37 = 558. */
-    assert_int_equal(bonus_row_item_x(500, 5, 37, 4), 558);
+    assert_int_equal(bonus_row_item_x(500, 5, 37, 5, 4), 558);
 }
 
 static void test_bonus_row_stride_between_items(void **state)
 {
     (void)state;
-    int x0 = bonus_row_item_x(500, 5, 37, 0);
-    int x1 = bonus_row_item_x(500, 5, 37, 1);
-    int x2 = bonus_row_item_x(500, 5, 37, 2);
-    /* Successive items differ by exactly stride. */
+    int x0 = bonus_row_item_x(500, 5, 37, 5, 0);
+    int x1 = bonus_row_item_x(500, 5, 37, 5, 1);
+    int x2 = bonus_row_item_x(500, 5, 37, 5, 2);
+    /* Successive items differ by exactly stride (padding does not affect spacing). */
     assert_int_equal(x1 - x0, 37);
     assert_int_equal(x2 - x1, 37);
 }
 
-static void test_bonus_row_bullet_stride(void **state)
+static void test_bonus_row_bullet_no_padding(void **state)
 {
     (void)state;
-    /* Bullet row: stride=10, total=20 bullets, center=500.
-     *   max_len = 20*10 + 5 = 205; max_len/2 = 102 (int)
-     *   item 0:  500 + 102 - 20*10 = 500 + 102 - 200 = 402
-     *   item 19: 500 + 102 - 1*10  = 592 */
-    assert_int_equal(bonus_row_item_x(500, 20, 10, 0), 402);
-    assert_int_equal(bonus_row_item_x(500, 20, 10, 19), 592);
+    /* Bullet row: stride=10, padding=0 (matches original/bonus.c:462
+     * `maxLen = bullets*7 + 3*bullets` with no `+ N` term, unlike
+     * coins at original/bonus.c:354).  Total=20, center=500.
+     *   max_len = 20*10 + 0 = 200; max_len/2 = 100
+     *   item 0:  500 + 100 - 20*10 = 500 + 100 - 200 = 400
+     *   item 19: 500 + 100 - 1*10  = 590 */
+    assert_int_equal(bonus_row_item_x(500, 20, 10, 0, 0), 400);
+    assert_int_equal(bonus_row_item_x(500, 20, 10, 0, 19), 590);
 }
 
 static void test_bonus_row_single_item_centred(void **state)
 {
     (void)state;
-    /* Single item at total=1, stride=37:
+    /* Single item at total=1, stride=37, padding=5:
      *   max_len = 37 + 5 = 42; max_len/2 = 21
      *   x = center + 21 - 1*37 = center - 16. */
-    assert_int_equal(bonus_row_item_x(500, 1, 37, 0), 484);
+    assert_int_equal(bonus_row_item_x(500, 1, 37, 5, 0), 484);
 }
 
 /* =========================================================================
@@ -291,7 +293,7 @@ int main(void)
         cmocka_unit_test(test_bonus_row_first_item_leftmost),
         cmocka_unit_test(test_bonus_row_last_item_rightmost),
         cmocka_unit_test(test_bonus_row_stride_between_items),
-        cmocka_unit_test(test_bonus_row_bullet_stride),
+        cmocka_unit_test(test_bonus_row_bullet_no_padding),
         cmocka_unit_test(test_bonus_row_single_item_centred),
     };
 

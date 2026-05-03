@@ -538,22 +538,36 @@ void game_render_bonus(const game_ctx_t *ctx)
         /* Animated coin row: draw one BONUS_BLK sprite per coin already
          * consumed by the state machine (initial_coins - live_coins).
          * Mirrors original/bonus.c:280-389 DoBonuses centred-row layout.
-         * On super-bonus (>8 coins) or no-coins paths the renderer falls
-         * back to a label since the state machine awards points without
-         * draining individual coins. */
+         *
+         * Fallback labels for the non-animated paths in the original:
+         *   timer-void (time_bonus_secs == 0): bonus_system skips coin
+         *     drain entirely so initial > 0 yet drawn == 0 — show the
+         *     "Bonus coins void" message (original/bonus.c:288-303).
+         *   no-coins (initial == 0): "Sorry, no bonus coins collected"
+         *     (original/bonus.c:312-328).
+         *   super-bonus (initial > 8): one-shot "Super Bonus - N"
+         *     (original/bonus.c:330-351). */
         int initial = bonus_system_get_initial_coins(ctx->bonus);
         int live = bonus_system_get_coins(ctx->bonus);
         int drawn = initial - live;
+        int time_secs = bonus_system_get_time_bonus_secs(ctx->bonus);
         SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
         int center_x = PLAY_AREA_X + PLAY_AREA_W / 2;
         int row_y = PLAY_AREA_Y + 200;
         sdl2_texture_info_t coin_tex;
-        if (initial > 0 && initial <= 8 && drawn > 0 &&
-            sdl2_texture_get(ctx->texture, SPR_BLOCK_BONUS_1, &coin_tex) == SDL2T_OK)
+        if (time_secs == 0 && initial > 0)
+        {
+            sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_DATA,
+                                          "Bonus coins void - Timer ran out!", row_y, green,
+                                          PLAY_AREA_W);
+        }
+        else if (initial > 0 && initial <= 8 && drawn > 0 &&
+                 sdl2_texture_get(ctx->texture, SPR_BLOCK_BONUS_1, &coin_tex) == SDL2T_OK)
         {
             for (int i = 0; i < drawn && i < initial; i++)
             {
-                SDL_Rect dst = {.x = bonus_row_item_x(center_x, initial, BONUS_COIN_STRIDE, i),
+                SDL_Rect dst = {.x = bonus_row_item_x(center_x, initial, BONUS_COIN_STRIDE,
+                                                      BONUS_COIN_PADDING, i),
                                 .y = row_y,
                                 .w = coin_tex.width,
                                 .h = coin_tex.height};
@@ -599,7 +613,8 @@ void game_render_bonus(const game_ctx_t *ctx)
         {
             for (int i = 0; i < drawn_b && i < initial_b; i++)
             {
-                SDL_Rect dst = {.x = bonus_row_item_x(center_x, initial_b, BONUS_BULLET_STRIDE, i),
+                SDL_Rect dst = {.x = bonus_row_item_x(center_x, initial_b, BONUS_BULLET_STRIDE,
+                                                      BONUS_BULLET_PADDING, i),
                                 .y = row_y,
                                 .w = bullet_tex.width,
                                 .h = bullet_tex.height};
