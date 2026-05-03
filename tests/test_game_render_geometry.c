@@ -91,6 +91,126 @@ static void test_overlay_pos_zero_text(void **state)
 }
 
 /* =========================================================================
+ * level_life_position — right-to-left lives in level info panel
+ * (basket 4, xboing-c-f9i)
+ * ========================================================================= */
+
+static void test_life_pos_rightmost_at_anchor(void **state)
+{
+    (void)state;
+    /* Modern LEVEL_AREA_X=284, LEVEL_AREA_Y=5; sprite 25x24 (asset).
+     * Life i=0 center at (284+175, 5+21) = (459, 26).
+     * Top-left at (459 - 25/2, 26 - 24/2) = (447, 14). */
+    int x = 0, y = 0;
+    level_life_position(284, 5, 0, 25, 24, &x, &y);
+    assert_int_equal(x, 447);
+    assert_int_equal(y, 14);
+}
+
+static void test_life_pos_stride_30_left(void **state)
+{
+    (void)state;
+    /* Life i=1 center 30px left of i=0 → (459-30, 26) = (429, 26). */
+    int x = 0, y = 0;
+    level_life_position(284, 5, 1, 25, 24, &x, &y);
+    assert_int_equal(x, 429 - 25 / 2);
+    assert_int_equal(y, 26 - 24 / 2);
+}
+
+static void test_life_pos_three_lives_progression(void **state)
+{
+    (void)state;
+    /* Lives 0..2 should march left at 30px stride. */
+    int x0 = 0, x1 = 0, x2 = 0;
+    level_life_position(284, 5, 0, 25, 24, &x0, NULL);
+    level_life_position(284, 5, 1, 25, 24, &x1, NULL);
+    level_life_position(284, 5, 2, 25, 24, &x2, NULL);
+    assert_int_equal(x0 - x1, 30);
+    assert_int_equal(x1 - x2, 30);
+}
+
+static void test_life_pos_null_out_skipped(void **state)
+{
+    (void)state;
+    int y = 0;
+    level_life_position(284, 5, 0, 25, 24, NULL, &y);
+    assert_int_equal(y, 14);
+    int x = 0;
+    level_life_position(284, 5, 0, 25, 24, &x, NULL);
+    assert_int_equal(x, 447);
+}
+
+static void test_life_pos_at_origin(void **state)
+{
+    (void)state;
+    /* level_area at (0,0) — centers at (175, 21).
+     * Sprite 25x24, integer-half = 12 (matches original/level.c:204
+     * RenderShape(... x - 12, y - 12, 25, 24)).  Top-left at (163, 9). */
+    int x = 0, y = 0;
+    level_life_position(0, 0, 0, 25, 24, &x, &y);
+    assert_int_equal(x, 163);
+    assert_int_equal(y, 9);
+}
+
+/* =========================================================================
+ * level_number_digit_position — right-anchored level number digits
+ * (basket 4, xboing-c-82v)
+ * ========================================================================= */
+
+static void test_level_num_rightmost_digit(void **state)
+{
+    (void)state;
+    /* Modern LEVEL_AREA_X=284.  Anchor is window-local x=260; rightmost
+     * digit (index 0) drawn at anchor - 32 = 228.  Absolute: 284 + 228 = 512. */
+    int x = 0, y = 0;
+    level_number_digit_position(284, 5, 0, &x, &y);
+    assert_int_equal(x, 512);
+    assert_int_equal(y, 10);
+}
+
+static void test_level_num_tens_digit(void **state)
+{
+    (void)state;
+    /* Tens digit (index 1) at anchor - 64 = 196.  Absolute: 284 + 196 = 480. */
+    int x = 0, y = 0;
+    level_number_digit_position(284, 5, 1, &x, &y);
+    assert_int_equal(x, 480);
+    assert_int_equal(y, 10);
+}
+
+static void test_level_num_hundreds_digit(void **state)
+{
+    (void)state;
+    /* Hundreds (index 2) at anchor - 96 = 164.  Absolute: 284 + 164 = 448. */
+    int x = 0, y = 0;
+    level_number_digit_position(284, 5, 2, &x, &y);
+    assert_int_equal(x, 448);
+    assert_int_equal(y, 10);
+}
+
+static void test_level_num_stride_32(void **state)
+{
+    (void)state;
+    /* Each successive digit is 32 px to the left of the prior (more
+     * significant digit further left).  Difference between index 0 and
+     * index 1 is 32. */
+    int x0 = 0, x1 = 0;
+    level_number_digit_position(284, 5, 0, &x0, NULL);
+    level_number_digit_position(284, 5, 1, &x1, NULL);
+    assert_int_equal(x0 - x1, 32);
+}
+
+static void test_level_num_at_origin(void **state)
+{
+    (void)state;
+    /* level_area at (0,0): rightmost digit at anchor-32 = 228, y=5. */
+    int x = 0, y = 0;
+    level_number_digit_position(0, 0, 0, &x, &y);
+    assert_int_equal(x, 228);
+    assert_int_equal(y, 5);
+}
+
+/* =========================================================================
  * Test runner
  * ========================================================================= */
 
@@ -104,6 +224,16 @@ int main(void)
         cmocka_unit_test(test_overlay_pos_null_out_x_skipped),
         cmocka_unit_test(test_overlay_pos_null_out_y_skipped),
         cmocka_unit_test(test_overlay_pos_zero_text),
+        cmocka_unit_test(test_life_pos_rightmost_at_anchor),
+        cmocka_unit_test(test_life_pos_stride_30_left),
+        cmocka_unit_test(test_life_pos_three_lives_progression),
+        cmocka_unit_test(test_life_pos_null_out_skipped),
+        cmocka_unit_test(test_life_pos_at_origin),
+        cmocka_unit_test(test_level_num_rightmost_digit),
+        cmocka_unit_test(test_level_num_tens_digit),
+        cmocka_unit_test(test_level_num_hundreds_digit),
+        cmocka_unit_test(test_level_num_stride_32),
+        cmocka_unit_test(test_level_num_at_origin),
     };
 
     return cmocka_run_group_tests(tests, NULL, NULL);
