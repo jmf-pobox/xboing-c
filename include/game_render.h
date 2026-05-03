@@ -74,6 +74,62 @@ void game_render_specials_coords(int lh, const special_label_info_t *labels, int
                                  int *abs_y);
 
 /*
+ * Pure helper — compute the absolute pixel position of life icon i in the
+ * level info panel.  Mirrors original/level.c:223-224:
+ *
+ *   DrawLife(display, window, 175 - (i * 30), 21);
+ *
+ * which calls RenderShape at (x - sprite_w/2, y - sprite_h/2).  The (175, 21)
+ * pair is the SPRITE CENTER in window-local coordinates with stride 30 between
+ * lives.  In modern absolute coords:
+ *
+ *   center_x = level_area_x + LEVEL_LIFE_ANCHOR_X - i * LEVEL_LIFE_STRIDE
+ *   center_y = level_area_y + LEVEL_LIFE_ANCHOR_Y
+ *   out_x    = center_x - sprite_w / 2
+ *   out_y    = center_y - sprite_h / 2
+ *
+ * Lives render right-to-left starting at i=0 (the rightmost icon).
+ * NULL out_x or out_y skips that axis.
+ */
+#define LEVEL_LIFE_ANCHOR_X 175
+#define LEVEL_LIFE_ANCHOR_Y 21
+#define LEVEL_LIFE_STRIDE 30
+
+static inline void level_life_position(int level_area_x, int level_area_y, int i, int sprite_w,
+                                       int sprite_h, int *out_x, int *out_y)
+{
+    int center_x = level_area_x + LEVEL_LIFE_ANCHOR_X - i * LEVEL_LIFE_STRIDE;
+    int center_y = level_area_y + LEVEL_LIFE_ANCHOR_Y;
+    if (out_x)
+        *out_x = center_x - sprite_w / 2;
+    if (out_y)
+        *out_y = center_y - sprite_h / 2;
+}
+
+/*
+ * Pure helper — compute the absolute pixel position of level-number digit
+ * `digit_index` (0=rightmost) when rendering right-anchored.  Mirrors
+ * original/score.c:155-167 DrawOutNumber recursion which lays digits at
+ * x - 32, x - 64, ... from the anchor.
+ *
+ * Original anchor for level number is x=260 in level-window-local coordinates
+ * (original/level.c:210); rightmost digit lands at x=228 (anchor - 32) and
+ * each preceding digit at -32 from its successor.
+ */
+#define LEVEL_NUM_ANCHOR_X 260
+#define LEVEL_NUM_ANCHOR_Y 5
+#define LEVEL_NUM_STRIDE 32
+
+static inline void level_number_digit_position(int level_area_x, int level_area_y, int digit_index,
+                                               int *out_x, int *out_y)
+{
+    if (out_x)
+        *out_x = level_area_x + LEVEL_NUM_ANCHOR_X - (digit_index + 1) * LEVEL_NUM_STRIDE;
+    if (out_y)
+        *out_y = level_area_y + LEVEL_NUM_ANCHOR_Y;
+}
+
+/*
  * Pure helper — compute the top-left position to center a text glyph within a
  * block-sized bounding box. Used for DROP_BLK hit-points digit, RANDOM_BLK
  * "- R -" overlay, and any future composite text rendering that needs to

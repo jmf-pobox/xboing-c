@@ -527,6 +527,11 @@ void game_render_bullets(const game_ctx_t *ctx)
 #define LEVEL_AREA_X 284
 #define LEVEL_AREA_Y 5
 
+/* Level-number digit dimensions — match the 30x40 RenderShape call at
+ * original/score.c:152.  Score digits use the same family. */
+#define LEVEL_NUM_DIGIT_W 30
+#define LEVEL_NUM_DIGIT_H 40
+
 void game_render_lives(const game_ctx_t *ctx)
 {
     SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
@@ -535,38 +540,43 @@ void game_render_lives(const game_ctx_t *ctx)
     if (sdl2_texture_get(ctx->texture, SPR_BALL_LIFE, &tex) != SDL2T_OK)
         return;
 
-    /* Draw one life ball for each life remaining */
+    /* Draw lives right-to-left, anchored at LEVEL_AREA_X + 175 (life i=0
+     * is the rightmost icon, original/level.c:223-224).  Sprite dimensions
+     * come from the texture cache so future asset swaps stay correct. */
     int lives = ctx->lives_left;
     if (lives > 5)
         lives = 5; /* Cap display at 5 */
 
     for (int i = 0; i < lives; i++)
     {
-        SDL_Rect dst = {
-            .x = LEVEL_AREA_X + 5 + i * 18,
-            .y = LEVEL_AREA_Y + 30,
-            .w = 16,
-            .h = 16,
-        };
+        SDL_Rect dst = {.w = tex.width, .h = tex.height};
+        level_life_position(LEVEL_AREA_X, LEVEL_AREA_Y, i, tex.width, tex.height, &dst.x, &dst.y);
         SDL_RenderCopy(sdl, tex.texture, NULL, &dst);
     }
 
-    /* Draw level number as digits */
+    /* Draw level number right-anchored at LEVEL_AREA_X + 260 in absolute
+     * coords (original/level.c:210 DisplayLevelNumber → DrawOutNumber at
+     * window-local x=260, y=5).  Iterate digits least-significant first
+     * so digit_index 0 is the rightmost. */
     int level = ctx->level_number;
-    int d1 = level / 10;
-    int d0 = level % 10;
+    if (level <= 0)
+        level = 1;
 
-    sdl2_texture_info_t dtex;
-    if (d1 > 0 && sdl2_texture_get(ctx->texture, sprite_digit_key(d1), &dtex) == SDL2T_OK)
+    int digit_index = 0;
+    int remaining = level;
+    do
     {
-        SDL_Rect dst = {LEVEL_AREA_X + 5, LEVEL_AREA_Y + 5, 20, 25};
-        SDL_RenderCopy(sdl, dtex.texture, NULL, &dst);
-    }
-    if (sdl2_texture_get(ctx->texture, sprite_digit_key(d0), &dtex) == SDL2T_OK)
-    {
-        SDL_Rect dst = {LEVEL_AREA_X + 27, LEVEL_AREA_Y + 5, 20, 25};
-        SDL_RenderCopy(sdl, dtex.texture, NULL, &dst);
-    }
+        int digit = remaining % 10;
+        sdl2_texture_info_t dtex;
+        if (sdl2_texture_get(ctx->texture, sprite_digit_key(digit), &dtex) == SDL2T_OK)
+        {
+            SDL_Rect dst = {.w = LEVEL_NUM_DIGIT_W, .h = LEVEL_NUM_DIGIT_H};
+            level_number_digit_position(LEVEL_AREA_X, LEVEL_AREA_Y, digit_index, &dst.x, &dst.y);
+            SDL_RenderCopy(sdl, dtex.texture, NULL, &dst);
+        }
+        remaining /= 10;
+        digit_index++;
+    } while (remaining > 0);
 
     /* Ammo belt — bullet strip in the level panel */
     game_render_ammo_belt(ctx);
