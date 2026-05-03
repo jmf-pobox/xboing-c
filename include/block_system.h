@@ -154,7 +154,6 @@ block_system_status_t block_system_clear_all(block_system_t *ctx);
 
 /*
  * Callback invoked at explosion finalize (one tick after stage 4).
- * Fires AFTER occupancy is cleared but BEFORE the cell is reusable.
  * Receives the block's saved type and hit_points so the integration layer
  * can apply score + per-type finalize-only side effects (BOMB chain,
  * BULLET +4 ammo, BONUS counter, X2/X4 toggles, etc.).
@@ -162,8 +161,11 @@ block_system_status_t block_system_clear_all(block_system_t *ctx);
  * Matches original/blocks.c:1547 (AddToScore) and the per-type switch at
  * original/blocks.c:1550-1637 — all of which fire at finalize, not hit time.
  *
- * Ordering invariant: block_system_is_occupied(ctx, row, col) returns 0
- * inside this callback (cell already cleared).
+ * Ordering invariant: clear_entry runs BEFORE the callback, so the cell
+ * is unoccupied AND reusable at callback time
+ * (block_system_is_occupied returns 0; block_system_cell_available returns 1).
+ * Saved block_type and hit_points are passed by parameter — the cell no
+ * longer holds them.
  */
 typedef void (*block_system_finalize_cb_t)(int row, int col, int block_type, int hit_points,
                                            void *ud);
@@ -244,9 +246,12 @@ void block_system_advance_animations(block_system_t *ctx, int frame);
  *     (original/gun.c:325-340).
  *
  * Returns 0 in any of the following cases:
- *   - Block was cleared (all other types, or multi-hit specials whose
- *     counterSlide reached 0). Caller must NOT call block_system_clear
- *     separately — it has already cleared the block.
+ *   - Block was destroyed (all other types, or multi-hit specials whose
+ *     counterSlide reached 0).  Caller must arm the explosion lifecycle
+ *     by calling block_system_explode(ctx, row, col, frame) — this
+ *     function no longer clears the block, so finalize-time effects
+ *     (BULLET +4 ammo, MAXAMMO unlimited, etc.) fire via the
+ *     block-finalize callback rather than at hit time.
  *   - ctx is NULL.
  *   - (row, col) is out of bounds.
  *   - The cell is already unoccupied.

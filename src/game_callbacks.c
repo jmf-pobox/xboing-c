@@ -383,38 +383,36 @@ static void gun_cb_on_block_hit(int row, int col, void *ud)
         score_system_add(ctx->score, (unsigned long)points, &senv);
     }
 
-    /* Delegate clear/absorb logic to block_system — original/gun.c:318-350.
-     * Returns 1 if bullet absorbed (block still occupied), 0 if block cleared. */
+    /* Delegate decrement / absorb logic to block_system —
+     * original/gun.c:318-350.  Returns 1 if bullet absorbed (block still
+     * occupied), 0 if the block would be destroyed by this hit. */
     int absorbed = block_system_decrement_gun_hit(ctx->block, row, col);
     if (absorbed)
         return;
 
-    /* Block was cleared — handle pickup effects. */
-    unsigned long frame = sdl2_state_frame(ctx->state);
+    /* Block destroyed by this bullet — arm the explosion lifecycle so
+     * finalize-time effects (BULLET +4 ammo, MAXAMMO unlimited, score,
+     * BOMB chain, etc.) fire via game_callbacks_on_block_finalize at
+     * the end of the explosion animation.  This matches original
+     * blocks.c:1547-1637 where every block dies through
+     * ExplodeBlocksPending regardless of whether the killing hit was
+     * a bullet or a ball.  Pickup-feedback messages still fire at hit
+     * time below for immediate player feedback. */
+    int frame = (int)sdl2_state_frame(ctx->state);
+    (void)block_system_explode(ctx->block, row, col, frame);
+
     switch (block_type)
     {
         case BULLET_BLK:
-            /* original/blocks.c:1581-1585 — AddABullet x NUMBER_OF_BULLETS_NEW_LEVEL (4).
-             * Skip when unlimited is active: MAXAMMO_BLK uses GUN_MAX_AMMO+1 as
-             * a sentinel; gun_system_add_ammo clamps to GUN_MAX_AMMO, so adding
-             * here would silently reduce 21→20. */
-            if (!gun_system_get_unlimited(ctx->gun))
-            {
-                for (int i = 0; i < BLOCK_NUMBER_OF_BULLETS_NEW_LEVEL; i++)
-                    gun_system_add_ammo(ctx->gun);
-            }
             if (ctx->audio)
                 sdl2_audio_play(ctx->audio, "ammo");
-            message_system_set(ctx->message, "More ammunition, cool!", 1, (int)frame);
+            message_system_set(ctx->message, "More ammunition, cool!", 1, frame);
             break;
 
         case MAXAMMO_BLK:
-            /* original/blocks.c:1588-1593 — SetUnlimitedBullets + SetNumberBullets(MAX+1) */
-            gun_system_set_unlimited(ctx->gun, 1);
-            gun_system_set_ammo(ctx->gun, GUN_MAX_AMMO + 1);
             if (ctx->audio)
                 sdl2_audio_play(ctx->audio, "ammo");
-            message_system_set(ctx->message, "Unlimited bullets!", 1, (int)frame);
+            message_system_set(ctx->message, "Unlimited bullets!", 1, frame);
             break;
 
         default:

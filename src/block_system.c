@@ -1005,8 +1005,11 @@ int block_system_decrement_gun_hit(block_system_t *ctx, int row, int col)
         /* counterSlide reached zero — fall through to clear */
     }
 
-    /* Regular block or multi-hit special exhausted: clear the block. */
-    block_system_clear(ctx, row, col);
+    /* Regular block or multi-hit special exhausted: caller must arm
+     * explosion via block_system_explode().  This function does NOT
+     * clear or arm — the caller controls the lifecycle so the explosion
+     * is driven from the gameplay tick (with the correct `frame` value)
+     * and routes through game_callbacks_on_block_finalize. */
     return 0;
 }
 
@@ -1026,6 +1029,8 @@ const char *block_system_status_string(block_system_status_t status)
             return "allocation failed";
         case BLOCK_SYS_ERR_OUT_OF_BOUNDS:
             return "row/col out of bounds";
+        case BLOCK_SYS_ERR_INVALID_STATE:
+            return "invalid state (cell unoccupied, already exploding, or HYPERSPACE_BLK)";
         default:
             return "unknown status";
     }

@@ -90,21 +90,27 @@ void game_render_blocks(const game_ctx_t *ctx)
 
             if (info.exploding)
             {
-                /* Explosion animation overrides normal appearance.
+                /* Explosion animation override.
                  *
-                 * Stage 4 is a clear-only frame (matches XClearArea path
-                 * at original/blocks.c:1528-1530) — skip drawing
-                 * entirely.  sprite_block_explode_key never returns NULL
-                 * on its default case, so the if-key-NULL guard below
-                 * does NOT fire here; the explicit branch is required.
+                 * block_system_update_explosions advances explode_slide
+                 * BEFORE the render path runs in the same tick.  So the
+                 * slide values the render path sees are off-by-one from
+                 * the original switch values:
                  *
-                 * For stages 1..3, pass slide-1 to map to 0-based sprite
-                 * frame indices (matches original
-                 * ExplodeBlockType(..., 0/1/2) at original/blocks.c:1512,
-                 * 1521, 1525). */
-                if (info.explode_slide >= 4)
+                 *   slide=2: original case 1 — explosion sprite frame 0
+                 *   slide=3: original case 2 — explosion sprite frame 1
+                 *   slide=4: original case 3 — explosion sprite frame 2
+                 *   slide=5: post-finalize (occupied=0 — won't reach here)
+                 *   slide=1: pre-first-update (not reachable in normal flow
+                 *            because update fires on the trigger tick)
+                 *
+                 * sprite_block_explode_key never returns NULL on its
+                 * default case, so the if-key-NULL guard below does NOT
+                 * fire here.  Skip slide outside [2, 4] explicitly and
+                 * pass slide-2 as the 0-based sprite frame index. */
+                if (info.explode_slide < 2 || info.explode_slide > 4)
                     continue;
-                key = sprite_block_explode_key(info.block_type, info.explode_slide - 1);
+                key = sprite_block_explode_key(info.block_type, info.explode_slide - 2);
             }
             else if (info.block_type == COUNTER_BLK && info.counter_slide > 0)
             {
