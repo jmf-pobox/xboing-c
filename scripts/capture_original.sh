@@ -30,8 +30,8 @@
 #
 # Without xfonts-75dpi/100dpi, X11 falls back to the `fixed` bitmap
 # font and original/xboing renders different glyphs than on a
-# developer machine (per sjl review Q1).  x11-utils provides xwininfo
-# (window-id lookup).
+# developer machine (per sjl review Q1).  x11-utils provides
+# xwininfo + xprop (window-id lookup and per-window PID filtering).
 #
 # Usage:
 #   scripts/capture_original.sh [output-dir]
@@ -67,21 +67,33 @@ require() {
     command -v "$cmd" >/dev/null 2>&1 || die "missing '$cmd' — see prereq comment in this script"
 }
 
-# Find the X11 window ID of an XBoing window.  Returns the ID on stdout.
+# Find the X11 window ID of an XBoing window owned by a specific PID.
 # The window's WM_NAME is "- XBoing II -" but its class is "XBoing"
 # (per original/init.c XSetWMProperties).  Mutter wraps it in an
-# x11-frames decoration window of the same name on GNOME, so we
-# specifically pick the inner window with class "XBoing" by parsing
-# `xwininfo -root -tree`.
+# x11-frames decoration window of the same name on GNOME, so we pick
+# the inner window with class "XBoing".  We additionally filter by
+# _NET_WM_PID to ensure we capture *our* freshly-launched xboing,
+# not some other XBoing instance the developer already had open.
 find_xboing_window() {
+    local target_pid="$1"
     xwininfo -root -tree 2>/dev/null \
-        | awk '/"XBoing" "XBoing"/ { print $1; exit }'
+        | awk '/"XBoing" "XBoing"/ { print $1 }' \
+        | while read -r win_id; do
+            local pid_line pid
+            pid_line=$(xprop -id "$win_id" _NET_WM_PID 2>/dev/null)
+            pid=$(echo "$pid_line" | awk -F' = ' '/_NET_WM_PID/ {print $2}')
+            if [[ "$pid" == "$target_pid" ]]; then
+                echo "$win_id"
+                return
+            fi
+        done
 }
 
 # --- Pre-flight ------------------------------------------------------------
 
 require import
 require xwininfo
+require xprop
 [[ -n "${DISPLAY:-}" ]] || die "DISPLAY not set — start Xvfb (see comment) or run on a desktop"
 [[ -x "$SNAPSHOT_BIN" ]] || die "expected $SNAPSHOT_BIN to exist and be executable (run 'make original-build')"
 
@@ -150,8 +162,10 @@ for state_line in "${STATES[@]}"; do
     fi
 
     # Find the xboing window and capture by ID (not root — that would
-    # include the developer's whole desktop).
-    win_id="$(find_xboing_window)"
+    # include the developer's whole desktop).  Filter by PID so we
+    # don't accidentally capture a pre-existing xboing instance the
+    # developer already had open.
+    win_id="$(find_xboing_window "$XBOING_PID")"
     if [[ -z "$win_id" ]]; then
         echo "WARN: could not locate XBoing window for $name; skipping"
         kill "$XBOING_PID" 2>/dev/null || true
