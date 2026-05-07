@@ -47,6 +47,7 @@
  *  Include file dependencies:
  */
 
+#include <X11/Xatom.h> /* XA_CARDINAL — used in -snapshot mode below. */
 #include <X11/Xlib.h>
 #include <X11/Xos.h>
 #include <X11/Xutil.h>
@@ -54,6 +55,7 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h> /* getpid — used in -snapshot mode below. */
 
 #include "audio.h"
 #include "ball.h"
@@ -1238,6 +1240,12 @@ static void handleGameStates(Display *display)
     XFlush(display);
 }
 
+/*
+ * snapshotFrames is set by `-snapshot N` on the command line
+ * (parsed in init.c).  Default 0 = normal interactive play.
+ */
+extern int snapshotFrames;
+
 static void handleEventLoop(Display *display)
 {
     XEvent event;
@@ -1266,6 +1274,60 @@ static void handleEventLoop(Display *display)
 
     /* Grab the pointer to the main window */
     GrabPointer(display, mainWindow);
+
+    /*
+     * Visual-fidelity snapshot mode: advance the game `snapshotFrames`
+     * frames without dispatching input events, then flush, sleep 2 s
+     * (giving an external `import`/`xwd` capture tool time to grab the
+     * window), then exit cleanly.  Used by scripts/capture_original.sh
+     * for the one-time golden-image collection.  Has no effect when
+     * snapshotFrames == 0 (the normal interactive default).
+     */
+    if (snapshotFrames > 0)
+    {
+        int sf;
+        /* Set _NET_WM_PID on mainWindow so capture wrappers can
+         * disambiguate when multiple xboing instances are running.
+         * scripts/capture_original.sh reads this via xprop and
+         * matches against the PID it forked.  The original 1996
+         * code does not set EWMH properties — this only fires in
+         * snapshot mode, leaving normal play unchanged. */
+        {
+            Atom net_wm_pid = XInternAtom(display, "_NET_WM_PID", False);
+            pid_t self_pid = getpid();
+            unsigned long pid_val = (unsigned long)self_pid;
+            XChangeProperty(display, mainWindow, net_wm_pid, XA_CARDINAL, 32,
+                            PropModeReplace, (unsigned char *)&pid_val, 1);
+        }
+        for (sf = 0; sf < snapshotFrames; sf++)
+        {
+            audioDeviceEvents();
+            if (mode == MODE_GAME || mode == MODE_BALL_WAIT)
+                sleepSync(display, speed);
+            else
+                sleepSync(display, 3);
+            /* Match the normal event loop ordering at line ~1283:
+             * frame is incremented BEFORE handleGameStates so the
+             * state machine sees the same frame value it would in
+             * normal play.  -snapshot N renders the visual state of
+             * frame N. */
+            frame++;
+            handleGameStates(display);
+        }
+        /* XSync (not XFlush) — XFlush only sends queued drawing
+         * requests; XSync also blocks until the server has processed
+         * them, ensuring the framebuffer is fully painted before we
+         * tell the wrapper it is safe to capture. */
+        XSync(display, False);
+        /* Emit a stable signal so capture wrappers can synchronise
+         * without polling.  scripts/capture_original.sh reads this
+         * line on stdout to know the 2-second capture window has
+         * begun.  Newline + flush so the wrapper sees it immediately. */
+        printf("XBOING_SNAPSHOT_READY\n");
+        fflush(stdout);
+        sleep(2);
+        exit(0);
+    }
 
     /* Loop forever and ever */
     while (True)
