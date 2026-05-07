@@ -2,10 +2,13 @@
 
 **Date:** 2026-05-03
 **Author:** claude (COO)
-**Status:** REVISED 2026-05-03 — gjm review (m-2026-05-03-002) and sjl review
-(m-2026-05-03-003) both PASS WITH REVISIONS.  Revisions section at the
-bottom captures the deltas from the two reviews.  Awaiting maintainer
-approval before any implementation.
+**Status:** REVISED AGAIN 2026-05-07 — Phase 1 shipped (PR #108).
+Phases 2/3/4 (SSIM/hash pyramid) collapsed into a single
+LLM-comparison phase per maintainer direction.  See "Second
+revision" at the very end of this file for the actual plan.
+Sections above that banner document the original pyramid design and
+the first round of peer reviews; kept for traceability but no longer
+the active plan.
 **Motivation:** the basket 1–6 audit was code-reading. Alignment defects
 slipped through (basket 4 lives left-anchored vs. right-anchored;
 basket 5 bullet row 2-px shifted; PR #107 NoWalls border overdrawn by
@@ -441,3 +444,138 @@ golden.
 4. **Goldens in repo size.**  ~30 baseline PNGs × ~30 KB each = ~900 KB
    in-repo for `tests/golden/original/`.  Acceptable, or LFS?
    sjl's review confirms acceptable in-repo until > 20 MB.
+
+---
+
+## Second revision (2026-05-07) — actual plan
+
+Maintainer feedback after Phase 1 shipped:
+
+> "It seems like it would be simpler to just get screenshots from key
+> screens in the original and use LLM comparisons to the app and this
+> would get us much closer than we are.  Also there are cases where
+> we need keyframes from animations too, not just stills.  The robust
+> infra you have described above seems more sophisticated than
+> required.  Font issues are important too, but don't have to match
+> 100%.  Right now, our issue is the two apps aren't close in some
+> screens not that they are off by a few pixels."
+
+This is correct.  The pyramid plan above optimised for **pixel-precise
+regression detection**.  The actual problem is **whole-screen
+divergence** — layout, alignment, missing animations, wrong sprites.
+SSIM thresholds and per-region hash tables are precision tools we
+don't need yet.
+
+### Revised approach
+
+One phase, not three.  Reuse the Phase 1 capture infrastructure
+unchanged (it shipped clean).  Replace the L2/L3/L4 pyramid with a
+single comparison loop driven by an LLM judge.
+
+```text
+┌─────────────────────────────────────────────────────────────┐
+│  Capture stills + animation keyframes from original/xboing  │  ← Phase 1 (DONE)
+│  via -snapshot N flag                                       │
+├─────────────────────────────────────────────────────────────┤
+│  Capture matching stills + keyframes from modern xboing     │  ← NEW Phase 2
+│  via the same state setup helpers                           │
+├─────────────────────────────────────────────────────────────┤
+│  LLM judge compares each (original.png, modern.png) pair    │  ← NEW Phase 2
+│  Returns structured findings: layout / alignment / sprites  │
+│  / colors / text positioning.  Font hinting below "I'd      │
+│  notice as a player" is explicitly out of scope.            │
+├─────────────────────────────────────────────────────────────┤
+│  Maintainer reads the report, fixes what matters            │
+└─────────────────────────────────────────────────────────────┘
+```
+
+L1 (pure-logic geometry helpers — `level_life_position`,
+`bonus_row_item_x`, etc.) stays as-is.  Off-by-one math doesn't need
+an LLM to catch.
+
+### What changes from the pyramid plan
+
+- **Drop L2 (SDL surface hash)** — not building it.
+- **Drop L3 (per-region SSIM)** — not building it.
+- **Drop `tests/golden/regions.h`** — no per-region cropping needed.
+  (Already shipped in Phase 1; leave in place for now, may revisit
+  later or delete in cleanup.)
+- **Drop the `game_ctx_set_rng_seed` test affordance.**  RNG seeding
+  is still a real bug worth fixing for replay determinism, but file
+  it as its own bd, not as a screenshot-test prerequisite.
+
+### What's added vs. the pyramid plan
+
+- **Animation keyframes.**  The basket 1–6 audit found defects in
+  animations (block explosion, bonus coin row, bonus bullet row, ball
+  launch guide, XBOING letter stamping).  Stills miss these.  Add
+  keyframe enumeration: for each animation, capture multiple
+  `-snapshot N` values that land on visually distinct moments
+  (coin 0/3/5/8, explosion stage 1/2/3, etc.).
+- **`scripts/capture_modern.sh`.**  Mirror of `capture_original.sh`
+  but drives the modern SDL2 binary (with `SDL_VIDEODRIVER=dummy` or
+  a software renderer per sjl B-3 — still relevant for the modern
+  side since SDL_RenderReadPixels with the dummy driver is
+  unreliable).
+- **`scripts/llm_compare.py`.**  Pairs each original/modern PNG,
+  sends both to the Anthropic API with a structured prompt, gets
+  back JSON: `{verdict: equivalent|diff, findings: [{category,
+  description, severity}]}`.
+
+### Cost / runtime
+
+- ~30 stills + ~50 animation keyframes = ~80 captures per side.
+- Capture run: ~10 minutes total (one-time per session).
+- LLM comparison: ~$0.01 per pair × 80 pairs = ~$0.80 per full run.
+  Run on rendering-touching PRs only (path-filter), not every push.
+- Compared to building + tuning SSIM thresholds: ~one engineering
+  day saved.
+
+### What we lose
+
+The cheap-fast layer that catches "I shifted one pixel and didn't
+mean to."  Acceptable: pixel regressions can be caught at L1
+(geometry-helper unit tests) where they're cheapest to write.  And
+they're not what's actually breaking us right now — whole-screen
+divergence is.
+
+### Phase plan (new)
+
+- **Phase 1** — capture infrastructure (DONE, PR #108).
+- **Phase 2** — modern capture script + LLM comparison loop +
+  initial keyframe expansion.  Adds `capture_modern.sh`,
+  `llm_compare.py`, `make visual-check`, and per-animation keyframe
+  enumeration in both capture scripts.
+- (No Phase 3 yet.  If gaps appear in practice, file follow-ups.)
+
+### What "looks right" actually means
+
+The LLM prompt explicitly defines acceptance:
+
+> Compare these two screenshots of the same XBoing game state.  The
+> first is from the canonical 1996 X11 binary; the second is from the
+> SDL2 modernization.  Report concrete visual differences in:
+>
+> - Layout (positions of UI elements relative to each other)
+> - Alignment (right-anchored vs. left-anchored, stride between
+>   repeated elements)
+> - Sprites (which sprite is shown — color, type, animation frame)
+> - Colors (background, border, accent — but not subtle font color
+>   shifts)
+> - Text positioning (where text lands; not glyph-level rendering)
+>
+> Out of scope:
+>
+> - Font hinting / anti-aliasing differences
+> - 1-2 pixel shifts that a player would not notice
+> - Color quantization differences from XPM-to-PNG conversion
+> - Cursor or window decoration artifacts
+>
+> Output JSON: `{verdict: "equivalent" | "diff", findings: [...]}`.
+
+### Open question for the maintainer
+
+Should `make visual-check` block CI on visual-rendering PRs (with
+the `~$0.80 + 10 min` cost) or stay manual / opt-in?
+Recommendation: manual for now; add a CI workflow once the prompt
+and keyframe catalog have stabilised over a few PRs.
