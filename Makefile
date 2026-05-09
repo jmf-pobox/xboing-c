@@ -25,7 +25,7 @@ PREFIX         ?= /usr/local
         lint format format-check \
         cppcheck cppcheck-src cppcheck-tests \
         tidy check ci \
-        original-build capture-original
+        original-build capture-original visual-check visual-check-setup
 
 # --- Default ---------------------------------------------------------------
 
@@ -107,6 +107,17 @@ original-build: ## Build the legacy 1996 Xlib binary in original/ (used for visu
 
 capture-original: original-build ## Capture visual-fidelity reference PNGs from original/xboing under Xvfb (one-time; commits to tests/golden/original/).
 	scripts/capture_original.sh tests/golden/original/
+
+visual-check-setup: ## Set up the managed venv and Python deps for `make visual-check`.
+	@if [ ! -x ~/.local/bin/uv ]; then \
+		echo "ERROR: uv not installed. Run: curl -LsSf https://astral.sh/uv/install.sh | sh"; \
+		exit 1; \
+	fi
+	~/.local/bin/uv venv .tmp/venv
+	~/.local/bin/uv pip install --python .tmp/venv/bin/python anthropic pyyaml
+
+visual-check: build ## LLM-based visual-fidelity comparison (modern vs. tests/golden/original/). Reads ANTHROPIC_API_KEY from env or `secret-tool lookup service anthropic`. Run `make visual-check-setup` once to install deps.
+	.tmp/venv/bin/python scripts/visual_check.py
 
 dogfood: deb ## Install .deb, launch xboing from .tmp/, verify window opens (requires sudo; skips window check if headless or xwininfo missing).
 	mkdir -p .tmp
