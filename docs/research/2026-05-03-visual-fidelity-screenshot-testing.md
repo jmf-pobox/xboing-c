@@ -495,16 +495,17 @@ an LLM to catch.
 
 ### What changes from the pyramid plan
 
-- **Drop L2 (SDL surface hash)** — not building it.
-- **Drop L3 (per-region SSIM)** — not building it.
-- **`tests/golden/regions.h` becomes unused.**  No per-region
-  cropping is needed under the LLM approach.  Already shipped in
-  Phase 1; left in place since it is harmless.  May be deleted in
-  a later cleanup pass once we are confident no future phase will
-  reuse the constants.
-- **Drop the `game_ctx_set_rng_seed` test affordance.**  RNG seeding
-  is still a real bug worth fixing for replay determinism, but file
-  it as its own bd, not as a screenshot-test prerequisite.
+The pyramid's L2 layer (SDL surface hash regression tests) is no
+longer being built.  Likewise L3 (per-region SSIM) and the L4
+LLM-judge gate as it was originally scoped.  The
+`game_ctx_set_rng_seed` test affordance was a prerequisite for L2
+and is no longer required for the screenshot pipeline; the
+underlying RNG-seed gap is still a real bug worth fixing for replay
+determinism, tracked separately as its own bd.
+
+The `tests/golden/regions.h` header that Phase 1 introduced is left
+in place — it is unused under the new approach but causes no harm,
+and removing it is a separate cleanup we can defer.
 
 ### What's added vs. the pyramid plan
 
@@ -515,12 +516,12 @@ an LLM to catch.
   `-snapshot N` values that land on visually distinct moments
   (coin 0/3/5/8, explosion stage 1/2/3, etc.).
 - **`scripts/capture_modern.sh`.**  Mirror of `capture_original.sh`
-  but drives the modern SDL2 binary.  Use the software renderer path
-  (`SDL_CreateSoftwareRenderer` against an `SDL_Surface` created via
-  `SDL_CreateRGBSurfaceWithFormat`) per sjl B-3.  Do NOT use
-  `SDL_VIDEODRIVER=dummy` + `SDL_RenderReadPixels`: that combination
-  is unreliable across SDL2 versions and was specifically rejected
-  by the sjl review.
+  but drives the modern SDL2 binary.  The required capture path is
+  the software renderer: `SDL_CreateSoftwareRenderer` against an
+  `SDL_Surface` created via `SDL_CreateRGBSurfaceWithFormat` (per
+  sjl review B-3).  See
+  `docs/reviews/2026-05-03-screenshot-methodology-sjl-review.md` for
+  the full rationale on capture-driver choice.
 - **`scripts/llm_compare.py`.**  Pairs each original/modern PNG,
   sends both to the Anthropic API with a structured prompt, gets
   back JSON: `{verdict: equivalent|diff, findings: [{category,
