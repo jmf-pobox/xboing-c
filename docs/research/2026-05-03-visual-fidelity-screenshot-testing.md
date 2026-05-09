@@ -497,9 +497,11 @@ an LLM to catch.
 
 - **Drop L2 (SDL surface hash)** — not building it.
 - **Drop L3 (per-region SSIM)** — not building it.
-- **Drop `tests/golden/regions.h`** — no per-region cropping needed.
-  (Already shipped in Phase 1; leave in place for now, may revisit
-  later or delete in cleanup.)
+- **`tests/golden/regions.h` becomes unused.**  No per-region
+  cropping is needed under the LLM approach.  Already shipped in
+  Phase 1; left in place since it is harmless.  May be deleted in
+  a later cleanup pass once we are confident no future phase will
+  reuse the constants.
 - **Drop the `game_ctx_set_rng_seed` test affordance.**  RNG seeding
   is still a real bug worth fixing for replay determinism, but file
   it as its own bd, not as a screenshot-test prerequisite.
@@ -513,10 +515,12 @@ an LLM to catch.
   `-snapshot N` values that land on visually distinct moments
   (coin 0/3/5/8, explosion stage 1/2/3, etc.).
 - **`scripts/capture_modern.sh`.**  Mirror of `capture_original.sh`
-  but drives the modern SDL2 binary (with `SDL_VIDEODRIVER=dummy` or
-  a software renderer per sjl B-3 — still relevant for the modern
-  side since SDL_RenderReadPixels with the dummy driver is
-  unreliable).
+  but drives the modern SDL2 binary.  Use the software renderer path
+  (`SDL_CreateSoftwareRenderer` against an `SDL_Surface` created via
+  `SDL_CreateRGBSurfaceWithFormat`) per sjl B-3.  Do NOT use
+  `SDL_VIDEODRIVER=dummy` + `SDL_RenderReadPixels`: that combination
+  is unreliable across SDL2 versions and was specifically rejected
+  by the sjl review.
 - **`scripts/llm_compare.py`.**  Pairs each original/modern PNG,
   sends both to the Anthropic API with a structured prompt, gets
   back JSON: `{verdict: equivalent|diff, findings: [{category,

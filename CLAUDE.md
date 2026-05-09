@@ -479,25 +479,48 @@ This phase reduces remote-review round-trips. Don't skip it.
 
 ### Phase 6: Ship (active monitoring; merge on review convergence)
 
+**This is mandatory and automatic for every PR — no exceptions for
+"trivial" PRs, "docs-only" PRs, or "I'll get to it later." A PR that
+sits open without active monitoring is a process failure. If you push
+new commits to an open PR, you must re-arm monitoring AND re-request
+Copilot review on the new commit; previous reviews refer to the old
+SHA and don't carry forward.**
+
 1. Commit with conventional message format (`type(scope): description`). `make check` must pass.
 2. `git push -u origin <branch>` then create the PR via the MCP GitHub tools (`mcp__github__create_pull_request`) or `gh pr create`.
-3. **Arm active monitoring immediately:**
+3. **Arm active monitoring immediately after `gh pr create` returns,
+   in the same turn:**
    - `gh pr checks <number> --watch` in the background.
-   - A 2-minute cron polling `gh pr view <number> --json reviews,comments,reviewDecision,state,mergeable`.
+   - A 2–3 minute cron polling `gh pr view <number> --json reviews,comments,reviewDecision,state,mergeable,statusCheckRollup`.
+   The cron must continue until the PR merges. If you push new commits,
+   the same cron is fine — it polls the latest state. Don't create a
+   second cron.
 4. Request Copilot review (`mcp__github__request_copilot_review`).
+   **Do this immediately after step 3 in the same turn, AND every
+   time you push a new commit to the PR branch** — Copilot does not
+   auto-re-review on push.
 5. **For each new finding on the latest commit:** address it inline in
    this PR — no follow-up bds, no "pre-existing" excuses. Run `make check`.
    Plain `git push` (not force, not rebase). Resolve the corresponding
    conversation thread. Thread resolution is the one workflow operation
    without a structured MCP tool today; use `gh api graphql`
    `resolveReviewThread` mutation as the documented exception to the
-   "prefer MCP over `gh api graphql`" Tool Usage rule.
-6. **Handle base conflicts via merge, never via rebase.** If the branch
+   "prefer MCP over `gh api graphql`" Tool Usage rule. After pushing
+   fixes, return to step 4 — re-request Copilot review on the new SHA.
+6. **Round budget: 2–4 rounds typical, until findings are de minimis.**
+   A round = (new commit pushed) → (Copilot or Cursor review) →
+   (findings addressed + threads resolved). After ~4 rounds, the
+   reviewer typically returns an empty pass — that's convergence.
+   Don't quit early on round 1 just because you addressed all current
+   findings; new findings often surface on round 2 once the easy ones
+   clear. Don't grind past round 5; if findings keep multiplying,
+   something is wrong with the change itself.
+7. **Handle base conflicts via merge, never via rebase.** If the branch
    goes `CONFLICTING`: click "Update branch" in the PR UI, or
    `git fetch origin master && git merge origin/master` then `git push`.
    This preserves commit SHAs and keeps reviewer state attached. **Never
    `git rebase` or `git push --force` on a branch with an open PR.**
-7. **Merge when reviews converge — when the last round produces no new
+8. **Merge when reviews converge — when the last round produces no new
    substantive findings.** A large change typically goes through 3–5
    rounds before reviews stop adding value. The merge gate is:
    - All CI checks green on the latest commit.
@@ -508,7 +531,7 @@ This phase reduces remote-review round-trips. Don't skip it.
    - Every conversation thread is resolved.
    That's the convergence signal. When it's met: merge. Don't wait for
    explicit human approval — the convergence *is* the approval.
-8. Merge: `gh pr merge <number> --squash --delete-branch`.
+9. Merge: `gh pr merge <number> --squash --delete-branch`.
 
 ### Phase 7: Close
 
