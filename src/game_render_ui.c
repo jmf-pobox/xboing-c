@@ -111,7 +111,9 @@ void game_render_presents(const game_ctx_t *ctx)
     }
 
     /* Author credits — rendered only during the credits phase
-     * (TEXT1 through TEXT_CLEAR). */
+     * (TEXT1 through TEXT_CLEAR).  Center within PRESENTS_TOTAL_WIDTH
+     * (565) not SDL2R_LOGICAL_WIDTH (575) — the presents system
+     * uses PRESENTS_TOTAL_WIDTH for all coordinate math. */
     {
         if (presents_system_is_credits_phase(ctx->presents))
         {
@@ -119,11 +121,11 @@ void game_render_presents(const game_ctx_t *ctx)
             SDL_Color yellow = {255, 255, 0, 255};
 
             sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TEXT, "Justin C. Kibell", 200,
-                                          white, SDL2R_LOGICAL_WIDTH);
+                                          white, PRESENTS_TOTAL_WIDTH);
             sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_COPY, "presents", 230, yellow,
-                                          SDL2R_LOGICAL_WIDTH);
+                                          PRESENTS_TOTAL_WIDTH);
             sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TITLE, "XBoing II", 270, white,
-                                          SDL2R_LOGICAL_WIDTH);
+                                          PRESENTS_TOTAL_WIDTH);
         }
     }
 
@@ -148,6 +150,21 @@ void game_render_presents(const game_ctx_t *ctx)
                 lx += 10 + letter_widths[i];
             }
         }
+
+        /* "II" suffix after all 6 letters — original/presents.c:344-348
+         * draws two 'I' glyphs below the XBOING title. */
+        presents_ii_info_t ii;
+        if (presents_system_get_ii_info(ctx->presents, &ii))
+        {
+            sdl2_texture_info_t tex;
+            if (sdl2_texture_get(ctx->texture, SPR_TITLE_I, &tex) == SDL2T_OK)
+            {
+                SDL_Rect d1 = {ii.i1_x, ii.y, tex.width, tex.height};
+                SDL_RenderCopy(sdl, tex.texture, NULL, &d1);
+                SDL_Rect d2 = {ii.i2_x, ii.y, tex.width, tex.height};
+                SDL_RenderCopy(sdl, tex.texture, NULL, &d2);
+            }
+        }
     }
 
     /* Sparkle — render when active */
@@ -158,7 +175,10 @@ void game_render_presents(const game_ctx_t *ctx)
             render_sparkle(ctx, si.x, si.y, si.frame_index);
     }
 
-    /* Typewriter text lines — render visible chars for each line */
+    /* Typewriter text lines — centered within PRESENTS_TOTAL_WIDTH.
+     * ti.x_offset from the system is 0 (the system notes the
+     * integration layer should compute centering).  We measure the
+     * visible substring and center it horizontally. */
     {
         SDL_Color green = {0, 255, 0, 255};
         for (int line = 0; line < 3; line++)
@@ -173,24 +193,25 @@ void game_render_presents(const game_ctx_t *ctx)
                     if (n > 255)
                         n = 255;
                     snprintf(buf, sizeof(buf), "%.*s", n, ti.text);
-                    sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_DATA, buf, ti.x_offset, ti.y,
-                                          green);
+                    sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_DATA, buf, ti.y, green,
+                                                  PRESENTS_TOTAL_WIDTH);
                 }
             }
         }
     }
 
     /* Curtain wipe — draw black rectangles closing from top and bottom.
-     * Covers the full logical window (mainWindow coords). */
+     * Coordinates from the presents system use PRESENTS_TOTAL
+     * dimensions (565×710). */
     {
         presents_wipe_info_t wi;
         presents_system_get_wipe_info(ctx->presents, &wi);
         if (wi.top_y > 0 || wi.complete)
         {
             SDL_SetRenderDrawColor(sdl, 0, 0, 0, 255);
-            SDL_Rect top_rect = {0, 0, SDL2R_LOGICAL_WIDTH, wi.top_y};
-            SDL_Rect bot_rect = {0, wi.bottom_y, SDL2R_LOGICAL_WIDTH,
-                                 SDL2R_LOGICAL_HEIGHT - wi.bottom_y};
+            SDL_Rect top_rect = {0, 0, PRESENTS_TOTAL_WIDTH, wi.top_y};
+            SDL_Rect bot_rect = {0, wi.bottom_y, PRESENTS_TOTAL_WIDTH,
+                                 PRESENTS_TOTAL_HEIGHT - wi.bottom_y};
             SDL_RenderFillRect(sdl, &top_rect);
             SDL_RenderFillRect(sdl, &bot_rect);
         }
