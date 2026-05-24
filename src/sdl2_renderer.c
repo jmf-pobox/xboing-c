@@ -68,10 +68,11 @@ sdl2_renderer_t *sdl2_renderer_create(const sdl2_renderer_config_t *config)
     ctx->fullscreen = config->fullscreen;
 
     /* Fit the initial window to the display's usable area while
-     * preserving the 575:720 aspect ratio.  Without this, scale=2 on
-     * a 1920×1200 display creates a 1150×1440 window — 240px taller
-     * than the screen.  The WM silently shrinks the height, breaking
-     * the aspect ratio and producing prominent letterbox bars.
+     * preserving the configured logical_width:logical_height aspect
+     * ratio.  Without this, scale=2 on a 1920×1200 display creates a
+     * 1150×1440 window — 240px taller than the screen.  The WM
+     * silently shrinks the height, breaking the aspect ratio and
+     * producing prominent letterbox bars.
      *
      * Strategy: try the configured scale first.  If that overflows,
      * compute the largest window that fits by capping to the usable
@@ -81,7 +82,7 @@ sdl2_renderer_t *sdl2_renderer_create(const sdl2_renderer_config_t *config)
      * handles internal scaling; SDL_HINT_RENDER_SCALE_QUALITY =
      * "nearest" preserves pixel-art sharpness at non-integer scales.
      *
-     * Design ref: docs/DESIGN.md:169 (ADR-005 point 2). */
+     * Design ref: docs/DESIGN.md ADR-004, point 2. */
     int physical_w = config->logical_width * config->scale;
     int physical_h = config->logical_height * config->scale;
 
