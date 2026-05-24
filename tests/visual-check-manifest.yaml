@@ -42,6 +42,14 @@ pairs:
       script: scripts/capture_modern_one.sh
       args: ["1", ".tmp/visual-check/modern/presents-early.png"]
 
+  - name: intro-blocks
+    a: tests/golden/original/intro-blocks.png
+    b: .tmp/visual-check/modern/intro-blocks.png
+    expected: diff
+    capture:
+      script: scripts/capture_modern_one.sh
+      args: ["17", ".tmp/visual-check/modern/intro-blocks.png"]
+
   # intro-late: original captured at frame 2500 (~3.0s at ~833 vfps).
   # At that frame the original is mid-XBOING-letter-stamping (first
   # X just placed).  Modern at ATTRACT_FRAME_MULTIPLIER=6 and ~133
@@ -50,7 +58,7 @@ pairs:
   - name: intro-late
     a: tests/golden/original/intro-late.png
     b: .tmp/visual-check/modern/intro-late.png
-    expected: diff
+    expected: equivalent
     capture:
       script: scripts/capture_modern_one.sh
       args: ["3.5", ".tmp/visual-check/modern/intro-late.png"]

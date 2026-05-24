@@ -6,6 +6,7 @@
 
 #include "intro_system.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 
 /* =========================================================================
@@ -316,6 +317,7 @@ int intro_system_update(intro_system_t *ctx, int frame)
     ctx->sound.volume = 0;
     ctx->blink_active = 0;
 
+    intro_state_t prev = ctx->state;
     switch (ctx->state)
     {
         case INTRO_STATE_TITLE:
@@ -336,6 +338,15 @@ int intro_system_update(intro_system_t *ctx, int frame)
         case INTRO_STATE_WAIT:
         case INTRO_STATE_NONE:
             break;
+    }
+
+    if (ctx->state != prev && getenv("XBOING_LOG_TRANSITIONS"))
+    {
+        static const char *const names[] = {"NONE",    "TITLE",  "BLOCKS", "TEXT",
+                                            "SPARKLE", "FINISH", "WAIT"};
+        unsigned int pi = ((unsigned int)prev <= 6) ? (unsigned int)prev : 0;
+        unsigned int ci = ((unsigned int)ctx->state <= 6) ? (unsigned int)ctx->state : 0;
+        fprintf(stderr, "XBOING_INTRO: %s -> %s frame=%d\n", names[pi], names[ci], frame);
     }
 
     return ctx->finished ? 0 : 1;

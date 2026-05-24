@@ -7,6 +7,7 @@
 
 #include "sdl2_state.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -32,6 +33,10 @@ struct sdl2_state
 
     /* User data passed to all callbacks. */
     void *user_data;
+
+    /* If nonzero, log every state transition to stderr.  Set from
+     * XBOING_LOG_TRANSITIONS env var at creation time. */
+    int log_transitions;
 };
 
 /* =========================================================================
@@ -73,6 +78,7 @@ sdl2_state_t *sdl2_state_create(void *user_data, sdl2_state_status_t *status)
     ctx->in_dialogue = false;
     ctx->frame = 0;
     ctx->user_data = user_data;
+    ctx->log_transitions = (getenv("XBOING_LOG_TRANSITIONS") != NULL);
 
     if (status != NULL)
     {
@@ -138,8 +144,19 @@ sdl2_state_status_t sdl2_state_transition(sdl2_state_t *ctx, sdl2_state_mode_t n
     call_handler(ctx->handlers[ctx->current].on_exit, ctx->current, ctx->user_data);
 
     /* Update state. */
+    sdl2_state_mode_t old_mode = ctx->current;
     ctx->previous = ctx->current;
     ctx->current = new_mode;
+
+    /* Log transitions when XBOING_LOG_TRANSITIONS is set.  Used by
+     * scripts/capture_modern_one.sh to determine the correct capture
+     * timing for each screen without trial-and-error wall-clock waits.
+     * Format: "XBOING_STATE: <old> -> <new> frame=<N>" on stderr. */
+    if (ctx->log_transitions)
+    {
+        fprintf(stderr, "XBOING_STATE: %s -> %s frame=%lu\n", sdl2_state_mode_name(old_mode),
+                sdl2_state_mode_name(new_mode), ctx->frame);
+    }
 
     /* Call enter on new mode. */
     call_handler(ctx->handlers[new_mode].on_enter, new_mode, ctx->user_data);
