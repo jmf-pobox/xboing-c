@@ -72,33 +72,34 @@ void game_render_presents(const game_ctx_t *ctx)
      * → typewriter → wipe.
      */
 
+    /*
+     * All presents content uses mainWindow-absolute coordinates — NO
+     * PLAY_AREA_X / PLAY_AREA_Y offset.  The original calls
+     * Presents(display, mainWindow) at original/main.c:1190, so all
+     * drawing lands at mainWindow (x, y) not playWindow (x, y).
+     * Only gameplay rendering (blocks, paddle, ball) uses the play-area
+     * offset.
+     */
+
     /* Flag + earth — always render once set (persists from FLAG state) */
     {
         presents_flag_info_t fi;
         presents_system_get_flag_info(ctx->presents, &fi);
 
-        /* flag_x is set to non-zero when FLAG state runs */
         if (fi.flag_x > 0 || fi.flag_y > 0)
         {
             sdl2_texture_info_t tex;
             if (sdl2_texture_get(ctx->texture, SPR_PRESENTS_FLAG, &tex) == SDL2T_OK)
             {
-                SDL_Rect dst = {PLAY_AREA_X + fi.flag_x, PLAY_AREA_Y + fi.flag_y, tex.width,
-                                tex.height};
+                SDL_Rect dst = {fi.flag_x, fi.flag_y, tex.width, tex.height};
                 SDL_RenderCopy(sdl, tex.texture, NULL, &dst);
             }
             if (sdl2_texture_get(ctx->texture, SPR_PRESENTS_EARTH, &tex) == SDL2T_OK)
             {
-                SDL_Rect dst = {PLAY_AREA_X + fi.earth_x, PLAY_AREA_Y + fi.earth_y, tex.width,
-                                tex.height};
+                SDL_Rect dst = {fi.earth_x, fi.earth_y, tex.width, tex.height};
                 SDL_RenderCopy(sdl, tex.texture, NULL, &dst);
             }
 
-            /* "Made in Australia" caption and copyright use mainWindow-
-             * absolute coordinates (not play-area-relative), centered
-             * within the full logical window width — matching
-             * original/presents.c:220-231 which uses absolute y values
-             * and PLAY_WIDTH+MAIN_WIDTH for centering. */
             SDL_Color white = {255, 255, 255, 255};
             sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TEXT, "Made in Australia", 65,
                                           white, SDL2R_LOGICAL_WIDTH);
@@ -109,35 +110,25 @@ void game_render_presents(const game_ctx_t *ctx)
         }
     }
 
-    /* Author credits — rendered only while the presents system is in
-     * the credits phase (TEXT1 through TEXT_CLEAR).  Previously this
-     * checked `state != FLAG && state != NONE` which leaked credits
-     * into the 800-frame WAIT-after-FLAG hold (WAIT has enum value 13
-     * which passes both checks).  The credits_entered flag is set by
-     * do_text1 and cleared by do_text_clear, gating this correctly. */
+    /* Author credits — rendered only during the credits phase
+     * (TEXT1 through TEXT_CLEAR). */
     {
         if (presents_system_is_credits_phase(ctx->presents))
         {
             SDL_Color white = {255, 255, 255, 255};
             SDL_Color yellow = {255, 255, 0, 255};
 
-            sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TEXT, "Justin C. Kibell",
-                                          PLAY_AREA_Y + 200, white, PLAY_AREA_W);
-            sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_COPY, "presents", PLAY_AREA_Y + 230,
-                                          yellow, PLAY_AREA_W);
-            sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TITLE, "XBoing II",
-                                          PLAY_AREA_Y + 270, white, PLAY_AREA_W);
+            sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TEXT, "Justin C. Kibell", 200,
+                                          white, SDL2R_LOGICAL_WIDTH);
+            sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_COPY, "presents", 230, yellow,
+                                          SDL2R_LOGICAL_WIDTH);
+            sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TITLE, "XBoing II", 270, white,
+                                          SDL2R_LOGICAL_WIDTH);
         }
     }
 
-    /* XBOING letter stamps — render if any letters have been placed.
-     *
-     * Layout matches original/presents.c:319-354: letters start at
-     * window-local x=40, y=220, and each letter advances by
-     * `10 + dists[i]` where dists[] = {71, 73, 83, 41, 85, 88} are
-     * the per-letter widths.  Fixed 80-px stride looked uniformly
-     * spaced but didn't match the original's variable-width XBOING
-     * glyphs. */
+    /* XBOING letter stamps — variable per-letter widths matching
+     * original/presents.c:319-354 (mainWindow coordinates). */
     {
         presents_letter_info_t li;
         if (presents_system_get_letter_info(ctx->presents, &li))
@@ -145,13 +136,13 @@ void game_render_presents(const game_ctx_t *ctx)
             static const char *const letter_keys[] = {SPR_TITLE_X, SPR_TITLE_B, SPR_TITLE_O,
                                                       SPR_TITLE_I, SPR_TITLE_N, SPR_TITLE_G};
             static const int letter_widths[] = {71, 73, 83, 41, 85, 88};
-            int lx = PLAY_AREA_X + 40;
+            int lx = 40;
             for (int i = 0; i <= li.letter_index && i < 6; i++)
             {
                 sdl2_texture_info_t tex;
                 if (sdl2_texture_get(ctx->texture, letter_keys[i], &tex) == SDL2T_OK)
                 {
-                    SDL_Rect dst = {lx, PLAY_AREA_Y + 220, tex.width, tex.height};
+                    SDL_Rect dst = {lx, 220, tex.width, tex.height};
                     SDL_RenderCopy(sdl, tex.texture, NULL, &dst);
                 }
                 lx += 10 + letter_widths[i];
@@ -164,7 +155,7 @@ void game_render_presents(const game_ctx_t *ctx)
         presents_sparkle_info_t si;
         presents_system_get_sparkle_info(ctx->presents, &si);
         if (si.active)
-            render_sparkle(ctx, PLAY_AREA_X + si.x, PLAY_AREA_Y + si.y, si.frame_index);
+            render_sparkle(ctx, si.x, si.y, si.frame_index);
     }
 
     /* Typewriter text lines — render visible chars for each line */
@@ -182,23 +173,24 @@ void game_render_presents(const game_ctx_t *ctx)
                     if (n > 255)
                         n = 255;
                     snprintf(buf, sizeof(buf), "%.*s", n, ti.text);
-                    sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_DATA, buf,
-                                          PLAY_AREA_X + ti.x_offset, PLAY_AREA_Y + ti.y, green);
+                    sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_DATA, buf, ti.x_offset, ti.y,
+                                          green);
                 }
             }
         }
     }
 
-    /* Curtain wipe — draw black rectangles closing from top and bottom */
+    /* Curtain wipe — draw black rectangles closing from top and bottom.
+     * Covers the full logical window (mainWindow coords). */
     {
         presents_wipe_info_t wi;
         presents_system_get_wipe_info(ctx->presents, &wi);
         if (wi.top_y > 0 || wi.complete)
         {
             SDL_SetRenderDrawColor(sdl, 0, 0, 0, 255);
-            SDL_Rect top_rect = {PLAY_AREA_X, PLAY_AREA_Y, PLAY_AREA_W, wi.top_y};
-            SDL_Rect bot_rect = {PLAY_AREA_X, PLAY_AREA_Y + wi.bottom_y, PLAY_AREA_W,
-                                 PLAY_AREA_H - wi.bottom_y};
+            SDL_Rect top_rect = {0, 0, SDL2R_LOGICAL_WIDTH, wi.top_y};
+            SDL_Rect bot_rect = {0, wi.bottom_y, SDL2R_LOGICAL_WIDTH,
+                                 SDL2R_LOGICAL_HEIGHT - wi.bottom_y};
             SDL_RenderFillRect(sdl, &top_rect);
             SDL_RenderFillRect(sdl, &bot_rect);
         }

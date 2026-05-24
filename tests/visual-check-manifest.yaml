@@ -42,10 +42,15 @@ pairs:
       script: scripts/capture_modern_one.sh
       args: ["1", ".tmp/visual-check/modern/presents-early.png"]
 
+  # intro-late: original captured at frame 2500 (~3.0s at ~833 vfps).
+  # At that frame the original is mid-XBOING-letter-stamping (first
+  # X just placed).  Modern at ATTRACT_FRAME_MULTIPLIER=6 and ~133
+  # real tps: frame 2500 ≈ 2500/(133*6) ≈ 3.1s wall-clock.  Capture
+  # at 3.5s to clear the TEXT_CLEAR boundary and land in LETTERS.
   - name: intro-late
     a: tests/golden/original/intro-late.png
     b: .tmp/visual-check/modern/intro-late.png
     expected: diff
     capture:
       script: scripts/capture_modern_one.sh
-      args: ["8", ".tmp/visual-check/modern/intro-late.png"]
+      args: ["3.5", ".tmp/visual-check/modern/intro-late.png"]
