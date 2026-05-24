@@ -195,4 +195,10 @@ presents_sound_t presents_system_get_sound(const presents_system_t *ctx);
 /* Query: which typewriter line index (0-2) is currently active, or -1. */
 int presents_system_get_active_typewriter_line(const presents_system_t *ctx);
 
+/* Returns 1 if the presents sequence is in the credits phase
+ * (TEXT1..TEXT_CLEAR states have been entered but not yet cleared).
+ * Used by the renderer to gate credits text so it doesn't leak into
+ * the 800-frame WAIT-after-FLAG hold. */
+int presents_system_is_credits_phase(const presents_system_t *ctx);
+
 #endif /* PRESENTS_SYSTEM_H */

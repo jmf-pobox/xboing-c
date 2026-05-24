@@ -40,6 +40,11 @@ struct presents_system
     /* FLAG state positions. */
     presents_flag_info_t flag_info;
 
+    /* Credits phase (TEXT1..TEXT_CLEAR).  Set to 1 at TEXT1, cleared at
+     * TEXT_CLEAR.  Renderer uses this to gate credits text so it doesn't
+     * leak into the 800-frame WAIT-after-FLAG hold. */
+    int credits_entered;
+
     /* LETTERS state. */
     int letter_index; /* 0..5 during stamping, 6 = "II" drawn */
     int letter_x;
@@ -112,7 +117,7 @@ static void do_flag(presents_system_t *ctx)
 
 static void do_text1(presents_system_t *ctx)
 {
-    /* Integration layer draws justin bitmap at computed position. */
+    ctx->credits_entered = 1;
     set_wait(ctx, PRESENTS_STATE_TEXT2, ctx->current_frame + PRESENTS_TEXT1_DELAY);
 }
 
@@ -140,6 +145,7 @@ static void do_text3(presents_system_t *ctx)
 
 static void do_text_clear(presents_system_t *ctx)
 {
+    ctx->credits_entered = 0;
     /* Reset letter stamping state. */
     ctx->letter_index = 0;
     ctx->letter_x = 40;
@@ -405,6 +411,7 @@ void presents_system_begin(presents_system_t *ctx, int frame)
     ctx->next_frame = frame;
 
     /* Reset all sub-state. */
+    ctx->credits_entered = 0;
     ctx->letter_index = 0;
     ctx->letter_x = 40;
     ctx->letter_y = 220;
@@ -635,4 +642,13 @@ int presents_system_get_active_typewriter_line(const presents_system_t *ctx)
         return -1;
     }
     return ctx->typewriter_active_line;
+}
+
+int presents_system_is_credits_phase(const presents_system_t *ctx)
+{
+    if (!ctx)
+    {
+        return 0;
+    }
+    return ctx->credits_entered;
 }

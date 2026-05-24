@@ -94,26 +94,32 @@ void game_render_presents(const game_ctx_t *ctx)
                 SDL_RenderCopy(sdl, tex.texture, NULL, &dst);
             }
 
-            /* Copyright text at bottom */
+            /* "Made in Australia" caption below the flag — matches
+             * original/presents.c:220 DrawShadowCentredText at y=65. */
             SDL_Color white = {255, 255, 255, 255};
-            sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_COPY,
-                                          "(c) 1993-1996 Justin C. Kibell",
-                                          PLAY_AREA_Y + fi.copyright_y, white, PLAY_AREA_W);
+            sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TEXT, "Made in Australia",
+                                          PLAY_AREA_Y + 65, white, PLAY_AREA_W);
+
+            /* Copyright text at bottom — fi.copyright_y is mainWindow-
+             * absolute (PRESENTS_TOTAL_HEIGHT - 20 = 690), NOT play-area
+             * relative, so do NOT add PLAY_AREA_Y (that would push it to
+             * y=750, off-screen on a 720-tall window). */
+            sdl2_font_draw_shadow_centred(
+                ctx->font, SDL2F_FONT_COPY,
+                "\xc2\xa9 Copyright 1993-1997, Justin C. Kibell, All Rights Reserved",
+                fi.copyright_y, white, PLAY_AREA_W);
         }
     }
 
-    /* Author credits — query the active typewriter line to know progress.
-     * TEXT1/TEXT2/TEXT3 states each set one line of credits. After TEXT3,
-     * all three are visible until TEXT_CLEAR. We render based on whether
-     * the typewriter has been used (active_line >= 0 means past flag). */
+    /* Author credits — rendered only while the presents system is in
+     * the credits phase (TEXT1 through TEXT_CLEAR).  Previously this
+     * checked `state != FLAG && state != NONE` which leaked credits
+     * into the 800-frame WAIT-after-FLAG hold (WAIT has enum value 13
+     * which passes both checks).  The credits_entered flag is set by
+     * do_text1 and cleared by do_text_clear, gating this correctly. */
     {
-        int active_line = presents_system_get_active_typewriter_line(ctx->presents);
-        presents_state_t state = presents_system_get_state(ctx->presents);
-
-        /* Credits text appears after FLAG, before LETTERS */
-        if (active_line < 0 && state != PRESENTS_STATE_FLAG && state != PRESENTS_STATE_NONE)
+        if (presents_system_is_credits_phase(ctx->presents))
         {
-            /* Between FLAG and LETTERS — show credits */
             SDL_Color white = {255, 255, 255, 255};
             SDL_Color yellow = {255, 255, 0, 255};
 
