@@ -67,8 +67,46 @@ sdl2_renderer_t *sdl2_renderer_create(const sdl2_renderer_config_t *config)
     ctx->logical_height = config->logical_height;
     ctx->fullscreen = config->fullscreen;
 
+    /* Fit the initial window to the display's usable area while
+     * preserving the 575:720 aspect ratio.  Without this, scale=2 on
+     * a 1920×1200 display creates a 1150×1440 window — 240px taller
+     * than the screen.  The WM silently shrinks the height, breaking
+     * the aspect ratio and producing prominent letterbox bars.
+     *
+     * Strategy: try the configured scale first.  If that overflows,
+     * compute the largest window that fits by capping to the usable
+     * height and deriving width from the aspect ratio.  Falls back to
+     * the configured scale if SDL_GetDisplayUsableBounds fails
+     * (e.g., headless / dummy driver).  SDL_RenderSetLogicalSize
+     * handles internal scaling; SDL_HINT_RENDER_SCALE_QUALITY =
+     * "nearest" preserves pixel-art sharpness at non-integer scales.
+     *
+     * Design ref: docs/DESIGN.md:169 (ADR-005 point 2). */
     int physical_w = config->logical_width * config->scale;
     int physical_h = config->logical_height * config->scale;
+
+    if (!config->fullscreen)
+    {
+        SDL_Rect usable;
+        if (SDL_GetDisplayUsableBounds(0, &usable) == 0)
+        {
+            if (physical_w > usable.w || physical_h > usable.h)
+            {
+                /* Scale to fit: cap to usable height, derive width
+                 * from aspect ratio.  If width overflows too, cap to
+                 * usable width and derive height instead. */
+                int fit_h = usable.h;
+                int fit_w = fit_h * config->logical_width / config->logical_height;
+                if (fit_w > usable.w)
+                {
+                    fit_w = usable.w;
+                    fit_h = fit_w * config->logical_height / config->logical_width;
+                }
+                physical_w = fit_w;
+                physical_h = fit_h;
+            }
+        }
+    }
 
     Uint32 window_flags = SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE;
     if (config->fullscreen)
