@@ -94,20 +94,18 @@ void game_render_presents(const game_ctx_t *ctx)
                 SDL_RenderCopy(sdl, tex.texture, NULL, &dst);
             }
 
-            /* "Made in Australia" caption below the flag — matches
-             * original/presents.c:220 DrawShadowCentredText at y=65. */
+            /* "Made in Australia" caption and copyright use mainWindow-
+             * absolute coordinates (not play-area-relative), centered
+             * within the full logical window width — matching
+             * original/presents.c:220-231 which uses absolute y values
+             * and PLAY_WIDTH+MAIN_WIDTH for centering. */
             SDL_Color white = {255, 255, 255, 255};
-            sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TEXT, "Made in Australia",
-                                          PLAY_AREA_Y + 65, white, PLAY_AREA_W);
-
-            /* Copyright text at bottom — fi.copyright_y is mainWindow-
-             * absolute (PRESENTS_TOTAL_HEIGHT - 20 = 690), NOT play-area
-             * relative, so do NOT add PLAY_AREA_Y (that would push it to
-             * y=750, off-screen on a 720-tall window). */
+            sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TEXT, "Made in Australia", 65,
+                                          white, SDL2R_LOGICAL_WIDTH);
             sdl2_font_draw_shadow_centred(
                 ctx->font, SDL2F_FONT_COPY,
                 "\xc2\xa9 Copyright 1993-1997, Justin C. Kibell, All Rights Reserved",
-                fi.copyright_y, white, PLAY_AREA_W);
+                fi.copyright_y, white, SDL2R_LOGICAL_WIDTH);
         }
     }
 

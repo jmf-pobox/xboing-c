@@ -417,6 +417,75 @@ static void test_null_safety(void **state)
  * Test runner
  * ========================================================================= */
 
+/* =========================================================================
+ * Group 8: Credits phase gating (xboing-c-elg)
+ *
+ * presents_system_is_credits_phase gates the renderer so credits don't
+ * leak during the 800-frame WAIT-after-FLAG hold.  Regression tests
+ * exercise: (a) false during FLAG/WAIT-before-TEXT1, (b) true once TEXT1
+ * fires, (c) false after TEXT_CLEAR, (d) false after skip.
+ * ========================================================================= */
+
+static void test_credits_phase_false_during_flag_wait(void **state)
+{
+    (void)state;
+    presents_system_t *ctx = make_ctx();
+    presents_system_begin(ctx, 0);
+
+    /* Immediately after begin: state is FLAG.  Update a few frames to
+     * enter WAIT-before-TEXT1 (FLAG_DELAY=800 from now). */
+    for (int f = 0; f < 10; f++)
+        presents_system_update(ctx, f);
+
+    assert_int_equal(presents_system_is_credits_phase(ctx), 0);
+    presents_system_destroy(ctx);
+}
+
+static void test_credits_phase_true_at_text1(void **state)
+{
+    (void)state;
+    presents_system_t *ctx = make_ctx();
+    presents_system_begin(ctx, 0);
+
+    int f = advance_to_state(ctx, PRESENTS_STATE_TEXT1, 0, 2000);
+    assert_true(f < 2000);
+    /* TEXT1 fires on this frame — credits_entered should be set. */
+    presents_system_update(ctx, f);
+    assert_int_equal(presents_system_is_credits_phase(ctx), 1);
+    presents_system_destroy(ctx);
+}
+
+static void test_credits_phase_false_after_text_clear(void **state)
+{
+    (void)state;
+    presents_system_t *ctx = make_ctx();
+    presents_system_begin(ctx, 0);
+
+    int f = advance_to_state(ctx, PRESENTS_STATE_TEXT_CLEAR, 0, 5000);
+    assert_true(f < 5000);
+    presents_system_update(ctx, f);
+    /* TEXT_CLEAR fires — credits_entered should be cleared. */
+    assert_int_equal(presents_system_is_credits_phase(ctx), 0);
+    presents_system_destroy(ctx);
+}
+
+static void test_credits_phase_false_after_skip(void **state)
+{
+    (void)state;
+    presents_system_t *ctx = make_ctx();
+    presents_system_begin(ctx, 0);
+
+    /* Advance into credits phase so credits_entered = 1. */
+    int f = advance_to_state(ctx, PRESENTS_STATE_TEXT1, 0, 2000);
+    presents_system_update(ctx, f);
+    assert_int_equal(presents_system_is_credits_phase(ctx), 1);
+
+    /* Skip clears credits_entered. */
+    presents_system_skip(ctx, f + 1);
+    assert_int_equal(presents_system_is_credits_phase(ctx), 0);
+    presents_system_destroy(ctx);
+}
+
 int main(void)
 {
     const struct CMUnitTest tests[] = {
@@ -445,6 +514,11 @@ int main(void)
         cmocka_unit_test(test_skip_jumps_to_finish),
         cmocka_unit_test(test_full_sequence_completes),
         cmocka_unit_test(test_null_safety),
+        /* Group 8: Credits phase gating (xboing-c-elg) */
+        cmocka_unit_test(test_credits_phase_false_during_flag_wait),
+        cmocka_unit_test(test_credits_phase_true_at_text1),
+        cmocka_unit_test(test_credits_phase_false_after_text_clear),
+        cmocka_unit_test(test_credits_phase_false_after_skip),
     };
 
     return cmocka_run_group_tests(tests, NULL, NULL);

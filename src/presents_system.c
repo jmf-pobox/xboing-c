@@ -496,6 +496,7 @@ void presents_system_skip(presents_system_t *ctx, int frame)
     {
         return;
     }
+    ctx->credits_entered = 0;
     ctx->current_frame = frame;
     set_wait(ctx, PRESENTS_STATE_FINISH, frame);
 }
