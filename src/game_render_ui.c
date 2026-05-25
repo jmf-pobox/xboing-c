@@ -238,7 +238,8 @@ void game_render_intro(const game_ctx_t *ctx)
      * tile + border rectangle — NOT gameplay content. */
     {
         sdl2_texture_info_t bg;
-        if (sdl2_texture_get(ctx->texture, SPR_BGRND_MAIN, &bg) == SDL2T_OK)
+        if (sdl2_texture_get(ctx->texture, SPR_BGRND_MAIN, &bg) == SDL2T_OK && bg.width > 0 &&
+            bg.height > 0)
         {
             int tw = bg.width;
             int th = bg.height;
@@ -399,7 +400,8 @@ void game_render_instruct(const game_ctx_t *ctx)
     {
         SDL_Renderer *sdl2 = sdl2_renderer_get(ctx->renderer);
         sdl2_texture_info_t bg;
-        if (sdl2_texture_get(ctx->texture, SPR_BGRND_MAIN, &bg) == SDL2T_OK)
+        if (sdl2_texture_get(ctx->texture, SPR_BGRND_MAIN, &bg) == SDL2T_OK && bg.width > 0 &&
+            bg.height > 0)
         {
             int tw = bg.width;
             int th = bg.height;

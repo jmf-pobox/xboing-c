@@ -323,6 +323,10 @@ static void mode_intro_enter(sdl2_state_mode_t mode, void *ud)
     int frame = (int)sdl2_state_frame(ctx->state);
     message_system_set_default(ctx->message, "Welcome to XBoing");
     message_system_set(ctx->message, "Welcome to XBoing", 0, frame);
+
+    /* Start devil-eyes animation so they blink during intro
+     * (original/intro.c:359 HandleBlink → BlinkDevilEyes). */
+    sfx_system_start_deveyes(ctx->sfx);
 }
 
 static void mode_intro_update(sdl2_state_mode_t mode, void *ud)
@@ -339,6 +343,10 @@ static void mode_intro_update(sdl2_state_mode_t mode, void *ud)
         if (snd.name && ctx->audio)
             sdl2_audio_play(ctx->audio, snd.name);
     }
+
+    /* Drive devil-eyes SFX so they animate during intro
+     * (original/intro.c:359 HandleBlink → BlinkDevilEyes). */
+    sfx_system_update_deveyes(ctx->sfx, GAME_PLAY_WIDTH, GAME_PLAY_HEIGHT);
 
     if (sdl2_input_just_pressed(ctx->input, SDL2I_START))
     {
@@ -357,6 +365,9 @@ static void mode_instruct_enter(sdl2_state_mode_t mode, void *ud)
     game_ctx_t *ctx = ud;
     attract_frame_counter = 0;
     intro_system_begin(ctx->intro, INTRO_MODE_INSTRUCT, 0);
+
+    int frame = (int)sdl2_state_frame(ctx->state);
+    message_system_set(ctx->message, "Save the rainforests", 0, frame);
 }
 
 static void mode_instruct_update(sdl2_state_mode_t mode, void *ud)
