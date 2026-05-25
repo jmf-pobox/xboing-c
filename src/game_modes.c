@@ -276,14 +276,22 @@ static int attract_frame_counter;
 static unsigned long attract_fake_score;
 static int attract_next_flash;
 
+static unsigned int attract_rand_state = 12345;
+
+static int attract_rand(void)
+{
+    attract_rand_state = attract_rand_state * 1103515245 + 12345;
+    return (int)((attract_rand_state >> 16) & 0x7fff);
+}
+
 static void attract_random_display(game_ctx_t *ctx)
 {
     if (attract_frame_counter < attract_next_flash)
         return;
 
     attract_next_flash = attract_frame_counter + ATTRACT_FLASH_INTERVAL;
-    score_system_set(ctx->score, attract_fake_score++);
-    special_system_randomize(ctx->special, rand);
+    score_system_set_display(ctx->score, attract_fake_score++);
+    special_system_randomize(ctx->special, attract_rand);
 }
 
 /* =========================================================================

@@ -107,6 +107,15 @@ void score_system_set(score_system_t *ctx, u_long value)
     notify_score_changed(ctx);
 }
 
+void score_system_set_display(score_system_t *ctx, u_long value)
+{
+    if (ctx == NULL)
+    {
+        return;
+    }
+    ctx->score = value;
+}
+
 u_long score_system_get(const score_system_t *ctx)
 {
     if (ctx == NULL)

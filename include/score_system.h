@@ -107,6 +107,10 @@ void score_system_destroy(score_system_t *ctx);
 /* Set the score to an exact value.  Resets extra life tracking. */
 void score_system_set(score_system_t *ctx, u_long value);
 
+/* Set the display value without triggering callbacks or extra-life
+ * tracking.  For attract-mode animation only. */
+void score_system_set_display(score_system_t *ctx, u_long value);
+
 /* Return the current score. */
 u_long score_system_get(const score_system_t *ctx);
 
