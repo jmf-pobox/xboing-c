@@ -744,17 +744,79 @@ void game_destroy(game_ctx_t *ctx)
  * Stub callbacks (replaced by game_modes.c / game_callbacks.c)
  * ========================================================================= */
 
+const char *vc_presents_name(int s)
+{
+    switch (s)
+    {
+        case PRESENTS_STATE_FLAG:
+            return "flag";
+        case PRESENTS_STATE_TEXT1:
+            return "text1";
+        case PRESENTS_STATE_TEXT2:
+            return "text2";
+        case PRESENTS_STATE_TEXT3:
+            return "text3";
+        case PRESENTS_STATE_TEXT_CLEAR:
+            return "text-clear";
+        case PRESENTS_STATE_LETTERS:
+            return "letters";
+        case PRESENTS_STATE_SHINE:
+            return "shine";
+        case PRESENTS_STATE_SPECIAL_TEXT1:
+            return "typewriter1";
+        case PRESENTS_STATE_SPECIAL_TEXT2:
+            return "typewriter2";
+        case PRESENTS_STATE_SPECIAL_TEXT3:
+            return "typewriter3";
+        case PRESENTS_STATE_CLEAR:
+            return "wipe";
+        default:
+            return NULL;
+    }
+}
+
+const char *vc_intro_name(int s)
+{
+    switch (s)
+    {
+        case INTRO_STATE_TITLE:
+            return "title";
+        case INTRO_STATE_BLOCKS:
+            return "blocks";
+        case INTRO_STATE_TEXT:
+            return "text";
+        case INTRO_STATE_SPARKLE:
+            return "explode";
+        default:
+            return NULL;
+    }
+}
+
+const char *vc_instruct_name(int s)
+{
+    switch (s)
+    {
+        case INTRO_STATE_TITLE:
+            return "title";
+        case INTRO_STATE_TEXT:
+            return "text";
+        case INTRO_STATE_SPARKLE:
+            return "sparkle";
+        default:
+            return NULL;
+    }
+}
+
 static void vc_signal_modern(const char *mode_name, const char *substate, int seq)
 {
     printf("XBOING_SNAPSHOT %s/%s/%03d\n", mode_name, substate, seq);
     fflush(stdout);
-    SDL_Delay(200);
+    SDL_Delay(100);
 }
 
-static void vc_check(game_ctx_t *ctx)
+static void vc_check(game_ctx_t *ctx, int pre_presents, int pre_credits, int pre_intro)
 {
     static sdl2_state_mode_t prev_mode = SDL2ST_NONE;
-    static int prev_substate = -1;
     static unsigned long next_capture_frame = 0;
     static int seq = 0;
     static const char *cur_subname = NULL;
@@ -776,7 +838,6 @@ static void vc_check(game_ctx_t *ctx)
             exit(0);
         }
         prev_mode = mode;
-        prev_substate = -1;
         cur_subname = NULL;
         seq = 0;
     }
@@ -785,128 +846,118 @@ static void vc_check(game_ctx_t *ctx)
     if (!vc_active)
         return;
 
-    int cur_substate = -1;
-    const char *subname = NULL;
+    int pre_sub = -1;
+    int post_sub = -1;
     const char *mode_str = NULL;
 
     if (mode == SDL2ST_PRESENTS)
     {
-        cur_substate = (int)presents_system_get_state(ctx->presents);
+        pre_sub = pre_presents;
+        post_sub = (int)presents_system_get_state(ctx->presents);
         mode_str = "presents";
-        switch (cur_substate)
+
+        /* Credits stage changes are invisible to sub-state detection
+         * (TEXT1/2/3 flash by within one update call). Use the
+         * persistent credits_stage field instead. */
+        int post_credits = presents_system_get_credits_stage(ctx->presents);
+        if (post_credits != pre_credits && post_credits > 0)
         {
-            case PRESENTS_STATE_FLAG:
-                subname = "flag";
-                break;
-            case PRESENTS_STATE_TEXT1:
-                subname = "text1";
-                break;
-            case PRESENTS_STATE_TEXT2:
-                subname = "text2";
-                break;
-            case PRESENTS_STATE_TEXT3:
-                subname = "text3";
-                break;
-            case PRESENTS_STATE_TEXT_CLEAR:
-                subname = "text-clear";
-                break;
-            case PRESENTS_STATE_LETTERS:
-                subname = "letters";
-                break;
-            case PRESENTS_STATE_SHINE:
-                subname = "shine";
-                break;
-            case PRESENTS_STATE_SPECIAL_TEXT1:
-                subname = "typewriter1";
-                break;
-            case PRESENTS_STATE_SPECIAL_TEXT2:
-                subname = "typewriter2";
-                break;
-            case PRESENTS_STATE_SPECIAL_TEXT3:
-                subname = "typewriter3";
-                break;
-            case PRESENTS_STATE_CLEAR:
-                subname = "wipe";
-                break;
-            default:
-                break;
+            static const char *const credit_names[] = {NULL, "text1", "text2", "text3"};
+            const char *cn = credit_names[post_credits];
+            if (cn && cn != cur_subname)
+            {
+                seq = 0;
+                vc_signal_modern("presents", cn, seq);
+                seq++;
+                cur_subname = cn;
+                next_capture_frame = frame + (unsigned long)ctx->vc_interval;
+            }
+        }
+        else if (post_credits == 0 && pre_credits > 0)
+        {
+            const char *cn = "text-clear";
+            if (cn != cur_subname)
+            {
+                seq = 0;
+                vc_signal_modern("presents", cn, seq);
+                seq++;
+                cur_subname = cn;
+                next_capture_frame = frame + (unsigned long)ctx->vc_interval;
+            }
         }
     }
     else if (mode == SDL2ST_INTRO)
     {
-        cur_substate = (int)intro_system_get_state(ctx->intro);
+        pre_sub = pre_intro;
+        post_sub = (int)intro_system_get_state(ctx->intro);
         mode_str = "intro";
-        switch (cur_substate)
-        {
-            case INTRO_STATE_TITLE:
-                subname = "title";
-                break;
-            case INTRO_STATE_BLOCKS:
-                subname = "blocks";
-                break;
-            case INTRO_STATE_TEXT:
-                subname = "text";
-                break;
-            case INTRO_STATE_SPARKLE:
-                subname = "explode";
-                break;
-            default:
-                break;
-        }
     }
     else if (mode == SDL2ST_INSTRUCT)
     {
-        cur_substate = (int)intro_system_get_state(ctx->intro);
+        pre_sub = pre_intro;
+        post_sub = (int)intro_system_get_state(ctx->intro);
         mode_str = "instruct";
-        switch (cur_substate)
-        {
-            case INTRO_STATE_TITLE:
-                subname = "title";
-                break;
-            case INTRO_STATE_TEXT:
-                subname = "text";
-                break;
-            case INTRO_STATE_SPARKLE:
-                subname = "sparkle";
-                break;
-            default:
-                break;
-        }
     }
 
-    if (!mode_str || !subname)
+    if (!mode_str)
         return;
 
-    if (cur_substate != prev_substate)
+    const char *(*name_fn)(int) = NULL;
+    if (mode == SDL2ST_PRESENTS)
+        name_fn = vc_presents_name;
+    else if (mode == SDL2ST_INTRO)
+        name_fn = vc_intro_name;
+    else if (mode == SDL2ST_INSTRUCT)
+        name_fn = vc_instruct_name;
+
+    if (!name_fn)
+        return;
+
+    /* Content state ran this frame (pre != post). Signal pre name. */
+    const char *pre_name = name_fn(pre_sub);
+    if (pre_sub != post_sub && pre_name && pre_name != cur_subname)
     {
-        if (subname != cur_subname)
+        seq = 0;
+        vc_signal_modern(mode_str, pre_name, seq);
+        seq++;
+        cur_subname = pre_name;
+        next_capture_frame = frame + (unsigned long)ctx->vc_interval;
+    }
+
+    /* Persistent state (pre == post, named) — interval sampling. */
+    const char *post_name = name_fn(post_sub);
+    if (pre_sub == post_sub && post_name)
+    {
+        if (post_name != cur_subname)
         {
             seq = 0;
-            vc_signal_modern(mode_str, subname, seq);
+            vc_signal_modern(mode_str, post_name, seq);
             seq++;
+            cur_subname = post_name;
+            next_capture_frame = frame + (unsigned long)ctx->vc_interval;
         }
-        prev_substate = cur_substate;
-        cur_subname = subname;
-        next_capture_frame = frame + (unsigned long)ctx->vc_interval;
-    }
-    else if (frame >= next_capture_frame)
-    {
-        vc_signal_modern(mode_str, subname, seq);
-        seq++;
-        next_capture_frame = frame + (unsigned long)ctx->vc_interval;
+        else if (frame >= next_capture_frame)
+        {
+            vc_signal_modern(mode_str, post_name, seq);
+            seq++;
+            next_capture_frame = frame + (unsigned long)ctx->vc_interval;
+        }
     }
 }
+
+static int vc_pre_presents_state;
+static int vc_pre_credits_stage;
+static int vc_pre_intro_state;
 
 static void stub_tick(void *user_data)
 {
     game_ctx_t *ctx = user_data;
-    /* sdl2_state_update dispatches to mode-specific on_update handlers
-     * registered by game_modes_register() — gameplay logic, input, etc.
-     * all happen inside the mode handler. */
-    sdl2_state_update(ctx->state);
 
-    if (ctx->vc_mode >= 0)
-        vc_check(ctx);
+    vc_pre_presents_state = (int)presents_system_get_state(ctx->presents);
+    vc_pre_credits_stage = presents_system_get_credits_stage(ctx->presents);
+    vc_pre_intro_state = (int)intro_system_get_state(ctx->intro);
+
+    sdl2_state_update(ctx->state);
 }
 
 static void stub_render(double alpha, void *user_data)
@@ -914,6 +965,9 @@ static void stub_render(double alpha, void *user_data)
     game_ctx_t *ctx = user_data;
     ctx->render_alpha = alpha;
     game_render_frame(ctx);
+
+    if (ctx->vc_mode >= 0)
+        vc_check(ctx, vc_pre_presents_state, vc_pre_credits_stage, vc_pre_intro_state);
 }
 
 /* =========================================================================
