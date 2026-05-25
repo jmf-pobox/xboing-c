@@ -201,4 +201,12 @@ int presents_system_get_active_typewriter_line(const presents_system_t *ctx);
  * the 800-frame WAIT-after-FLAG hold. */
 int presents_system_is_credits_phase(const presents_system_t *ctx);
 
+/* Returns the credits display stage:
+ *   0 = no credits visible
+ *   1 = "JUSTIN" bitmap visible (after TEXT1)
+ *   2 = "JUSTIN" + "KIBELL" visible (after TEXT2)
+ *   3 = "presents" bitmap visible (after TEXT3, before TEXT_CLEAR)
+ */
+int presents_system_get_credits_stage(const presents_system_t *ctx);
+
 #endif /* PRESENTS_SYSTEM_H */

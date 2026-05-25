@@ -110,22 +110,37 @@ void game_render_presents(const game_ctx_t *ctx)
         }
     }
 
-    /* Author credits — rendered only during the credits phase
-     * (TEXT1 through TEXT_CLEAR).  Center within PRESENTS_TOTAL_WIDTH
-     * (565) not SDL2R_LOGICAL_WIDTH (575) — the presents system
-     * uses PRESENTS_TOTAL_WIDTH for all coordinate math. */
+    /* Author credits — bitmap sprites sequenced per original/presents.c.
+     * Stage 1: "JUSTIN" at (140, 530).  Stage 2: adds "KIBELL" at (152, 584).
+     * Stage 3: replaces both with "presents" at (77, 562).
+     * Positions: center = (MAIN_WIDTH+PLAY_WIDTH)/2 = 282. */
     {
-        if (presents_system_is_credits_phase(ctx->presents))
-        {
-            SDL_Color white = {255, 255, 255, 255};
-            SDL_Color yellow = {255, 255, 0, 255};
+        int credits_stage = presents_system_get_credits_stage(ctx->presents);
+        sdl2_texture_info_t tex;
 
-            sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TEXT, "Justin C. Kibell", 200,
-                                          white, PRESENTS_TOTAL_WIDTH);
-            sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_COPY, "presents", 230, yellow,
-                                          PRESENTS_TOTAL_WIDTH);
-            sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TITLE, "XBoing II", 270, white,
-                                          PRESENTS_TOTAL_WIDTH);
+        if (credits_stage == 1 || credits_stage == 2)
+        {
+            if (sdl2_texture_get(ctx->texture, SPR_PRESENTS_JUSTIN, &tex) == SDL2T_OK)
+            {
+                SDL_Rect dst = {140, 530, tex.width, tex.height};
+                SDL_RenderCopy(sdl, tex.texture, NULL, &dst);
+            }
+        }
+        if (credits_stage == 2)
+        {
+            if (sdl2_texture_get(ctx->texture, SPR_PRESENTS_KIBELL, &tex) == SDL2T_OK)
+            {
+                SDL_Rect dst = {152, 584, tex.width, tex.height};
+                SDL_RenderCopy(sdl, tex.texture, NULL, &dst);
+            }
+        }
+        if (credits_stage == 3)
+        {
+            if (sdl2_texture_get(ctx->texture, SPR_PRESENTS, &tex) == SDL2T_OK)
+            {
+                SDL_Rect dst = {77, 562, tex.width, tex.height};
+                SDL_RenderCopy(sdl, tex.texture, NULL, &dst);
+            }
         }
     }
 
@@ -180,7 +195,7 @@ void game_render_presents(const game_ctx_t *ctx)
      * integration layer should compute centering).  We measure the
      * visible substring and center it horizontally. */
     {
-        SDL_Color green = {0, 255, 0, 255};
+        SDL_Color red = {255, 0, 0, 255};
         for (int line = 0; line < 3; line++)
         {
             presents_typewriter_info_t ti;
@@ -193,7 +208,7 @@ void game_render_presents(const game_ctx_t *ctx)
                     if (n > 255)
                         n = 255;
                     snprintf(buf, sizeof(buf), "%.*s", n, ti.text);
-                    sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_DATA, buf, ti.y, green,
+                    sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_DATA, buf, ti.y, red,
                                                   PRESENTS_TOTAL_WIDTH);
                 }
             }
@@ -214,6 +229,11 @@ void game_render_presents(const game_ctx_t *ctx)
                                  PRESENTS_TOTAL_HEIGHT - wi.bottom_y};
             SDL_RenderFillRect(sdl, &top_rect);
             SDL_RenderFillRect(sdl, &bot_rect);
+
+            /* Red lines at the wipe edges per original/presents.c:529-532 */
+            SDL_SetRenderDrawColor(sdl, 255, 0, 0, 255);
+            SDL_RenderDrawLine(sdl, 2, wi.top_y, PRESENTS_TOTAL_WIDTH - 2, wi.top_y);
+            SDL_RenderDrawLine(sdl, 2, wi.bottom_y - 1, PRESENTS_TOTAL_WIDTH - 2, wi.bottom_y - 1);
         }
     }
 }
