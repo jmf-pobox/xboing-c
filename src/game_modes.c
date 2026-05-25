@@ -278,9 +278,11 @@ static int attract_next_flash;
 
 static void attract_random_display(game_ctx_t *ctx)
 {
-    (void)ctx;
-    (void)attract_next_flash;
-    (void)attract_fake_score;
+    if (attract_frame_counter < attract_next_flash)
+        return;
+
+    attract_next_flash = attract_frame_counter + ATTRACT_FLASH_INTERVAL;
+    score_system_set_display(ctx->score, attract_fake_score++);
 }
 
 /* =========================================================================
@@ -691,7 +693,7 @@ static void mode_highscore_enter(sdl2_state_mode_t mode, void *ud)
         }
         /* Fall through to display */
     }
-    else if (!ctx->score_submitted)
+    else if (!ctx->score_submitted && ctx->game_active)
     {
         /* Insert the player's score into the personal table and save to disk */
         unsigned long final_score = score_system_get(ctx->score);
