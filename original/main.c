@@ -1144,6 +1144,7 @@ static void handleGameMode(Display *display)
 /* ----- Visual-capture infrastructure ---------------------------------- */
 
 extern int visualCaptureMode;
+extern int visualCaptureInterval;
 
 static int vc_capturing(int target_mode)
 {
@@ -1152,10 +1153,11 @@ static int vc_capturing(int target_mode)
     return visualCaptureMode == 99 || visualCaptureMode == target_mode;
 }
 
-static void vc_signal(Display *display, const char *mode_name, const char *substate)
+static void vc_signal(Display *display, const char *mode_name,
+                      const char *substate, int seq)
 {
     XSync(display, False);
-    printf("XBOING_SNAPSHOT %s/%s\n", mode_name, substate);
+    printf("XBOING_SNAPSHOT %s/%s/%03d\n", mode_name, substate, seq);
     fflush(stdout);
     sleep(1);
 }
@@ -1391,77 +1393,108 @@ static void handleGameStates(Display *display)
     /* Flush the display */
     XFlush(display);
 
-    /* ----- Visual-capture: detect sub-state transitions --------------- */
+    /* ----- Visual-capture: interval sampling within sub-states --------- */
     if (visualCaptureMode >= 0)
     {
         static int prev_mode = -1;
-        static int prev_presents = -1;
-        static int prev_intro = -1;
-        static int prev_instruct = -1;
-        static int prev_demo = -1;
-        static int prev_keys = -1;
-        static int prev_keysedit = -1;
-        static int prev_highscore = -1;
-        static int prev_preview = -1;
-        static int anim_entry_frame = -1;
-        static int anim_mid_signaled = 0;
+        static int prev_substate = -1;
+        static const char *cur_substate_name = NULL;
+        static int next_capture_frame = 0;
+        static int seq = 0;
+        static int pending_entry = 0;
 
-        /* Detect top-level mode change — reset prev for the new mode,
-         * and if we were capturing a single mode that just ended, exit. */
+        /* Detect top-level mode change. */
         if (mode != prev_mode)
         {
             if (prev_mode >= 0 && visualCaptureMode != 99 &&
                 visualCaptureMode == prev_mode)
                 vc_done();
             prev_mode = mode;
-            anim_entry_frame = -1;
-            anim_mid_signaled = 0;
+            prev_substate = -1;
+            cur_substate_name = NULL;
+            seq = 0;
+            pending_entry = 0;
         }
 
-#define VC_CHECK(MODE_CONST, mode_str, state_var, prev_var, name_fn)         \
-    if (mode == MODE_CONST && vc_capturing(MODE_CONST))                      \
-    {                                                                        \
-        if (state_var != prev_var)                                           \
-        {                                                                    \
-            const char *n = name_fn(prev_var);                               \
-            if (n && prev_var >= 0)                                          \
-                vc_signal(display, mode_str, n);                             \
-            prev_var = state_var;                                            \
-            anim_entry_frame = frame;                                        \
-            anim_mid_signaled = 0;                                           \
-        }                                                                    \
-        else if (!anim_mid_signaled && anim_entry_frame > 0 &&              \
-                 frame - anim_entry_frame >= 500)                            \
-        {                                                                    \
-            const char *n = name_fn(state_var);                              \
-            if (n)                                                           \
-            {                                                                \
-                char mid_name[64];                                           \
-                snprintf(mid_name, sizeof(mid_name), "%s-mid", n);          \
-                vc_signal(display, mode_str, mid_name);                      \
-                anim_mid_signaled = 1;                                       \
-            }                                                                \
-        }                                                                    \
-    }
+        /* Resolve current sub-state for whichever mode is active. */
+        int cur_substate = -1;
+        const char *cur_name = NULL;
+        const char *mode_str = NULL;
 
-        VC_CHECK(MODE_PRESENTS, "presents", PresentState, prev_presents,
-                 presents_state_name)
-        VC_CHECK(MODE_INTRO, "intro", IntroState, prev_intro,
-                 intro_state_name)
-        VC_CHECK(MODE_INSTRUCT, "instruct", InstructState, prev_instruct,
-                 instruct_state_name)
-        VC_CHECK(MODE_DEMO, "demo", DemoState, prev_demo,
-                 demo_state_name)
-        VC_CHECK(MODE_KEYS, "keys", KeysState, prev_keys,
-                 keys_state_name)
-        VC_CHECK(MODE_KEYSEDIT, "keysedit", KeysEditState, prev_keysedit,
-                 keysedit_state_name)
-        VC_CHECK(MODE_HIGHSCORE, "highscore", HighScoreState,
-                 prev_highscore, highscore_state_name)
-        VC_CHECK(MODE_PREVIEW, "preview", PreviewState, prev_preview,
-                 preview_state_name)
+        if (mode == MODE_PRESENTS && vc_capturing(MODE_PRESENTS))
+        {
+            cur_substate = PresentState;
+            cur_name = presents_state_name(cur_substate);
+            mode_str = "presents";
+        }
+        else if (mode == MODE_INTRO && vc_capturing(MODE_INTRO))
+        {
+            cur_substate = IntroState;
+            cur_name = intro_state_name(cur_substate);
+            mode_str = "intro";
+        }
+        else if (mode == MODE_INSTRUCT && vc_capturing(MODE_INSTRUCT))
+        {
+            cur_substate = InstructState;
+            cur_name = instruct_state_name(cur_substate);
+            mode_str = "instruct";
+        }
+        else if (mode == MODE_DEMO && vc_capturing(MODE_DEMO))
+        {
+            cur_substate = DemoState;
+            cur_name = demo_state_name(cur_substate);
+            mode_str = "demo";
+        }
+        else if (mode == MODE_KEYS && vc_capturing(MODE_KEYS))
+        {
+            cur_substate = KeysState;
+            cur_name = keys_state_name(cur_substate);
+            mode_str = "keys";
+        }
+        else if (mode == MODE_KEYSEDIT && vc_capturing(MODE_KEYSEDIT))
+        {
+            cur_substate = KeysEditState;
+            cur_name = keysedit_state_name(cur_substate);
+            mode_str = "keysedit";
+        }
+        else if (mode == MODE_HIGHSCORE && vc_capturing(MODE_HIGHSCORE))
+        {
+            cur_substate = HighScoreState;
+            cur_name = highscore_state_name(cur_substate);
+            mode_str = "highscore";
+        }
+        else if (mode == MODE_PREVIEW && vc_capturing(MODE_PREVIEW))
+        {
+            cur_substate = PreviewState;
+            cur_name = preview_state_name(cur_substate);
+            mode_str = "preview";
+        }
 
-#undef VC_CHECK
+        if (mode_str && cur_name)
+        {
+            /* Sub-state changed — capture immediately with the NEW
+             * state name.  The previous state's draw is complete
+             * (XFlush above), and the interval resets. */
+            if (cur_substate != prev_substate)
+            {
+                if (cur_name != cur_substate_name)
+                {
+                    seq = 0;
+                    vc_signal(display, mode_str, cur_name, seq);
+                    seq++;
+                }
+                prev_substate = cur_substate;
+                cur_substate_name = cur_name;
+                next_capture_frame = frame + visualCaptureInterval;
+            }
+            /* Same sub-state — capture at interval. */
+            else if (frame >= next_capture_frame)
+            {
+                vc_signal(display, mode_str, cur_name, seq);
+                seq++;
+                next_capture_frame = frame + visualCaptureInterval;
+            }
+        }
     }
 }
 

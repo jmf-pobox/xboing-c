@@ -147,9 +147,10 @@ int snapshotFrames = 0;
 /*
  * Visual-capture mode: -1 = off, 0..15 = specific MODE_* constant,
  * 99 = all modes.  When active, the game signals at each sub-state
- * transition for external screenshot capture.
+ * transition and every visualCaptureInterval frames within each state.
  */
 int visualCaptureMode = -1;
+int visualCaptureInterval = 100;
 
 static void InitialiseGraphics(Display *display, Window window)
 {
@@ -713,26 +714,48 @@ static void ParseCommandLine(char **argv, int argc)
         }
         else if (!compareArgument(argv[i], "-visual-capture", 15))
         {
+            /* Syntax: -visual-capture <mode>[:<interval>]
+             * mode = all|presents|intro|instruct|demo|keys|keysedit|highscore|preview
+             * interval = frames between captures within each sub-state (default 100) */
             i++;
             if (i < argc)
             {
-                if (!strcmp(argv[i], "all"))
+                char mode_buf[64];
+                int interval = 0;
+                char *colon = strchr(argv[i], ':');
+                if (colon)
+                {
+                    size_t mlen = (size_t)(colon - argv[i]);
+                    if (mlen >= sizeof(mode_buf))
+                        mlen = sizeof(mode_buf) - 1;
+                    memcpy(mode_buf, argv[i], mlen);
+                    mode_buf[mlen] = '\0';
+                    interval = atoi(colon + 1);
+                    if (interval > 0)
+                        visualCaptureInterval = interval;
+                }
+                else
+                {
+                    snprintf(mode_buf, sizeof(mode_buf), "%s", argv[i]);
+                }
+
+                if (!strcmp(mode_buf, "all"))
                     visualCaptureMode = 99;
-                else if (!strcmp(argv[i], "presents"))
+                else if (!strcmp(mode_buf, "presents"))
                     visualCaptureMode = MODE_PRESENTS;
-                else if (!strcmp(argv[i], "intro"))
+                else if (!strcmp(mode_buf, "intro"))
                     visualCaptureMode = MODE_INTRO;
-                else if (!strcmp(argv[i], "instruct"))
+                else if (!strcmp(mode_buf, "instruct"))
                     visualCaptureMode = MODE_INSTRUCT;
-                else if (!strcmp(argv[i], "demo"))
+                else if (!strcmp(mode_buf, "demo"))
                     visualCaptureMode = MODE_DEMO;
-                else if (!strcmp(argv[i], "keys"))
+                else if (!strcmp(mode_buf, "keys"))
                     visualCaptureMode = MODE_KEYS;
-                else if (!strcmp(argv[i], "keysedit"))
+                else if (!strcmp(mode_buf, "keysedit"))
                     visualCaptureMode = MODE_KEYSEDIT;
-                else if (!strcmp(argv[i], "highscore"))
+                else if (!strcmp(mode_buf, "highscore"))
                     visualCaptureMode = MODE_HIGHSCORE;
-                else if (!strcmp(argv[i], "preview"))
+                else if (!strcmp(mode_buf, "preview"))
                     visualCaptureMode = MODE_PREVIEW;
                 else
                 {
