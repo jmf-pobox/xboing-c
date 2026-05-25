@@ -205,17 +205,20 @@ static void render_block_composite(const game_ctx_t *ctx, SDL_Renderer *sdl, int
         }
         case BULLET_BLK:
         {
-            /* BULLET_BLK: 4 bullet sprites at offsets (6,10),(15,10),(24,10),(33,10)
-             * (original/blocks.c:1682-1685). */
+            /* BULLET_BLK: 4 bullets at center-point offsets (6,10),(15,10),
+             * (24,10),(33,10) per original/blocks.c:1682-1685.
+             * DrawTheBullet subtracts BULLET_WC=3, BULLET_HC=8. */
             sdl2_texture_info_t btex;
             if (sdl2_texture_get(ctx->texture, SPR_BULLET, &btex) == SDL2T_OK)
             {
+                int bwc = btex.width / 2;
+                int bhc = btex.height / 2;
                 static const int bullet_offsets_x[] = {6, 15, 24, 33};
                 for (int b = 0; b < 4; b++)
                 {
                     SDL_Rect bdst = {
-                        .x = block_x + bullet_offsets_x[b],
-                        .y = block_y + 10,
+                        .x = block_x + bullet_offsets_x[b] - bwc,
+                        .y = block_y + 10 - bhc,
                         .w = btex.width,
                         .h = btex.height,
                     };

@@ -271,7 +271,17 @@ static void mode_pause_exit(sdl2_state_mode_t mode, void *ud)
  * ========================================================================= */
 
 #define ATTRACT_FRAME_MULTIPLIER 6
+#define ATTRACT_FLASH_INTERVAL 500
 static int attract_frame_counter;
+static unsigned long attract_fake_score;
+static int attract_next_flash;
+
+static void attract_random_display(game_ctx_t *ctx)
+{
+    (void)ctx;
+    (void)attract_next_flash;
+    (void)attract_fake_score;
+}
 
 /* =========================================================================
  * MODE_PRESENTS — splash screen sequence
@@ -316,6 +326,9 @@ static void mode_intro_enter(sdl2_state_mode_t mode, void *ud)
     (void)mode;
     game_ctx_t *ctx = ud;
     attract_frame_counter = 0;
+    attract_next_flash = ATTRACT_FLASH_INTERVAL;
+    attract_fake_score = 0;
+    score_system_set_display(ctx->score, 0);
     intro_system_begin(ctx->intro, INTRO_MODE_INTRO, 0);
 
     /* "Welcome to XBoing" in the message bar — matches
@@ -344,12 +357,11 @@ static void mode_intro_update(sdl2_state_mode_t mode, void *ud)
             sdl2_audio_play(ctx->audio, snd.name);
     }
 
-    /* Drive devil-eyes SFX at the original's blink rate.  Original
-     * intro.c:362 advances one blink frame every BLINK_RATE=25 game
-     * frames (~30ms at ~833fps), then waits BLINK_GAP=1000 frames
-     * (~1.2s) before restarting.  At 133 real tps with multiplier 6,
-     * 100 attract frames ≈ 125ms per step → ~3.2s per 26-step cycle.
-     * Cooldown 2000 attract frames ≈ 2.5s between cycles. */
+    attract_random_display(ctx);
+
+    /* Devil-eyes: original BLINK_RATE=25 frames (~30ms at ~833fps),
+     * BLINK_GAP=1000 frames (~1.2s).  Attract frames at 6×133tps:
+     * 25 attract frames ≈ 31ms/step, 1000 attract frames ≈ 1.25s gap. */
     {
         static int deveye_tick = 0;
         static int deveye_cooldown = 0; // cppcheck-suppress variableScope
@@ -358,7 +370,7 @@ static void mode_intro_update(sdl2_state_mode_t mode, void *ud)
         int still_active = sfx_system_get_deveye_info(ctx->sfx).active;
         if (still_active)
         {
-            if (deveye_tick >= 100)
+            if (deveye_tick >= 25)
             {
                 sfx_system_update_deveyes(ctx->sfx, GAME_PLAY_WIDTH, GAME_PLAY_HEIGHT);
                 deveye_tick = 0;
@@ -367,7 +379,7 @@ static void mode_intro_update(sdl2_state_mode_t mode, void *ud)
         else
         {
             deveye_cooldown += ATTRACT_FRAME_MULTIPLIER;
-            if (deveye_cooldown >= 2000)
+            if (deveye_cooldown >= 1000)
             {
                 sfx_system_start_deveyes(ctx->sfx);
                 deveye_cooldown = 0;
@@ -391,6 +403,9 @@ static void mode_instruct_enter(sdl2_state_mode_t mode, void *ud)
     (void)mode;
     game_ctx_t *ctx = ud;
     attract_frame_counter = 0;
+    attract_next_flash = ATTRACT_FLASH_INTERVAL;
+    attract_fake_score = 0;
+    score_system_set_display(ctx->score, 0);
     intro_system_begin(ctx->intro, INTRO_MODE_INSTRUCT, 0);
 
     int frame = (int)sdl2_state_frame(ctx->state);
@@ -411,6 +426,8 @@ static void mode_instruct_update(sdl2_state_mode_t mode, void *ud)
         if (snd.name && ctx->audio)
             sdl2_audio_play(ctx->audio, snd.name);
     }
+
+    attract_random_display(ctx);
 
     if (sdl2_input_just_pressed(ctx->input, SDL2I_START))
     {
