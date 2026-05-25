@@ -69,7 +69,7 @@ trap cleanup EXIT
 
 mkfifo "$FIFO"
 
-(cd "$RUN_DIR" && exec $BINARY $EXTRA_ARGS -visual-capture "$MODE") >"$FIFO" 2>/dev/null &
+(cd "$RUN_DIR" && exec "$BINARY" $EXTRA_ARGS -visual-capture "$MODE") >"$FIFO" 2>/dev/null &
 XPID=$!
 
 WIN_ID=""
