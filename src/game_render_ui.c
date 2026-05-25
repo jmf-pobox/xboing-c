@@ -230,6 +230,52 @@ void game_render_intro(const game_ctx_t *ctx)
     if (state == INTRO_STATE_NONE)
         return;
 
+    /* Play area background + border — the gray stone panel with green
+     * frame that contains ALL intro content in the original.  Original
+     * uses BACKGROUND_0 = mainBackPixmap = mnbgrnd.xpm (a specific
+     * high-contrast stone tile, NOT the per-level background tile).
+     * SPR_BGRND_MAIN maps to that asset.  Draw ONLY the background
+     * tile + border rectangle — NOT gameplay content. */
+    {
+        sdl2_texture_info_t bg;
+        if (sdl2_texture_get(ctx->texture, SPR_BGRND_MAIN, &bg) == SDL2T_OK)
+        {
+            int tw = bg.width;
+            int th = bg.height;
+            for (int ty = PLAY_AREA_Y; ty < PLAY_AREA_Y + PLAY_AREA_H; ty += th)
+            {
+                for (int tx = PLAY_AREA_X; tx < PLAY_AREA_X + PLAY_AREA_W; tx += tw)
+                {
+                    int dw = tw;
+                    int dh = th;
+                    if (tx + dw > PLAY_AREA_X + PLAY_AREA_W)
+                        dw = PLAY_AREA_X + PLAY_AREA_W - tx;
+                    if (ty + dh > PLAY_AREA_Y + PLAY_AREA_H)
+                        dh = PLAY_AREA_Y + PLAY_AREA_H - ty;
+                    SDL_Rect src = {0, 0, dw, dh};
+                    SDL_Rect dst = {tx, ty, dw, dh};
+                    SDL_RenderCopy(sdl, bg.texture, &src, &dst);
+                }
+            }
+        }
+    }
+    {
+        /* Green border matching original playWindow border_width=2 */
+        SDL_SetRenderDrawColor(sdl, 0, 200, 0, 255);
+        int bx = PLAY_AREA_X - 2;
+        int by = PLAY_AREA_Y - 2;
+        int bw = PLAY_AREA_W + 4;
+        int bh = PLAY_AREA_H + 4;
+        SDL_Rect top = {bx, by, bw, 2};
+        SDL_Rect bottom = {bx, by + bh - 2, bw, 2};
+        SDL_Rect left = {bx, by, 2, bh};
+        SDL_Rect right = {bx + bw - 2, by, 2, bh};
+        SDL_RenderFillRect(sdl, &top);
+        SDL_RenderFillRect(sdl, &bottom);
+        SDL_RenderFillRect(sdl, &left);
+        SDL_RenderFillRect(sdl, &right);
+    }
+
     /* Title */
     if (state >= INTRO_STATE_TITLE)
     {
@@ -317,11 +363,10 @@ void game_render_intro(const game_ctx_t *ctx)
             }
         }
 
-        /* "Insert coin to start the game" — original/intro.c:302-305
-         * centered at y = PLAY_HEIGHT - 27 inside playWindow.  Original
-         * uses X11 "tann" color (tan).  Centering width is the full
-         * window width (PLAY_AREA_W + 2 * PLAY_AREA_X) so the text
-         * aligns with the play area center. */
+        /* "Insert coin to start the game" — inside the play area
+         * at the bottom, matching original/intro.c:302-305 which
+         * draws at y = PLAY_HEIGHT - 27 inside playWindow.  Original
+         * uses X11 "tann" color (tan). */
         SDL_Color tan_clr = {210, 180, 140, 255};
         sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TEXT, "Insert coin to start the game",
                                       PLAY_AREA_Y + PLAY_AREA_H - 27, tan_clr,
@@ -348,6 +393,49 @@ void game_render_instruct(const game_ctx_t *ctx)
 
     if (state == INTRO_STATE_NONE)
         return;
+
+    /* Same background panel as the intro blocks screen — mnbgrnd
+     * tile + green border only, no gameplay content. */
+    {
+        SDL_Renderer *sdl2 = sdl2_renderer_get(ctx->renderer);
+        sdl2_texture_info_t bg;
+        if (sdl2_texture_get(ctx->texture, SPR_BGRND_MAIN, &bg) == SDL2T_OK)
+        {
+            int tw = bg.width;
+            int th = bg.height;
+            for (int ty = PLAY_AREA_Y; ty < PLAY_AREA_Y + PLAY_AREA_H; ty += th)
+            {
+                for (int tx = PLAY_AREA_X; tx < PLAY_AREA_X + PLAY_AREA_W; tx += tw)
+                {
+                    int dw = tw;
+                    int dh = th;
+                    if (tx + dw > PLAY_AREA_X + PLAY_AREA_W)
+                        dw = PLAY_AREA_X + PLAY_AREA_W - tx;
+                    if (ty + dh > PLAY_AREA_Y + PLAY_AREA_H)
+                        dh = PLAY_AREA_Y + PLAY_AREA_H - ty;
+                    SDL_Rect src = {0, 0, dw, dh};
+                    SDL_Rect dst = {tx, ty, dw, dh};
+                    SDL_RenderCopy(sdl2, bg.texture, &src, &dst);
+                }
+            }
+        }
+    }
+    {
+        SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
+        SDL_SetRenderDrawColor(sdl, 0, 200, 0, 255);
+        int bx = PLAY_AREA_X - 2;
+        int by = PLAY_AREA_Y - 2;
+        int bw = PLAY_AREA_W + 4;
+        int bh = PLAY_AREA_H + 4;
+        SDL_Rect top = {bx, by, bw, 2};
+        SDL_Rect bottom = {bx, by + bh - 2, bw, 2};
+        SDL_Rect left = {bx, by, 2, bh};
+        SDL_Rect right = {bx + bw - 2, by, 2, bh};
+        SDL_RenderFillRect(sdl, &top);
+        SDL_RenderFillRect(sdl, &bottom);
+        SDL_RenderFillRect(sdl, &left);
+        SDL_RenderFillRect(sdl, &right);
+    }
 
     /* Title */
     if (state >= INTRO_STATE_TITLE)

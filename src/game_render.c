@@ -1040,10 +1040,24 @@ void game_render_frame(const game_ctx_t *ctx)
 
         case SDL2ST_INTRO:
             game_render_intro(ctx);
+            /* HUD elements visible during intro — original's X11
+             * sub-windows are already mapped.  Devil eyes blink in
+             * the play area bottom-right (original/intro.c:359). */
+            game_render_score(ctx);
+            game_render_lives(ctx);
+            game_render_messages(ctx);
+            game_render_timer(ctx);
+            game_render_specials(ctx);
+            game_render_deveyes(ctx);
             break;
 
         case SDL2ST_INSTRUCT:
             game_render_instruct(ctx);
+            game_render_score(ctx);
+            game_render_lives(ctx);
+            game_render_messages(ctx);
+            game_render_timer(ctx);
+            game_render_specials(ctx);
             break;
 
         case SDL2ST_DEMO:

@@ -317,6 +317,12 @@ static void mode_intro_enter(sdl2_state_mode_t mode, void *ud)
     game_ctx_t *ctx = ud;
     attract_frame_counter = 0;
     intro_system_begin(ctx->intro, INTRO_MODE_INTRO, 0);
+
+    /* "Welcome to XBoing" in the message bar — matches
+     * original/intro.c:203 SetCurrentMessage. */
+    int frame = (int)sdl2_state_frame(ctx->state);
+    message_system_set_default(ctx->message, "Welcome to XBoing");
+    message_system_set(ctx->message, "Welcome to XBoing", 0, frame);
 }
 
 static void mode_intro_update(sdl2_state_mode_t mode, void *ud)
