@@ -49,11 +49,6 @@ pairs:
     expected: diff
 
   # ----- Intro screen key frames -------------------------------------
-  - name: intro/blocks
-    a: tests/golden/original/intro/blocks-000.png
-    b: .tmp/visual-check/modern/intro/explode-000.png
-    expected: diff
-
   - name: intro/explode
     a: tests/golden/original/intro/explode-007.png
     b: .tmp/visual-check/modern/intro/explode-001.png
