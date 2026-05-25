@@ -559,7 +559,8 @@ void game_render_lives(const game_ctx_t *ctx)
      * coords (original/level.c:210 DisplayLevelNumber → DrawOutNumber at
      * window-local x=260, y=5).  Iterate digits least-significant first
      * so digit_index 0 is the rightmost. */
-    int level = ctx->attract_level_display > 0 ? ctx->attract_level_display : ctx->level_number;
+    int level = (!ctx->game_active && ctx->attract_level_display > 0) ? ctx->attract_level_display
+                                                                      : ctx->level_number;
     if (level <= 0)
         level = 1;
 
@@ -1122,10 +1123,15 @@ void game_render_frame(const game_ctx_t *ctx)
 
     /* Outer shell: HUD elements shared by all attract modes.
      * Matches the original's always-mapped X11 sub-windows
-     * (scoreWindow, levelWindow, messWindow, specialWindow). */
-    if (mode == SDL2ST_INTRO || mode == SDL2ST_INSTRUCT || mode == SDL2ST_DEMO ||
-        mode == SDL2ST_PREVIEW || mode == SDL2ST_KEYS || mode == SDL2ST_KEYSEDIT ||
-        mode == SDL2ST_HIGHSCORE)
+     * (scoreWindow, levelWindow, messWindow, specialWindow).
+     * Also render when in dialogue over an attract mode (highscore entry). */
+    sdl2_state_mode_t effective = mode;
+    if (mode == SDL2ST_DIALOGUE)
+        effective = sdl2_state_saved_mode(ctx->state);
+
+    if (effective == SDL2ST_INTRO || effective == SDL2ST_INSTRUCT || effective == SDL2ST_DEMO ||
+        effective == SDL2ST_PREVIEW || effective == SDL2ST_KEYS || effective == SDL2ST_KEYSEDIT ||
+        effective == SDL2ST_HIGHSCORE)
     {
         game_render_score(ctx);
         game_render_lives(ctx);
@@ -1133,7 +1139,7 @@ void game_render_frame(const game_ctx_t *ctx)
         game_render_timer(ctx);
         game_render_specials(ctx);
 
-        if (mode == SDL2ST_INTRO || mode == SDL2ST_KEYS)
+        if (effective == SDL2ST_INTRO || effective == SDL2ST_KEYS)
             game_render_deveyes(ctx);
     }
 

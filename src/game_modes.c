@@ -140,6 +140,7 @@ static void mode_game_enter(sdl2_state_mode_t mode, void *ud)
     if (prev == SDL2ST_EDIT)
     {
         /* Play-test from editor — use existing blocks, just place ball */
+        ctx->attract_level_display = 0;
         ctx->lives_left = 3;
         ctx->game_active = true;
         ctx->score_submitted = false;
@@ -284,7 +285,7 @@ static void attract_random_display(game_ctx_t *ctx)
 
     attract_next_flash = attract_frame_counter + ATTRACT_FLASH_INTERVAL;
     score_system_set_display(ctx->score, attract_fake_score++);
-    ctx->attract_level_display = (rand() % 80) + 1;
+    ctx->attract_level_display = (rand() % LEVEL_MAX_NUM) + 1;
     special_system_randomize(ctx->special, rand);
 }
 
@@ -328,13 +329,17 @@ static void mode_presents_update(sdl2_state_mode_t mode, void *ud)
  * MODE_INTRO — block descriptions + sparkle
  * ========================================================================= */
 
+static int intro_deveye_tick;
+static int intro_deveye_cooldown;
+
 static void mode_intro_enter(sdl2_state_mode_t mode, void *ud)
 {
     (void)mode;
     game_ctx_t *ctx = ud;
     attract_frame_counter = 0;
     attract_next_flash = 0;
-    attract_next_flash = ATTRACT_FLASH_INTERVAL;
+    intro_deveye_tick = 0;
+    intro_deveye_cooldown = 0;
     intro_system_begin(ctx->intro, INTRO_MODE_INTRO, 0);
 
     /* "Welcome to XBoing" in the message bar — matches
@@ -370,26 +375,24 @@ static void mode_intro_update(sdl2_state_mode_t mode, void *ud)
      * BLINK_GAP=1000 frames (~1.2s).  Attract frames at 6×133tps:
      * 25 attract frames ≈ 31ms/step, 1000 attract frames ≈ 1.25s gap. */
     {
-        static int deveye_tick = 0;
-        static int deveye_cooldown = 0; // cppcheck-suppress variableScope
-        deveye_tick += ATTRACT_FRAME_MULTIPLIER;
+        intro_deveye_tick += ATTRACT_FRAME_MULTIPLIER;
 
         int still_active = sfx_system_get_deveye_info(ctx->sfx).active;
         if (still_active)
         {
-            if (deveye_tick >= 25)
+            if (intro_deveye_tick >= 25)
             {
                 sfx_system_update_deveyes(ctx->sfx, GAME_PLAY_WIDTH, GAME_PLAY_HEIGHT);
-                deveye_tick = 0;
+                intro_deveye_tick = 0;
             }
         }
         else
         {
-            deveye_cooldown += ATTRACT_FRAME_MULTIPLIER;
-            if (deveye_cooldown >= 1000)
+            intro_deveye_cooldown += ATTRACT_FRAME_MULTIPLIER;
+            if (intro_deveye_cooldown >= 1000)
             {
                 sfx_system_start_deveyes(ctx->sfx);
-                deveye_cooldown = 0;
+                intro_deveye_cooldown = 0;
             }
         }
     }
@@ -411,7 +414,6 @@ static void mode_instruct_enter(sdl2_state_mode_t mode, void *ud)
     game_ctx_t *ctx = ud;
     attract_frame_counter = 0;
     attract_next_flash = 0;
-    attract_next_flash = ATTRACT_FLASH_INTERVAL;
     intro_system_begin(ctx->intro, INTRO_MODE_INSTRUCT, 0);
 
     int frame = (int)sdl2_state_frame(ctx->state);
@@ -550,12 +552,17 @@ static void mode_preview_update(sdl2_state_mode_t mode, void *ud)
  * MODE_KEYS — game controls display
  * ========================================================================= */
 
+static int keys_deveye_tick;
+static int keys_deveye_cooldown;
+
 static void mode_keys_enter(sdl2_state_mode_t mode, void *ud)
 {
     (void)mode;
     game_ctx_t *ctx = ud;
     attract_frame_counter = 0;
     attract_next_flash = 0;
+    keys_deveye_tick = 0;
+    keys_deveye_cooldown = 0;
     keys_system_begin(ctx->keys, KEYS_MODE_GAME, 0);
 
     int frame = (int)sdl2_state_frame(ctx->state);
@@ -579,26 +586,24 @@ static void mode_keys_update(sdl2_state_mode_t mode, void *ud)
 
     /* Devil eyes during keys screen per original/keys.c:332 */
     {
-        static int deveye_tick = 0;
-        static int deveye_cooldown = 0; // cppcheck-suppress variableScope
-        deveye_tick += ATTRACT_FRAME_MULTIPLIER;
+        keys_deveye_tick += ATTRACT_FRAME_MULTIPLIER;
 
         int still_active = sfx_system_get_deveye_info(ctx->sfx).active;
         if (still_active)
         {
-            if (deveye_tick >= 25)
+            if (keys_deveye_tick >= 25)
             {
                 sfx_system_update_deveyes(ctx->sfx, GAME_PLAY_WIDTH, GAME_PLAY_HEIGHT);
-                deveye_tick = 0;
+                keys_deveye_tick = 0;
             }
         }
         else
         {
-            deveye_cooldown += ATTRACT_FRAME_MULTIPLIER;
-            if (deveye_cooldown >= 1000)
+            keys_deveye_cooldown += ATTRACT_FRAME_MULTIPLIER;
+            if (keys_deveye_cooldown >= 1000)
             {
                 sfx_system_start_deveyes(ctx->sfx);
-                deveye_cooldown = 0;
+                keys_deveye_cooldown = 0;
             }
         }
     }
