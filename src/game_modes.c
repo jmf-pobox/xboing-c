@@ -446,6 +446,19 @@ static void mode_demo_enter(sdl2_state_mode_t mode, void *ud)
     game_ctx_t *ctx = ud;
     attract_frame_counter = 0;
     demo_system_begin(ctx->demo, DEMO_MODE_DEMO, 0);
+
+    int frame = (int)sdl2_state_frame(ctx->state);
+    message_system_set(ctx->message, "Demonstration", 0, frame);
+
+    /* Load demo.data blocks per original/demo.c:137 */
+    {
+        char level_path[PATHS_MAX_PATH];
+        if (paths_level_file(&ctx->paths, "demo.data", level_path, sizeof(level_path)) == PATHS_OK)
+        {
+            block_system_clear_all(ctx->block);
+            level_system_load_file(ctx->level, level_path);
+        }
+    }
 }
 
 static void mode_demo_update(sdl2_state_mode_t mode, void *ud)
@@ -529,6 +542,32 @@ static void mode_keys_update(sdl2_state_mode_t mode, void *ud)
     }
 
     attract_random_display(ctx);
+
+    /* Devil eyes during keys screen per original/keys.c:332 */
+    {
+        static int deveye_tick = 0;
+        static int deveye_cooldown = 0;
+        deveye_tick += ATTRACT_FRAME_MULTIPLIER;
+
+        int still_active = sfx_system_get_deveye_info(ctx->sfx).active;
+        if (still_active)
+        {
+            if (deveye_tick >= 25)
+            {
+                sfx_system_update_deveyes(ctx->sfx, GAME_PLAY_WIDTH, GAME_PLAY_HEIGHT);
+                deveye_tick = 0;
+            }
+        }
+        else
+        {
+            deveye_cooldown += ATTRACT_FRAME_MULTIPLIER;
+            if (deveye_cooldown >= 1000)
+            {
+                sfx_system_start_deveyes(ctx->sfx);
+                deveye_cooldown = 0;
+            }
+        }
+    }
 
     if (sdl2_input_just_pressed(ctx->input, SDL2I_START))
     {

@@ -629,12 +629,17 @@ void game_render_demo(const game_ctx_t *ctx)
     if (state == DEMO_STATE_SPARKLE)
         render_border_glow(ctx);
 
-    /* Title */
+    /* XBOING title image — same as intro/instruct per original/demo.c:117
+     * DrawIntroTitle(display, window, 10, 10). */
     if (state >= DEMO_STATE_TITLE)
     {
-        SDL_Color white = {255, 255, 255, 255};
-        sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TITLE, "Demonstration",
-                                      PLAY_AREA_Y + 20, white, PLAY_AREA_W);
+        sdl2_texture_info_t tex;
+        if (sdl2_texture_get(ctx->texture, SPR_TITLE_BIG, &tex) == SDL2T_OK)
+        {
+            int tx = PLAY_AREA_X + (PLAY_AREA_W - tex.width) / 2;
+            SDL_Rect dst = {tx, PLAY_AREA_Y + 10, tex.width, tex.height};
+            SDL_RenderCopy(sdl2_renderer_get(ctx->renderer), tex.texture, NULL, &dst);
+        }
     }
 
     /* Ball trail animation */
@@ -663,13 +668,19 @@ void game_render_demo(const game_ctx_t *ctx)
         const demo_text_line_t *lines = NULL;
         int count = demo_system_get_demo_text(ctx->demo, &lines);
 
-        SDL_Color green = {0, 255, 0, 255};
+        SDL_Color yellow = {255, 255, 0, 255};
         for (int i = 0; i < count; i++)
         {
             if (lines[i].text)
-                sdl2_font_draw(ctx->font, SDL2F_FONT_DATA, lines[i].text, PLAY_AREA_X + lines[i].x,
-                               PLAY_AREA_Y + lines[i].y, green);
+                sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_DATA, lines[i].text,
+                                      PLAY_AREA_X + lines[i].x, PLAY_AREA_Y + lines[i].y, yellow);
         }
+
+        /* "Insert coin" per original/demo.c:241 */
+        SDL_Color tan_clr = {210, 180, 140, 255};
+        sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TEXT, "Insert coin to start the game",
+                                      PLAY_AREA_Y + PLAY_AREA_H - 27, tan_clr,
+                                      PLAY_AREA_W + 2 * PLAY_AREA_X);
     }
 
     /* Sparkle */

@@ -30,14 +30,15 @@ require xprop
 [[ -n "${DISPLAY:-}" ]] || die "DISPLAY not set"
 
 case "$VARIANT" in
-    original) BINARY="original/xboing" ; EXTRA_ARGS="-usedefcmap" ;;
-    modern)   BINARY="build/xboing"    ; EXTRA_ARGS="" ;;
+    original) BINARY="./xboing" ; EXTRA_ARGS="-usedefcmap" ; RUN_DIR="original" ;;
+    modern)   BINARY="./build/xboing" ; EXTRA_ARGS="" ; RUN_DIR="." ;;
     *)        die "Unknown variant '$VARIANT' — use 'original' or 'modern'" ;;
 esac
 
-[[ -x "$BINARY" ]] || die "$BINARY not found or not executable"
+[[ -x "${RUN_DIR}/${BINARY#./}" ]] || die "${RUN_DIR}/${BINARY#./} not found or not executable"
 
 mkdir -p "$OUT_DIR"
+OUT_DIR="$(cd "$OUT_DIR" && pwd)"
 
 find_xboing_window() {
     local target_pid="$1"
@@ -64,7 +65,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-$BINARY $EXTRA_ARGS -visual-capture "$MODE" >"$FIFO" 2>/dev/null &
+(cd "$RUN_DIR" && exec $BINARY $EXTRA_ARGS -visual-capture "$MODE") >"$FIFO" 2>/dev/null &
 XPID=$!
 
 WIN_ID=""

@@ -1071,6 +1071,7 @@ void game_render_frame(const game_ctx_t *ctx)
 
         case SDL2ST_DEMO:
             game_render_demo(ctx);
+            game_render_blocks(ctx);
             game_render_score(ctx);
             game_render_lives(ctx);
             game_render_messages(ctx);
