@@ -118,9 +118,9 @@ visual-check-setup: ## Set up the managed venv and Python deps for `make visual-
 
 visual-check: build ## LLM-based visual-fidelity comparison (modern vs. tests/golden/original/). Reads ANTHROPIC_API_KEY from env or `secret-tool lookup service anthropic`. Run `make visual-check-setup` once to install deps.
 	@echo "Capturing modern screenshots for comparison..."
-	scripts/visual_capture.sh modern "presents:200" .tmp/visual-check/modern/
-	scripts/visual_capture.sh modern "intro:200" .tmp/visual-check/modern/
-	scripts/visual_capture.sh modern "instruct:200" .tmp/visual-check/modern/
+	BUILD_DIR=$(BUILD_DIR) scripts/visual_capture.sh modern "presents:200" .tmp/visual-check/modern/
+	BUILD_DIR=$(BUILD_DIR) scripts/visual_capture.sh modern "intro:200" .tmp/visual-check/modern/
+	BUILD_DIR=$(BUILD_DIR) scripts/visual_capture.sh modern "instruct:200" .tmp/visual-check/modern/
 	@echo "Running LLM comparison..."
 	.tmp/venv/bin/python scripts/visual_check.py
 
