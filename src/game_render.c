@@ -559,7 +559,7 @@ void game_render_lives(const game_ctx_t *ctx)
      * coords (original/level.c:210 DisplayLevelNumber → DrawOutNumber at
      * window-local x=260, y=5).  Iterate digits least-significant first
      * so digit_index 0 is the rightmost. */
-    int level = ctx->level_number;
+    int level = ctx->attract_level_display > 0 ? ctx->attract_level_display : ctx->level_number;
     if (level <= 0)
         level = 1;
 

@@ -283,6 +283,7 @@ static void attract_random_display(game_ctx_t *ctx)
 
     attract_next_flash = attract_frame_counter + ATTRACT_FLASH_INTERVAL;
     score_system_set_display(ctx->score, attract_fake_score++);
+    ctx->attract_level_display = (rand() % 80) + 1;
 }
 
 /* =========================================================================
@@ -329,7 +330,7 @@ static void mode_intro_enter(sdl2_state_mode_t mode, void *ud)
     game_ctx_t *ctx = ud;
     attract_frame_counter = 0;
     attract_next_flash = ATTRACT_FLASH_INTERVAL;
-    attract_fake_score = 0;
+    attract_fake_score = 0; ctx->attract_level_display = 0;
     score_system_set_display(ctx->score, 0);
     intro_system_begin(ctx->intro, INTRO_MODE_INTRO, 0);
 
@@ -406,7 +407,7 @@ static void mode_instruct_enter(sdl2_state_mode_t mode, void *ud)
     game_ctx_t *ctx = ud;
     attract_frame_counter = 0;
     attract_next_flash = ATTRACT_FLASH_INTERVAL;
-    attract_fake_score = 0;
+    attract_fake_score = 0; ctx->attract_level_display = 0;
     score_system_set_display(ctx->score, 0);
     intro_system_begin(ctx->intro, INTRO_MODE_INSTRUCT, 0);
 
