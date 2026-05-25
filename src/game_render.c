@@ -1071,19 +1071,40 @@ void game_render_frame(const game_ctx_t *ctx)
 
         case SDL2ST_DEMO:
             game_render_demo(ctx);
+            game_render_score(ctx);
+            game_render_lives(ctx);
+            game_render_messages(ctx);
+            game_render_timer(ctx);
+            game_render_specials(ctx);
             break;
 
         case SDL2ST_PREVIEW:
             game_render_background(ctx);
             game_render_preview(ctx);
+            game_render_score(ctx);
+            game_render_lives(ctx);
+            game_render_messages(ctx);
+            game_render_timer(ctx);
+            game_render_specials(ctx);
             break;
 
         case SDL2ST_KEYS:
             game_render_keys(ctx);
+            game_render_score(ctx);
+            game_render_lives(ctx);
+            game_render_messages(ctx);
+            game_render_timer(ctx);
+            game_render_specials(ctx);
+            game_render_deveyes(ctx);
             break;
 
         case SDL2ST_KEYSEDIT:
             game_render_keysedit(ctx);
+            game_render_score(ctx);
+            game_render_lives(ctx);
+            game_render_messages(ctx);
+            game_render_timer(ctx);
+            game_render_specials(ctx);
             break;
 
         case SDL2ST_BONUS:
@@ -1092,6 +1113,11 @@ void game_render_frame(const game_ctx_t *ctx)
 
         case SDL2ST_HIGHSCORE:
             game_render_highscore(ctx);
+            game_render_score(ctx);
+            game_render_lives(ctx);
+            game_render_messages(ctx);
+            game_render_timer(ctx);
+            game_render_specials(ctx);
             break;
 
         case SDL2ST_DIALOGUE:
