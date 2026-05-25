@@ -283,7 +283,6 @@ static void attract_random_display(game_ctx_t *ctx)
 
     attract_next_flash = attract_frame_counter + ATTRACT_FLASH_INTERVAL;
     score_system_set(ctx->score, attract_fake_score++);
-    ctx->level_number = (rand() % 80) + 1;
     special_system_randomize(ctx->special, rand);
 }
 
