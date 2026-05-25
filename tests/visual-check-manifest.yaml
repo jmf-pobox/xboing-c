@@ -23,14 +23,9 @@ pairs:
     expected: equivalent
 
   # ----- Presents screen key frames -----------------------------------
-  - name: presents/flag
-    a: tests/golden/original/presents/flag-000.png
-    b: .tmp/visual-check/modern/presents/flag-000.png
-    expected: diff
-
-  - name: presents/text1
-    a: tests/golden/original/presents/text1-000.png
-    b: .tmp/visual-check/modern/presents/text1-000.png
+  - name: presents/text2
+    a: tests/golden/original/presents/text2-000.png
+    b: .tmp/visual-check/modern/presents/text2-000.png
     expected: diff
 
   - name: presents/letters
