@@ -366,7 +366,7 @@ void game_render_intro(const game_ctx_t *ctx)
     }
     /* Border: static green during early states, glow during SPARKLE
      * per original/intro.c:406 BorderGlow(). */
-    if (state == INTRO_STATE_SPARKLE)
+    if (state == INTRO_STATE_EXPLODE)
     {
         render_border_glow(ctx);
     }
@@ -485,7 +485,7 @@ void game_render_intro(const game_ctx_t *ctx)
     }
 
     /* Sparkle */
-    if (state == INTRO_STATE_SPARKLE)
+    if (state == INTRO_STATE_EXPLODE)
     {
         intro_sparkle_info_t si;
         intro_system_get_sparkle_info(ctx->intro, &si);
@@ -532,7 +532,7 @@ void game_render_instruct(const game_ctx_t *ctx)
             }
         }
     }
-    if (state == INTRO_STATE_SPARKLE)
+    if (state == INTRO_STATE_EXPLODE)
     {
         render_border_glow(ctx);
     }
@@ -606,7 +606,7 @@ void game_render_instruct(const game_ctx_t *ctx)
     }
 
     /* Sparkle */
-    if (state == INTRO_STATE_SPARKLE)
+    if (state == INTRO_STATE_EXPLODE)
     {
         intro_sparkle_info_t si;
         intro_system_get_sparkle_info(ctx->intro, &si);

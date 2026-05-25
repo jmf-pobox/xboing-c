@@ -785,7 +785,7 @@ const char *vc_intro_name(int s)
             return "blocks";
         case INTRO_STATE_TEXT:
             return "text";
-        case INTRO_STATE_SPARKLE:
+        case INTRO_STATE_EXPLODE:
             return "explode";
         default:
             return NULL;
@@ -800,7 +800,7 @@ const char *vc_instruct_name(int s)
             return "title";
         case INTRO_STATE_TEXT:
             return "text";
-        case INTRO_STATE_SPARKLE:
+        case INTRO_STATE_EXPLODE:
             return "sparkle";
         default:
             return NULL;
