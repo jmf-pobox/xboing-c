@@ -516,46 +516,37 @@ void game_render_demo(const game_ctx_t *ctx)
         }
     }
 
-    /* Ball trail animation */
+    /* Ball trail + decorations + paddle — all drawn during BLOCKS state.
+     * Order matches original/demo.c DoBlocks: trail → half-block → paddle. */
     if (state >= DEMO_STATE_BLOCKS)
     {
+        SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
+
+        /* Ball trail animation */
         const demo_ball_pos_t *trail = NULL;
         int count = demo_system_get_ball_trail(ctx->demo, &trail);
-
         for (int i = 0; i < count; i++)
         {
             const char *key = sprite_ball_key(trail[i].frame_index);
             sdl2_texture_info_t tex;
             if (sdl2_texture_get(ctx->texture, key, &tex) == SDL2T_OK)
             {
-                SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
                 SDL_Rect dst = {PLAY_AREA_X + trail[i].x, PLAY_AREA_Y + trail[i].y, tex.width,
                                 tex.height};
                 SDL_RenderCopy(sdl, tex.texture, NULL, &dst);
             }
         }
-    }
 
-    /* Half-disintegrated block at (col=2, row=12) per original/demo.c:173-176.
-     * colWidth=55, rowHeight=32 → pixel (110, 384) in playWindow. */
-    if (state >= DEMO_STATE_BLOCKS)
-    {
+        /* Half-disintegrated block at (col=2, row=12) per original/demo.c:173-176 */
         const char *exkey = sprite_block_explode_key(YELLOW_BLK, 1);
         sdl2_texture_info_t etex;
         if (exkey && sdl2_texture_get(ctx->texture, exkey, &etex) == SDL2T_OK)
         {
             SDL_Rect dst = {PLAY_AREA_X + 110, PLAY_AREA_Y + 384, etex.width, etex.height};
-            SDL_RenderCopy(sdl2_renderer_get(ctx->renderer), etex.texture, NULL, &dst);
+            SDL_RenderCopy(sdl, etex.texture, NULL, &dst);
         }
-    }
 
-    /* Paddle + left arrow per original/demo.c:178-182.
-     * DrawPaddle(x=PLAY_WIDTH/2, y=PLAY_HEIGHT-90, PADDLE_HUGE)
-     * renders at (x-35, y) size 70x15.
-     * Left arrow at (x-75, y-1) size 35x19. */
-    if (state >= DEMO_STATE_BLOCKS)
-    {
-        SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
+        /* Paddle + left arrow per original/demo.c:178-182 */
         int px = PLAY_AREA_X + PLAY_AREA_W / 2;
         int py = PLAY_AREA_Y + PLAY_AREA_H - 90;
 

@@ -26,7 +26,6 @@
 #include "savegame_io.h"
 #include "score_system.h"
 #include "sdl2_input.h"
-#include "sfx_system.h"
 #include "sdl2_loop.h"
 #include "sdl2_state.h"
 #include "sfx_system.h"
