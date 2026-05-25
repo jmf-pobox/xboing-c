@@ -61,7 +61,6 @@ typedef enum
     SDL2I_TOGGLE_SFX,
     SDL2I_TOGGLE_CONTROL,
     SDL2I_ICONIFY,
-    SDL2I_NEXT_LEVEL, /* Debug — skip to next level */
 
     /* Speed levels (1-9) */
     SDL2I_SPEED_1,
@@ -109,12 +108,7 @@ typedef struct sdl2_input sdl2_input_t;
  *   Space = start,  C = cycle,  H = scores,  E = editor,  W = set level,
  *   Q = quit,  =/KP+ = volume up,  -/KP- = volume down,
  *   A = audio,  S = sfx,  G = control toggle,
- *   I = iconify,  \ = next level (debug),  1-9 = speed levels.
- *
- * Note: Legacy used XK_plus (Shift+=) for volume up and XK_equal for the
- * debug next-level command.  Scancode-only mapping cannot distinguish these
- * since they share SDL_SCANCODE_EQUALS.  Volume up keeps the = key;
- * next-level was moved to backslash.
+ *   I = iconify,  1-9 = speed levels.
  *
  * Returns NULL on allocation failure.
  */

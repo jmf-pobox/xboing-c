@@ -73,7 +73,6 @@ static const struct sdl2_input_binding default_bindings[SDL2I_ACTION_COUNT] = {
     [SDL2I_TOGGLE_SFX] = {{SDL_SCANCODE_S, SDL_SCANCODE_UNKNOWN}},
     [SDL2I_TOGGLE_CONTROL] = {{SDL_SCANCODE_G, SDL_SCANCODE_UNKNOWN}},
     [SDL2I_ICONIFY] = {{SDL_SCANCODE_I, SDL_SCANCODE_UNKNOWN}},
-    [SDL2I_NEXT_LEVEL] = {{SDL_SCANCODE_BACKSLASH, SDL_SCANCODE_UNKNOWN}},
     [SDL2I_SPEED_1] = {{SDL_SCANCODE_1, SDL_SCANCODE_UNKNOWN}},
     [SDL2I_SPEED_2] = {{SDL_SCANCODE_2, SDL_SCANCODE_UNKNOWN}},
     [SDL2I_SPEED_3] = {{SDL_SCANCODE_3, SDL_SCANCODE_UNKNOWN}},
@@ -472,8 +471,6 @@ const char *sdl2_input_action_name(sdl2_input_action_t action)
             return "toggle_control";
         case SDL2I_ICONIFY:
             return "iconify";
-        case SDL2I_NEXT_LEVEL:
-            return "next_level";
         case SDL2I_SPEED_1:
             return "speed_1";
         case SDL2I_SPEED_2:

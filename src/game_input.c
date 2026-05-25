@@ -26,6 +26,7 @@
 #include "savegame_io.h"
 #include "score_system.h"
 #include "sdl2_input.h"
+#include "sfx_system.h"
 #include "sdl2_loop.h"
 #include "sdl2_state.h"
 #include "sfx_system.h"
@@ -358,5 +359,16 @@ void game_input_update(game_ctx_t *ctx)
                 sdl2_input_just_pressed(ctx->input, SDL2I_ENTER_EDITOR))
                 sdl2_state_transition(ctx->state, SDL2ST_EDIT);
             break;
+    }
+
+    /* Global keys — work from any mode per original handleMiscKeys/handleIntroKeys */
+
+    /* S key toggles visual SFX per original/main.c:639 */
+    if (sdl2_input_just_pressed(ctx->input, SDL2I_TOGGLE_SFX))
+    {
+        int was = sfx_system_get_enabled(ctx->sfx);
+        sfx_system_set_enabled(ctx->sfx, !was);
+        int frame = (int)sdl2_state_frame(ctx->state);
+        message_system_set(ctx->message, was ? "- SFX OFF -" : "- SFX ON -", 1, frame);
     }
 }
