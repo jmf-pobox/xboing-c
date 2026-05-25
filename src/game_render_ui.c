@@ -626,6 +626,8 @@ void game_render_demo(const game_ctx_t *ctx)
         return;
 
     render_play_area_frame(ctx);
+    if (state == DEMO_STATE_SPARKLE)
+        render_border_glow(ctx);
 
     /* Title */
     if (state >= DEMO_STATE_TITLE)
@@ -720,6 +722,8 @@ void game_render_keys(const game_ctx_t *ctx)
         return;
 
     render_play_area_frame(ctx);
+    if (state == KEYS_STATE_SPARKLE)
+        render_border_glow(ctx);
 
     if (state >= KEYS_STATE_TITLE)
     {
@@ -763,6 +767,8 @@ void game_render_keysedit(const game_ctx_t *ctx)
         return;
 
     render_play_area_frame(ctx);
+    if (state == KEYS_STATE_SPARKLE)
+        render_border_glow(ctx);
 
     if (state >= KEYS_STATE_TITLE)
     {
@@ -957,7 +963,12 @@ void game_render_highscore(const game_ctx_t *ctx)
         return;
 
     /* Highscore uses space/starfield background (already the default)
-     * but still needs the green border frame. */
+     * but still needs the border frame — glow during SPARKLE. */
+    if (state == HIGHSCORE_STATE_SPARKLE)
+    {
+        render_border_glow(ctx);
+    }
+    else
     {
         SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
         SDL_SetRenderDrawColor(sdl, 0, 200, 0, 255);
