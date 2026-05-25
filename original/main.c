@@ -1141,6 +1141,158 @@ static void handleGameMode(Display *display)
         CheckGameRules(display, playWindow);
 }
 
+/* ----- Visual-capture infrastructure ---------------------------------- */
+
+extern int visualCaptureMode;
+
+static int vc_capturing(int target_mode)
+{
+    if (visualCaptureMode < 0)
+        return 0;
+    return visualCaptureMode == 99 || visualCaptureMode == target_mode;
+}
+
+static void vc_signal(Display *display, const char *mode_name, const char *substate)
+{
+    XSync(display, False);
+    printf("XBOING_SNAPSHOT %s/%s\n", mode_name, substate);
+    fflush(stdout);
+    sleep(1);
+}
+
+static void vc_done(void)
+{
+    printf("XBOING_SNAPSHOT_DONE\n");
+    fflush(stdout);
+    exit(0);
+}
+
+static const char *presents_state_name(int s)
+{
+    switch (s)
+    {
+        case PRESENT_FLAG:
+            return "flag";
+        case PRESENT_TEXT1:
+            return "credits";
+        case PRESENT_LETTERS:
+            return "letters";
+        case PRESENT_SHINE:
+            return "shine";
+        default:
+            return NULL;
+    }
+}
+
+static const char *intro_state_name(int s)
+{
+    switch (s)
+    {
+        case INTRO_TITLE:
+            return "title";
+        case INTRO_BLOCKS:
+            return "blocks";
+        case INTRO_TEXT:
+            return "text";
+        case INTRO_EXPLODE:
+            return "explode";
+        default:
+            return NULL;
+    }
+}
+
+static const char *instruct_state_name(int s)
+{
+    switch (s)
+    {
+        case INSTRUCT_TITLE:
+            return "title";
+        case INSTRUCT_TEXT:
+            return "text";
+        case INSTRUCT_SPARKLE:
+            return "sparkle";
+        default:
+            return NULL;
+    }
+}
+
+static const char *demo_state_name(int s)
+{
+    switch (s)
+    {
+        case DEMO_TITLE:
+            return "title";
+        case DEMO_BLOCKS:
+            return "blocks";
+        case DEMO_TEXT:
+            return "text";
+        case DEMO_SPARKLE:
+            return "sparkle";
+        default:
+            return NULL;
+    }
+}
+
+static const char *keys_state_name(int s)
+{
+    switch (s)
+    {
+        case KEYS_TITLE:
+            return "title";
+        case KEYS_TEXT:
+            return "text";
+        case KEYS_SPARKLE:
+            return "sparkle";
+        default:
+            return NULL;
+    }
+}
+
+static const char *keysedit_state_name(int s)
+{
+    switch (s)
+    {
+        case KEYSEDIT_TITLE:
+            return "title";
+        case KEYSEDIT_TEXT:
+            return "text";
+        case KEYSEDIT_SPARKLE:
+            return "sparkle";
+        default:
+            return NULL;
+    }
+}
+
+static const char *highscore_state_name(int s)
+{
+    switch (s)
+    {
+        case HIGHSCORE_TITLE:
+            return "title";
+        case HIGHSCORE_SHOW:
+            return "show";
+        case HIGHSCORE_SPARKLE:
+            return "sparkle";
+        default:
+            return NULL;
+    }
+}
+
+static const char *preview_state_name(int s)
+{
+    switch (s)
+    {
+        case PREVIEW_LEVEL:
+            return "level";
+        case PREVIEW_TEXT:
+            return "text";
+        default:
+            return NULL;
+    }
+}
+
+/* -------------------------------------------------------------------- */
+
 static void handleGameStates(Display *display)
 {
     /* Update the message window if any new messages come along */
@@ -1238,6 +1390,79 @@ static void handleGameStates(Display *display)
 
     /* Flush the display */
     XFlush(display);
+
+    /* ----- Visual-capture: detect sub-state transitions --------------- */
+    if (visualCaptureMode >= 0)
+    {
+        static int prev_mode = -1;
+        static int prev_presents = -1;
+        static int prev_intro = -1;
+        static int prev_instruct = -1;
+        static int prev_demo = -1;
+        static int prev_keys = -1;
+        static int prev_keysedit = -1;
+        static int prev_highscore = -1;
+        static int prev_preview = -1;
+        static int anim_entry_frame = -1;
+        static int anim_mid_signaled = 0;
+
+        /* Detect top-level mode change — reset prev for the new mode,
+         * and if we were capturing a single mode that just ended, exit. */
+        if (mode != prev_mode)
+        {
+            if (prev_mode >= 0 && visualCaptureMode != 99 &&
+                visualCaptureMode == prev_mode)
+                vc_done();
+            prev_mode = mode;
+            anim_entry_frame = -1;
+            anim_mid_signaled = 0;
+        }
+
+#define VC_CHECK(MODE_CONST, mode_str, state_var, prev_var, name_fn)         \
+    if (mode == MODE_CONST && vc_capturing(MODE_CONST))                      \
+    {                                                                        \
+        if (state_var != prev_var)                                           \
+        {                                                                    \
+            const char *n = name_fn(prev_var);                               \
+            if (n && prev_var >= 0)                                          \
+                vc_signal(display, mode_str, n);                             \
+            prev_var = state_var;                                            \
+            anim_entry_frame = frame;                                        \
+            anim_mid_signaled = 0;                                           \
+        }                                                                    \
+        else if (!anim_mid_signaled && anim_entry_frame > 0 &&              \
+                 frame - anim_entry_frame >= 500)                            \
+        {                                                                    \
+            const char *n = name_fn(state_var);                              \
+            if (n)                                                           \
+            {                                                                \
+                char mid_name[64];                                           \
+                snprintf(mid_name, sizeof(mid_name), "%s-mid", n);          \
+                vc_signal(display, mode_str, mid_name);                      \
+                anim_mid_signaled = 1;                                       \
+            }                                                                \
+        }                                                                    \
+    }
+
+        VC_CHECK(MODE_PRESENTS, "presents", PresentState, prev_presents,
+                 presents_state_name)
+        VC_CHECK(MODE_INTRO, "intro", IntroState, prev_intro,
+                 intro_state_name)
+        VC_CHECK(MODE_INSTRUCT, "instruct", InstructState, prev_instruct,
+                 instruct_state_name)
+        VC_CHECK(MODE_DEMO, "demo", DemoState, prev_demo,
+                 demo_state_name)
+        VC_CHECK(MODE_KEYS, "keys", KeysState, prev_keys,
+                 keys_state_name)
+        VC_CHECK(MODE_KEYSEDIT, "keysedit", KeysEditState, prev_keysedit,
+                 keysedit_state_name)
+        VC_CHECK(MODE_HIGHSCORE, "highscore", HighScoreState,
+                 prev_highscore, highscore_state_name)
+        VC_CHECK(MODE_PREVIEW, "preview", PreviewState, prev_preview,
+                 preview_state_name)
+
+#undef VC_CHECK
+    }
 }
 
 /*
@@ -1327,6 +1552,17 @@ static void handleEventLoop(Display *display)
         fflush(stdout);
         sleep(2);
         exit(0);
+    }
+
+    /* Visual-capture mode: set _NET_WM_PID for capture script
+     * window-finding, same as snapshot mode above. */
+    if (visualCaptureMode >= 0)
+    {
+        Atom net_wm_pid = XInternAtom(display, "_NET_WM_PID", False);
+        pid_t self_pid = getpid();
+        unsigned long pid_val = (unsigned long)self_pid;
+        XChangeProperty(display, mainWindow, net_wm_pid, XA_CARDINAL, 32,
+                        PropModeReplace, (unsigned char *)&pid_val, 1);
     }
 
     /* Loop forever and ever */

@@ -56,6 +56,7 @@
 #include <X11/cursorfont.h>
 #include <signal.h>
 #include <stddef.h>
+#include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
@@ -142,6 +143,13 @@ int noSound, debug;
  * interactive play.  Does not affect any other code path.
  */
 int snapshotFrames = 0;
+
+/*
+ * Visual-capture mode: -1 = off, 0..15 = specific MODE_* constant,
+ * 99 = all modes.  When active, the game signals at each sub-state
+ * transition for external screenshot capture.
+ */
+int visualCaptureMode = -1;
 
 static void InitialiseGraphics(Display *display, Window window)
 {
@@ -697,6 +705,38 @@ static void ParseCommandLine(char **argv, int argc)
                 else
                 {
                     WarningMessage("Snapshot frame count must be 1..99999");
+                    PrintUsage();
+                }
+            }
+            else
+                PrintUsage();
+        }
+        else if (!compareArgument(argv[i], "-visual-capture", 15))
+        {
+            i++;
+            if (i < argc)
+            {
+                if (!strcmp(argv[i], "all"))
+                    visualCaptureMode = 99;
+                else if (!strcmp(argv[i], "presents"))
+                    visualCaptureMode = MODE_PRESENTS;
+                else if (!strcmp(argv[i], "intro"))
+                    visualCaptureMode = MODE_INTRO;
+                else if (!strcmp(argv[i], "instruct"))
+                    visualCaptureMode = MODE_INSTRUCT;
+                else if (!strcmp(argv[i], "demo"))
+                    visualCaptureMode = MODE_DEMO;
+                else if (!strcmp(argv[i], "keys"))
+                    visualCaptureMode = MODE_KEYS;
+                else if (!strcmp(argv[i], "keysedit"))
+                    visualCaptureMode = MODE_KEYSEDIT;
+                else if (!strcmp(argv[i], "highscore"))
+                    visualCaptureMode = MODE_HIGHSCORE;
+                else if (!strcmp(argv[i], "preview"))
+                    visualCaptureMode = MODE_PREVIEW;
+                else
+                {
+                    WarningMessage("Unknown mode for -visual-capture");
                     PrintUsage();
                 }
             }
