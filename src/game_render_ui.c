@@ -275,6 +275,9 @@ void game_render_intro(const game_ctx_t *ctx)
             SPR_BLOCK_WALLOFF,    /* INTRO_BLK_WALLOFF     → WALLOFF_BLK */
             SPR_BLOCK_STICKY,     /* INTRO_BLK_STICKY      → STICKY_BLK */
         };
+        _Static_assert(sizeof(intro_sprite_keys) / sizeof(intro_sprite_keys[0]) ==
+                           INTRO_BLOCK_TOTAL,
+                       "intro_sprite_keys must match intro_block_type_t enum count");
 
         const intro_block_entry_t *entries = NULL;
         int count = intro_system_get_block_table(ctx->intro, &entries);
@@ -315,10 +318,14 @@ void game_render_intro(const game_ctx_t *ctx)
         }
 
         /* "Insert coin to start the game" — original/intro.c:302-305
-         * centered at y = PLAY_HEIGHT - 27 inside playWindow. */
-        SDL_Color red = {255, 0, 0, 255};
+         * centered at y = PLAY_HEIGHT - 27 inside playWindow.  Original
+         * uses X11 "tann" color (tan).  Centering width is the full
+         * window width (PLAY_AREA_W + 2 * PLAY_AREA_X) so the text
+         * aligns with the play area center. */
+        SDL_Color tan_clr = {210, 180, 140, 255};
         sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TEXT, "Insert coin to start the game",
-                                      PLAY_AREA_Y + PLAY_AREA_H - 27, red, PLAY_AREA_W);
+                                      PLAY_AREA_Y + PLAY_AREA_H - 27, tan_clr,
+                                      PLAY_AREA_W + 2 * PLAY_AREA_X);
     }
 
     /* Sparkle */

@@ -148,9 +148,8 @@ sdl2_state_status_t sdl2_state_transition(sdl2_state_t *ctx, sdl2_state_mode_t n
     ctx->previous = ctx->current;
     ctx->current = new_mode;
 
-    /* Log transitions when XBOING_LOG_TRANSITIONS is set.  Used by
-     * scripts/capture_modern_one.sh to determine the correct capture
-     * timing for each screen without trial-and-error wall-clock waits.
+    /* Log transitions when XBOING_LOG_TRANSITIONS is set.  Useful for
+     * determining capture timing for each screen deterministically.
      * Format: "XBOING_STATE: <old> -> <new> frame=<N>" on stderr. */
     if (ctx->log_transitions)
     {
