@@ -53,7 +53,7 @@ static void render_border_glow(const game_ctx_t *ctx)
     };
 
     unsigned long frame = sdl2_state_frame(ctx->state);
-    int cycle_pos = (int)((frame / 7) % 24);
+    int cycle_pos = (int)((frame / 12) % 24);
     int use_green = (cycle_pos / 12) % 2;
     int idx = cycle_pos % 12;
     if (idx > 6)
