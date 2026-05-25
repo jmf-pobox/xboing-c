@@ -205,7 +205,7 @@ static void do_text(intro_system_t *ctx)
     /* Text drawn once.  Advance to sparkle loop.
      * Sparkle state was initialized in begin(), matching legacy where
      * Reset*() sets up the frame counters before the state machine runs. */
-    ctx->state = INTRO_STATE_SPARKLE;
+    ctx->state = INTRO_STATE_EXPLODE;
 }
 
 static void do_sparkle(intro_system_t *ctx)
@@ -330,7 +330,7 @@ int intro_system_update(intro_system_t *ctx, int frame)
         case INTRO_STATE_TEXT:
             do_text(ctx);
             break;
-        case INTRO_STATE_SPARKLE:
+        case INTRO_STATE_EXPLODE:
             do_sparkle(ctx);
             break;
         case INTRO_STATE_FINISH:
@@ -409,7 +409,7 @@ void intro_system_get_sparkle_info(const intro_system_t *ctx, intro_sparkle_info
     out->x = ctx->sparkle_x;
     out->y = ctx->sparkle_y;
     out->frame_index = ctx->sparkle_frame;
-    out->active = (ctx->state == INTRO_STATE_SPARKLE && !ctx->finished) ? 1 : 0;
+    out->active = (ctx->state == INTRO_STATE_EXPLODE && !ctx->finished) ? 1 : 0;
     out->save_bg = ctx->sparkle_bg_saved;
     out->restore_bg = ctx->sparkle_restore;
 }
@@ -435,7 +435,7 @@ int intro_system_should_blink(const intro_system_t *ctx)
 
 int intro_system_should_draw_specials(const intro_system_t *ctx)
 {
-    if (!ctx || ctx->state != INTRO_STATE_SPARKLE)
+    if (!ctx || ctx->state != INTRO_STATE_EXPLODE)
     {
         return 0;
     }

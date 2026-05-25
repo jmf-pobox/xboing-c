@@ -1047,77 +1047,33 @@ void game_render_frame(const game_ctx_t *ctx)
             game_render_presents(ctx);
             break;
 
+        /* Attract-mode screens: each renderer draws inner content only.
+         * Outer shell (HUD) is rendered once after the switch. */
         case SDL2ST_INTRO:
             game_render_intro(ctx);
-            /* HUD elements visible during intro — original's X11
-             * sub-windows are already mapped.  Devil eyes blink in
-             * the play area bottom-right (original/intro.c:359). */
-            game_render_score(ctx);
-            game_render_lives(ctx);
-            game_render_messages(ctx);
-            game_render_timer(ctx);
-            game_render_specials(ctx);
-            game_render_deveyes(ctx);
             break;
-
         case SDL2ST_INSTRUCT:
             game_render_instruct(ctx);
-            game_render_score(ctx);
-            game_render_lives(ctx);
-            game_render_messages(ctx);
-            game_render_timer(ctx);
-            game_render_specials(ctx);
             break;
-
         case SDL2ST_DEMO:
             game_render_demo(ctx);
-            game_render_score(ctx);
-            game_render_lives(ctx);
-            game_render_messages(ctx);
-            game_render_timer(ctx);
-            game_render_specials(ctx);
             break;
-
         case SDL2ST_PREVIEW:
             game_render_background(ctx);
             game_render_preview(ctx);
-            game_render_score(ctx);
-            game_render_lives(ctx);
-            game_render_messages(ctx);
-            game_render_timer(ctx);
-            game_render_specials(ctx);
             break;
-
         case SDL2ST_KEYS:
             game_render_keys(ctx);
-            game_render_score(ctx);
-            game_render_lives(ctx);
-            game_render_messages(ctx);
-            game_render_timer(ctx);
-            game_render_specials(ctx);
-            game_render_deveyes(ctx);
             break;
-
         case SDL2ST_KEYSEDIT:
             game_render_keysedit(ctx);
-            game_render_score(ctx);
-            game_render_lives(ctx);
-            game_render_messages(ctx);
-            game_render_timer(ctx);
-            game_render_specials(ctx);
+            break;
+        case SDL2ST_HIGHSCORE:
+            game_render_highscore(ctx);
             break;
 
         case SDL2ST_BONUS:
             game_render_bonus(ctx);
-            break;
-
-        case SDL2ST_HIGHSCORE:
-            game_render_highscore(ctx);
-            game_render_score(ctx);
-            game_render_lives(ctx);
-            game_render_messages(ctx);
-            game_render_timer(ctx);
-            game_render_specials(ctx);
             break;
 
         case SDL2ST_DIALOGUE:
@@ -1162,6 +1118,23 @@ void game_render_frame(const game_ctx_t *ctx)
 
         default:
             break;
+    }
+
+    /* Outer shell: HUD elements shared by all attract modes.
+     * Matches the original's always-mapped X11 sub-windows
+     * (scoreWindow, levelWindow, messWindow, specialWindow). */
+    if (mode == SDL2ST_INTRO || mode == SDL2ST_INSTRUCT || mode == SDL2ST_DEMO ||
+        mode == SDL2ST_PREVIEW || mode == SDL2ST_KEYS || mode == SDL2ST_KEYSEDIT ||
+        mode == SDL2ST_HIGHSCORE)
+    {
+        game_render_score(ctx);
+        game_render_lives(ctx);
+        game_render_messages(ctx);
+        game_render_timer(ctx);
+        game_render_specials(ctx);
+
+        if (mode == SDL2ST_INTRO || mode == SDL2ST_KEYS)
+            game_render_deveyes(ctx);
     }
 
     sdl2_renderer_present(ctx->renderer);
