@@ -31,7 +31,7 @@ require xprop
 
 case "$VARIANT" in
     original) BINARY="./xboing" ; EXTRA_ARGS="-usedefcmap" ; RUN_DIR="original" ;;
-    modern)   BINARY="./build/xboing" ; EXTRA_ARGS="" ; RUN_DIR="." ;;
+    modern)   BINARY="./${BUILD_DIR:-build}/xboing" ; EXTRA_ARGS="" ; RUN_DIR="." ;;
     *)        die "Unknown variant '$VARIANT' — use 'original' or 'modern'" ;;
 esac
 
@@ -55,17 +55,21 @@ find_xboing_window() {
         done
 }
 
-FIFO="$(mktemp -u --suffix=.vc-fifo)"
-mkfifo "$FIFO"
+mkdir -p .tmp
+FIFO_DIR="$(mktemp -d .tmp/visual-capture.XXXXXX)"
+FIFO="$FIFO_DIR/fifo"
 
 XPID=""
 cleanup() {
     [[ -n "$XPID" ]] && kill "$XPID" 2>/dev/null && wait "$XPID" 2>/dev/null
     rm -f "$FIFO"
+    rmdir "$FIFO_DIR" 2>/dev/null || true
 }
 trap cleanup EXIT
 
-(cd "$RUN_DIR" && exec $BINARY $EXTRA_ARGS -visual-capture "$MODE") >"$FIFO" 2>/dev/null &
+mkfifo "$FIFO"
+
+(cd "$RUN_DIR" && exec "$BINARY" $EXTRA_ARGS -visual-capture "$MODE") >"$FIFO" 2>/dev/null &
 XPID=$!
 
 WIN_ID=""

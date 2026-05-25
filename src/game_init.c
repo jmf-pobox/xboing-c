@@ -744,7 +744,7 @@ void game_destroy(game_ctx_t *ctx)
  * Stub callbacks (replaced by game_modes.c / game_callbacks.c)
  * ========================================================================= */
 
-const char *vc_presents_name(int s)
+static const char *vc_presents_name(int s)
 {
     switch (s)
     {
@@ -775,7 +775,7 @@ const char *vc_presents_name(int s)
     }
 }
 
-const char *vc_intro_name(int s)
+static const char *vc_intro_name(int s)
 {
     switch (s)
     {
@@ -792,7 +792,7 @@ const char *vc_intro_name(int s)
     }
 }
 
-const char *vc_instruct_name(int s)
+static const char *vc_instruct_name(int s)
 {
     switch (s)
     {

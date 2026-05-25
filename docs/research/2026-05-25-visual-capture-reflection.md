@@ -82,10 +82,11 @@ transitions are all temporal bugs that require multiple capture points.
 
 ## What's still missing
 
-1. **Modern exit after single-mode capture** — the game doesn't detect
-   the presents→intro mode transition and exit. Needs investigation.
+1. ~~Modern exit after single-mode capture~~ — Fixed: mode-transition
+   check runs before the vc_active gate. Root cause: the gate returned
+   early when the mode had already transitioned away.
 2. **Deeper attract screens** — demo, keys, keysedit, highscore, preview
-   haven't been captured or compared yet.
+   goldens captured; demo content partially implemented.
 3. **Gameplay screens** — bonus, level complete, etc. require starting a
    game session, not just the attract cycle.
 4. **Automated comparison** — the LLM comparison pipeline
