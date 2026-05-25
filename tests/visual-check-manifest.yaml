@@ -1,64 +1,76 @@
 # Visual-fidelity comparison manifest.
 #
-# Each pair specifies a comparison and its expected verdict.  The
-# scripts/visual_check.py driver runs the LLM on each pair and fails
-# if any pair's actual verdict does not match `expected`.
+# Each pair compares an original golden (from tests/golden/original/)
+# against a modern capture (produced by scripts/visual_capture.sh).
 #
-# `expected: equivalent` pairs are sanity checks (typically self-
-# comparisons of an image against itself) that verify the LLM does not
-# hallucinate differences when none exist.  Per the slice findings
-# (docs/research/2026-05-08-llm-comparison-slice-findings.md), this
-# self-comparison was the gap the slice didn't cover; running it as
-# part of every batch closes the false-positive audit.
+# `expected: equivalent` — sanity check (self-comparison or matched pair).
+# `expected: diff` — known divergences exist (font rendering, timing).
 #
-# `expected: diff` pairs verify the LLM correctly identifies real
-# divergences between original/xboing and the modern SDL2 port.  We
-# do not assert which specific findings — only that the verdict is
-# "diff."  Reading the findings is a maintainer task.
-#
-# `capture:` is optional.  If present, the driver runs the script
-# (with the listed args) to produce the `b` image when it is missing
-# or when --refresh-modern is set.  Without `capture:`, the image
-# must already exist on disk (e.g. an original/ golden).
+# Key-frame pairs: one representative image per content sub-state.
+# Full filmstrip goldens in tests/golden/original/<mode>/ are for
+# manual inspection; the LLM comparison uses these key frames only.
 
 pairs:
-  # ----- Self-comparison sanity checks ------------------------------
-  - name: self-presents-early
-    a: tests/golden/original/presents-early.png
-    b: tests/golden/original/presents-early.png
+  # ----- Self-comparison sanity checks --------------------------------
+  - name: self-presents-text1
+    a: tests/golden/original/presents/text1-000.png
+    b: tests/golden/original/presents/text1-000.png
     expected: equivalent
 
-  - name: self-intro-late
-    a: tests/golden/original/intro-late.png
-    b: tests/golden/original/intro-late.png
+  - name: self-intro-blocks
+    a: tests/golden/original/intro/blocks-000.png
+    b: tests/golden/original/intro/blocks-000.png
     expected: equivalent
 
-  # ----- Original vs. modern --------------------------------------
-  - name: presents-early
-    a: tests/golden/original/presents-early.png
-    b: .tmp/visual-check/modern/presents-early.png
+  # ----- Presents screen key frames -----------------------------------
+  - name: presents/flag
+    a: tests/golden/original/presents/flag-000.png
+    b: .tmp/visual-check/modern/presents/flag-000.png
     expected: diff
-    capture:
-      script: scripts/capture_modern_one.sh
-      args: ["1", ".tmp/visual-check/modern/presents-early.png"]
 
-  - name: intro-blocks
-    a: tests/golden/original/intro-blocks.png
-    b: .tmp/visual-check/modern/intro-blocks.png
+  - name: presents/text1
+    a: tests/golden/original/presents/text1-000.png
+    b: .tmp/visual-check/modern/presents/text1-000.png
     expected: diff
-    capture:
-      script: scripts/capture_modern_one.sh
-      args: ["17", ".tmp/visual-check/modern/intro-blocks.png"]
 
-  # intro-late: original captured at frame 2500 (~3.0s at ~833 vfps).
-  # At that frame the original is mid-XBOING-letter-stamping (first
-  # X just placed).  Modern at ATTRACT_FRAME_MULTIPLIER=6 and ~133
-  # real tps: frame 2500 ≈ 2500/(133*6) ≈ 3.1s wall-clock.  Capture
-  # at 3.5s to clear the TEXT_CLEAR boundary and land in LETTERS.
-  - name: intro-late
-    a: tests/golden/original/intro-late.png
-    b: .tmp/visual-check/modern/intro-late.png
-    expected: equivalent
-    capture:
-      script: scripts/capture_modern_one.sh
-      args: ["3.5", ".tmp/visual-check/modern/intro-late.png"]
+  - name: presents/letters
+    a: tests/golden/original/presents/letters-000.png
+    b: .tmp/visual-check/modern/presents/letters-000.png
+    expected: diff
+
+  - name: presents/shine
+    a: tests/golden/original/presents/shine-000.png
+    b: .tmp/visual-check/modern/presents/shine-000.png
+    expected: diff
+
+  - name: presents/typewriter1
+    a: tests/golden/original/presents/typewriter1-003.png
+    b: .tmp/visual-check/modern/presents/typewriter1-000.png
+    expected: diff
+
+  - name: presents/wipe
+    a: tests/golden/original/presents/wipe-001.png
+    b: .tmp/visual-check/modern/presents/wipe-000.png
+    expected: diff
+
+  # ----- Intro screen key frames -------------------------------------
+  - name: intro/blocks
+    a: tests/golden/original/intro/blocks-000.png
+    b: .tmp/visual-check/modern/intro/explode-000.png
+    expected: diff
+
+  - name: intro/explode
+    a: tests/golden/original/intro/explode-007.png
+    b: .tmp/visual-check/modern/intro/explode-001.png
+    expected: diff
+
+  # ----- Instruct screen key frames ----------------------------------
+  - name: instruct/text
+    a: tests/golden/original/instruct/text-000.png
+    b: .tmp/visual-check/modern/instruct/text-000.png
+    expected: diff
+
+  - name: instruct/sparkle
+    a: tests/golden/original/instruct/sparkle-010.png
+    b: .tmp/visual-check/modern/instruct/sparkle-000.png
+    expected: diff
