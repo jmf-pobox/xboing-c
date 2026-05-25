@@ -130,6 +130,10 @@ typedef struct game_ctx
     /* Debug / control flags */
     bool debug_mode;
 
+    /* Visual-capture: -1 = off, SDL2ST_* = single mode, 99 = all */
+    int vc_mode;
+    int vc_interval;
+
 } game_ctx_t;
 
 #endif /* GAME_CONTEXT_H */

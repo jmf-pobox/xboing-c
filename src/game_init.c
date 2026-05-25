@@ -294,6 +294,8 @@ game_ctx_t *game_create(int argc, char *argv[])
     ctx->lives_left = 3;
     ctx->bonus_count = 0;
     ctx->debug_mode = cli.debug;
+    ctx->vc_mode = cli.visual_capture_mode;
+    ctx->vc_interval = cli.visual_capture_interval;
 
     /* Load high score tables */
     highscore_io_init_table(&ctx->hs_global);
@@ -742,6 +744,140 @@ void game_destroy(game_ctx_t *ctx)
  * Stub callbacks (replaced by game_modes.c / game_callbacks.c)
  * ========================================================================= */
 
+static void vc_signal_modern(const char *mode_name, const char *substate, int seq)
+{
+    printf("XBOING_SNAPSHOT %s/%s/%03d\n", mode_name, substate, seq);
+    fflush(stdout);
+    SDL_Delay(200);
+}
+
+static void vc_check(game_ctx_t *ctx)
+{
+    static sdl2_state_mode_t prev_mode = SDL2ST_NONE;
+    static int prev_substate = -1;
+    static unsigned long next_capture_frame = 0;
+    static int seq = 0;
+    static const char *cur_subname = NULL;
+
+    sdl2_state_mode_t mode = sdl2_state_current(ctx->state);
+    unsigned long frame = sdl2_state_frame(ctx->state);
+
+    int vc_active = (ctx->vc_mode == 99 || ctx->vc_mode == (int)mode);
+    if (!vc_active)
+        return;
+
+    if (mode != prev_mode)
+    {
+        if (prev_mode != SDL2ST_NONE && ctx->vc_mode != 99 &&
+            ctx->vc_mode == (int)prev_mode)
+        {
+            printf("XBOING_SNAPSHOT_DONE\n");
+            fflush(stdout);
+            exit(0);
+        }
+        prev_mode = mode;
+        prev_substate = -1;
+        cur_subname = NULL;
+        seq = 0;
+    }
+
+    int cur_substate = -1;
+    const char *subname = NULL;
+    const char *mode_str = NULL;
+
+    if (mode == SDL2ST_PRESENTS)
+    {
+        cur_substate = (int)presents_system_get_state(ctx->presents);
+        mode_str = "presents";
+        switch (cur_substate)
+        {
+            case PRESENTS_STATE_FLAG:
+                subname = "flag";
+                break;
+            case PRESENTS_STATE_TEXT1:
+                subname = "credits";
+                break;
+            case PRESENTS_STATE_LETTERS:
+                subname = "letters";
+                break;
+            case PRESENTS_STATE_SHINE:
+                subname = "shine";
+                break;
+            case PRESENTS_STATE_SPECIAL_TEXT1:
+                subname = "typewriter";
+                break;
+            case PRESENTS_STATE_CLEAR:
+                subname = "wipe";
+                break;
+            default:
+                break;
+        }
+    }
+    else if (mode == SDL2ST_INTRO)
+    {
+        cur_substate = (int)intro_system_get_state(ctx->intro);
+        mode_str = "intro";
+        switch (cur_substate)
+        {
+            case INTRO_STATE_TITLE:
+                subname = "title";
+                break;
+            case INTRO_STATE_BLOCKS:
+                subname = "blocks";
+                break;
+            case INTRO_STATE_TEXT:
+                subname = "text";
+                break;
+            case INTRO_STATE_SPARKLE:
+                subname = "explode";
+                break;
+            default:
+                break;
+        }
+    }
+    else if (mode == SDL2ST_INSTRUCT)
+    {
+        cur_substate = (int)intro_system_get_state(ctx->intro);
+        mode_str = "instruct";
+        switch (cur_substate)
+        {
+            case INTRO_STATE_TITLE:
+                subname = "title";
+                break;
+            case INTRO_STATE_TEXT:
+                subname = "text";
+                break;
+            case INTRO_STATE_SPARKLE:
+                subname = "sparkle";
+                break;
+            default:
+                break;
+        }
+    }
+
+    if (!mode_str || !subname)
+        return;
+
+    if (cur_substate != prev_substate)
+    {
+        if (subname != cur_subname)
+        {
+            seq = 0;
+            vc_signal_modern(mode_str, subname, seq);
+            seq++;
+        }
+        prev_substate = cur_substate;
+        cur_subname = subname;
+        next_capture_frame = frame + (unsigned long)ctx->vc_interval;
+    }
+    else if (frame >= next_capture_frame)
+    {
+        vc_signal_modern(mode_str, subname, seq);
+        seq++;
+        next_capture_frame = frame + (unsigned long)ctx->vc_interval;
+    }
+}
+
 static void stub_tick(void *user_data)
 {
     game_ctx_t *ctx = user_data;
@@ -749,6 +885,9 @@ static void stub_tick(void *user_data)
      * registered by game_modes_register() — gameplay logic, input, etc.
      * all happen inside the mode handler. */
     sdl2_state_update(ctx->state);
+
+    if (ctx->vc_mode >= 0)
+        vc_check(ctx);
 }
 
 static void stub_render(double alpha, void *user_data)

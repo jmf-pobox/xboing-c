@@ -42,7 +42,7 @@ mkdir -p "$OUT_DIR"
 find_xboing_window() {
     local target_pid="$1"
     xwininfo -root -tree 2>/dev/null \
-        | awk '/"XBoing" "XBoing"/ { print $1 }' \
+        | awk 'tolower($0) ~ /"xboing" "xboing"/ { print $1 }' \
         | while read -r win_id; do
             local pid_line pid
             pid_line=$(xprop -id "$win_id" _NET_WM_PID 2>/dev/null)
