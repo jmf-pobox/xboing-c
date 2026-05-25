@@ -271,7 +271,19 @@ static void mode_pause_exit(sdl2_state_mode_t mode, void *ud)
  * ========================================================================= */
 
 #define ATTRACT_FRAME_MULTIPLIER 6
+#define ATTRACT_FLASH_INTERVAL 500
 static int attract_frame_counter;
+static unsigned long attract_fake_score;
+
+static void attract_random_display(game_ctx_t *ctx)
+{
+    if ((attract_frame_counter % ATTRACT_FLASH_INTERVAL) != 0)
+        return;
+
+    score_system_set(ctx->score, attract_fake_score++);
+    ctx->level_number = (rand() % 80) + 1;
+    special_system_randomize(ctx->special, rand);
+}
 
 /* =========================================================================
  * MODE_PRESENTS — splash screen sequence
@@ -344,6 +356,8 @@ static void mode_intro_update(sdl2_state_mode_t mode, void *ud)
             sdl2_audio_play(ctx->audio, snd.name);
     }
 
+    attract_random_display(ctx);
+
     /* Drive devil-eyes SFX at the original's blink rate.  Original
      * intro.c:362 advances one blink frame every BLINK_RATE=25 game
      * frames (~30ms at ~833fps), then waits BLINK_GAP=1000 frames
@@ -411,6 +425,8 @@ static void mode_instruct_update(sdl2_state_mode_t mode, void *ud)
         if (snd.name && ctx->audio)
             sdl2_audio_play(ctx->audio, snd.name);
     }
+
+    attract_random_display(ctx);
 
     if (sdl2_input_just_pressed(ctx->input, SDL2I_START))
     {
