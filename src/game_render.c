@@ -587,14 +587,17 @@ void game_render_lives(const game_ctx_t *ctx)
 /*
  * Render the current ammo count as a row of bullet sprites.
  *
- * X formula from original/level.c:AddABullet:
- *   strip_start_x = 192 - (ammo_count * 9)   (window-relative)
- *   bullet i at LEVEL_AREA_X + strip_start_x + (i * 9)
- * Y: LEVEL_AREA_Y + 43  (original/level.c:316)
+ * Original/level.c:ReDrawBulletsLeft draws each bullet with
+ * DrawTheBullet(display, levelWindow, x, 43) where (x, 43) is the
+ * CENTER of the bullet in levelWindow coordinates.  DrawTheBullet
+ * (original/gun.c:534-538) renders at (x - BULLET_WC, y - BULLET_HC)
+ * where BULLET_WC=3 and BULLET_HC=8 (half-width/height of 7×16).
  *
- * At max ammo (20 bullets): strip width = 180px, leftmost bullet at
- * window-relative x=12, rightmost at x=183.  Fits within level window (w=286).
- * Skipped when unlimited ammo is active (no belt shown).
+ * X formula: x = 192 - ((i + 1) * 9)  for i = 0..ammo_count-1
+ * Y center: 43 in levelWindow → absolute y = LEVEL_AREA_Y + 43
+ * Top-left: (center_x - 3, center_y - 8) = (x - 3, LEVEL_AREA_Y + 35)
+ *
+ * Skipped when unlimited ammo is active.
  */
 void game_render_ammo_belt(const game_ctx_t *ctx)
 {
@@ -612,14 +615,17 @@ void game_render_ammo_belt(const game_ctx_t *ctx)
         return;
 
     SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
-    int strip_start_x = 192 - (ammo_count * 9);
-    int belt_y = LEVEL_AREA_Y + 43;
+    int bullet_wc = btex.width / 2;
+    int bullet_hc = btex.height / 2;
 
     for (int i = 0; i < ammo_count; i++)
     {
+        /* Center position in levelWindow coords, matching original */
+        int cx = 192 - ((i + 1) * 9);
+        int cy = 43;
         SDL_Rect dst = {
-            .x = LEVEL_AREA_X + strip_start_x + (i * 9),
-            .y = belt_y,
+            .x = LEVEL_AREA_X + cx - bullet_wc,
+            .y = LEVEL_AREA_Y + cy - bullet_hc,
             .w = btex.width,
             .h = btex.height,
         };
@@ -886,9 +892,9 @@ void game_render_messages(const game_ctx_t *ctx)
     if (!text || text[0] == '\0')
         return;
 
-    SDL_Color yellow = {255, 255, 50, 255};
-    sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_COPY, text, MESSAGE_AREA_X + 5, MESSAGE_AREA_Y + 8,
-                          yellow);
+    SDL_Color green = {0, 190, 0, 255};
+    sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_TEXT, text, MESSAGE_AREA_X + 5, MESSAGE_AREA_Y + 5,
+                          green);
 }
 
 /* =========================================================================
@@ -1040,10 +1046,24 @@ void game_render_frame(const game_ctx_t *ctx)
 
         case SDL2ST_INTRO:
             game_render_intro(ctx);
+            /* HUD elements visible during intro — original's X11
+             * sub-windows are already mapped.  Devil eyes blink in
+             * the play area bottom-right (original/intro.c:359). */
+            game_render_score(ctx);
+            game_render_lives(ctx);
+            game_render_messages(ctx);
+            game_render_timer(ctx);
+            game_render_specials(ctx);
+            game_render_deveyes(ctx);
             break;
 
         case SDL2ST_INSTRUCT:
             game_render_instruct(ctx);
+            game_render_score(ctx);
+            game_render_lives(ctx);
+            game_render_messages(ctx);
+            game_render_timer(ctx);
+            game_render_specials(ctx);
             break;
 
         case SDL2ST_DEMO:

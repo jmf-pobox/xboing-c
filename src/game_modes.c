@@ -317,6 +317,16 @@ static void mode_intro_enter(sdl2_state_mode_t mode, void *ud)
     game_ctx_t *ctx = ud;
     attract_frame_counter = 0;
     intro_system_begin(ctx->intro, INTRO_MODE_INTRO, 0);
+
+    /* "Welcome to XBoing" in the message bar — matches
+     * original/intro.c:203 SetCurrentMessage. */
+    int frame = (int)sdl2_state_frame(ctx->state);
+    message_system_set_default(ctx->message, "Welcome to XBoing");
+    message_system_set(ctx->message, "Welcome to XBoing", 0, frame);
+
+    /* Start devil-eyes animation so they blink during intro
+     * (original/intro.c:359 HandleBlink → BlinkDevilEyes). */
+    sfx_system_start_deveyes(ctx->sfx);
 }
 
 static void mode_intro_update(sdl2_state_mode_t mode, void *ud)
@@ -332,6 +342,37 @@ static void mode_intro_update(sdl2_state_mode_t mode, void *ud)
         intro_sound_t snd = intro_system_get_sound(ctx->intro);
         if (snd.name && ctx->audio)
             sdl2_audio_play(ctx->audio, snd.name);
+    }
+
+    /* Drive devil-eyes SFX at the original's blink rate.  Original
+     * intro.c:362 advances one blink frame every BLINK_RATE=25 game
+     * frames (~30ms at ~833fps), then waits BLINK_GAP=1000 frames
+     * (~1.2s) before restarting.  At 133 real tps with multiplier 6,
+     * 100 attract frames ≈ 125ms per step → ~3.2s per 26-step cycle.
+     * Cooldown 2000 attract frames ≈ 2.5s between cycles. */
+    {
+        static int deveye_tick = 0;
+        static int deveye_cooldown = 0; // cppcheck-suppress variableScope
+        deveye_tick += ATTRACT_FRAME_MULTIPLIER;
+
+        int still_active = sfx_system_get_deveye_info(ctx->sfx).active;
+        if (still_active)
+        {
+            if (deveye_tick >= 100)
+            {
+                sfx_system_update_deveyes(ctx->sfx, GAME_PLAY_WIDTH, GAME_PLAY_HEIGHT);
+                deveye_tick = 0;
+            }
+        }
+        else
+        {
+            deveye_cooldown += ATTRACT_FRAME_MULTIPLIER;
+            if (deveye_cooldown >= 2000)
+            {
+                sfx_system_start_deveyes(ctx->sfx);
+                deveye_cooldown = 0;
+            }
+        }
     }
 
     if (sdl2_input_just_pressed(ctx->input, SDL2I_START))
@@ -351,6 +392,9 @@ static void mode_instruct_enter(sdl2_state_mode_t mode, void *ud)
     game_ctx_t *ctx = ud;
     attract_frame_counter = 0;
     intro_system_begin(ctx->intro, INTRO_MODE_INSTRUCT, 0);
+
+    int frame = (int)sdl2_state_frame(ctx->state);
+    message_system_set(ctx->message, "Save the rainforests", 0, frame);
 }
 
 static void mode_instruct_update(sdl2_state_mode_t mode, void *ud)

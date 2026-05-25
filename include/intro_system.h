@@ -42,7 +42,7 @@
 #define INTRO_BLOCK_TEXT_OFFSET 60
 
 /* Instruction text */
-#define INSTRUCT_TEXT_LINES 20
+#define INSTRUCT_TEXT_LINES 21
 #define INSTRUCT_GAP 5
 
 /* =========================================================================
