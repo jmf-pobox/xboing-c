@@ -38,6 +38,49 @@
  * Helper: render a sparkle (star) frame at a position
  * ========================================================================= */
 
+/* Shared play-area frame: stone background tile + green border.
+ * Used by all attract screens that draw into the play area. */
+static void render_play_area_frame(const game_ctx_t *ctx)
+{
+    SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
+    sdl2_texture_info_t bg;
+    if (sdl2_texture_get(ctx->texture, SPR_BGRND_MAIN, &bg) == SDL2T_OK && bg.width > 0 &&
+        bg.height > 0)
+    {
+        int tw = bg.width;
+        int th = bg.height;
+        for (int ty = PLAY_AREA_Y; ty < PLAY_AREA_Y + PLAY_AREA_H; ty += th)
+        {
+            for (int tx = PLAY_AREA_X; tx < PLAY_AREA_X + PLAY_AREA_W; tx += tw)
+            {
+                int dw = tw;
+                int dh = th;
+                if (tx + dw > PLAY_AREA_X + PLAY_AREA_W)
+                    dw = PLAY_AREA_X + PLAY_AREA_W - tx;
+                if (ty + dh > PLAY_AREA_Y + PLAY_AREA_H)
+                    dh = PLAY_AREA_Y + PLAY_AREA_H - ty;
+                SDL_Rect src = {0, 0, dw, dh};
+                SDL_Rect dst = {tx, ty, dw, dh};
+                SDL_RenderCopy(sdl, bg.texture, &src, &dst);
+            }
+        }
+    }
+
+    SDL_SetRenderDrawColor(sdl, 0, 200, 0, 255);
+    int bx = PLAY_AREA_X - 2;
+    int by = PLAY_AREA_Y - 2;
+    int bw = PLAY_AREA_W + 4;
+    int bh = PLAY_AREA_H + 4;
+    SDL_Rect top = {bx, by, bw, 2};
+    SDL_Rect bottom = {bx, by + bh - 2, bw, 2};
+    SDL_Rect left = {bx, by, 2, bh};
+    SDL_Rect right = {bx + bw - 2, by, 2, bh};
+    SDL_RenderFillRect(sdl, &top);
+    SDL_RenderFillRect(sdl, &bottom);
+    SDL_RenderFillRect(sdl, &left);
+    SDL_RenderFillRect(sdl, &right);
+}
+
 /* Border glow: cycles through red[0..6] and green[0..6] ranges,
  * alternating at each peak, updating every 40 frames.  Matches
  * original/sfx.c:324 BorderGlow(). */
@@ -582,6 +625,8 @@ void game_render_demo(const game_ctx_t *ctx)
     if (state == DEMO_STATE_NONE)
         return;
 
+    render_play_area_frame(ctx);
+
     /* Title */
     if (state >= DEMO_STATE_TITLE)
     {
@@ -674,6 +719,8 @@ void game_render_keys(const game_ctx_t *ctx)
     if (state == KEYS_STATE_NONE)
         return;
 
+    render_play_area_frame(ctx);
+
     if (state >= KEYS_STATE_TITLE)
     {
         SDL_Color white = {255, 255, 255, 255};
@@ -714,6 +761,8 @@ void game_render_keysedit(const game_ctx_t *ctx)
     keys_state_t state = keys_system_get_state(ctx->keys);
     if (state == KEYS_STATE_NONE)
         return;
+
+    render_play_area_frame(ctx);
 
     if (state >= KEYS_STATE_TITLE)
     {
@@ -906,6 +955,25 @@ void game_render_highscore(const game_ctx_t *ctx)
     highscore_state_t state = highscore_system_get_state(ctx->highscore_display);
     if (state == HIGHSCORE_STATE_NONE)
         return;
+
+    /* Highscore uses space/starfield background (already the default)
+     * but still needs the green border frame. */
+    {
+        SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
+        SDL_SetRenderDrawColor(sdl, 0, 200, 0, 255);
+        int bx = PLAY_AREA_X - 2;
+        int by = PLAY_AREA_Y - 2;
+        int bw = PLAY_AREA_W + 4;
+        int bh = PLAY_AREA_H + 4;
+        SDL_Rect top = {bx, by, bw, 2};
+        SDL_Rect bottom = {bx, by + bh - 2, bw, 2};
+        SDL_Rect left = {bx, by, 2, bh};
+        SDL_Rect right = {bx + bw - 2, by, 2, bh};
+        SDL_RenderFillRect(sdl, &top);
+        SDL_RenderFillRect(sdl, &bottom);
+        SDL_RenderFillRect(sdl, &left);
+        SDL_RenderFillRect(sdl, &right);
+    }
 
     SDL_Color white = {255, 255, 255, 255};
     SDL_Color yellow = {255, 255, 0, 255};

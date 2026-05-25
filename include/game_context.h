@@ -134,6 +134,9 @@ typedef struct game_ctx
     int vc_mode;
     int vc_interval;
 
+    /* Attract-mode display overrides (don't affect game state) */
+    int attract_level_display; /* 0 = use real level_number */
+
 } game_ctx_t;
 
 #endif /* GAME_CONTEXT_H */

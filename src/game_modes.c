@@ -72,6 +72,7 @@ static void start_new_game(game_ctx_t *ctx)
 {
     /* Reset game state */
     ctx->level_number = ctx->start_level;
+    ctx->attract_level_display = 0;
     ctx->lives_left = 3;
     ctx->game_active = true;
     ctx->score_submitted = false;
@@ -283,6 +284,7 @@ static void attract_random_display(game_ctx_t *ctx)
 
     attract_next_flash = attract_frame_counter + ATTRACT_FLASH_INTERVAL;
     score_system_set_display(ctx->score, attract_fake_score++);
+    ctx->attract_level_display = (rand() % 80) + 1;
 }
 
 /* =========================================================================
@@ -329,8 +331,6 @@ static void mode_intro_enter(sdl2_state_mode_t mode, void *ud)
     game_ctx_t *ctx = ud;
     attract_frame_counter = 0;
     attract_next_flash = ATTRACT_FLASH_INTERVAL;
-    attract_fake_score = 0;
-    score_system_set_display(ctx->score, 0);
     intro_system_begin(ctx->intro, INTRO_MODE_INTRO, 0);
 
     /* "Welcome to XBoing" in the message bar — matches
@@ -406,8 +406,6 @@ static void mode_instruct_enter(sdl2_state_mode_t mode, void *ud)
     game_ctx_t *ctx = ud;
     attract_frame_counter = 0;
     attract_next_flash = ATTRACT_FLASH_INTERVAL;
-    attract_fake_score = 0;
-    score_system_set_display(ctx->score, 0);
     intro_system_begin(ctx->intro, INTRO_MODE_INSTRUCT, 0);
 
     int frame = (int)sdl2_state_frame(ctx->state);
@@ -464,6 +462,8 @@ static void mode_demo_update(sdl2_state_mode_t mode, void *ud)
             sdl2_audio_play(ctx->audio, snd.name);
     }
 
+    attract_random_display(ctx);
+
     if (sdl2_input_just_pressed(ctx->input, SDL2I_START))
     {
         sdl2_state_transition(ctx->state, SDL2ST_GAME);
@@ -497,6 +497,8 @@ static void mode_preview_update(sdl2_state_mode_t mode, void *ud)
             sdl2_audio_play(ctx->audio, snd.name);
     }
 
+    attract_random_display(ctx);
+
     if (sdl2_input_just_pressed(ctx->input, SDL2I_START))
     {
         sdl2_state_transition(ctx->state, SDL2ST_GAME);
@@ -526,6 +528,8 @@ static void mode_keys_update(sdl2_state_mode_t mode, void *ud)
         keys_system_update(ctx->keys, attract_frame_counter);
     }
 
+    attract_random_display(ctx);
+
     if (sdl2_input_just_pressed(ctx->input, SDL2I_START))
     {
         sdl2_state_transition(ctx->state, SDL2ST_GAME);
@@ -554,6 +558,8 @@ static void mode_keysedit_update(sdl2_state_mode_t mode, void *ud)
         attract_frame_counter++;
         keys_system_update(ctx->keys, attract_frame_counter);
     }
+
+    attract_random_display(ctx);
 
     if (sdl2_input_just_pressed(ctx->input, SDL2I_START))
     {
@@ -752,6 +758,8 @@ static void mode_highscore_update(sdl2_state_mode_t mode, void *ud)
         attract_frame_counter++;
         highscore_system_update(ctx->highscore_display, attract_frame_counter);
     }
+
+    attract_random_display(ctx);
 
     if (sdl2_input_just_pressed(ctx->input, SDL2I_START))
     {

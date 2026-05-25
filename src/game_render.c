@@ -559,7 +559,7 @@ void game_render_lives(const game_ctx_t *ctx)
      * coords (original/level.c:210 DisplayLevelNumber → DrawOutNumber at
      * window-local x=260, y=5).  Iterate digits least-significant first
      * so digit_index 0 is the rightmost. */
-    int level = ctx->level_number;
+    int level = ctx->attract_level_display > 0 ? ctx->attract_level_display : ctx->level_number;
     if (level <= 0)
         level = 1;
 
@@ -1071,19 +1071,40 @@ void game_render_frame(const game_ctx_t *ctx)
 
         case SDL2ST_DEMO:
             game_render_demo(ctx);
+            game_render_score(ctx);
+            game_render_lives(ctx);
+            game_render_messages(ctx);
+            game_render_timer(ctx);
+            game_render_specials(ctx);
             break;
 
         case SDL2ST_PREVIEW:
             game_render_background(ctx);
             game_render_preview(ctx);
+            game_render_score(ctx);
+            game_render_lives(ctx);
+            game_render_messages(ctx);
+            game_render_timer(ctx);
+            game_render_specials(ctx);
             break;
 
         case SDL2ST_KEYS:
             game_render_keys(ctx);
+            game_render_score(ctx);
+            game_render_lives(ctx);
+            game_render_messages(ctx);
+            game_render_timer(ctx);
+            game_render_specials(ctx);
+            game_render_deveyes(ctx);
             break;
 
         case SDL2ST_KEYSEDIT:
             game_render_keysedit(ctx);
+            game_render_score(ctx);
+            game_render_lives(ctx);
+            game_render_messages(ctx);
+            game_render_timer(ctx);
+            game_render_specials(ctx);
             break;
 
         case SDL2ST_BONUS:
@@ -1092,6 +1113,11 @@ void game_render_frame(const game_ctx_t *ctx)
 
         case SDL2ST_HIGHSCORE:
             game_render_highscore(ctx);
+            game_render_score(ctx);
+            game_render_lives(ctx);
+            game_render_messages(ctx);
+            game_render_timer(ctx);
+            game_render_specials(ctx);
             break;
 
         case SDL2ST_DIALOGUE:
