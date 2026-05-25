@@ -312,7 +312,7 @@ void game_render_intro(const game_ctx_t *ctx)
             if (entries[i].description)
             {
                 sdl2_font_draw(ctx->font, SDL2F_FONT_COPY, entries[i].description,
-                               PLAY_AREA_X + entries[i].x + 50, PLAY_AREA_Y + entries[i].y + 2,
+                               PLAY_AREA_X + entries[i].x + 60, PLAY_AREA_Y + entries[i].y + 2,
                                green);
             }
         }
