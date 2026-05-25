@@ -830,8 +830,7 @@ static void vc_check(game_ctx_t *ctx, int pre_presents, int pre_credits, int pre
      * isn't the one we're capturing. */
     if (mode != prev_mode)
     {
-        if (prev_mode != SDL2ST_NONE && ctx->vc_mode != 99 &&
-            ctx->vc_mode == (int)prev_mode)
+        if (prev_mode != SDL2ST_NONE && ctx->vc_mode != 99 && ctx->vc_mode == (int)prev_mode)
         {
             printf("XBOING_SNAPSHOT_DONE\n");
             fflush(stdout);
