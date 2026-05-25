@@ -32,7 +32,7 @@ static const intro_block_entry_t block_table[INTRO_BLOCK_TOTAL] = {
     {INTRO_BLK_TIMER, 260, 200, 10, 0, "- Extra Time"},
     {INTRO_BLK_BLACK, 260, 240, 0, 0, "- Solid wall"},
     {INTRO_BLK_BOMB, 260, 280, 9, 0, "- Bomb!"},
-    {INTRO_BLK_PADDLE, 260, 320, 20, 0, "- The Paddle"},
+    {INTRO_BLK_PADDLE, 260, 320, 0, 0, "- The Paddle"},
     {INTRO_BLK_BULLET_ITEM, 260, 360, 20, 5, "- Bullet"},
     {INTRO_BLK_DEATH, 260, 400, 8, 0, "- Instant Death!"},
     {INTRO_BLK_EXTRABALL, 260, 440, 10, 0, "- Extra Ball"},
@@ -65,6 +65,7 @@ static const intro_instruct_line_t instruct_lines[INSTRUCT_TEXT_LINES] = {
     {"Sometimes a special block may appear or be added to another block", 0, 1},
     {"that will effect the gameplay if hit. They also disappear randomly.", 0, 0},
     {NULL, 1, 0},
+    {"Please read the manual for more information on how to play.", 0, 1},
 };
 
 /* =========================================================================

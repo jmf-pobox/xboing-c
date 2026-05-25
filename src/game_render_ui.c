@@ -358,9 +358,9 @@ void game_render_intro(const game_ctx_t *ctx)
             /* Draw description text — all green per original. */
             if (entries[i].description)
             {
-                sdl2_font_draw(ctx->font, SDL2F_FONT_COPY, entries[i].description,
-                               PLAY_AREA_X + entries[i].x + 60, PLAY_AREA_Y + entries[i].y + 2,
-                               green);
+                sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_TEXT, entries[i].description,
+                                      PLAY_AREA_X + entries[i].x + 60,
+                                      PLAY_AREA_Y + entries[i].y + 2, green);
             }
         }
 
@@ -439,38 +439,55 @@ void game_render_instruct(const game_ctx_t *ctx)
         SDL_RenderFillRect(sdl, &right);
     }
 
-    /* Title */
+    /* XBOING title image — original/inst.c:219 calls DoIntroTitle
+     * which draws the same title sprite as the intro blocks screen. */
     if (state >= INTRO_STATE_TITLE)
     {
-        SDL_Color white = {255, 255, 255, 255};
-        sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TITLE, "Instructions", PLAY_AREA_Y + 20,
-                                      white, PLAY_AREA_W);
+        sdl2_texture_info_t tex;
+        if (sdl2_texture_get(ctx->texture, SPR_TITLE_BIG, &tex) == SDL2T_OK)
+        {
+            int tx = PLAY_AREA_X + (PLAY_AREA_W - tex.width) / 2;
+            SDL_Rect dst = {tx, PLAY_AREA_Y + 10, tex.width, tex.height};
+            SDL_RenderCopy(sdl2_renderer_get(ctx->renderer), tex.texture, NULL, &dst);
+        }
     }
 
-    /* Instruction text lines */
+    /* "- Instructions -" title + body text + "Insert coin" —
+     * all drawn during INTRO_STATE_TEXT per original/inst.c:134-163. */
     if (state >= INTRO_STATE_TEXT)
     {
+        /* Title: titleFont, y=110, red, centered across PLAY_WIDTH. */
+        SDL_Color red = {255, 0, 0, 255};
+        sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TITLE, "- Instructions -",
+                                      PLAY_AREA_Y + 110, red, PLAY_AREA_W + 2 * PLAY_AREA_X);
+
         const intro_instruct_line_t *lines = NULL;
         int count = intro_system_get_instruct_text(ctx->intro, &lines);
 
-        SDL_Color white = {255, 255, 255, 255};
-        SDL_Color yellow = {255, 255, 0, 255};
-        SDL_Color green = {0, 255, 0, 255};
+        SDL_Color green_bright = {0, 255, 0, 255};
+        SDL_Color green_medium = {0, 187, 0, 255};
 
+        int y = PLAY_AREA_Y + 150;
         for (int i = 0; i < count; i++)
         {
             if (lines[i].is_spacer)
+            {
+                y += 18;
                 continue;
+            }
 
-            SDL_Color clr = white;
-            if (lines[i].color_index == 1)
-                clr = yellow;
-            else if (lines[i].color_index == 2)
-                clr = green;
-
-            sdl2_font_draw(ctx->font, SDL2F_FONT_COPY, lines[i].text, PLAY_AREA_X + 30,
-                           PLAY_AREA_Y + 90 + i * 24, clr);
+            SDL_Color clr = lines[i].color_index % 2 ? green_bright : green_medium;
+            sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_DATA, lines[i].text, y, clr,
+                                          PLAY_AREA_W + 2 * PLAY_AREA_X);
+            y += 18;
         }
+
+        /* "Insert coin" — original/inst.c:163: textFont, tann,
+         * y = PLAY_HEIGHT - 40, centred across PLAY_WIDTH. */
+        SDL_Color tan_clr = {210, 180, 140, 255};
+        sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TEXT, "Insert coin to start the game",
+                                      PLAY_AREA_Y + PLAY_AREA_H - 40, tan_clr,
+                                      PLAY_AREA_W + 2 * PLAY_AREA_X);
     }
 
     /* Sparkle */
