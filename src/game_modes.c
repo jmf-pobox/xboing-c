@@ -469,6 +469,8 @@ static void mode_demo_enter(sdl2_state_mode_t mode, void *ud)
         {
             block_system_clear_all(ctx->block);
             level_system_load_file(ctx->level, level_path);
+            ctx->time_bonus_total = level_system_get_time_bonus(ctx->level);
+            ctx->time_remaining = ctx->time_bonus_total;
         }
     }
 }

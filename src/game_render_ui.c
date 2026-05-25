@@ -12,6 +12,7 @@
 
 #include <SDL2/SDL.h>
 
+#include "block_types.h"
 #include "bonus_system.h"
 #include "demo_system.h"
 #include "game_context.h"
@@ -532,6 +533,44 @@ void game_render_demo(const game_ctx_t *ctx)
                                 tex.height};
                 SDL_RenderCopy(sdl, tex.texture, NULL, &dst);
             }
+        }
+    }
+
+    /* Half-disintegrated block at (col=2, row=12) per original/demo.c:173-176.
+     * colWidth=55, rowHeight=32 → pixel (110, 384) in playWindow. */
+    if (state >= DEMO_STATE_BLOCKS)
+    {
+        const char *exkey = sprite_block_explode_key(YELLOW_BLK, 1);
+        sdl2_texture_info_t etex;
+        if (exkey && sdl2_texture_get(ctx->texture, exkey, &etex) == SDL2T_OK)
+        {
+            SDL_Rect dst = {PLAY_AREA_X + 110, PLAY_AREA_Y + 384, etex.width, etex.height};
+            SDL_RenderCopy(sdl2_renderer_get(ctx->renderer), etex.texture, NULL, &dst);
+        }
+    }
+
+    /* Paddle + left arrow per original/demo.c:178-182.
+     * DrawPaddle(x=PLAY_WIDTH/2, y=PLAY_HEIGHT-90, PADDLE_HUGE)
+     * renders at (x-35, y) size 70x15.
+     * Left arrow at (x-75, y-1) size 35x19. */
+    if (state >= DEMO_STATE_BLOCKS)
+    {
+        SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
+        int px = PLAY_AREA_X + PLAY_AREA_W / 2;
+        int py = PLAY_AREA_Y + PLAY_AREA_H - 90;
+
+        sdl2_texture_info_t ptex;
+        if (sdl2_texture_get(ctx->texture, SPR_PADDLE_HUGE, &ptex) == SDL2T_OK)
+        {
+            SDL_Rect dst = {px - 35, py, ptex.width, ptex.height};
+            SDL_RenderCopy(sdl, ptex.texture, NULL, &dst);
+        }
+
+        sdl2_texture_info_t atex;
+        if (sdl2_texture_get(ctx->texture, SPR_LEFT_ARROW, &atex) == SDL2T_OK)
+        {
+            SDL_Rect dst = {px - 75, py - 1, atex.width, atex.height};
+            SDL_RenderCopy(sdl, atex.texture, NULL, &dst);
         }
     }
 
