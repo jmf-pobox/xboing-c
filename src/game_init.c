@@ -762,10 +762,10 @@ static void vc_check(game_ctx_t *ctx)
     sdl2_state_mode_t mode = sdl2_state_current(ctx->state);
     unsigned long frame = sdl2_state_frame(ctx->state);
 
-    int vc_active = (ctx->vc_mode == 99 || ctx->vc_mode == (int)mode);
-    if (!vc_active)
-        return;
-
+    /* Check mode transition BEFORE the active-mode gate — when
+     * capturing a single mode, we need to detect the transition
+     * away from that mode and exit, even though the new mode
+     * isn't the one we're capturing. */
     if (mode != prev_mode)
     {
         if (prev_mode != SDL2ST_NONE && ctx->vc_mode != 99 &&
@@ -780,6 +780,10 @@ static void vc_check(game_ctx_t *ctx)
         cur_subname = NULL;
         seq = 0;
     }
+
+    int vc_active = (ctx->vc_mode == 99 || ctx->vc_mode == (int)mode);
+    if (!vc_active)
+        return;
 
     int cur_substate = -1;
     const char *subname = NULL;
