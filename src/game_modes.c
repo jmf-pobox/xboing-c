@@ -271,7 +271,7 @@ static void mode_pause_exit(sdl2_state_mode_t mode, void *ud)
  * ========================================================================= */
 
 #define ATTRACT_FRAME_MULTIPLIER 6
-#define ATTRACT_FLASH_INTERVAL 500
+#define ATTRACT_FLASH_INTERVAL 300
 static int attract_frame_counter;
 static unsigned long attract_fake_score;
 
