@@ -493,18 +493,15 @@ static void mode_demo_update(sdl2_state_mode_t mode, void *ud)
  * MODE_PREVIEW — random level preview
  * ========================================================================= */
 
+static int preview_message_set;
+
 static void mode_preview_enter(sdl2_state_mode_t mode, void *ud)
 {
     (void)mode;
     game_ctx_t *ctx = ud;
     attract_frame_counter = 0; attract_next_flash = 0;
+    preview_message_set = 0;
     demo_system_begin(ctx->demo, DEMO_MODE_PREVIEW, 0);
-
-    int level = demo_system_get_preview_level(ctx->demo);
-    char msg[64];
-    snprintf(msg, sizeof(msg), "Preview of level %d", level);
-    int frame = (int)sdl2_state_frame(ctx->state);
-    message_system_set(ctx->message, msg, 0, frame);
 }
 
 static void mode_preview_update(sdl2_state_mode_t mode, void *ud)
@@ -523,6 +520,19 @@ static void mode_preview_update(sdl2_state_mode_t mode, void *ud)
     }
 
     attract_random_display(ctx);
+
+    if (!preview_message_set)
+    {
+        int level = demo_system_get_preview_level(ctx->demo);
+        if (level > 0)
+        {
+            char msg[64];
+            snprintf(msg, sizeof(msg), "Preview of level %d", level);
+            int frame = (int)sdl2_state_frame(ctx->state);
+            message_system_set(ctx->message, msg, 0, frame);
+            preview_message_set = 1;
+        }
+    }
 
     if (sdl2_input_just_pressed(ctx->input, SDL2I_START))
     {
