@@ -25,6 +25,8 @@
 #include "sdl2_texture.h"
 #include "sprite_catalog.h"
 
+#include "sdl2_state.h"
+
 /* Layout constants from legacy stage.c */
 #define OFFSET_X 35
 #define PLAY_AREA_X OFFSET_X
@@ -35,6 +37,45 @@
 /* =========================================================================
  * Helper: render a sparkle (star) frame at a position
  * ========================================================================= */
+
+/* Border glow: cycles through red[0..6] and green[0..6] ranges,
+ * alternating at each peak, updating every 40 frames.  Matches
+ * original/sfx.c:324 BorderGlow(). */
+static void render_border_glow(const game_ctx_t *ctx)
+{
+    static const SDL_Color reds[] = {
+        {255, 0, 0, 255}, {221, 0, 0, 255}, {187, 0, 0, 255}, {153, 0, 0, 255},
+        {119, 0, 0, 255}, {85, 0, 0, 255},  {51, 0, 0, 255},
+    };
+    static const SDL_Color greens[] = {
+        {0, 255, 0, 255}, {0, 221, 0, 255}, {0, 187, 0, 255}, {0, 153, 0, 255},
+        {0, 119, 0, 255}, {0, 85, 0, 255},  {0, 51, 0, 255},
+    };
+
+    unsigned long frame = sdl2_state_frame(ctx->state);
+    int cycle_pos = (int)((frame / 12) % 24);
+    int use_green = (cycle_pos / 12) % 2;
+    int idx = cycle_pos % 12;
+    if (idx > 6)
+        idx = 12 - idx;
+
+    SDL_Color c = use_green ? greens[idx] : reds[idx];
+    SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
+    SDL_SetRenderDrawColor(sdl, c.r, c.g, c.b, 255);
+
+    int bx = PLAY_AREA_X - 2;
+    int by = PLAY_AREA_Y - 2;
+    int bw = PLAY_AREA_W + 4;
+    int bh = PLAY_AREA_H + 4;
+    SDL_Rect top = {bx, by, bw, 2};
+    SDL_Rect bottom = {bx, by + bh - 2, bw, 2};
+    SDL_Rect left = {bx, by, 2, bh};
+    SDL_Rect right = {bx + bw - 2, by, 2, bh};
+    SDL_RenderFillRect(sdl, &top);
+    SDL_RenderFillRect(sdl, &bottom);
+    SDL_RenderFillRect(sdl, &left);
+    SDL_RenderFillRect(sdl, &right);
+}
 
 static void render_sparkle(const game_ctx_t *ctx, int x, int y, int frame_index)
 {
@@ -110,22 +151,37 @@ void game_render_presents(const game_ctx_t *ctx)
         }
     }
 
-    /* Author credits — rendered only during the credits phase
-     * (TEXT1 through TEXT_CLEAR).  Center within PRESENTS_TOTAL_WIDTH
-     * (565) not SDL2R_LOGICAL_WIDTH (575) — the presents system
-     * uses PRESENTS_TOTAL_WIDTH for all coordinate math. */
+    /* Author credits — bitmap sprites sequenced per original/presents.c.
+     * Stage 1: "JUSTIN" at (140, 530).  Stage 2: adds "KIBELL" at (152, 584).
+     * Stage 3: replaces both with "presents" at (77, 562).
+     * Positions: center = (MAIN_WIDTH+PLAY_WIDTH)/2 = 282. */
     {
-        if (presents_system_is_credits_phase(ctx->presents))
-        {
-            SDL_Color white = {255, 255, 255, 255};
-            SDL_Color yellow = {255, 255, 0, 255};
+        int credits_stage = presents_system_get_credits_stage(ctx->presents);
+        sdl2_texture_info_t tex;
 
-            sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TEXT, "Justin C. Kibell", 200,
-                                          white, PRESENTS_TOTAL_WIDTH);
-            sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_COPY, "presents", 230, yellow,
-                                          PRESENTS_TOTAL_WIDTH);
-            sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TITLE, "XBoing II", 270, white,
-                                          PRESENTS_TOTAL_WIDTH);
+        if (credits_stage == 1 || credits_stage == 2)
+        {
+            if (sdl2_texture_get(ctx->texture, SPR_PRESENTS_JUSTIN, &tex) == SDL2T_OK)
+            {
+                SDL_Rect dst = {140, 530, tex.width, tex.height};
+                SDL_RenderCopy(sdl, tex.texture, NULL, &dst);
+            }
+        }
+        if (credits_stage == 2)
+        {
+            if (sdl2_texture_get(ctx->texture, SPR_PRESENTS_KIBELL, &tex) == SDL2T_OK)
+            {
+                SDL_Rect dst = {152, 584, tex.width, tex.height};
+                SDL_RenderCopy(sdl, tex.texture, NULL, &dst);
+            }
+        }
+        if (credits_stage == 3)
+        {
+            if (sdl2_texture_get(ctx->texture, SPR_PRESENTS, &tex) == SDL2T_OK)
+            {
+                SDL_Rect dst = {77, 562, tex.width, tex.height};
+                SDL_RenderCopy(sdl, tex.texture, NULL, &dst);
+            }
         }
     }
 
@@ -180,7 +236,7 @@ void game_render_presents(const game_ctx_t *ctx)
      * integration layer should compute centering).  We measure the
      * visible substring and center it horizontally. */
     {
-        SDL_Color green = {0, 255, 0, 255};
+        SDL_Color red = {255, 0, 0, 255};
         for (int line = 0; line < 3; line++)
         {
             presents_typewriter_info_t ti;
@@ -193,7 +249,7 @@ void game_render_presents(const game_ctx_t *ctx)
                     if (n > 255)
                         n = 255;
                     snprintf(buf, sizeof(buf), "%.*s", n, ti.text);
-                    sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_DATA, buf, ti.y, green,
+                    sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_DATA, buf, ti.y, red,
                                                   PRESENTS_TOTAL_WIDTH);
                 }
             }
@@ -214,6 +270,11 @@ void game_render_presents(const game_ctx_t *ctx)
                                  PRESENTS_TOTAL_HEIGHT - wi.bottom_y};
             SDL_RenderFillRect(sdl, &top_rect);
             SDL_RenderFillRect(sdl, &bot_rect);
+
+            /* Red lines at the wipe edges per original/presents.c:529-532 */
+            SDL_SetRenderDrawColor(sdl, 255, 0, 0, 255);
+            SDL_RenderDrawLine(sdl, 2, wi.top_y, PRESENTS_TOTAL_WIDTH - 2, wi.top_y);
+            SDL_RenderDrawLine(sdl, 2, wi.bottom_y - 1, PRESENTS_TOTAL_WIDTH - 2, wi.bottom_y - 1);
         }
     }
 }
@@ -260,8 +321,14 @@ void game_render_intro(const game_ctx_t *ctx)
             }
         }
     }
+    /* Border: static green during early states, glow during SPARKLE
+     * per original/intro.c:406 BorderGlow(). */
+    if (state == INTRO_STATE_SPARKLE)
     {
-        /* Green border matching original playWindow border_width=2 */
+        render_border_glow(ctx);
+    }
+    else
+    {
         SDL_SetRenderDrawColor(sdl, 0, 200, 0, 255);
         int bx = PLAY_AREA_X - 2;
         int by = PLAY_AREA_Y - 2;
@@ -422,9 +489,14 @@ void game_render_instruct(const game_ctx_t *ctx)
             }
         }
     }
+    if (state == INTRO_STATE_SPARKLE)
     {
-        SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
-        SDL_SetRenderDrawColor(sdl, 0, 200, 0, 255);
+        render_border_glow(ctx);
+    }
+    else
+    {
+        SDL_Renderer *sdl2 = sdl2_renderer_get(ctx->renderer);
+        SDL_SetRenderDrawColor(sdl2, 0, 200, 0, 255);
         int bx = PLAY_AREA_X - 2;
         int by = PLAY_AREA_Y - 2;
         int bw = PLAY_AREA_W + 4;
@@ -433,10 +505,10 @@ void game_render_instruct(const game_ctx_t *ctx)
         SDL_Rect bottom = {bx, by + bh - 2, bw, 2};
         SDL_Rect left = {bx, by, 2, bh};
         SDL_Rect right = {bx + bw - 2, by, 2, bh};
-        SDL_RenderFillRect(sdl, &top);
-        SDL_RenderFillRect(sdl, &bottom);
-        SDL_RenderFillRect(sdl, &left);
-        SDL_RenderFillRect(sdl, &right);
+        SDL_RenderFillRect(sdl2, &top);
+        SDL_RenderFillRect(sdl2, &bottom);
+        SDL_RenderFillRect(sdl2, &left);
+        SDL_RenderFillRect(sdl2, &right);
     }
 
     /* XBOING title image — original/inst.c:219 calls DoIntroTitle

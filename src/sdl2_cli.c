@@ -9,8 +9,11 @@
 
 #include <errno.h>
 #include <limits.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "sdl2_state.h"
 
 /* =========================================================================
  * Option matching
@@ -108,6 +111,8 @@ sdl2_cli_config_t sdl2_cli_config_defaults(void)
     cfg.max_volume = 80;
     cfg.debug = false;
     cfg.grab = false;
+    cfg.visual_capture_mode = -1;
+    cfg.visual_capture_interval = 100;
     return cfg;
 }
 
@@ -282,6 +287,62 @@ sdl2_cli_status_t sdl2_cli_parse(int argc, char *const argv[], sdl2_cli_config_t
             }
             memcpy(config->nickname, name, len);
             config->nickname[len] = '\0';
+            continue;
+        }
+
+        if (match_option(arg, "-visual-capture"))
+        {
+            const char *val = NULL;
+            if (!parse_str_arg(argc, argv, &i, &val))
+            {
+                if (bad_option != NULL)
+                {
+                    *bad_option = arg;
+                }
+                return SDL2C_ERR_MISSING_VALUE;
+            }
+            char mode_buf[64];
+            const char *colon = strchr(val, ':');
+            if (colon)
+            {
+                size_t mlen = (size_t)(colon - val);
+                if (mlen >= sizeof(mode_buf))
+                    mlen = sizeof(mode_buf) - 1;
+                memcpy(mode_buf, val, mlen);
+                mode_buf[mlen] = '\0';
+                int iv = atoi(colon + 1);
+                if (iv > 0)
+                    config->visual_capture_interval = iv;
+            }
+            else
+            {
+                snprintf(mode_buf, sizeof(mode_buf), "%s", val);
+            }
+
+            if (strcmp(mode_buf, "all") == 0)
+                config->visual_capture_mode = 99;
+            else if (strcmp(mode_buf, "presents") == 0)
+                config->visual_capture_mode = SDL2ST_PRESENTS;
+            else if (strcmp(mode_buf, "intro") == 0)
+                config->visual_capture_mode = SDL2ST_INTRO;
+            else if (strcmp(mode_buf, "instruct") == 0)
+                config->visual_capture_mode = SDL2ST_INSTRUCT;
+            else if (strcmp(mode_buf, "demo") == 0)
+                config->visual_capture_mode = SDL2ST_DEMO;
+            else if (strcmp(mode_buf, "keys") == 0)
+                config->visual_capture_mode = SDL2ST_KEYS;
+            else if (strcmp(mode_buf, "keysedit") == 0)
+                config->visual_capture_mode = SDL2ST_KEYSEDIT;
+            else if (strcmp(mode_buf, "highscore") == 0)
+                config->visual_capture_mode = SDL2ST_HIGHSCORE;
+            else if (strcmp(mode_buf, "preview") == 0)
+                config->visual_capture_mode = SDL2ST_PREVIEW;
+            else
+            {
+                if (bad_option != NULL)
+                    *bad_option = val;
+                return SDL2C_ERR_UNKNOWN_OPTION;
+            }
             continue;
         }
 

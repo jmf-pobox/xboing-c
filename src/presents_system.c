@@ -45,6 +45,9 @@ struct presents_system
      * leak into the 800-frame WAIT-after-FLAG hold. */
     int credits_entered;
 
+    /* Credits display stage: 0=none, 1=justin, 2=justin+kibell, 3=presents */
+    int credits_stage;
+
     /* LETTERS state. */
     int letter_index; /* 0..5 during stamping, 6 = "II" drawn */
     int letter_x;
@@ -118,6 +121,7 @@ static void do_flag(presents_system_t *ctx)
 static void do_text1(presents_system_t *ctx)
 {
     ctx->credits_entered = 1;
+    ctx->credits_stage = 1;
     set_wait(ctx, PRESENTS_STATE_TEXT2, ctx->current_frame + PRESENTS_TEXT1_DELAY);
 }
 
@@ -127,6 +131,7 @@ static void do_text1(presents_system_t *ctx)
 
 static void do_text2(presents_system_t *ctx)
 {
+    ctx->credits_stage = 2;
     set_wait(ctx, PRESENTS_STATE_TEXT3, ctx->current_frame + PRESENTS_TEXT2_DELAY);
 }
 
@@ -136,6 +141,7 @@ static void do_text2(presents_system_t *ctx)
 
 static void do_text3(presents_system_t *ctx)
 {
+    ctx->credits_stage = 3;
     set_wait(ctx, PRESENTS_STATE_TEXT_CLEAR, ctx->current_frame + PRESENTS_TEXT3_DELAY);
 }
 
@@ -146,6 +152,7 @@ static void do_text3(presents_system_t *ctx)
 static void do_text_clear(presents_system_t *ctx)
 {
     ctx->credits_entered = 0;
+    ctx->credits_stage = 0;
     /* Reset letter stamping state. */
     ctx->letter_index = 0;
     ctx->letter_x = 40;
@@ -652,4 +659,13 @@ int presents_system_is_credits_phase(const presents_system_t *ctx)
         return 0;
     }
     return ctx->credits_entered;
+}
+
+int presents_system_get_credits_stage(const presents_system_t *ctx)
+{
+    if (!ctx)
+    {
+        return 0;
+    }
+    return ctx->credits_stage;
 }

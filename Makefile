@@ -119,6 +119,17 @@ visual-check-setup: ## Set up the managed venv and Python deps for `make visual-
 visual-check: build ## LLM-based visual-fidelity comparison (modern vs. tests/golden/original/). Reads ANTHROPIC_API_KEY from env or `secret-tool lookup service anthropic`. Run `make visual-check-setup` once to install deps.
 	.tmp/venv/bin/python scripts/visual_check.py
 
+# --- Visual-capture targets (state-driven screenshot capture) ----------------
+
+golden-screen: original-build ## Capture original goldens for one screen. Usage: make golden-screen SCREEN=intro INTERVAL=200
+	scripts/visual_capture.sh original "$(SCREEN):$(or $(INTERVAL),200)" tests/golden/original/
+
+golden-all: original-build ## Capture original goldens for all attract screens (one-time).
+	scripts/visual_capture.sh original "all:$(or $(INTERVAL),200)" tests/golden/original/
+
+modern-screen: build ## Capture modern screenshots for one screen. Usage: make modern-screen SCREEN=intro INTERVAL=200
+	scripts/visual_capture.sh modern "$(SCREEN):$(or $(INTERVAL),200)" .tmp/visual-check/modern/
+
 dogfood: deb ## Install .deb, launch xboing from .tmp/, verify window opens (requires sudo; skips window check if headless or xwininfo missing).
 	mkdir -p .tmp
 	rm -f .tmp/xboing_*.deb .tmp/dogfood.deb

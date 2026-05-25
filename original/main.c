@@ -1141,6 +1141,174 @@ static void handleGameMode(Display *display)
         CheckGameRules(display, playWindow);
 }
 
+/* ----- Visual-capture infrastructure ---------------------------------- */
+
+extern int visualCaptureMode;
+extern int visualCaptureInterval;
+
+static int vc_capturing(int target_mode)
+{
+    if (visualCaptureMode < 0)
+        return 0;
+    return visualCaptureMode == 99 || visualCaptureMode == target_mode;
+}
+
+static void vc_signal(Display *display, const char *mode_name,
+                      const char *substate, int seq)
+{
+    XSync(display, False);
+    printf("XBOING_SNAPSHOT %s/%s/%03d\n", mode_name, substate, seq);
+    fflush(stdout);
+    sleep(1);
+}
+
+static void vc_done(void)
+{
+    printf("XBOING_SNAPSHOT_DONE\n");
+    fflush(stdout);
+    exit(0);
+}
+
+static const char *presents_state_name(int s)
+{
+    switch (s)
+    {
+        case PRESENT_FLAG:
+            return "flag";
+        case PRESENT_TEXT1:
+            return "text1";
+        case PRESENT_TEXT2:
+            return "text2";
+        case PRESENT_TEXT3:
+            return "text3";
+        case PRESENT_TEXT_CLEAR:
+            return "text-clear";
+        case PRESENT_LETTERS:
+            return "letters";
+        case PRESENT_SHINE:
+            return "shine";
+        case PRESENT_SPECIAL_TEXT1:
+            return "typewriter1";
+        case PRESENT_SPECIAL_TEXT2:
+            return "typewriter2";
+        case PRESENT_SPECIAL_TEXT3:
+            return "typewriter3";
+        case PRESENT_CLEAR:
+            return "wipe";
+        default:
+            return NULL;
+    }
+}
+
+static const char *intro_state_name(int s)
+{
+    switch (s)
+    {
+        case INTRO_TITLE:
+            return "title";
+        case INTRO_BLOCKS:
+            return "blocks";
+        case INTRO_TEXT:
+            return "text";
+        case INTRO_EXPLODE:
+            return "explode";
+        default:
+            return NULL;
+    }
+}
+
+static const char *instruct_state_name(int s)
+{
+    switch (s)
+    {
+        case INSTRUCT_TITLE:
+            return "title";
+        case INSTRUCT_TEXT:
+            return "text";
+        case INSTRUCT_SPARKLE:
+            return "sparkle";
+        default:
+            return NULL;
+    }
+}
+
+static const char *demo_state_name(int s)
+{
+    switch (s)
+    {
+        case DEMO_TITLE:
+            return "title";
+        case DEMO_BLOCKS:
+            return "blocks";
+        case DEMO_TEXT:
+            return "text";
+        case DEMO_SPARKLE:
+            return "sparkle";
+        default:
+            return NULL;
+    }
+}
+
+static const char *keys_state_name(int s)
+{
+    switch (s)
+    {
+        case KEYS_TITLE:
+            return "title";
+        case KEYS_TEXT:
+            return "text";
+        case KEYS_SPARKLE:
+            return "sparkle";
+        default:
+            return NULL;
+    }
+}
+
+static const char *keysedit_state_name(int s)
+{
+    switch (s)
+    {
+        case KEYSEDIT_TITLE:
+            return "title";
+        case KEYSEDIT_TEXT:
+            return "text";
+        case KEYSEDIT_SPARKLE:
+            return "sparkle";
+        default:
+            return NULL;
+    }
+}
+
+static const char *highscore_state_name(int s)
+{
+    switch (s)
+    {
+        case HIGHSCORE_TITLE:
+            return "title";
+        case HIGHSCORE_SHOW:
+            return "show";
+        case HIGHSCORE_SPARKLE:
+            return "sparkle";
+        default:
+            return NULL;
+    }
+}
+
+static const char *preview_state_name(int s)
+{
+    switch (s)
+    {
+        case PREVIEW_LEVEL:
+            return "level";
+        case PREVIEW_TEXT:
+            return "text";
+        default:
+            return NULL;
+    }
+}
+
+/* -------------------------------------------------------------------- */
+
 static void handleGameStates(Display *display)
 {
     /* Update the message window if any new messages come along */
@@ -1178,6 +1346,16 @@ static void handleGameStates(Display *display)
         default:
             break;
     }
+
+    /* Snapshot sub-state before dispatch for visual-capture. */
+    int vc_pre_presents = PresentState;
+    int vc_pre_intro = IntroState;
+    int vc_pre_instruct = InstructState;
+    int vc_pre_demo = DemoState;
+    int vc_pre_keys = KeysState;
+    int vc_pre_keysedit = KeysEditState;
+    int vc_pre_highscore = HighScoreState;
+    int vc_pre_preview = PreviewState;
 
     /* Switch on the current game mode */
     switch (mode)
@@ -1238,6 +1416,133 @@ static void handleGameStates(Display *display)
 
     /* Flush the display */
     XFlush(display);
+
+    /* ----- Visual-capture: interval sampling within sub-states --------- */
+    if (visualCaptureMode >= 0)
+    {
+        static int prev_mode = -1;
+        static int prev_substate = -1;
+        static const char *cur_substate_name = NULL;
+        static int next_capture_frame = 0;
+        static int seq = 0;
+        static int pending_entry = 0;
+
+        /* Detect top-level mode change. */
+        if (mode != prev_mode)
+        {
+            if (prev_mode >= 0 && visualCaptureMode != 99 &&
+                visualCaptureMode == prev_mode)
+                vc_done();
+            prev_mode = mode;
+            prev_substate = -1;
+            cur_substate_name = NULL;
+            seq = 0;
+            pending_entry = 0;
+        }
+
+        /* Resolve pre- and post-dispatch sub-states.  Content states
+         * (FLAG, TEXT1, etc.) execute in one frame and transition to
+         * WAIT, so the post-dispatch state is usually WAIT.  We use
+         * the pre-dispatch state to detect what just drew. */
+        int pre_substate = -1;
+        int post_substate = -1;
+        const char *mode_str = NULL;
+        const char *(*name_fn)(int) = NULL;
+
+        if (mode == MODE_PRESENTS && vc_capturing(MODE_PRESENTS))
+        {
+            pre_substate = vc_pre_presents;
+            post_substate = PresentState;
+            mode_str = "presents";
+            name_fn = presents_state_name;
+        }
+        else if (mode == MODE_INTRO && vc_capturing(MODE_INTRO))
+        {
+            pre_substate = vc_pre_intro;
+            post_substate = IntroState;
+            mode_str = "intro";
+            name_fn = intro_state_name;
+        }
+        else if (mode == MODE_INSTRUCT && vc_capturing(MODE_INSTRUCT))
+        {
+            pre_substate = vc_pre_instruct;
+            post_substate = InstructState;
+            mode_str = "instruct";
+            name_fn = instruct_state_name;
+        }
+        else if (mode == MODE_DEMO && vc_capturing(MODE_DEMO))
+        {
+            pre_substate = vc_pre_demo;
+            post_substate = DemoState;
+            mode_str = "demo";
+            name_fn = demo_state_name;
+        }
+        else if (mode == MODE_KEYS && vc_capturing(MODE_KEYS))
+        {
+            pre_substate = vc_pre_keys;
+            post_substate = KeysState;
+            mode_str = "keys";
+            name_fn = keys_state_name;
+        }
+        else if (mode == MODE_KEYSEDIT && vc_capturing(MODE_KEYSEDIT))
+        {
+            pre_substate = vc_pre_keysedit;
+            post_substate = KeysEditState;
+            mode_str = "keysedit";
+            name_fn = keysedit_state_name;
+        }
+        else if (mode == MODE_HIGHSCORE && vc_capturing(MODE_HIGHSCORE))
+        {
+            pre_substate = vc_pre_highscore;
+            post_substate = HighScoreState;
+            mode_str = "highscore";
+            name_fn = highscore_state_name;
+        }
+        else if (mode == MODE_PREVIEW && vc_capturing(MODE_PREVIEW))
+        {
+            pre_substate = vc_pre_preview;
+            post_substate = PreviewState;
+            mode_str = "preview";
+            name_fn = preview_state_name;
+        }
+
+        if (mode_str && name_fn)
+        {
+            /* Content state ran this frame (pre != post means it drew
+             * and transitioned).  Signal the pre-dispatch state name
+             * since that's what's visible on screen. */
+            const char *pre_name = name_fn(pre_substate);
+            if (pre_substate != post_substate && pre_name &&
+                pre_name != cur_substate_name)
+            {
+                seq = 0;
+                vc_signal(display, mode_str, pre_name, seq);
+                seq++;
+                cur_substate_name = pre_name;
+                next_capture_frame = frame + visualCaptureInterval;
+            }
+
+            /* Persistent state (pre == post, named) — interval sampling. */
+            const char *post_name = name_fn(post_substate);
+            if (pre_substate == post_substate && post_name)
+            {
+                if (post_name != cur_substate_name)
+                {
+                    seq = 0;
+                    vc_signal(display, mode_str, post_name, seq);
+                    seq++;
+                    cur_substate_name = post_name;
+                    next_capture_frame = frame + visualCaptureInterval;
+                }
+                else if (frame >= next_capture_frame)
+                {
+                    vc_signal(display, mode_str, post_name, seq);
+                    seq++;
+                    next_capture_frame = frame + visualCaptureInterval;
+                }
+            }
+        }
+    }
 }
 
 /*
@@ -1327,6 +1632,17 @@ static void handleEventLoop(Display *display)
         fflush(stdout);
         sleep(2);
         exit(0);
+    }
+
+    /* Visual-capture mode: set _NET_WM_PID for capture script
+     * window-finding, same as snapshot mode above. */
+    if (visualCaptureMode >= 0)
+    {
+        Atom net_wm_pid = XInternAtom(display, "_NET_WM_PID", False);
+        pid_t self_pid = getpid();
+        unsigned long pid_val = (unsigned long)self_pid;
+        XChangeProperty(display, mainWindow, net_wm_pid, XA_CARDINAL, 32,
+                        PropModeReplace, (unsigned char *)&pid_val, 1);
     }
 
     /* Loop forever and ever */
