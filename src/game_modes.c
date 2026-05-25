@@ -274,12 +274,14 @@ static void mode_pause_exit(sdl2_state_mode_t mode, void *ud)
 #define ATTRACT_FLASH_INTERVAL 300
 static int attract_frame_counter;
 static unsigned long attract_fake_score;
+static int attract_next_flash;
 
 static void attract_random_display(game_ctx_t *ctx)
 {
-    if ((attract_frame_counter % ATTRACT_FLASH_INTERVAL) != 0)
+    if (attract_frame_counter < attract_next_flash)
         return;
 
+    attract_next_flash = attract_frame_counter + ATTRACT_FLASH_INTERVAL;
     score_system_set(ctx->score, attract_fake_score++);
     ctx->level_number = (rand() % 80) + 1;
     special_system_randomize(ctx->special, rand);
@@ -293,7 +295,7 @@ static void mode_presents_enter(sdl2_state_mode_t mode, void *ud)
 {
     (void)mode;
     game_ctx_t *ctx = ud;
-    attract_frame_counter = 0;
+    attract_frame_counter = 0; attract_next_flash = ATTRACT_FLASH_INTERVAL;
     presents_system_begin(ctx->presents, 0);
 }
 
@@ -327,7 +329,7 @@ static void mode_intro_enter(sdl2_state_mode_t mode, void *ud)
 {
     (void)mode;
     game_ctx_t *ctx = ud;
-    attract_frame_counter = 0;
+    attract_frame_counter = 0; attract_next_flash = ATTRACT_FLASH_INTERVAL;
     intro_system_begin(ctx->intro, INTRO_MODE_INTRO, 0);
 
     /* "Welcome to XBoing" in the message bar — matches
@@ -404,7 +406,7 @@ static void mode_instruct_enter(sdl2_state_mode_t mode, void *ud)
 {
     (void)mode;
     game_ctx_t *ctx = ud;
-    attract_frame_counter = 0;
+    attract_frame_counter = 0; attract_next_flash = ATTRACT_FLASH_INTERVAL;
     intro_system_begin(ctx->intro, INTRO_MODE_INSTRUCT, 0);
 
     int frame = (int)sdl2_state_frame(ctx->state);
@@ -443,7 +445,7 @@ static void mode_demo_enter(sdl2_state_mode_t mode, void *ud)
 {
     (void)mode;
     game_ctx_t *ctx = ud;
-    attract_frame_counter = 0;
+    attract_frame_counter = 0; attract_next_flash = ATTRACT_FLASH_INTERVAL;
     demo_system_begin(ctx->demo, DEMO_MODE_DEMO, 0);
 }
 
@@ -476,7 +478,7 @@ static void mode_preview_enter(sdl2_state_mode_t mode, void *ud)
 {
     (void)mode;
     game_ctx_t *ctx = ud;
-    attract_frame_counter = 0;
+    attract_frame_counter = 0; attract_next_flash = ATTRACT_FLASH_INTERVAL;
     demo_system_begin(ctx->demo, DEMO_MODE_PREVIEW, 0);
 }
 
@@ -509,7 +511,7 @@ static void mode_keys_enter(sdl2_state_mode_t mode, void *ud)
 {
     (void)mode;
     game_ctx_t *ctx = ud;
-    attract_frame_counter = 0;
+    attract_frame_counter = 0; attract_next_flash = ATTRACT_FLASH_INTERVAL;
     keys_system_begin(ctx->keys, KEYS_MODE_GAME, 0);
 }
 
@@ -538,7 +540,7 @@ static void mode_keysedit_enter(sdl2_state_mode_t mode, void *ud)
 {
     (void)mode;
     game_ctx_t *ctx = ud;
-    attract_frame_counter = 0;
+    attract_frame_counter = 0; attract_next_flash = ATTRACT_FLASH_INTERVAL;
     keys_system_begin(ctx->keys, KEYS_MODE_EDITOR, 0);
 }
 
@@ -571,7 +573,7 @@ static void mode_bonus_enter(sdl2_state_mode_t mode, void *ud)
 {
     (void)mode;
     game_ctx_t *ctx = ud;
-    attract_frame_counter = 0;
+    attract_frame_counter = 0; attract_next_flash = ATTRACT_FLASH_INTERVAL;
 
     /* Restore cursor during bonus tally */
     if (ctx->cursor)
@@ -662,7 +664,7 @@ static void mode_highscore_enter(sdl2_state_mode_t mode, void *ud)
 {
     (void)mode;
     game_ctx_t *ctx = ud;
-    attract_frame_counter = 0;
+    attract_frame_counter = 0; attract_next_flash = ATTRACT_FLASH_INTERVAL;
 
     /* Restore cursor when leaving gameplay */
     if (ctx->cursor)
