@@ -242,19 +242,60 @@ void game_render_intro(const game_ctx_t *ctx)
         }
     }
 
-    /* Block descriptions table */
+    /* Block descriptions table.  Each entry's .type is an
+     * intro_block_type_t enum (0..21), NOT a block_types.h constant.
+     * The mapping table below translates to the correct sprite key.
+     * PADDLE and BULLET_ITEM are not block types and get their own
+     * sprite keys directly. */
     if (state >= INTRO_STATE_BLOCKS)
     {
+        /* Map INTRO_BLK_* → sprite key.  Order matches the
+         * intro_block_type_t enum in include/intro_system.h. */
+        static const char *const intro_sprite_keys[] = {
+            SPR_BLOCK_RED,        /* INTRO_BLK_RED         → RED_BLK */
+            SPR_BLOCK_ROAMER,     /* INTRO_BLK_ROAMER      → ROAMER_BLK */
+            SPR_BLOCK_PAD_EXPAND, /* INTRO_BLK_PAD_EXPAND  → PAD_EXPAND_BLK */
+            SPR_BLOCK_X2_1,       /* INTRO_BLK_BONUSX2     → BONUSX2_BLK */
+            SPR_BLOCK_LOTSAMMO,   /* INTRO_BLK_MAXAMMO     → MAXAMMO_BLK */
+            SPR_BLOCK_GREEN,      /* INTRO_BLK_DROP        → DROP_BLK */
+            SPR_BLOCK_YELLOW,     /* INTRO_BLK_BULLET      → BULLET_BLK */
+            SPR_BLOCK_HYPERSPACE, /* INTRO_BLK_HYPERSPACE  → HYPERSPACE_BLK */
+            SPR_BLOCK_REVERSE,    /* INTRO_BLK_REVERSE     → REVERSE_BLK */
+            SPR_BLOCK_MACHGUN,    /* INTRO_BLK_MGUN        → MGUN_BLK */
+            SPR_BLOCK_MULTIBALL,  /* INTRO_BLK_MULTIBALL   → MULTIBALL_BLK */
+            SPR_BLOCK_BONUS_1,    /* INTRO_BLK_BONUS       → BONUS_BLK */
+            SPR_BLOCK_COUNTER_5,  /* INTRO_BLK_COUNTER     → COUNTER_BLK (slide=5) */
+            SPR_BLOCK_CLOCK,      /* INTRO_BLK_TIMER       → TIMER_BLK */
+            SPR_BLOCK_BLACK,      /* INTRO_BLK_BLACK       → BLACK_BLK */
+            SPR_BLOCK_BOMB,       /* INTRO_BLK_BOMB        → BOMB_BLK */
+            SPR_PADDLE_SMALL,     /* INTRO_BLK_PADDLE      → paddle sprite */
+            SPR_BULLET,           /* INTRO_BLK_BULLET_ITEM → bullet sprite */
+            SPR_BLOCK_DEATH_1,    /* INTRO_BLK_DEATH       → DEATH_BLK */
+            SPR_BLOCK_EXTRABALL,  /* INTRO_BLK_EXTRABALL   → EXTRABALL_BLK */
+            SPR_BLOCK_WALLOFF,    /* INTRO_BLK_WALLOFF     → WALLOFF_BLK */
+            SPR_BLOCK_STICKY,     /* INTRO_BLK_STICKY      → STICKY_BLK */
+        };
+        _Static_assert(sizeof(intro_sprite_keys) / sizeof(intro_sprite_keys[0]) ==
+                           INTRO_BLOCK_TOTAL,
+                       "intro_sprite_keys must match intro_block_type_t enum count");
+
         const intro_block_entry_t *entries = NULL;
         int count = intro_system_get_block_table(ctx->intro, &entries);
 
-        SDL_Color white = {255, 255, 255, 255};
-        SDL_Color yellow = {255, 255, 0, 255};
+        /* Original uses green for all block descriptions
+         * (original/intro.c:207 etc.). */
+        SDL_Color green = {0, 255, 0, 255};
 
         for (int i = 0; i < count; i++)
         {
-            /* Draw block sprite */
-            const char *key = sprite_block_key(entries[i].type);
+            /* Draw block sprite using the corrected mapping. */
+            int type_idx = (int)entries[i].type;
+            const char *key = NULL;
+            if (type_idx >= 0 &&
+                type_idx < (int)(sizeof(intro_sprite_keys) / sizeof(intro_sprite_keys[0])))
+            {
+                key = intro_sprite_keys[type_idx];
+            }
             if (key)
             {
                 sdl2_texture_info_t tex;
@@ -267,15 +308,24 @@ void game_render_intro(const game_ctx_t *ctx)
                 }
             }
 
-            /* Draw description text */
+            /* Draw description text — all green per original. */
             if (entries[i].description)
             {
-                SDL_Color clr = (i % 2 == 0) ? white : yellow;
                 sdl2_font_draw(ctx->font, SDL2F_FONT_COPY, entries[i].description,
                                PLAY_AREA_X + entries[i].x + 50, PLAY_AREA_Y + entries[i].y + 2,
-                               clr);
+                               green);
             }
         }
+
+        /* "Insert coin to start the game" — original/intro.c:302-305
+         * centered at y = PLAY_HEIGHT - 27 inside playWindow.  Original
+         * uses X11 "tann" color (tan).  Centering width is the full
+         * window width (PLAY_AREA_W + 2 * PLAY_AREA_X) so the text
+         * aligns with the play area center. */
+        SDL_Color tan_clr = {210, 180, 140, 255};
+        sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TEXT, "Insert coin to start the game",
+                                      PLAY_AREA_Y + PLAY_AREA_H - 27, tan_clr,
+                                      PLAY_AREA_W + 2 * PLAY_AREA_X);
     }
 
     /* Sparkle */
