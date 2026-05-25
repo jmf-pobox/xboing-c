@@ -278,8 +278,10 @@ static int attract_frame_counter;
 static unsigned long attract_fake_score;
 static int attract_next_flash;
 
-static void attract_random_display(game_ctx_t *ctx)
+static void attract_random_display(game_ctx_t *ctx, int is_animating)
 {
+    if (!is_animating)
+        return;
     if (attract_frame_counter < attract_next_flash)
         return;
 
@@ -369,7 +371,7 @@ static void mode_intro_update(sdl2_state_mode_t mode, void *ud)
             sdl2_audio_play(ctx->audio, snd.name);
     }
 
-    attract_random_display(ctx);
+    attract_random_display(ctx, intro_system_get_state(ctx->intro) == INTRO_STATE_EXPLODE);
 
     /* Devil-eyes: original BLINK_RATE=25 frames (~30ms at ~833fps),
      * BLINK_GAP=1000 frames (~1.2s).  Attract frames at 6×133tps:
@@ -436,7 +438,7 @@ static void mode_instruct_update(sdl2_state_mode_t mode, void *ud)
             sdl2_audio_play(ctx->audio, snd.name);
     }
 
-    attract_random_display(ctx);
+    attract_random_display(ctx, intro_system_get_state(ctx->intro) == INTRO_STATE_EXPLODE);
 
     if (sdl2_input_just_pressed(ctx->input, SDL2I_START))
     {
@@ -486,7 +488,7 @@ static void mode_demo_update(sdl2_state_mode_t mode, void *ud)
             sdl2_audio_play(ctx->audio, snd.name);
     }
 
-    attract_random_display(ctx);
+    attract_random_display(ctx, demo_system_get_state(ctx->demo) == DEMO_STATE_SPARKLE);
 
     if (sdl2_input_just_pressed(ctx->input, SDL2I_START))
     {
@@ -526,7 +528,7 @@ static void mode_preview_update(sdl2_state_mode_t mode, void *ud)
             sdl2_audio_play(ctx->audio, snd.name);
     }
 
-    attract_random_display(ctx);
+    attract_random_display(ctx, demo_system_get_state(ctx->demo) == DEMO_STATE_WAIT);
 
     if (!preview_message_set)
     {
@@ -582,7 +584,7 @@ static void mode_keys_update(sdl2_state_mode_t mode, void *ud)
         keys_system_update(ctx->keys, attract_frame_counter);
     }
 
-    attract_random_display(ctx);
+    attract_random_display(ctx, keys_system_get_state(ctx->keys) == KEYS_STATE_SPARKLE);
 
     /* Devil eyes during keys screen per original/keys.c:332 */
     {
@@ -642,7 +644,7 @@ static void mode_keysedit_update(sdl2_state_mode_t mode, void *ud)
         keys_system_update(ctx->keys, attract_frame_counter);
     }
 
-    attract_random_display(ctx);
+    attract_random_display(ctx, keys_system_get_state(ctx->keys) == KEYS_STATE_SPARKLE);
 
     if (sdl2_input_just_pressed(ctx->input, SDL2I_START))
     {
@@ -849,7 +851,8 @@ static void mode_highscore_update(sdl2_state_mode_t mode, void *ud)
         highscore_system_update(ctx->highscore_display, attract_frame_counter);
     }
 
-    attract_random_display(ctx);
+    attract_random_display(ctx, highscore_system_get_state(ctx->highscore_display) ==
+                                    HIGHSCORE_STATE_SPARKLE);
 
     if (sdl2_input_just_pressed(ctx->input, SDL2I_START))
     {

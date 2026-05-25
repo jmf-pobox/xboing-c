@@ -55,13 +55,15 @@ find_xboing_window() {
         done
 }
 
-FIFO="$(mktemp -u --suffix=.vc-fifo)"
+FIFO_DIR="$(mktemp -d --suffix=.vc)"
+FIFO="$FIFO_DIR/fifo"
 mkfifo "$FIFO"
 
 XPID=""
 cleanup() {
     [[ -n "$XPID" ]] && kill "$XPID" 2>/dev/null && wait "$XPID" 2>/dev/null
     rm -f "$FIFO"
+    rmdir "$FIFO_DIR" 2>/dev/null
 }
 trap cleanup EXIT
 
