@@ -455,27 +455,115 @@ Every code change follows this pipeline. Steps are ordered — do not skip ahead
 2. Write the code that makes the tests pass.
 3. Run quality gates after each logical change. Zero violations before moving on.
 
-### Phase 4: Document
+### Phase 4: Definition of Done — every item verified before opening a PR
 
-1. Add an ADR to `docs/DESIGN.md` if the change involves a design decision with rejected alternatives.
-2. Update `README.md` if user-facing behavior changed (new commands, flags, defaults, config).
+**The goal is working code, not a merged PR.** A PR is the final
+packaging step after the change is already verified to be correct.
+Driving a PR to merge while the feature is visibly broken is a
+process failure — it optimizes for "CI green + reviewer happy" instead
+of "the thing actually works."
 
-### Phase 5: Local Review (incl. dogfood) — *before* opening the PR
+Every change must pass ALL of the following gates in order.  Do not
+skip ahead.  Do not open a PR until gate 7 passes.
 
-This phase reduces remote-review round-trips. Don't skip it.
+#### Gate 1: Code complete
 
-1. Run a local code-reviewer agent on the diff: `pr-review-toolkit:code-reviewer`
-   or `feature-dev:code-reviewer`. Address every valid finding before
-   pushing. Repeat until the agent's review produces no substantive
-   findings (just style nits at most).
-2. **Dogfood the change.** For UI / packaging / runtime-path changes,
-   install the binary and walk the user journey from the same starting
-   point a real user would (desktop launcher, fresh terminal in `$HOME`,
-   `cd .tmp && <cmd>` from the repo, or a `make dogfood`-style wrapper
-   when one exists). Use `.tmp/` (gitignored, inside the repo) — never
-   `/tmp` — per the Tool Usage stay-inside-repo rule. Don't rely on
-   running from the source-tree cwd.
-3. `make check` must pass.
+The change solves the actual problem, not a subset of it.  "Code
+complete" means: if a user looked at the game right now, the thing
+you set out to fix would be fixed.  Partial fixes that leave visible
+artifacts (wrong positions, missing elements, flickering, clipped
+content) are not code-complete — they are work in progress.
+
+*Why:* Prevents shipping half-fixes that require immediate follow-up
+PRs.  The basket 1–6 audit shipped cleanly because each basket was
+code-complete before the PR opened.  The intro-screen work shipped
+PRs with visible bugs because this gate was skipped.
+
+#### Gate 2: Quality gates pass
+
+`make check` must pass: format-check, cppcheck, markdownlint, ctest
+debug (all tests), ctest asan (all tests), dpkg-buildpackage, lintian.
+Zero warnings, zero errors, zero test failures.
+
+*Why:* Catches memory bugs, format drift, lint regressions, and
+packaging issues before they reach CI.  ASan is non-negotiable for a
+30-year-old C codebase — it finds the bugs you'd spend a week debugging.
+
+#### Gate 3: Local code review
+
+Run a code-reviewer agent on the diff (`pr-review-toolkit:code-reviewer`
+or `feature-dev:code-reviewer`).  Address every valid finding.  Repeat
+until the agent produces no substantive findings.
+
+*Why:* Reduces remote-review round-trips from 4–5 to 1–2.  The agent
+catches the same categories Copilot catches (const-correctness, missing
+guards, stale comments, enum sync) without the 3-minute CI latency.
+
+#### Gate 4: Game run + visual verification
+
+Build the binary.  Launch the game.  Navigate to the screen or state
+the change affects.  Capture a screenshot.  Compare visually against
+the original (`tests/golden/original/` reference or the running
+`original/xboing` binary).
+
+For rendering changes: open both screenshots side-by-side in eog (or
+equivalent) and verify every element matches.  Don't trust "it
+compiles and tests pass" — tests verify logic, not pixels.
+
+*Why:* This is the gate that was missing.  The intro-screen PRs
+(#113–#115) passed all tests and Copilot review but shipped with
+wrong sprites, missing backgrounds, mispositioned elements, and
+disappearing eyes.  A 10-second visual check would have caught every
+one of those.
+
+#### Gate 5: LLM judge (for visual changes)
+
+Run `make visual-check` or a targeted `llm_compare.py` call against
+the relevant screen pair.  The LLM should report the prior findings
+as resolved.  Any new major findings must be fixed before proceeding.
+
+Skip this gate for non-visual changes (pure logic, tests, docs).
+
+*Why:* Catches divergences that are hard to see in a quick glance —
+subtle alignment shifts, wrong colors, missing composite overlays.
+The LLM comparison found the 10px text offset, the bullet-row 2px
+padding error, and the copyright off-screen bug that human dogfood
+missed.
+
+#### Gate 6: User verification (for visual changes)
+
+Open the screenshot in eog alongside the original reference.  Ask
+the user to confirm.  Do not proceed until they say it's right.
+
+Skip this gate for non-visual changes, or when the user has
+explicitly said to proceed autonomously.
+
+*Why:* The user sees things the LLM doesn't — overall "feel,"
+relative proportions, animation timing, elements that are present
+but wrong in a way that's hard to describe programmatically.  The
+user caught the window-size issue, the ammo-belt misposition, and
+the devil-eyes disappearance — none of which the LLM flagged as
+major.
+
+#### Gate 7: Documentation
+
+1. Add an ADR to `docs/DESIGN.md` if the change involves a design
+   decision with rejected alternatives.
+2. Update `README.md` if user-facing behavior changed (new commands,
+   flags, defaults, config).
+3. Update `resume.md` if the change materially advances the project
+   state (new screens fixed, new infrastructure landed).
+
+*Why:* Decisions not recorded are decisions re-debated.  The
+coordinate-system fix (mainWindow-absolute vs play-area-relative)
+was re-derived three times across PRs #110, #112, and #115 because
+it wasn't documented as an ADR after the first fix.
+
+#### Gate 8: PR
+
+Only now.  Commit, push, create the PR, arm monitoring, drive
+Copilot review rounds per Phase 6.  The PR is a formality at this
+point — the code is already verified to be correct.
 
 ### Phase 6: Ship (active monitoring; merge on review convergence)
 
