@@ -296,7 +296,8 @@ static void mode_presents_enter(sdl2_state_mode_t mode, void *ud)
 {
     (void)mode;
     game_ctx_t *ctx = ud;
-    attract_frame_counter = 0; attract_next_flash = 0;
+    attract_frame_counter = 0;
+    attract_next_flash = 0;
     presents_system_begin(ctx->presents, 0);
 }
 
@@ -331,7 +332,8 @@ static void mode_intro_enter(sdl2_state_mode_t mode, void *ud)
 {
     (void)mode;
     game_ctx_t *ctx = ud;
-    attract_frame_counter = 0; attract_next_flash = 0;
+    attract_frame_counter = 0;
+    attract_next_flash = 0;
     attract_next_flash = ATTRACT_FLASH_INTERVAL;
     intro_system_begin(ctx->intro, INTRO_MODE_INTRO, 0);
 
@@ -407,7 +409,8 @@ static void mode_instruct_enter(sdl2_state_mode_t mode, void *ud)
 {
     (void)mode;
     game_ctx_t *ctx = ud;
-    attract_frame_counter = 0; attract_next_flash = 0;
+    attract_frame_counter = 0;
+    attract_next_flash = 0;
     attract_next_flash = ATTRACT_FLASH_INTERVAL;
     intro_system_begin(ctx->intro, INTRO_MODE_INSTRUCT, 0);
 
@@ -448,7 +451,8 @@ static void mode_demo_enter(sdl2_state_mode_t mode, void *ud)
 {
     (void)mode;
     game_ctx_t *ctx = ud;
-    attract_frame_counter = 0; attract_next_flash = 0;
+    attract_frame_counter = 0;
+    attract_next_flash = 0;
     demo_system_begin(ctx->demo, DEMO_MODE_DEMO, 0);
 
     int frame = (int)sdl2_state_frame(ctx->state);
@@ -499,7 +503,8 @@ static void mode_preview_enter(sdl2_state_mode_t mode, void *ud)
 {
     (void)mode;
     game_ctx_t *ctx = ud;
-    attract_frame_counter = 0; attract_next_flash = 0;
+    attract_frame_counter = 0;
+    attract_next_flash = 0;
     preview_message_set = 0;
     demo_system_begin(ctx->demo, DEMO_MODE_PREVIEW, 0);
 }
@@ -549,7 +554,8 @@ static void mode_keys_enter(sdl2_state_mode_t mode, void *ud)
 {
     (void)mode;
     game_ctx_t *ctx = ud;
-    attract_frame_counter = 0; attract_next_flash = 0;
+    attract_frame_counter = 0;
+    attract_next_flash = 0;
     keys_system_begin(ctx->keys, KEYS_MODE_GAME, 0);
 
     int frame = (int)sdl2_state_frame(ctx->state);
@@ -574,7 +580,7 @@ static void mode_keys_update(sdl2_state_mode_t mode, void *ud)
     /* Devil eyes during keys screen per original/keys.c:332 */
     {
         static int deveye_tick = 0;
-        static int deveye_cooldown = 0;
+        static int deveye_cooldown = 0; // cppcheck-suppress variableScope
         deveye_tick += ATTRACT_FRAME_MULTIPLIER;
 
         int still_active = sfx_system_get_deveye_info(ctx->sfx).active;
@@ -612,7 +618,8 @@ static void mode_keysedit_enter(sdl2_state_mode_t mode, void *ud)
 {
     (void)mode;
     game_ctx_t *ctx = ud;
-    attract_frame_counter = 0; attract_next_flash = 0;
+    attract_frame_counter = 0;
+    attract_next_flash = 0;
     keys_system_begin(ctx->keys, KEYS_MODE_EDITOR, 0);
 
     int frame = (int)sdl2_state_frame(ctx->state);
@@ -651,7 +658,8 @@ static void mode_bonus_enter(sdl2_state_mode_t mode, void *ud)
 {
     (void)mode;
     game_ctx_t *ctx = ud;
-    attract_frame_counter = 0; attract_next_flash = 0;
+    attract_frame_counter = 0;
+    attract_next_flash = 0;
 
     /* Restore cursor during bonus tally */
     if (ctx->cursor)
@@ -743,7 +751,8 @@ static void mode_highscore_enter(sdl2_state_mode_t mode, void *ud)
 {
     (void)mode;
     game_ctx_t *ctx = ud;
-    attract_frame_counter = 0; attract_next_flash = 0;
+    attract_frame_counter = 0;
+    attract_next_flash = 0;
 
     /* Restore cursor when leaving gameplay */
     if (ctx->cursor)
