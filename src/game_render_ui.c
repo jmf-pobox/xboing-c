@@ -629,6 +629,10 @@ void game_render_demo(const game_ctx_t *ctx)
     if (state == DEMO_STATE_SPARKLE)
         render_border_glow(ctx);
 
+    /* Blocks from demo.data — rendered after background, before title/trail */
+    if (state >= DEMO_STATE_BLOCKS)
+        game_render_blocks(ctx);
+
     /* XBOING title image — same as intro/instruct per original/demo.c:117
      * DrawIntroTitle(display, window, 10, 10). */
     if (state >= DEMO_STATE_TITLE)
