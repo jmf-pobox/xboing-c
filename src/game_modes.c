@@ -278,11 +278,9 @@ static int attract_next_flash;
 
 static void attract_random_display(game_ctx_t *ctx)
 {
-    if (attract_frame_counter < attract_next_flash)
-        return;
-
-    attract_next_flash = attract_frame_counter + ATTRACT_FLASH_INTERVAL;
-    score_system_set_display(ctx->score, attract_fake_score++);
+    (void)ctx;
+    (void)attract_next_flash;
+    (void)attract_fake_score;
 }
 
 /* =========================================================================
