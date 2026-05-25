@@ -799,7 +799,16 @@ static void vc_check(game_ctx_t *ctx)
                 subname = "flag";
                 break;
             case PRESENTS_STATE_TEXT1:
-                subname = "credits";
+                subname = "text1";
+                break;
+            case PRESENTS_STATE_TEXT2:
+                subname = "text2";
+                break;
+            case PRESENTS_STATE_TEXT3:
+                subname = "text3";
+                break;
+            case PRESENTS_STATE_TEXT_CLEAR:
+                subname = "text-clear";
                 break;
             case PRESENTS_STATE_LETTERS:
                 subname = "letters";
@@ -808,7 +817,13 @@ static void vc_check(game_ctx_t *ctx)
                 subname = "shine";
                 break;
             case PRESENTS_STATE_SPECIAL_TEXT1:
-                subname = "typewriter";
+                subname = "typewriter1";
+                break;
+            case PRESENTS_STATE_SPECIAL_TEXT2:
+                subname = "typewriter2";
+                break;
+            case PRESENTS_STATE_SPECIAL_TEXT3:
+                subname = "typewriter3";
                 break;
             case PRESENTS_STATE_CLEAR:
                 subname = "wipe";

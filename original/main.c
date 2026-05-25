@@ -1176,11 +1176,25 @@ static const char *presents_state_name(int s)
         case PRESENT_FLAG:
             return "flag";
         case PRESENT_TEXT1:
-            return "credits";
+            return "text1";
+        case PRESENT_TEXT2:
+            return "text2";
+        case PRESENT_TEXT3:
+            return "text3";
+        case PRESENT_TEXT_CLEAR:
+            return "text-clear";
         case PRESENT_LETTERS:
             return "letters";
         case PRESENT_SHINE:
             return "shine";
+        case PRESENT_SPECIAL_TEXT1:
+            return "typewriter1";
+        case PRESENT_SPECIAL_TEXT2:
+            return "typewriter2";
+        case PRESENT_SPECIAL_TEXT3:
+            return "typewriter3";
+        case PRESENT_CLEAR:
+            return "wipe";
         default:
             return NULL;
     }
@@ -1333,6 +1347,16 @@ static void handleGameStates(Display *display)
             break;
     }
 
+    /* Snapshot sub-state before dispatch for visual-capture. */
+    int vc_pre_presents = PresentState;
+    int vc_pre_intro = IntroState;
+    int vc_pre_instruct = InstructState;
+    int vc_pre_demo = DemoState;
+    int vc_pre_keys = KeysState;
+    int vc_pre_keysedit = KeysEditState;
+    int vc_pre_highscore = HighScoreState;
+    int vc_pre_preview = PreviewState;
+
     /* Switch on the current game mode */
     switch (mode)
     {
@@ -1416,83 +1440,106 @@ static void handleGameStates(Display *display)
             pending_entry = 0;
         }
 
-        /* Resolve current sub-state for whichever mode is active. */
-        int cur_substate = -1;
-        const char *cur_name = NULL;
+        /* Resolve pre- and post-dispatch sub-states.  Content states
+         * (FLAG, TEXT1, etc.) execute in one frame and transition to
+         * WAIT, so the post-dispatch state is usually WAIT.  We use
+         * the pre-dispatch state to detect what just drew. */
+        int pre_substate = -1;
+        int post_substate = -1;
         const char *mode_str = NULL;
+        const char *(*name_fn)(int) = NULL;
 
         if (mode == MODE_PRESENTS && vc_capturing(MODE_PRESENTS))
         {
-            cur_substate = PresentState;
-            cur_name = presents_state_name(cur_substate);
+            pre_substate = vc_pre_presents;
+            post_substate = PresentState;
             mode_str = "presents";
+            name_fn = presents_state_name;
         }
         else if (mode == MODE_INTRO && vc_capturing(MODE_INTRO))
         {
-            cur_substate = IntroState;
-            cur_name = intro_state_name(cur_substate);
+            pre_substate = vc_pre_intro;
+            post_substate = IntroState;
             mode_str = "intro";
+            name_fn = intro_state_name;
         }
         else if (mode == MODE_INSTRUCT && vc_capturing(MODE_INSTRUCT))
         {
-            cur_substate = InstructState;
-            cur_name = instruct_state_name(cur_substate);
+            pre_substate = vc_pre_instruct;
+            post_substate = InstructState;
             mode_str = "instruct";
+            name_fn = instruct_state_name;
         }
         else if (mode == MODE_DEMO && vc_capturing(MODE_DEMO))
         {
-            cur_substate = DemoState;
-            cur_name = demo_state_name(cur_substate);
+            pre_substate = vc_pre_demo;
+            post_substate = DemoState;
             mode_str = "demo";
+            name_fn = demo_state_name;
         }
         else if (mode == MODE_KEYS && vc_capturing(MODE_KEYS))
         {
-            cur_substate = KeysState;
-            cur_name = keys_state_name(cur_substate);
+            pre_substate = vc_pre_keys;
+            post_substate = KeysState;
             mode_str = "keys";
+            name_fn = keys_state_name;
         }
         else if (mode == MODE_KEYSEDIT && vc_capturing(MODE_KEYSEDIT))
         {
-            cur_substate = KeysEditState;
-            cur_name = keysedit_state_name(cur_substate);
+            pre_substate = vc_pre_keysedit;
+            post_substate = KeysEditState;
             mode_str = "keysedit";
+            name_fn = keysedit_state_name;
         }
         else if (mode == MODE_HIGHSCORE && vc_capturing(MODE_HIGHSCORE))
         {
-            cur_substate = HighScoreState;
-            cur_name = highscore_state_name(cur_substate);
+            pre_substate = vc_pre_highscore;
+            post_substate = HighScoreState;
             mode_str = "highscore";
+            name_fn = highscore_state_name;
         }
         else if (mode == MODE_PREVIEW && vc_capturing(MODE_PREVIEW))
         {
-            cur_substate = PreviewState;
-            cur_name = preview_state_name(cur_substate);
+            pre_substate = vc_pre_preview;
+            post_substate = PreviewState;
             mode_str = "preview";
+            name_fn = preview_state_name;
         }
 
-        if (mode_str && cur_name)
+        if (mode_str && name_fn)
         {
-            /* Sub-state changed — capture immediately with the NEW
-             * state name.  The previous state's draw is complete
-             * (XFlush above), and the interval resets. */
-            if (cur_substate != prev_substate)
+            /* Content state ran this frame (pre != post means it drew
+             * and transitioned).  Signal the pre-dispatch state name
+             * since that's what's visible on screen. */
+            const char *pre_name = name_fn(pre_substate);
+            if (pre_substate != post_substate && pre_name &&
+                pre_name != cur_substate_name)
             {
-                if (cur_name != cur_substate_name)
-                {
-                    seq = 0;
-                    vc_signal(display, mode_str, cur_name, seq);
-                    seq++;
-                }
-                prev_substate = cur_substate;
-                cur_substate_name = cur_name;
+                seq = 0;
+                vc_signal(display, mode_str, pre_name, seq);
+                seq++;
+                cur_substate_name = pre_name;
                 next_capture_frame = frame + visualCaptureInterval;
             }
-            /* Same sub-state — capture at interval. */
-            else if (frame >= next_capture_frame)
+
+            /* Persistent state (pre == post, named) — interval sampling. */
+            const char *post_name = name_fn(post_substate);
+            if (pre_substate == post_substate && post_name)
             {
-                vc_signal(display, mode_str, cur_name, seq);
-                seq++;
-                next_capture_frame = frame + visualCaptureInterval;
+                if (post_name != cur_substate_name)
+                {
+                    seq = 0;
+                    vc_signal(display, mode_str, post_name, seq);
+                    seq++;
+                    cur_substate_name = post_name;
+                    next_capture_frame = frame + visualCaptureInterval;
+                }
+                else if (frame >= next_capture_frame)
+                {
+                    vc_signal(display, mode_str, post_name, seq);
+                    seq++;
+                    next_capture_frame = frame + visualCaptureInterval;
+                }
             }
         }
     }
