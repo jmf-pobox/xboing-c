@@ -38,9 +38,10 @@
  * Helper: render a sparkle (star) frame at a position
  * ========================================================================= */
 
-/* Shared play-area frame: stone background tile + green border.
- * Used by all attract screens that draw into the play area. */
-static void render_play_area_frame(const game_ctx_t *ctx)
+/* Shared play-area frame: stone background tile + border.
+ * When glow is true, uses game_render_border_glow (SFX system state).
+ * When false, draws a static green border. */
+static void render_play_area_frame(const game_ctx_t *ctx, bool glow)
 {
     SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
     sdl2_texture_info_t bg;
@@ -66,58 +67,26 @@ static void render_play_area_frame(const game_ctx_t *ctx)
         }
     }
 
-    SDL_SetRenderDrawColor(sdl, 0, 200, 0, 255);
-    int bx = PLAY_AREA_X - 2;
-    int by = PLAY_AREA_Y - 2;
-    int bw = PLAY_AREA_W + 4;
-    int bh = PLAY_AREA_H + 4;
-    SDL_Rect top = {bx, by, bw, 2};
-    SDL_Rect bottom = {bx, by + bh - 2, bw, 2};
-    SDL_Rect left = {bx, by, 2, bh};
-    SDL_Rect right = {bx + bw - 2, by, 2, bh};
-    SDL_RenderFillRect(sdl, &top);
-    SDL_RenderFillRect(sdl, &bottom);
-    SDL_RenderFillRect(sdl, &left);
-    SDL_RenderFillRect(sdl, &right);
-}
-
-/* Border glow: cycles through red[0..6] and green[0..6] ranges,
- * alternating at each peak, updating every 40 frames.  Matches
- * original/sfx.c:324 BorderGlow(). */
-static void render_border_glow(const game_ctx_t *ctx)
-{
-    static const SDL_Color reds[] = {
-        {255, 0, 0, 255}, {221, 0, 0, 255}, {187, 0, 0, 255}, {153, 0, 0, 255},
-        {119, 0, 0, 255}, {85, 0, 0, 255},  {51, 0, 0, 255},
-    };
-    static const SDL_Color greens[] = {
-        {0, 255, 0, 255}, {0, 221, 0, 255}, {0, 187, 0, 255}, {0, 153, 0, 255},
-        {0, 119, 0, 255}, {0, 85, 0, 255},  {0, 51, 0, 255},
-    };
-
-    unsigned long frame = sdl2_state_frame(ctx->state);
-    int cycle_pos = (int)((frame / 6) % 24);
-    int use_green = (cycle_pos / 12) % 2;
-    int idx = cycle_pos % 12;
-    if (idx > 6)
-        idx = 12 - idx;
-
-    SDL_Color c = use_green ? greens[idx] : reds[idx];
-    SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
-    SDL_SetRenderDrawColor(sdl, c.r, c.g, c.b, 255);
-
-    int bx = PLAY_AREA_X - 2;
-    int by = PLAY_AREA_Y - 2;
-    int bw = PLAY_AREA_W + 4;
-    int bh = PLAY_AREA_H + 4;
-    SDL_Rect top = {bx, by, bw, 2};
-    SDL_Rect bottom = {bx, by + bh - 2, bw, 2};
-    SDL_Rect left = {bx, by, 2, bh};
-    SDL_Rect right = {bx + bw - 2, by, 2, bh};
-    SDL_RenderFillRect(sdl, &top);
-    SDL_RenderFillRect(sdl, &bottom);
-    SDL_RenderFillRect(sdl, &left);
-    SDL_RenderFillRect(sdl, &right);
+    if (glow)
+    {
+        game_render_border_glow(ctx);
+    }
+    else
+    {
+        SDL_SetRenderDrawColor(sdl, 0, 200, 0, 255);
+        int bx = PLAY_AREA_X - 2;
+        int by = PLAY_AREA_Y - 2;
+        int bw = PLAY_AREA_W + 4;
+        int bh = PLAY_AREA_H + 4;
+        SDL_Rect top = {bx, by, bw, 2};
+        SDL_Rect bottom = {bx, by + bh - 2, bw, 2};
+        SDL_Rect left = {bx, by, 2, bh};
+        SDL_Rect right = {bx + bw - 2, by, 2, bh};
+        SDL_RenderFillRect(sdl, &top);
+        SDL_RenderFillRect(sdl, &bottom);
+        SDL_RenderFillRect(sdl, &left);
+        SDL_RenderFillRect(sdl, &right);
+    }
 }
 
 static void render_sparkle(const game_ctx_t *ctx, int x, int y, int frame_index)
@@ -334,58 +303,7 @@ void game_render_intro(const game_ctx_t *ctx)
     if (state == INTRO_STATE_NONE)
         return;
 
-    /* Play area background + border — the gray stone panel with green
-     * frame that contains ALL intro content in the original.  Original
-     * uses BACKGROUND_0 = mainBackPixmap = mnbgrnd.xpm (a specific
-     * high-contrast stone tile, NOT the per-level background tile).
-     * SPR_BGRND_MAIN maps to that asset.  Draw ONLY the background
-     * tile + border rectangle — NOT gameplay content. */
-    {
-        sdl2_texture_info_t bg;
-        if (sdl2_texture_get(ctx->texture, SPR_BGRND_MAIN, &bg) == SDL2T_OK && bg.width > 0 &&
-            bg.height > 0)
-        {
-            int tw = bg.width;
-            int th = bg.height;
-            for (int ty = PLAY_AREA_Y; ty < PLAY_AREA_Y + PLAY_AREA_H; ty += th)
-            {
-                for (int tx = PLAY_AREA_X; tx < PLAY_AREA_X + PLAY_AREA_W; tx += tw)
-                {
-                    int dw = tw;
-                    int dh = th;
-                    if (tx + dw > PLAY_AREA_X + PLAY_AREA_W)
-                        dw = PLAY_AREA_X + PLAY_AREA_W - tx;
-                    if (ty + dh > PLAY_AREA_Y + PLAY_AREA_H)
-                        dh = PLAY_AREA_Y + PLAY_AREA_H - ty;
-                    SDL_Rect src = {0, 0, dw, dh};
-                    SDL_Rect dst = {tx, ty, dw, dh};
-                    SDL_RenderCopy(sdl, bg.texture, &src, &dst);
-                }
-            }
-        }
-    }
-    /* Border: static green during early states, glow during SPARKLE
-     * per original/intro.c:406 BorderGlow(). */
-    if (state == INTRO_STATE_EXPLODE)
-    {
-        render_border_glow(ctx);
-    }
-    else
-    {
-        SDL_SetRenderDrawColor(sdl, 0, 200, 0, 255);
-        int bx = PLAY_AREA_X - 2;
-        int by = PLAY_AREA_Y - 2;
-        int bw = PLAY_AREA_W + 4;
-        int bh = PLAY_AREA_H + 4;
-        SDL_Rect top = {bx, by, bw, 2};
-        SDL_Rect bottom = {bx, by + bh - 2, bw, 2};
-        SDL_Rect left = {bx, by, 2, bh};
-        SDL_Rect right = {bx + bw - 2, by, 2, bh};
-        SDL_RenderFillRect(sdl, &top);
-        SDL_RenderFillRect(sdl, &bottom);
-        SDL_RenderFillRect(sdl, &left);
-        SDL_RenderFillRect(sdl, &right);
-    }
+    render_play_area_frame(ctx, state == INTRO_STATE_EXPLODE);
 
     /* Title */
     if (state >= INTRO_STATE_TITLE)
@@ -505,54 +423,7 @@ void game_render_instruct(const game_ctx_t *ctx)
     if (state == INTRO_STATE_NONE)
         return;
 
-    /* Same background panel as the intro blocks screen — mnbgrnd
-     * tile + green border only, no gameplay content. */
-    {
-        SDL_Renderer *sdl2 = sdl2_renderer_get(ctx->renderer);
-        sdl2_texture_info_t bg;
-        if (sdl2_texture_get(ctx->texture, SPR_BGRND_MAIN, &bg) == SDL2T_OK && bg.width > 0 &&
-            bg.height > 0)
-        {
-            int tw = bg.width;
-            int th = bg.height;
-            for (int ty = PLAY_AREA_Y; ty < PLAY_AREA_Y + PLAY_AREA_H; ty += th)
-            {
-                for (int tx = PLAY_AREA_X; tx < PLAY_AREA_X + PLAY_AREA_W; tx += tw)
-                {
-                    int dw = tw;
-                    int dh = th;
-                    if (tx + dw > PLAY_AREA_X + PLAY_AREA_W)
-                        dw = PLAY_AREA_X + PLAY_AREA_W - tx;
-                    if (ty + dh > PLAY_AREA_Y + PLAY_AREA_H)
-                        dh = PLAY_AREA_Y + PLAY_AREA_H - ty;
-                    SDL_Rect src = {0, 0, dw, dh};
-                    SDL_Rect dst = {tx, ty, dw, dh};
-                    SDL_RenderCopy(sdl2, bg.texture, &src, &dst);
-                }
-            }
-        }
-    }
-    if (state == INTRO_STATE_EXPLODE)
-    {
-        render_border_glow(ctx);
-    }
-    else
-    {
-        SDL_Renderer *sdl2 = sdl2_renderer_get(ctx->renderer);
-        SDL_SetRenderDrawColor(sdl2, 0, 200, 0, 255);
-        int bx = PLAY_AREA_X - 2;
-        int by = PLAY_AREA_Y - 2;
-        int bw = PLAY_AREA_W + 4;
-        int bh = PLAY_AREA_H + 4;
-        SDL_Rect top = {bx, by, bw, 2};
-        SDL_Rect bottom = {bx, by + bh - 2, bw, 2};
-        SDL_Rect left = {bx, by, 2, bh};
-        SDL_Rect right = {bx + bw - 2, by, 2, bh};
-        SDL_RenderFillRect(sdl2, &top);
-        SDL_RenderFillRect(sdl2, &bottom);
-        SDL_RenderFillRect(sdl2, &left);
-        SDL_RenderFillRect(sdl2, &right);
-    }
+    render_play_area_frame(ctx, state == INTRO_STATE_EXPLODE);
 
     /* XBOING title image — original/inst.c:219 calls DoIntroTitle
      * which draws the same title sprite as the intro blocks screen. */
@@ -625,9 +496,7 @@ void game_render_demo(const game_ctx_t *ctx)
     if (state == DEMO_STATE_NONE)
         return;
 
-    render_play_area_frame(ctx);
-    if (state == DEMO_STATE_SPARKLE)
-        render_border_glow(ctx);
+    render_play_area_frame(ctx, state == DEMO_STATE_SPARKLE);
 
     /* Blocks from demo.data — rendered after background, before title/trail */
     if (state >= DEMO_STATE_BLOCKS)
@@ -736,9 +605,7 @@ void game_render_keys(const game_ctx_t *ctx)
     if (state == KEYS_STATE_NONE)
         return;
 
-    render_play_area_frame(ctx);
-    if (state == KEYS_STATE_SPARKLE)
-        render_border_glow(ctx);
+    render_play_area_frame(ctx, state == KEYS_STATE_SPARKLE);
 
     if (state >= KEYS_STATE_TITLE)
     {
@@ -781,9 +648,7 @@ void game_render_keysedit(const game_ctx_t *ctx)
     if (state == KEYS_STATE_NONE)
         return;
 
-    render_play_area_frame(ctx);
-    if (state == KEYS_STATE_SPARKLE)
-        render_border_glow(ctx);
+    render_play_area_frame(ctx, state == KEYS_STATE_SPARKLE);
 
     if (state >= KEYS_STATE_TITLE)
     {
@@ -977,11 +842,9 @@ void game_render_highscore(const game_ctx_t *ctx)
     if (state == HIGHSCORE_STATE_NONE)
         return;
 
-    /* Highscore uses space/starfield background (already the default)
-     * but still needs the border frame — glow during SPARKLE. */
     if (state == HIGHSCORE_STATE_SPARKLE)
     {
-        render_border_glow(ctx);
+        game_render_border_glow(ctx);
     }
     else
     {

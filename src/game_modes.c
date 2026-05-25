@@ -307,6 +307,7 @@ static void mode_presents_update(sdl2_state_mode_t mode, void *ud)
     for (int i = 0; i < ATTRACT_FRAME_MULTIPLIER; i++)
     {
         attract_frame_counter++;
+        sfx_system_update_glow(ctx->sfx, attract_frame_counter);
         presents_system_update(ctx->presents, attract_frame_counter);
 
         presents_sound_t snd = presents_system_get_sound(ctx->presents);
@@ -352,6 +353,7 @@ static void mode_intro_update(sdl2_state_mode_t mode, void *ud)
     for (int i = 0; i < ATTRACT_FRAME_MULTIPLIER; i++)
     {
         attract_frame_counter++;
+        sfx_system_update_glow(ctx->sfx, attract_frame_counter);
         intro_system_update(ctx->intro, attract_frame_counter);
 
         intro_sound_t snd = intro_system_get_sound(ctx->intro);
@@ -420,6 +422,7 @@ static void mode_instruct_update(sdl2_state_mode_t mode, void *ud)
     for (int i = 0; i < ATTRACT_FRAME_MULTIPLIER; i++)
     {
         attract_frame_counter++;
+        sfx_system_update_glow(ctx->sfx, attract_frame_counter);
         intro_system_update(ctx->intro, attract_frame_counter);
 
         intro_sound_t snd = intro_system_get_sound(ctx->intro);
@@ -468,6 +471,7 @@ static void mode_demo_update(sdl2_state_mode_t mode, void *ud)
     for (int i = 0; i < ATTRACT_FRAME_MULTIPLIER; i++)
     {
         attract_frame_counter++;
+        sfx_system_update_glow(ctx->sfx, attract_frame_counter);
         demo_system_update(ctx->demo, attract_frame_counter);
 
         demo_sound_t snd = demo_system_get_sound(ctx->demo);
@@ -503,6 +507,7 @@ static void mode_preview_update(sdl2_state_mode_t mode, void *ud)
     for (int i = 0; i < ATTRACT_FRAME_MULTIPLIER; i++)
     {
         attract_frame_counter++;
+        sfx_system_update_glow(ctx->sfx, attract_frame_counter);
         demo_system_update(ctx->demo, attract_frame_counter);
 
         demo_sound_t snd = demo_system_get_sound(ctx->demo);
@@ -538,6 +543,7 @@ static void mode_keys_update(sdl2_state_mode_t mode, void *ud)
     for (int i = 0; i < ATTRACT_FRAME_MULTIPLIER; i++)
     {
         attract_frame_counter++;
+        sfx_system_update_glow(ctx->sfx, attract_frame_counter);
         keys_system_update(ctx->keys, attract_frame_counter);
     }
 
@@ -595,6 +601,7 @@ static void mode_keysedit_update(sdl2_state_mode_t mode, void *ud)
     for (int i = 0; i < ATTRACT_FRAME_MULTIPLIER; i++)
     {
         attract_frame_counter++;
+        sfx_system_update_glow(ctx->sfx, attract_frame_counter);
         keys_system_update(ctx->keys, attract_frame_counter);
     }
 
@@ -647,6 +654,7 @@ static void mode_bonus_update(sdl2_state_mode_t mode, void *ud)
     for (int i = 0; i < ATTRACT_FRAME_MULTIPLIER; i++)
     {
         attract_frame_counter++;
+        sfx_system_update_glow(ctx->sfx, attract_frame_counter);
         bonus_system_update(ctx->bonus, attract_frame_counter);
     }
 
@@ -795,6 +803,7 @@ static void mode_highscore_update(sdl2_state_mode_t mode, void *ud)
     for (int i = 0; i < ATTRACT_FRAME_MULTIPLIER; i++)
     {
         attract_frame_counter++;
+        sfx_system_update_glow(ctx->sfx, attract_frame_counter);
         highscore_system_update(ctx->highscore_display, attract_frame_counter);
     }
 
