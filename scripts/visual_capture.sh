@@ -55,7 +55,8 @@ find_xboing_window() {
         done
 }
 
-FIFO_DIR="$(mktemp -d --suffix=.vc)"
+mkdir -p .tmp
+FIFO_DIR="$(mktemp -d .tmp/visual-capture.XXXXXX)"
 FIFO="$FIFO_DIR/fifo"
 
 XPID=""
