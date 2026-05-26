@@ -316,7 +316,7 @@ void game_input_global(game_ctx_t *ctx)
     if (sdl2_input_just_pressed(ctx->input, SDL2I_QUIT) &&
         sdl2_state_current(ctx->state) != SDL2ST_EDIT)
     {
-        SDL_Event quit_event;
+        SDL_Event quit_event = {0};
         quit_event.type = SDL_QUIT;
         SDL_PushEvent(&quit_event);
     }

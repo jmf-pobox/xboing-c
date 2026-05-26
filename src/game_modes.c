@@ -465,6 +465,8 @@ static void mode_demo_enter(sdl2_state_mode_t mode, void *ud)
     /* Load demo.data blocks per original/demo.c:137 */
     {
         char level_path[PATHS_MAX_PATH];
+        ctx->time_bonus_total = 0;
+        ctx->time_remaining = 0;
         if (paths_level_file(&ctx->paths, "demo.data", level_path, sizeof(level_path)) == PATHS_OK)
         {
             block_system_clear_all(ctx->block);

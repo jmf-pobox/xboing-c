@@ -540,7 +540,7 @@ void game_render_demo(const game_ctx_t *ctx)
         /* Half-disintegrated block at (col=2, row=12) per original/demo.c:173-176 */
         const char *exkey = sprite_block_explode_key(YELLOW_BLK, 1);
         sdl2_texture_info_t etex;
-        if (exkey && sdl2_texture_get(ctx->texture, exkey, &etex) == SDL2T_OK)
+        if (sdl2_texture_get(ctx->texture, exkey, &etex) == SDL2T_OK)
         {
             SDL_Rect dst = {PLAY_AREA_X + 110, PLAY_AREA_Y + 384, etex.width, etex.height};
             SDL_RenderCopy(sdl, etex.texture, NULL, &dst);

@@ -108,7 +108,8 @@ typedef struct sdl2_input sdl2_input_t;
  *   Space = start,  C = cycle,  H = scores,  E = editor,  W = set level,
  *   Q = quit,  =/KP+ = volume up,  -/KP- = volume down,
  *   A = audio,  S = sfx,  G = control toggle,
- *   I = iconify,  1-9 = speed levels.
+ *   I = fullscreen toggle (modernized from original iconify),
+ *   1-9 = speed levels (attract modes only).
  *
  * Returns NULL on allocation failure.
  */

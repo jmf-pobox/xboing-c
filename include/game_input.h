@@ -24,10 +24,10 @@ void game_input_update(game_ctx_t *ctx);
 /*
  * Process mode-independent (global) input for the current frame.
  *
- * Handles keys that work from any mode: SFX toggle (S), speed (1-9),
- * volume (+/-), iconify/fullscreen (I), control toggle (G), quit (Q).
- * Mirrors original/main.c handleMiscKeys + handleSpeedKeys, which
- * are called from every mode's key handler via default-case fallthrough.
+ * Handles mode-independent keys: SFX toggle (S), volume (+/-),
+ * fullscreen toggle (I), control toggle (G), quit (Q).  Speed keys
+ * (1-9) are attract-mode only per original handleSpeedKeys scope.
+ * Mirrors original/main.c handleMiscKeys + handleSpeedKeys.
  *
  * Must be called once per visual frame in game_main.c, after
  * sdl2_input_begin_frame() + event processing and before
