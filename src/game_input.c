@@ -320,6 +320,23 @@ void game_input_global(game_ctx_t *ctx)
         }
     }
 
+    /* A: toggle audio on/off — original/main.c:396-422 handleSoundKey.
+     * Global key (works in both attract and gameplay). */
+    if (sdl2_input_just_pressed(ctx->input, SDL2I_TOGGLE_AUDIO))
+    {
+        if (ctx->audio)
+        {
+            bool was_muted = sdl2_audio_is_muted(ctx->audio);
+            sdl2_audio_set_muted(ctx->audio, !was_muted);
+            message_system_set(ctx->message, was_muted ? "- Audio ON -" : "- Audio OFF -", 1,
+                               frame);
+        }
+        else
+        {
+            message_system_set(ctx->message, "- Audio unavailable -", 1, frame);
+        }
+    }
+
     /* +/-: volume up/down — original/main.c:822 */
     if (ctx->audio)
     {
@@ -380,5 +397,4 @@ void game_input_global(game_ctx_t *ctx)
         }
     }
 
-    /* A: audio toggle — deferred, no sdl2_audio enable/disable API */
 }

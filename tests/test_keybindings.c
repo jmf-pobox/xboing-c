@@ -31,6 +31,7 @@
 #include "paddle_system.h"
 #include "sdl2_input.h"
 #include "sdl2_loop.h"
+#include "sdl2_audio.h"
 #include "sdl2_state.h"
 #include "sfx_system.h"
 
@@ -361,6 +362,23 @@ static void test_gameplay_paddle_blocked_in_mouse_mode(void **vstate)
  * Group 4: Attract navigation
  * ========================================================================= */
 
+static void test_global_audio_toggle(void **vstate)
+{
+    game_ctx_t *ctx = ((kb_fixture_t *)*vstate)->ctx;
+    if (!ctx->audio)
+    {
+        skip();
+        return;
+    }
+    assert_false(sdl2_audio_is_muted(ctx->audio));
+    inject_key(ctx, SDL_SCANCODE_A);
+    game_input_global(ctx);
+    assert_true(sdl2_audio_is_muted(ctx->audio));
+    inject_key(ctx, SDL_SCANCODE_A);
+    game_input_global(ctx);
+    assert_false(sdl2_audio_is_muted(ctx->audio));
+}
+
 static void test_attract_cycle_table(void **vstate)
 {
     (void)vstate;
@@ -419,6 +437,7 @@ int main(void)
         cmocka_unit_test_setup_teardown(test_global_control_toggle, setup_attract, teardown),
         cmocka_unit_test_setup_teardown(test_global_fullscreen_no_crash, setup_attract, teardown),
         cmocka_unit_test_setup_teardown(test_global_quit_pushes_event, setup_attract, teardown),
+        cmocka_unit_test_setup_teardown(test_global_audio_toggle, setup_attract, teardown),
     };
 
     const struct CMUnitTest scoping_tests[] = {
