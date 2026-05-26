@@ -98,7 +98,7 @@ int main(int argc, char *argv[])
             sdl2_input_process_event(ctx->input, &event);
         }
 
-        /* Mode-independent keys (SFX, speed, volume, iconify, control, quit).
+        /* Mode-independent keys (SFX, speed, volume, fullscreen, control, quit).
          * Called once per visual frame, after events are processed and before
          * the fixed-timestep loop runs.  See game_input.h for rationale. */
         game_input_global(ctx);

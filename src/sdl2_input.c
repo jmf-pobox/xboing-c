@@ -470,7 +470,7 @@ const char *sdl2_input_action_name(sdl2_input_action_t action)
         case SDL2I_TOGGLE_CONTROL:
             return "toggle_control";
         case SDL2I_ICONIFY:
-            return "iconify";
+            return "fullscreen";
         case SDL2I_SPEED_1:
             return "speed_1";
         case SDL2I_SPEED_2:
