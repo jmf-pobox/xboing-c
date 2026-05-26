@@ -23,6 +23,7 @@
 #include <cmocka.h>
 
 #include "ball_system.h"
+#include "game_callbacks.h"
 #include "game_context.h"
 #include "game_init.h"
 #include "game_input.h"
@@ -310,6 +311,20 @@ static void test_gameplay_paddle_blocked_in_mouse_mode(void **vstate)
  * Group 4: Attract navigation
  * ========================================================================= */
 
+static void test_attract_cycle_table(void **vstate)
+{
+    (void)vstate;
+    assert_int_equal(game_callbacks_attract_next(SDL2ST_INTRO), SDL2ST_INSTRUCT);
+    assert_int_equal(game_callbacks_attract_next(SDL2ST_INSTRUCT), SDL2ST_DEMO);
+    assert_int_equal(game_callbacks_attract_next(SDL2ST_DEMO), SDL2ST_KEYS);
+    assert_int_equal(game_callbacks_attract_next(SDL2ST_KEYS), SDL2ST_KEYSEDIT);
+    assert_int_equal(game_callbacks_attract_next(SDL2ST_KEYSEDIT), SDL2ST_PREVIEW);
+    assert_int_equal(game_callbacks_attract_next(SDL2ST_PREVIEW), SDL2ST_HIGHSCORE);
+    assert_int_equal(game_callbacks_attract_next(SDL2ST_HIGHSCORE), SDL2ST_INTRO);
+    assert_int_equal(game_callbacks_attract_next(SDL2ST_GAME), SDL2ST_NONE);
+    assert_int_equal(game_callbacks_attract_next(SDL2ST_NONE), SDL2ST_NONE);
+}
+
 static void test_attract_c_cycles_screen(void **vstate)
 {
     game_ctx_t *ctx = ((kb_fixture_t *)*vstate)->ctx;
@@ -375,6 +390,7 @@ int main(void)
     };
 
     const struct CMUnitTest attract_tests[] = {
+        cmocka_unit_test(test_attract_cycle_table),
         cmocka_unit_test_setup_teardown(test_attract_c_cycles_screen, setup_attract, teardown),
         cmocka_unit_test_setup_teardown(test_attract_c_full_cycle_order, setup_attract, teardown),
     };

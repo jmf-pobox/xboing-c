@@ -329,38 +329,11 @@ void game_input_global(game_ctx_t *ctx)
     }
 
     /* C: cycle attract screens — original/main.c:554-605.
-     * Order matches natural callback chain in game_callbacks.c:
-     * INTRO → INSTRUCT → DEMO → KEYS → KEYSEDIT → PREVIEW → HIGHSCORE → INTRO.
-     * Original calls SetGameSpeed(FAST_SPEED) before each transition. */
+     * Uses game_callbacks_attract_next() as single source of truth for
+     * cycle order.  Original calls SetGameSpeed(FAST_SPEED) before each. */
     if (sdl2_input_just_pressed(ctx->input, SDL2I_CYCLE))
     {
-        sdl2_state_mode_t next = SDL2ST_NONE;
-        switch (mode)
-        {
-            case SDL2ST_INTRO:
-                next = SDL2ST_INSTRUCT;
-                break;
-            case SDL2ST_INSTRUCT:
-                next = SDL2ST_DEMO;
-                break;
-            case SDL2ST_DEMO:
-                next = SDL2ST_KEYS;
-                break;
-            case SDL2ST_KEYS:
-                next = SDL2ST_KEYSEDIT;
-                break;
-            case SDL2ST_KEYSEDIT:
-                next = SDL2ST_PREVIEW;
-                break;
-            case SDL2ST_PREVIEW:
-                next = SDL2ST_HIGHSCORE;
-                break;
-            case SDL2ST_HIGHSCORE:
-                next = SDL2ST_INTRO;
-                break;
-            default:
-                break;
-        }
+        sdl2_state_mode_t next = game_callbacks_attract_next(mode);
         if (next != SDL2ST_NONE)
         {
             sdl2_loop_set_speed(ctx->loop, SDL2L_MAX_SPEED);
