@@ -87,6 +87,7 @@ static int setup_game(void **vstate)
     char *argv[] = {arg_prog, NULL};
     f->ctx = game_create(1, argv);
     assert_non_null(f->ctx);
+    f->ctx->config.use_keys = true;
     sdl2_state_transition(f->ctx->state, SDL2ST_PRESENTS);
     sdl2_state_transition(f->ctx->state, SDL2ST_GAME);
     *vstate = f;
@@ -293,6 +294,18 @@ static void test_gameplay_paddle_right_arrow(void **vstate)
     assert_true(after > before);
 }
 
+static void test_gameplay_paddle_blocked_in_mouse_mode(void **vstate)
+{
+    game_ctx_t *ctx = ((kb_fixture_t *)*vstate)->ctx;
+    ctx->config.use_keys = false;
+    int before = paddle_system_get_pos(ctx->paddle);
+    inject_key(ctx, SDL_SCANCODE_J);
+    sdl2_state_update(ctx->state);
+    int after = paddle_system_get_pos(ctx->paddle);
+    assert_int_equal(after, before);
+    ctx->config.use_keys = true;
+}
+
 /* =========================================================================
  * Group 4: Attract navigation
  * ========================================================================= */
@@ -357,6 +370,8 @@ int main(void)
         cmocka_unit_test_setup_teardown(test_gameplay_paddle_right, setup_game, teardown),
         cmocka_unit_test_setup_teardown(test_gameplay_paddle_left_arrow, setup_game, teardown),
         cmocka_unit_test_setup_teardown(test_gameplay_paddle_right_arrow, setup_game, teardown),
+        cmocka_unit_test_setup_teardown(test_gameplay_paddle_blocked_in_mouse_mode, setup_game,
+                                        teardown),
     };
 
     const struct CMUnitTest attract_tests[] = {

@@ -40,17 +40,22 @@
 static void input_update_paddle(game_ctx_t *ctx)
 {
     int direction = PADDLE_DIR_NONE;
+    int mx = 0;
 
-    if (sdl2_input_pressed(ctx->input, SDL2I_LEFT))
-        direction = PADDLE_DIR_LEFT;
-    else if (sdl2_input_pressed(ctx->input, SDL2I_RIGHT))
-        direction = PADDLE_DIR_RIGHT;
-
-    /* Mouse position for mouse-mode paddle control.
-     * The paddle module handles both keyboard and mouse input —
-     * keyboard takes priority when direction != NONE. */
-    int mx = 0, my = 0;
-    sdl2_input_get_mouse(ctx->input, &mx, &my);
+    if (ctx->config.use_keys)
+    {
+        /* Keyboard mode: direction only, no mouse — original/main.c:185-199. */
+        if (sdl2_input_pressed(ctx->input, SDL2I_LEFT))
+            direction = PADDLE_DIR_LEFT;
+        else if (sdl2_input_pressed(ctx->input, SDL2I_RIGHT))
+            direction = PADDLE_DIR_RIGHT;
+    }
+    else
+    {
+        /* Mouse mode: position only, no keyboard — original/main.c:201-213. */
+        int my = 0;
+        sdl2_input_get_mouse(ctx->input, &mx, &my);
+    }
 
     paddle_system_update(ctx->paddle, direction, mx);
 }
