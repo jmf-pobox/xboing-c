@@ -105,7 +105,7 @@ sdl2_cli_config_t sdl2_cli_config_defaults(void)
     memset(&cfg, 0, sizeof(cfg));
     cfg.speed = SDL2C_DEFAULT_SPEED;
     cfg.start_level = SDL2C_DEFAULT_LEVEL;
-    cfg.use_keys = false;
+    cfg.use_keys = true;
     cfg.sfx = true;
     cfg.sound = true;
     cfg.max_volume = 80;
