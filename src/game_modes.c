@@ -841,7 +841,8 @@ static void mode_highscore_enter(sdl2_state_mode_t mode, void *ud)
     highscore_system_begin(ctx->highscore_display, type, 0);
 
     int frame = (int)sdl2_state_frame(ctx->state);
-    const char *label = (type == HIGHSCORE_TYPE_GLOBAL) ? "<h> - Hall of Fame" : "<H> - Personal Best";
+    const char *label =
+        (type == HIGHSCORE_TYPE_GLOBAL) ? "<h> - Hall of Fame" : "<H> - Personal Best";
     message_system_set(ctx->message, label, 0, frame);
 }
 

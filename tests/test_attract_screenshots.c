@@ -63,7 +63,7 @@ typedef struct
     int pitch;
 } framebuf_t;
 
-static framebuf_t capture_and_save(game_ctx_t *ctx, const char *bmp_path)
+static framebuf_t capture_and_save(const game_ctx_t *ctx, const char *bmp_path)
 {
     framebuf_t fb = {0};
     SDL_Renderer *r = sdl2_renderer_get(ctx->renderer);

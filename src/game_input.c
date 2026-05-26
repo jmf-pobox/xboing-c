@@ -258,8 +258,7 @@ void game_input_global(game_ctx_t *ctx)
     if (is_attract && sdl2_input_just_pressed(ctx->input, SDL2I_SCORES))
     {
         bool shift = sdl2_input_shift_held(ctx->input);
-        ctx->highscore_request_type =
-            shift ? HIGHSCORE_TYPE_PERSONAL : HIGHSCORE_TYPE_GLOBAL;
+        ctx->highscore_request_type = shift ? HIGHSCORE_TYPE_PERSONAL : HIGHSCORE_TYPE_GLOBAL;
         sdl2_loop_set_speed(ctx->loop, SDL2L_DEFAULT_SPEED);
         sdl2_state_transition(ctx->state, SDL2ST_HIGHSCORE);
         if (ctx->audio)
@@ -406,5 +405,4 @@ void game_input_global(game_ctx_t *ctx)
             sdl2_state_transition(ctx->state, next);
         }
     }
-
 }
