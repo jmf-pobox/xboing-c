@@ -158,8 +158,8 @@ static const screen_pair_t attract_screens[] = {
     {SDL2ST_INSTRUCT, SDL2ST_DEMO, "demo"},
     {SDL2ST_DEMO, SDL2ST_KEYS, "keys"},
     {SDL2ST_KEYS, SDL2ST_KEYSEDIT, "keysedit"},
-    {SDL2ST_KEYSEDIT, SDL2ST_HIGHSCORE, "highscore"},
-    {SDL2ST_HIGHSCORE, SDL2ST_PREVIEW, "preview"},
+    {SDL2ST_KEYSEDIT, SDL2ST_PREVIEW, "preview"},
+    {SDL2ST_PREVIEW, SDL2ST_HIGHSCORE, "highscore"},
 };
 
 #define NUM_SCREENS (sizeof(attract_screens) / sizeof(attract_screens[0]))

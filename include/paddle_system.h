@@ -44,9 +44,8 @@ typedef enum
 #define PADDLE_WIDTH_HUGE 70
 
 /* Movement velocity for keyboard control (pixels per update).
- * Original: 10px every 5 frames (PADDLE_ANIMATE_DELAY).  We update
- * every frame for smooth interpolation, so 3px/frame ≈ 25% faster
- * than the original's effective 2px/frame. */
+ * Original: 10px every 5 frames (PADDLE_ANIMATE_DELAY) = 2px/frame.
+ * We update every frame for smooth interpolation; 4px/frame = 2x original. */
 #define PADDLE_VELOCITY 4
 
 /* Paddle geometry */

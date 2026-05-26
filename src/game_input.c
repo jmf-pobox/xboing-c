@@ -377,8 +377,10 @@ void game_input_global(game_ctx_t *ctx)
         }
     }
 
-    /* E: enter editor — works from GAME and attract modes */
-    if (sdl2_input_just_pressed(ctx->input, SDL2I_ENTER_EDITOR) && mode != SDL2ST_EDIT)
+    /* E: enter editor — original only handles E in handleGameKeys and
+     * handleIntroKeys, not during pause/presents/dialogue. */
+    if (sdl2_input_just_pressed(ctx->input, SDL2I_ENTER_EDITOR) &&
+        (mode == SDL2ST_GAME || is_attract))
         sdl2_state_transition(ctx->state, SDL2ST_EDIT);
 
     /* Q: quit — original/main.c:864.  Skip in editor mode (original
