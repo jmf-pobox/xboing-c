@@ -156,10 +156,10 @@ void game_input_update(game_ctx_t *ctx)
     {
         case SDL2ST_GAME:
         {
-            /* Paddle moves every PADDLE_ANIMATE_DELAY frames, not every tick.
-             * original/main.c:962: if ((frame % PADDLE_ANIMATE_DELAY) == 0) */
+            /* Original: frame%5 (PADDLE_ANIMATE_DELAY).  frame%4 is ~25%
+             * faster, which feels better on modern displays. */
             unsigned long frame = sdl2_state_frame(ctx->state);
-            if ((frame % 5) == 0)
+            if ((frame % 4) == 0)
                 input_update_paddle(ctx);
             input_launch_ball(ctx);
 
