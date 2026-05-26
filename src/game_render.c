@@ -983,54 +983,98 @@ static void game_render_dialogue(const game_ctx_t *ctx)
     if (state == DIALOGUE_STATE_NONE || state == DIALOGUE_STATE_FINISHED)
         return;
 
-    /* Center a box on screen */
+    /* Position matches original/stage.c:282-285:
+     * x = ((PLAY_WIDTH + MAIN_WIDTH) / 2) - (DIALOGUE_WIDTH / 2) = 92
+     * y = ((PLAY_HEIGHT + MAIN_HEIGHT) / 2) - (DIALOGUE_HEIGHT / 2) = 295 */
     int bw = DIALOGUE_WIDTH;
     int bh = DIALOGUE_HEIGHT;
-    int bx = (SDL2R_LOGICAL_WIDTH - bw) / 2;
-    int by = (SDL2R_LOGICAL_HEIGHT - bh) / 2;
+    int bx = 92;
+    int by = 295;
 
-    /* Dark background */
-    SDL_SetRenderDrawColor(sdl, 20, 20, 40, 255);
-    SDL_Rect bg = {bx, by, bw, bh};
-    SDL_RenderFillRect(sdl, &bg);
+    /* 1. Stone tile background — original/dialogue.c:165 DrawStageBackground */
+    sdl2_texture_info_t bg;
+    if (sdl2_texture_get(ctx->texture, SPR_BGRND_MAIN, &bg) == SDL2T_OK && bg.width > 0 &&
+        bg.height > 0)
+    {
+        for (int ty = by; ty < by + bh; ty += bg.height)
+        {
+            for (int tx = bx; tx < bx + bw; tx += bg.width)
+            {
+                int dw = bg.width;
+                int dh = bg.height;
+                if (tx + dw > bx + bw)
+                    dw = bx + bw - tx;
+                if (ty + dh > by + bh)
+                    dh = by + bh - ty;
+                SDL_Rect src = {0, 0, dw, dh};
+                SDL_Rect dst = {tx, ty, dw, dh};
+                SDL_RenderCopy(sdl, bg.texture, &src, &dst);
+            }
+        }
+    }
 
-    /* Border */
-    SDL_SetRenderDrawColor(sdl, 200, 200, 50, 255);
-    SDL_Rect border = {bx, by, bw, bh};
-    SDL_RenderDrawRect(sdl, &border);
+    /* 2. Red border (4px) — original/stage.c:284 border_width=4, red */
+    SDL_SetRenderDrawColor(sdl, 200, 0, 0, 255);
+    SDL_Rect border_top = {bx, by, bw, 4};
+    SDL_Rect border_bot = {bx, by + bh - 4, bw, 4};
+    SDL_Rect border_lft = {bx, by, 4, bh};
+    SDL_Rect border_rgt = {bx + bw - 4, by, 4, bh};
+    SDL_RenderFillRect(sdl, &border_top);
+    SDL_RenderFillRect(sdl, &border_bot);
+    SDL_RenderFillRect(sdl, &border_lft);
+    SDL_RenderFillRect(sdl, &border_rgt);
 
-    /* Message text */
+    /* 3. Icon — original/dialogue.c:176 RenderShape at (2, 4) */
+    sdl2_texture_info_t icon;
+    if (sdl2_texture_get(ctx->texture, SPR_TEXT, &icon) == SDL2T_OK)
+    {
+        SDL_Rect dst = {bx + 2, by + 4, icon.width, icon.height};
+        SDL_RenderCopy(sdl, icon.texture, NULL, &dst);
+    }
+
+    /* 4. Green shadow message — original/dialogue.c:169 y=10 */
     const char *msg = dialogue_system_get_message(ctx->dialogue);
     if (msg != NULL && msg[0] != '\0')
     {
-        SDL_Color yellow = {255, 255, 50, 255};
-        sdl2_font_draw(ctx->font, SDL2F_FONT_COPY, msg, bx + 15, by + 15, yellow);
+        SDL_Color green = {0, 200, 0, 255};
+        sdl2_font_metrics_t m;
+        int msg_x = bx + 10;
+        if (sdl2_font_measure(ctx->font, SDL2F_FONT_TEXT, msg, &m) == SDL2F_OK)
+            msg_x = bx + (bw - m.width) / 2;
+        sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_TEXT, msg, msg_x, by + 10, green);
     }
 
-    /* Input text with cursor */
-    const char *input = dialogue_system_get_input(ctx->dialogue);
-    if (input != NULL)
-    {
-        SDL_Color white = {255, 255, 255, 255};
-        sdl2_font_draw(ctx->font, SDL2F_FONT_COPY, input, bx + 15, by + 55, white);
+    /* 5. White separator — original/dialogue.c:187 DrawLine y=45, 2px */
+    SDL_SetRenderDrawColor(sdl, 255, 255, 255, 255);
+    SDL_Rect sep = {bx + 10, by + 45, bw - 20, 2};
+    SDL_RenderFillRect(sdl, &sep);
 
-        /* Measure actual text width for cursor placement */
-        int cursor_x = bx + 15;
-        if (input[0] != '\0')
-        {
-            sdl2_font_metrics_t m;
-            if (sdl2_font_measure(ctx->font, SDL2F_FONT_COPY, input, &m) == SDL2F_OK)
-                cursor_x += m.width;
-        }
+    /* 6. Input area — original/dialogue.c:234-242 */
+    const char *input = dialogue_system_get_input(ctx->dialogue);
+    if (input != NULL && input[0] != '\0')
+    {
+        SDL_Color yellow = {255, 255, 0, 255};
+        sdl2_font_metrics_t m;
+        int inp_x = bx + 10;
+        if (sdl2_font_measure(ctx->font, SDL2F_FONT_TEXT, input, &m) == SDL2F_OK)
+            inp_x = bx + (bw - m.width) / 2;
+        sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_TEXT, input, inp_x, by + 70, yellow);
+
+        /* Cursor after text */
         SDL_SetRenderDrawColor(sdl, 255, 255, 255, 255);
-        SDL_Rect cursor = {cursor_x, by + 55, 2, 16};
+        SDL_Rect cursor = {inp_x + m.width, by + 70, 2, 16};
         SDL_RenderFillRect(sdl, &cursor);
     }
-
-    /* Prompt */
-    SDL_Color grey = {160, 160, 160, 255};
-    sdl2_font_draw(ctx->font, SDL2F_FONT_COPY, "Enter to confirm, Esc to cancel", bx + 15,
-                   by + bh - 25, grey);
+    else
+    {
+        /* Question mark icon when input is empty — original uses (DIALOGUE_WIDTH/2)-16 */
+        sdl2_texture_info_t qmark;
+        if (sdl2_texture_get(ctx->texture, SPR_QUESTION, &qmark) == SDL2T_OK)
+        {
+            SDL_Rect dst = {bx + bw / 2 - 16, by + 70, qmark.width, qmark.height};
+            SDL_RenderCopy(sdl, qmark.texture, NULL, &dst);
+        }
+    }
 }
 
 void game_render_frame(const game_ctx_t *ctx)
@@ -1079,10 +1123,45 @@ void game_render_frame(const game_ctx_t *ctx)
 
         case SDL2ST_DIALOGUE:
         {
-            /* Render the underlying mode behind the dialogue overlay */
+            /* Render the underlying mode behind the dialogue overlay.
+             * Q fires from any mode except EDIT, so the saved mode can
+             * be GAME, PAUSE, INTRO, INSTRUCT, DEMO, etc. */
             sdl2_state_mode_t saved = sdl2_state_saved_mode(ctx->state);
-            if (saved == SDL2ST_HIGHSCORE)
-                game_render_highscore(ctx);
+            switch (saved)
+            {
+                case SDL2ST_HIGHSCORE:
+                    game_render_highscore(ctx);
+                    break;
+                case SDL2ST_GAME:
+                case SDL2ST_PAUSE:
+                    game_render_background(ctx);
+                    game_render_playfield(ctx);
+                    game_render_border_glow(ctx);
+                    game_render_eyedude(ctx);
+                    game_render_deveyes(ctx);
+                    break;
+                case SDL2ST_INTRO:
+                    game_render_intro(ctx);
+                    break;
+                case SDL2ST_INSTRUCT:
+                    game_render_instruct(ctx);
+                    break;
+                case SDL2ST_DEMO:
+                    game_render_demo(ctx);
+                    break;
+                case SDL2ST_PREVIEW:
+                    game_render_background(ctx);
+                    game_render_preview(ctx);
+                    break;
+                case SDL2ST_KEYS:
+                    game_render_keys(ctx);
+                    break;
+                case SDL2ST_KEYSEDIT:
+                    game_render_keysedit(ctx);
+                    break;
+                default:
+                    break;
+            }
             game_render_dialogue(ctx);
             break;
         }
