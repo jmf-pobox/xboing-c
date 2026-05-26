@@ -1504,7 +1504,7 @@ static void test_guide_advances_only_at_8x_frame_rate(void **state)
 
     /* Drive frames base+1..base+39: outer modulus fires at multiples of
      * BALL_FRAME_RATE.  None of those are multiples of
-     * BALL_FRAME_RATE * 8 = 40 (since base=2000 is itself a multiple of
+     * BALL_FRAME_RATE * 8 = 40 (since base=80 is itself a multiple of
      * 40), so guide.pos must NOT change. */
     for (int f = 1; f < 40; f++)
     {

@@ -21,6 +21,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <sys/stat.h>
+
 #include <SDL2/SDL.h>
 #include <cmocka.h>
 
@@ -79,7 +81,9 @@ static framebuf_t capture_and_save(const game_ctx_t *ctx, const char *bmp_path)
 
     if (bmp_path)
     {
-        SDL_SaveBMP(surf, bmp_path);
+        int save_rc = SDL_SaveBMP(surf, bmp_path);
+        if (save_rc != 0)
+            fprintf(stderr, "WARNING: SDL_SaveBMP(%s) failed: %s\n", bmp_path, SDL_GetError());
     }
 
     fb.pixels = calloc(1, (size_t)(fb.pitch * fb.h));
@@ -129,6 +133,7 @@ static int group_setup(void **vstate)
     char *argv[] = {arg0, arg1, NULL};
     g_ctx = game_create(2, argv);
     assert_non_null(g_ctx);
+    mkdir(".tmp", 0755);
     sdl2_state_transition(g_ctx->state, SDL2ST_PRESENTS);
     *vstate = g_ctx;
     return 0;

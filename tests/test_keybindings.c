@@ -340,10 +340,10 @@ static void test_gameplay_tilt_max_reached(void **vstate)
 {
     game_ctx_t *ctx = ((kb_fixture_t *)*vstate)->ctx;
     launch_ball(ctx);
-    ctx->user_tilts = 3;
+    ctx->user_tilts = GAME_MAX_TILTS;
     inject_key(ctx, SDL_SCANCODE_T);
     game_input_global(ctx);
-    assert_int_equal(ctx->user_tilts, 3);
+    assert_int_equal(ctx->user_tilts, GAME_MAX_TILTS);
 }
 
 static void test_gameplay_paddle_blocked_in_mouse_mode(void **vstate)

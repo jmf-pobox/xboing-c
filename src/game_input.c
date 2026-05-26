@@ -344,12 +344,12 @@ void game_input_global(game_ctx_t *ctx)
             int idx = ball_system_get_active_index(ctx->ball);
             if (idx >= 0)
             {
-                if (ctx->user_tilts < 3)
+                if (ctx->user_tilts < GAME_MAX_TILTS)
                 {
                     ball_system_env_t benv = game_callbacks_ball_env(ctx);
                     ball_system_do_tilt(ctx->ball, &benv, idx);
                     ctx->user_tilts++;
-                    int left = 3 - ctx->user_tilts;
+                    int left = GAME_MAX_TILTS - ctx->user_tilts;
                     char msg[64];
                     snprintf(msg, sizeof(msg), "You have %d %s left!", left,
                              left == 1 ? "tilt" : "tilts");

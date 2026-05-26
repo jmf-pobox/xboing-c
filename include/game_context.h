@@ -119,8 +119,9 @@ typedef struct game_ctx
     int time_remaining;   /* Seconds remaining on level timer */
     int timer_frame_acc;  /* Frame accumulator for 1-second countdown */
 
-    /* Tilt state */
-    int user_tilts; /* Remaining tilts this level */
+    /* Tilt state — original/include/main.h:85 */
+#define GAME_MAX_TILTS 3
+    int user_tilts;
 
     /* Bonus block counter — incremented on BONUS_BLK explosion finalize.
      * At count == 10, killer mode activates (matches original/blocks.c:1607). */
