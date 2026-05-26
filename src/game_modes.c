@@ -70,9 +70,11 @@
 static int wisdom_pending;
 static int quit_pending;
 static int abort_pending;
+static int level_pending;
 
 void game_modes_set_quit_pending(void) { quit_pending = 1; }
 void game_modes_set_abort_pending(void) { abort_pending = 1; }
+void game_modes_set_level_pending(void) { level_pending = 1; }
 
 static void start_new_game(game_ctx_t *ctx)
 {
@@ -85,6 +87,7 @@ static void start_new_game(game_ctx_t *ctx)
     wisdom_pending = 0;
     quit_pending = 0;
     abort_pending = 0;
+    level_pending = 0;
     ctx->game_start = time(NULL);
     ctx->paused_seconds = 0;
     ctx->bonus_block_active = false;
@@ -952,6 +955,34 @@ static void mode_dialogue_exit(sdl2_state_mode_t mode, void *ud)
                 SDL_Event quit_event = {0};
                 quit_event.type = SDL_QUIT;
                 SDL_PushEvent(&quit_event);
+            }
+        }
+    }
+
+    /* W key: set starting level — original/level.c:245-282 */
+    if (level_pending)
+    {
+        level_pending = 0;
+        if (!dialogue_system_was_cancelled(ctx->dialogue))
+        {
+            const char *ans = dialogue_system_get_input(ctx->dialogue);
+            if (ans && ans[0] != '\0')
+            {
+                int num = atoi(ans);
+                int frame = (int)sdl2_state_frame(ctx->state);
+                if (num > 0 && num <= LEVEL_MAX_NUM)
+                {
+                    ctx->start_level = num;
+                    char msg[64];
+                    snprintf(msg, sizeof(msg), "Starting level set to %d", num);
+                    message_system_set(ctx->message, msg, 1, frame);
+                }
+                else
+                {
+                    char msg[64];
+                    snprintf(msg, sizeof(msg), "Invalid - level range [1-%d]", LEVEL_MAX_NUM);
+                    message_system_set(ctx->message, msg, 1, frame);
+                }
             }
         }
     }

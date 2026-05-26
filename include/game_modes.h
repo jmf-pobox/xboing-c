@@ -21,5 +21,6 @@ void game_modes_register(game_ctx_t *ctx);
  * Follows the wisdom_pending pattern (game_modes.c:69). */
 void game_modes_set_quit_pending(void);
 void game_modes_set_abort_pending(void);
+void game_modes_set_level_pending(void);
 
 #endif /* GAME_MODES_H */

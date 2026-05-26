@@ -191,6 +191,14 @@ static void test_quit_blocked_during_dialogue(void **vstate)
     assert_int_equal(sdl2_state_current(ctx->state), SDL2ST_DIALOGUE);
 }
 
+static void test_global_set_level_opens_dialogue(void **vstate)
+{
+    game_ctx_t *ctx = ((kb_fixture_t *)*vstate)->ctx;
+    inject_key(ctx, SDL_SCANCODE_W);
+    game_input_global(ctx);
+    assert_int_equal(sdl2_state_current(ctx->state), SDL2ST_DIALOGUE);
+}
+
 /* =========================================================================
  * Group 2: Mode scoping (keys that must NOT fire outside attract)
  * ========================================================================= */
@@ -456,6 +464,8 @@ int main(void)
         cmocka_unit_test_setup_teardown(test_global_fullscreen_no_crash, setup_attract, teardown),
         cmocka_unit_test_setup_teardown(test_global_quit_opens_dialogue, setup_attract, teardown),
         cmocka_unit_test_setup_teardown(test_quit_blocked_during_dialogue, setup_attract, teardown),
+        cmocka_unit_test_setup_teardown(test_global_set_level_opens_dialogue, setup_attract,
+                                        teardown),
         cmocka_unit_test_setup_teardown(test_global_audio_toggle, setup_attract, teardown),
         cmocka_unit_test_setup_teardown(test_global_highscore_h_global, setup_attract, teardown),
         cmocka_unit_test_setup_teardown(test_global_highscore_H_personal, setup_attract, teardown),

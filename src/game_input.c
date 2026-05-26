@@ -395,6 +395,23 @@ void game_input_global(game_ctx_t *ctx)
         (mode == SDL2ST_GAME || is_attract))
         sdl2_state_transition(ctx->state, SDL2ST_EDIT);
 
+    /* W: set starting level — original/main.c:671-673, level.c:245-282.
+     * Attract-only.  Shows range message then opens numeric dialogue. */
+    if (is_attract && sdl2_input_just_pressed(ctx->input, SDL2I_SET_LEVEL) &&
+        mode != SDL2ST_DIALOGUE)
+    {
+        char range_msg[64];
+        snprintf(range_msg, sizeof(range_msg), "Level range is [1-%d]", LEVEL_MAX_NUM);
+        message_system_set(ctx->message, range_msg, 0, frame);
+
+        if (sdl2_state_push_dialogue(ctx->state) == SDL2ST_OK)
+        {
+            dialogue_system_open(ctx->dialogue, "Input game starting level number.",
+                                 DIALOGUE_ICON_TEXT, DIALOGUE_VALIDATION_NUMERIC);
+            game_modes_set_level_pending();
+        }
+    }
+
     /* Q: quit with confirmation — original/main.c:864-868.
      * "Exit XBoing you wimp? [y/n]" YesNoDialogue.
      * Blocked in EDIT (editor has own Q handler) and DIALOGUE
