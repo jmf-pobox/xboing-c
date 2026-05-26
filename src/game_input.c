@@ -323,5 +323,40 @@ void game_input_global(game_ctx_t *ctx)
         SDL_PushEvent(&quit_event);
     }
 
+    /* C: cycle attract screens — original/main.c:554-605.
+     * Each mode transitions to the next in the attract sequence. */
+    if (sdl2_input_just_pressed(ctx->input, SDL2I_CYCLE))
+    {
+        sdl2_state_mode_t next = SDL2ST_NONE;
+        switch (mode)
+        {
+            case SDL2ST_INTRO:
+                next = SDL2ST_INSTRUCT;
+                break;
+            case SDL2ST_INSTRUCT:
+                next = SDL2ST_DEMO;
+                break;
+            case SDL2ST_DEMO:
+                next = SDL2ST_KEYS;
+                break;
+            case SDL2ST_KEYS:
+                next = SDL2ST_KEYSEDIT;
+                break;
+            case SDL2ST_KEYSEDIT:
+                next = SDL2ST_HIGHSCORE;
+                break;
+            case SDL2ST_HIGHSCORE:
+                next = SDL2ST_PREVIEW;
+                break;
+            case SDL2ST_PREVIEW:
+                next = SDL2ST_INTRO;
+                break;
+            default:
+                break;
+        }
+        if (next != SDL2ST_NONE)
+            sdl2_state_transition(ctx->state, next);
+    }
+
     /* A: audio toggle — deferred, no sdl2_audio enable/disable API */
 }
