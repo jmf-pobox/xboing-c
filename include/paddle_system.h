@@ -47,7 +47,7 @@ typedef enum
  * Original: 10px every 5 frames (PADDLE_ANIMATE_DELAY).  We update
  * every frame for smooth interpolation, so 3px/frame ≈ 25% faster
  * than the original's effective 2px/frame. */
-#define PADDLE_VELOCITY 3
+#define PADDLE_VELOCITY 4
 
 /* Paddle geometry */
 #define PADDLE_RENDER_HEIGHT 15   /* Pixmap render height */
