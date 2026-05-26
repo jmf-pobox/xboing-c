@@ -468,9 +468,11 @@ static void mode_demo_enter(sdl2_state_mode_t mode, void *ud)
         if (paths_level_file(&ctx->paths, "demo.data", level_path, sizeof(level_path)) == PATHS_OK)
         {
             block_system_clear_all(ctx->block);
-            level_system_load_file(ctx->level, level_path);
-            ctx->time_bonus_total = level_system_get_time_bonus(ctx->level);
-            ctx->time_remaining = ctx->time_bonus_total;
+            if (level_system_load_file(ctx->level, level_path) == LEVEL_SYS_OK)
+            {
+                ctx->time_bonus_total = level_system_get_time_bonus(ctx->level);
+                ctx->time_remaining = ctx->time_bonus_total;
+            }
         }
     }
 }
