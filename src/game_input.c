@@ -151,6 +151,7 @@ static void input_load_game(game_ctx_t *ctx)
 void game_input_update(game_ctx_t *ctx)
 {
     sdl2_state_mode_t mode = sdl2_state_current(ctx->state);
+    int frame = (int)sdl2_state_frame(ctx->state);
 
     switch (mode)
     {
@@ -188,6 +189,42 @@ void game_input_update(game_ctx_t *ctx)
             /* P key pauses */
             if (sdl2_input_just_pressed(ctx->input, SDL2I_PAUSE))
                 sdl2_state_transition(ctx->state, SDL2ST_PAUSE);
+
+            /* D: kill an active ball — original/main.c:475-483. */
+            if (sdl2_input_just_pressed(ctx->input, SDL2I_KILL_BALL))
+            {
+                int idx = ball_system_get_active_index(ctx->ball);
+                if (idx >= 0)
+                {
+                    ball_system_env_t benv = game_callbacks_ball_env(ctx);
+                    ball_system_change_mode(ctx->ball, &benv, idx, BALL_POP);
+                }
+            }
+
+            /* T: tilt the board — original/main.c:451-473.
+             * MAX_TILTS=3 per level; resets in mode_game_enter. */
+            if (sdl2_input_just_pressed(ctx->input, SDL2I_TILT))
+            {
+                int idx = ball_system_get_active_index(ctx->ball);
+                if (idx >= 0)
+                {
+                    if (ctx->user_tilts < 3)
+                    {
+                        ball_system_env_t benv = game_callbacks_ball_env(ctx);
+                        ball_system_do_tilt(ctx->ball, &benv, idx);
+                        ctx->user_tilts++;
+                        int left = 3 - ctx->user_tilts;
+                        char msg[64];
+                        snprintf(msg, sizeof(msg), "You have %d %s left!", left,
+                                 left == 1 ? "tilt" : "tilts");
+                        message_system_set(ctx->message, msg, 1, frame);
+                    }
+                    else
+                    {
+                        message_system_set(ctx->message, "Maximum tilts reached!", 1, frame);
+                    }
+                }
+            }
 
             /* Z saves, X loads */
             if (sdl2_input_just_pressed(ctx->input, SDL2I_SAVE))
@@ -308,12 +345,14 @@ void game_input_global(game_ctx_t *ctx)
     if (sdl2_input_just_pressed(ctx->input, SDL2I_ICONIFY))
         sdl2_renderer_toggle_fullscreen(ctx->renderer);
 
-    /* G: toggle keyboard/mouse control — original/main.c:859 */
+    /* G: toggle keyboard/mouse control — original/main.c:377-394 */
     if (sdl2_input_just_pressed(ctx->input, SDL2I_TOGGLE_CONTROL))
     {
         ctx->config.use_keys = !ctx->config.use_keys;
         message_system_set(ctx->message, ctx->config.use_keys ? "Control: Keys" : "Control: Mouse",
                            1, frame);
+        if (ctx->audio)
+            sdl2_audio_play(ctx->audio, "toggle");
     }
 
     /* Q: quit — original/main.c:864.  Skip in editor mode (original

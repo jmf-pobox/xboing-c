@@ -295,6 +295,56 @@ static void test_gameplay_paddle_right_arrow(void **vstate)
     assert_true(after > before);
 }
 
+static void tick_until_ball_ready(game_ctx_t *ctx)
+{
+    for (int i = 0; i < 100; i++)
+    {
+        sdl2_input_begin_frame(ctx->input);
+        sdl2_state_update(ctx->state);
+        if (ball_system_get_active_index(ctx->ball) == -1 &&
+            ball_system_is_ball_waiting(ctx->ball))
+            break;
+    }
+}
+
+static void launch_ball(game_ctx_t *ctx)
+{
+    tick_until_ball_ready(ctx);
+    ball_system_env_t env = game_callbacks_ball_env(ctx);
+    int rc = ball_system_activate_waiting(ctx->ball, &env);
+    assert_true(rc >= 0);
+}
+
+static void test_gameplay_kill_ball(void **vstate)
+{
+    game_ctx_t *ctx = ((kb_fixture_t *)*vstate)->ctx;
+    launch_ball(ctx);
+    assert_true(ball_system_get_active_count(ctx->ball) > 0);
+    inject_key(ctx, SDL_SCANCODE_D);
+    sdl2_state_update(ctx->state);
+    assert_int_equal(ball_system_get_active_index(ctx->ball), -1);
+}
+
+static void test_gameplay_tilt(void **vstate)
+{
+    game_ctx_t *ctx = ((kb_fixture_t *)*vstate)->ctx;
+    launch_ball(ctx);
+    int before_tilts = ctx->user_tilts;
+    inject_key(ctx, SDL_SCANCODE_T);
+    sdl2_state_update(ctx->state);
+    assert_int_equal(ctx->user_tilts, before_tilts + 1);
+}
+
+static void test_gameplay_tilt_max_reached(void **vstate)
+{
+    game_ctx_t *ctx = ((kb_fixture_t *)*vstate)->ctx;
+    launch_ball(ctx);
+    ctx->user_tilts = 3;
+    inject_key(ctx, SDL_SCANCODE_T);
+    sdl2_state_update(ctx->state);
+    assert_int_equal(ctx->user_tilts, 3);
+}
+
 static void test_gameplay_paddle_blocked_in_mouse_mode(void **vstate)
 {
     game_ctx_t *ctx = ((kb_fixture_t *)*vstate)->ctx;
@@ -387,6 +437,9 @@ int main(void)
         cmocka_unit_test_setup_teardown(test_gameplay_paddle_right_arrow, setup_game, teardown),
         cmocka_unit_test_setup_teardown(test_gameplay_paddle_blocked_in_mouse_mode, setup_game,
                                         teardown),
+        cmocka_unit_test_setup_teardown(test_gameplay_kill_ball, setup_game, teardown),
+        cmocka_unit_test_setup_teardown(test_gameplay_tilt, setup_game, teardown),
+        cmocka_unit_test_setup_teardown(test_gameplay_tilt_max_reached, setup_game, teardown),
     };
 
     const struct CMUnitTest attract_tests[] = {
