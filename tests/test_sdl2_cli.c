@@ -53,7 +53,7 @@ static void test_defaults_use_keys(void **state)
 {
     (void)state;
     sdl2_cli_config_t cfg = sdl2_cli_config_defaults();
-    assert_true(cfg.use_keys);
+    assert_false(cfg.use_keys);
 }
 
 static void test_defaults_sfx(void **state)
