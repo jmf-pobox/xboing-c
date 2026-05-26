@@ -299,7 +299,7 @@ void game_input_global(game_ctx_t *ctx)
 
     /* I: fullscreen toggle — original/main.c:853 (XIconifyWindow).
      * Modernized as fullscreen toggle since SDL2 window management
-     * differs from X11 iconify semantics. See ADR in DESIGN.md. */
+     * differs from X11 iconify semantics. See ADR in docs/DESIGN.md. */
     if (sdl2_input_just_pressed(ctx->input, SDL2I_ICONIFY))
         sdl2_renderer_toggle_fullscreen(ctx->renderer);
 
