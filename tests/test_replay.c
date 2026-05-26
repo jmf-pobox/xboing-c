@@ -11,6 +11,7 @@
 
 #include <SDL2/SDL.h>
 
+#include "game_input.h"
 #include "sdl2_input.h"
 #include "sdl2_state.h"
 
@@ -125,6 +126,10 @@ int replay_tick(replay_ctx_t *rctx)
             inject_key_event(rctx->ctx->input, sc, ev->pressed);
         rctx->script_idx++;
     }
+
+    /* Global keys (pause, SFX, speed, etc.) — once per frame.
+     * Must run before sdl2_state_update to match game_main.c order. */
+    game_input_global(rctx->ctx);
 
     /* Tick the state machine */
     sdl2_state_update(rctx->ctx->state);

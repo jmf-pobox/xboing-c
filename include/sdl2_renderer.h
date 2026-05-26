@@ -92,4 +92,7 @@ void sdl2_renderer_get_logical_size(const sdl2_renderer_t *ctx, int *w, int *h);
 /* Get the current physical window size. */
 void sdl2_renderer_get_window_size(const sdl2_renderer_t *ctx, int *w, int *h);
 
+/* Save the current framebuffer to a BMP file.  Returns 0 on success. */
+int sdl2_renderer_save_screenshot(const sdl2_renderer_t *ctx, const char *path);
+
 #endif /* SDL2_RENDERER_H */

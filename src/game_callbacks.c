@@ -45,6 +45,33 @@
 #define GAME_ROW_HEIGHT (GAME_PLAY_HEIGHT / 18)
 
 /* =========================================================================
+ * Attract cycle — single source of truth for screen order
+ *
+ * Order matches the natural callback chain (keys_cb_on_finished →
+ * PREVIEW, demo_cb_on_finished(PREVIEW) → HIGHSCORE).  The original's
+ * C-key handler (original/main.c:554-605) had HIGHSCORE before PREVIEW,
+ * disagreeing with the natural cycle — a bug in the original that caused
+ * C-key and timer-based transitions to visit screens in different order.
+ * We align both paths to the natural order.
+ * ========================================================================= */
+
+static const sdl2_state_mode_t attract_cycle[] = {
+    SDL2ST_INTRO,    SDL2ST_INSTRUCT, SDL2ST_DEMO,      SDL2ST_KEYS,
+    SDL2ST_KEYSEDIT, SDL2ST_PREVIEW,  SDL2ST_HIGHSCORE,
+};
+static const int attract_cycle_len = (int)(sizeof(attract_cycle) / sizeof(attract_cycle[0]));
+
+sdl2_state_mode_t game_callbacks_attract_next(sdl2_state_mode_t current)
+{
+    for (int i = 0; i < attract_cycle_len; i++)
+    {
+        if (attract_cycle[i] == current)
+            return attract_cycle[(i + 1) % attract_cycle_len];
+    }
+    return SDL2ST_NONE;
+}
+
+/* =========================================================================
  * Ball system callbacks
  * ========================================================================= */
 
@@ -592,10 +619,8 @@ presents_system_callbacks_t game_callbacks_presents(void)
 static void intro_cb_on_finished(intro_screen_mode_t mode, void *ud)
 {
     game_ctx_t *ctx = ud;
-    if (mode == INTRO_MODE_INTRO)
-        sdl2_state_transition(ctx->state, SDL2ST_INSTRUCT);
-    else
-        sdl2_state_transition(ctx->state, SDL2ST_DEMO);
+    sdl2_state_mode_t current = (mode == INTRO_MODE_INTRO) ? SDL2ST_INTRO : SDL2ST_INSTRUCT;
+    sdl2_state_transition(ctx->state, game_callbacks_attract_next(current));
 }
 
 intro_system_callbacks_t game_callbacks_intro(void)
@@ -663,11 +688,8 @@ bonus_system_callbacks_t game_callbacks_bonus(void)
 static void demo_cb_on_finished(demo_screen_mode_t mode, void *ud)
 {
     game_ctx_t *ctx = ud;
-    /* Attract cycle: demo → keys → keysedit → preview → highscore → intro */
-    if (mode == DEMO_MODE_DEMO)
-        sdl2_state_transition(ctx->state, SDL2ST_KEYS);
-    else /* DEMO_MODE_PREVIEW */
-        sdl2_state_transition(ctx->state, SDL2ST_HIGHSCORE);
+    sdl2_state_mode_t current = (mode == DEMO_MODE_DEMO) ? SDL2ST_DEMO : SDL2ST_PREVIEW;
+    sdl2_state_transition(ctx->state, game_callbacks_attract_next(current));
 }
 
 static void demo_cb_on_load_level(int level_num, void *ud)
@@ -701,11 +723,8 @@ demo_system_callbacks_t game_callbacks_demo(void)
 static void keys_cb_on_finished(keys_screen_mode_t mode, void *ud)
 {
     game_ctx_t *ctx = ud;
-    /* Attract cycle: keys → keysedit → preview → highscore → intro */
-    if (mode == KEYS_MODE_GAME)
-        sdl2_state_transition(ctx->state, SDL2ST_KEYSEDIT);
-    else /* KEYS_MODE_EDITOR */
-        sdl2_state_transition(ctx->state, SDL2ST_PREVIEW);
+    sdl2_state_mode_t current = (mode == KEYS_MODE_GAME) ? SDL2ST_KEYS : SDL2ST_KEYSEDIT;
+    sdl2_state_transition(ctx->state, game_callbacks_attract_next(current));
 }
 
 keys_system_callbacks_t game_callbacks_keys(void)
@@ -724,8 +743,7 @@ static void highscore_cb_on_finished(highscore_type_t type, void *ud)
 {
     (void)type;
     game_ctx_t *ctx = ud;
-    /* After highscore display, cycle back to intro */
-    sdl2_state_transition(ctx->state, SDL2ST_INTRO);
+    sdl2_state_transition(ctx->state, game_callbacks_attract_next(SDL2ST_HIGHSCORE));
 }
 
 highscore_system_callbacks_t game_callbacks_highscore(void)

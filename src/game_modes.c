@@ -245,11 +245,7 @@ static void mode_pause_enter(sdl2_state_mode_t mode, void *ud)
 static void mode_pause_update(sdl2_state_mode_t mode, void *ud)
 {
     (void)mode;
-    game_ctx_t *ctx = ud;
-
-    /* Only check for unpause */
-    if (sdl2_input_just_pressed(ctx->input, SDL2I_PAUSE))
-        sdl2_state_transition(ctx->state, SDL2ST_GAME);
+    (void)ud;
 }
 
 static void mode_pause_exit(sdl2_state_mode_t mode, void *ud)
@@ -837,12 +833,17 @@ static void mode_highscore_enter(sdl2_state_mode_t mode, void *ud)
         }
     }
 
-    highscore_system_set_table(ctx->highscore_display, &ctx->hs_personal);
+    highscore_type_t type = ctx->highscore_request_type;
+    const highscore_table_t *table =
+        (type == HIGHSCORE_TYPE_GLOBAL) ? &ctx->hs_global : &ctx->hs_personal;
+    highscore_system_set_table(ctx->highscore_display, table);
     highscore_system_set_current_score(ctx->highscore_display, score_system_get(ctx->score));
-    highscore_system_begin(ctx->highscore_display, HIGHSCORE_TYPE_PERSONAL, 0);
+    highscore_system_begin(ctx->highscore_display, type, 0);
 
     int frame = (int)sdl2_state_frame(ctx->state);
-    message_system_set(ctx->message, "<H> - Personal Best", 0, frame);
+    const char *label =
+        (type == HIGHSCORE_TYPE_GLOBAL) ? "<h> - Hall of Fame" : "<H> - Personal Best";
+    message_system_set(ctx->message, label, 0, frame);
 }
 
 static void mode_highscore_update(sdl2_state_mode_t mode, void *ud)

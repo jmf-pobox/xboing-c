@@ -40,17 +40,22 @@
 static void input_update_paddle(game_ctx_t *ctx)
 {
     int direction = PADDLE_DIR_NONE;
+    int mx = 0;
 
-    if (sdl2_input_pressed(ctx->input, SDL2I_LEFT))
-        direction = PADDLE_DIR_LEFT;
-    else if (sdl2_input_pressed(ctx->input, SDL2I_RIGHT))
-        direction = PADDLE_DIR_RIGHT;
-
-    /* Mouse position for mouse-mode paddle control.
-     * The paddle module handles both keyboard and mouse input —
-     * keyboard takes priority when direction != NONE. */
-    int mx = 0, my = 0;
-    sdl2_input_get_mouse(ctx->input, &mx, &my);
+    if (ctx->config.use_keys)
+    {
+        /* Keyboard mode: direction only, no mouse — original/main.c:185-199. */
+        if (sdl2_input_pressed(ctx->input, SDL2I_LEFT))
+            direction = PADDLE_DIR_LEFT;
+        else if (sdl2_input_pressed(ctx->input, SDL2I_RIGHT))
+            direction = PADDLE_DIR_RIGHT;
+    }
+    else
+    {
+        /* Mouse mode: position only, no keyboard — original/main.c:201-213. */
+        int my = 0;
+        sdl2_input_get_mouse(ctx->input, &mx, &my);
+    }
 
     paddle_system_update(ctx->paddle, direction, mx);
 }
@@ -147,67 +152,10 @@ void game_input_update(game_ctx_t *ctx)
 {
     sdl2_state_mode_t mode = sdl2_state_current(ctx->state);
 
-    switch (mode)
+    if (mode == SDL2ST_GAME)
     {
-        case SDL2ST_GAME:
-            input_update_paddle(ctx);
-            input_launch_ball(ctx);
-
-            /* K key: dual-use — activate waiting ball first, then shoot.
-             * original/main.c:490-494: ActivateWaitingBall first; if no
-             * ball is waiting (returns -1), shootBullet. */
-            if (sdl2_input_just_pressed(ctx->input, SDL2I_SHOOT))
-            {
-                ball_system_env_t benv = game_callbacks_ball_env(ctx);
-                if (ball_system_activate_waiting(ctx->ball, &benv) == -1)
-                {
-                    gun_system_env_t genv = game_callbacks_gun_env(ctx);
-                    gun_system_shoot(ctx->gun, &genv);
-                }
-            }
-
-            /* Mouse click: same dual-use as K — original/main.c:357-366.
-             * Uses edge-trigger to fire once per click, not once per frame. */
-            if (sdl2_input_mouse_just_pressed(ctx->input, SDL_BUTTON_LEFT) ||
-                sdl2_input_mouse_just_pressed(ctx->input, SDL_BUTTON_MIDDLE) ||
-                sdl2_input_mouse_just_pressed(ctx->input, SDL_BUTTON_RIGHT))
-            {
-                ball_system_env_t benv = game_callbacks_ball_env(ctx);
-                if (ball_system_activate_waiting(ctx->ball, &benv) == -1)
-                {
-                    gun_system_env_t genv = game_callbacks_gun_env(ctx);
-                    gun_system_shoot(ctx->gun, &genv);
-                }
-            }
-
-            /* P key pauses */
-            if (sdl2_input_just_pressed(ctx->input, SDL2I_PAUSE))
-                sdl2_state_transition(ctx->state, SDL2ST_PAUSE);
-
-            /* Z saves, X loads */
-            if (sdl2_input_just_pressed(ctx->input, SDL2I_SAVE))
-                input_save_game(ctx);
-            if (sdl2_input_just_pressed(ctx->input, SDL2I_LOAD))
-                input_load_game(ctx);
-
-            /* E key enters editor */
-            if (sdl2_input_just_pressed(ctx->input, SDL2I_ENTER_EDITOR))
-                sdl2_state_transition(ctx->state, SDL2ST_EDIT);
-
-            /* Escape returns to editor if play-testing */
-            if (sdl2_input_just_pressed(ctx->input, SDL2I_ABORT))
-            {
-                sdl2_state_mode_t prev = sdl2_state_previous(ctx->state);
-                if (prev == SDL2ST_EDIT)
-                    sdl2_state_transition(ctx->state, SDL2ST_EDIT);
-            }
-            break;
-
-        default:
-            /* E key enters editor from any attract screen */
-            if (sdl2_input_just_pressed(ctx->input, SDL2I_ENTER_EDITOR))
-                sdl2_state_transition(ctx->state, SDL2ST_EDIT);
-            break;
+        input_update_paddle(ctx);
+        input_launch_ball(ctx);
     }
 }
 
@@ -253,6 +201,16 @@ void game_input_global(game_ctx_t *ctx)
                       mode == SDL2ST_PREVIEW || mode == SDL2ST_KEYS || mode == SDL2ST_KEYSEDIT ||
                       mode == SDL2ST_HIGHSCORE || mode == SDL2ST_BONUS);
 
+    /* P: pause/unpause — handled here (once per frame) not in
+     * game_input_update (per tick) to prevent multi-tick toggle. */
+    if (sdl2_input_just_pressed(ctx->input, SDL2I_PAUSE))
+    {
+        if (mode == SDL2ST_GAME)
+            sdl2_state_transition(ctx->state, SDL2ST_PAUSE);
+        else if (mode == SDL2ST_PAUSE)
+            sdl2_state_transition(ctx->state, SDL2ST_GAME);
+    }
+
     /* S: toggle visual SFX — original/main.c:639 handleIntroKeys */
     if (is_attract && sdl2_input_just_pressed(ctx->input, SDL2I_TOGGLE_SFX))
     {
@@ -276,6 +234,35 @@ void game_input_global(game_ctx_t *ctx)
                 break;
             }
         }
+    }
+
+    /* A: toggle audio on/off — original/main.c:396-422 handleSoundKey.
+     * Global key (works in both attract and gameplay). */
+    if (sdl2_input_just_pressed(ctx->input, SDL2I_TOGGLE_AUDIO))
+    {
+        if (ctx->audio)
+        {
+            bool was_muted = sdl2_audio_is_muted(ctx->audio);
+            sdl2_audio_set_muted(ctx->audio, !was_muted);
+            message_system_set(ctx->message, was_muted ? "- Audio ON -" : "- Audio OFF -", 1,
+                               frame);
+        }
+        else
+        {
+            message_system_set(ctx->message, "- Audio unavailable -", 1, frame);
+        }
+    }
+
+    /* H: show highscores — original/main.c:608-636.
+     * H (shift) = PERSONAL, h = GLOBAL. Attract-only. */
+    if (is_attract && sdl2_input_just_pressed(ctx->input, SDL2I_SCORES))
+    {
+        bool shift = sdl2_input_shift_held(ctx->input);
+        ctx->highscore_request_type = shift ? HIGHSCORE_TYPE_PERSONAL : HIGHSCORE_TYPE_GLOBAL;
+        sdl2_loop_set_speed(ctx->loop, SDL2L_DEFAULT_SPEED);
+        sdl2_state_transition(ctx->state, SDL2ST_HIGHSCORE);
+        if (ctx->audio)
+            sdl2_audio_play(ctx->audio, "toggle");
     }
 
     /* +/-: volume up/down — original/main.c:822 */
@@ -303,13 +290,98 @@ void game_input_global(game_ctx_t *ctx)
     if (sdl2_input_just_pressed(ctx->input, SDL2I_ICONIFY))
         sdl2_renderer_toggle_fullscreen(ctx->renderer);
 
-    /* G: toggle keyboard/mouse control — original/main.c:859 */
+    /* G: toggle keyboard/mouse control — original/main.c:377-394 */
     if (sdl2_input_just_pressed(ctx->input, SDL2I_TOGGLE_CONTROL))
     {
         ctx->config.use_keys = !ctx->config.use_keys;
         message_system_set(ctx->message, ctx->config.use_keys ? "Control: Keys" : "Control: Mouse",
                            1, frame);
+        if (ctx->audio)
+            sdl2_audio_play(ctx->audio, "toggle");
     }
+
+    /* --- Gameplay keys (GAME mode only) --- */
+    if (mode == SDL2ST_GAME)
+    {
+        /* K: shoot/activate — original/main.c:490-494 */
+        if (sdl2_input_just_pressed(ctx->input, SDL2I_SHOOT))
+        {
+            ball_system_env_t benv = game_callbacks_ball_env(ctx);
+            if (ball_system_activate_waiting(ctx->ball, &benv) == -1)
+            {
+                gun_system_env_t genv = game_callbacks_gun_env(ctx);
+                gun_system_shoot(ctx->gun, &genv);
+            }
+        }
+
+        /* Mouse click: same dual-use as K — original/main.c:357-366 */
+        if (sdl2_input_mouse_just_pressed(ctx->input, SDL_BUTTON_LEFT) ||
+            sdl2_input_mouse_just_pressed(ctx->input, SDL_BUTTON_MIDDLE) ||
+            sdl2_input_mouse_just_pressed(ctx->input, SDL_BUTTON_RIGHT))
+        {
+            ball_system_env_t benv = game_callbacks_ball_env(ctx);
+            if (ball_system_activate_waiting(ctx->ball, &benv) == -1)
+            {
+                gun_system_env_t genv = game_callbacks_gun_env(ctx);
+                gun_system_shoot(ctx->gun, &genv);
+            }
+        }
+
+        /* D: kill an active ball — original/main.c:475-483 */
+        if (sdl2_input_just_pressed(ctx->input, SDL2I_KILL_BALL))
+        {
+            int idx = ball_system_get_active_index(ctx->ball);
+            if (idx >= 0)
+            {
+                ball_system_env_t benv = game_callbacks_ball_env(ctx);
+                ball_system_change_mode(ctx->ball, &benv, idx, BALL_POP);
+            }
+        }
+
+        /* T: tilt the board — original/main.c:451-473 */
+        if (sdl2_input_just_pressed(ctx->input, SDL2I_TILT))
+        {
+            int idx = ball_system_get_active_index(ctx->ball);
+            if (idx >= 0)
+            {
+                if (ctx->user_tilts < GAME_MAX_TILTS)
+                {
+                    ball_system_env_t benv = game_callbacks_ball_env(ctx);
+                    ball_system_do_tilt(ctx->ball, &benv, idx);
+                    ctx->user_tilts++;
+                    int left = GAME_MAX_TILTS - ctx->user_tilts;
+                    char msg[64];
+                    snprintf(msg, sizeof(msg), "You have %d %s left!", left,
+                             left == 1 ? "tilt" : "tilts");
+                    message_system_set(ctx->message, msg, 1, frame);
+                }
+                else
+                {
+                    message_system_set(ctx->message, "Maximum tilts reached!", 1, frame);
+                }
+            }
+        }
+
+        /* Z saves, X loads */
+        if (sdl2_input_just_pressed(ctx->input, SDL2I_SAVE))
+            input_save_game(ctx);
+        if (sdl2_input_just_pressed(ctx->input, SDL2I_LOAD))
+            input_load_game(ctx);
+
+        /* Escape returns to editor if play-testing */
+        if (sdl2_input_just_pressed(ctx->input, SDL2I_ABORT))
+        {
+            sdl2_state_mode_t prev = sdl2_state_previous(ctx->state);
+            if (prev == SDL2ST_EDIT)
+                sdl2_state_transition(ctx->state, SDL2ST_EDIT);
+        }
+    }
+
+    /* E: enter editor — original only handles E in handleGameKeys and
+     * handleIntroKeys, not during pause/presents/dialogue. */
+    if (sdl2_input_just_pressed(ctx->input, SDL2I_ENTER_EDITOR) &&
+        (mode == SDL2ST_GAME || is_attract))
+        sdl2_state_transition(ctx->state, SDL2ST_EDIT);
 
     /* Q: quit — original/main.c:864.  Skip in editor mode (original
      * routes editor to handleEditorKeys, not handleMiscKeys).
@@ -323,5 +395,16 @@ void game_input_global(game_ctx_t *ctx)
         SDL_PushEvent(&quit_event);
     }
 
-    /* A: audio toggle — deferred, no sdl2_audio enable/disable API */
+    /* C: cycle attract screens — original/main.c:554-605.
+     * Uses game_callbacks_attract_next() as single source of truth for
+     * cycle order.  Original calls SetGameSpeed(FAST_SPEED) before each. */
+    if (sdl2_input_just_pressed(ctx->input, SDL2I_CYCLE))
+    {
+        sdl2_state_mode_t next = game_callbacks_attract_next(mode);
+        if (next != SDL2ST_NONE)
+        {
+            sdl2_loop_set_speed(ctx->loop, SDL2L_DEFAULT_SPEED);
+            sdl2_state_transition(ctx->state, next);
+        }
+    }
 }

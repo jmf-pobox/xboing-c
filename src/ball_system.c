@@ -400,7 +400,7 @@ void ball_system_update(ball_system_t *ctx, const ball_system_env_t *env)
                 }
 
                 /* Auto-activate after delay */
-                if (env->frame == ctx->balls[i].nextFrame)
+                if (env->frame >= ctx->balls[i].nextFrame)
                 {
                     /* Snap interpolation origin before switching to BALL_ACTIVE rate */
                     ctx->balls[i].render_from_x = ctx->balls[i].ballx;
@@ -793,10 +793,10 @@ static void animate_ball_pop(ball_system_t *ctx, const ball_system_env_t *env, i
 
     BALL *b = &ctx->balls[i];
 
-    if (env->frame == b->nextFrame)
+    if (env->frame >= b->nextFrame)
     {
         b->slide--;
-        b->nextFrame += BIRTH_FRAME_RATE;
+        b->nextFrame = env->frame + BIRTH_FRAME_RATE;
 
         /* First frame clears the ball visual (slide == BIRTH_SLIDES) */
         if (b->slide == BIRTH_SLIDES)
@@ -838,10 +838,10 @@ static void animate_ball_create(ball_system_t *ctx, const ball_system_env_t *env
         b->last_move_frame = env->frame;
     }
 
-    if (env->frame == b->nextFrame)
+    if (env->frame >= b->nextFrame)
     {
         b->slide++;
-        b->nextFrame += BIRTH_FRAME_RATE;
+        b->nextFrame = env->frame + BIRTH_FRAME_RATE;
 
         if (b->slide == BIRTH_SLIDES)
         {
@@ -872,7 +872,7 @@ static void do_ball_wait(ball_system_t *ctx, const ball_system_env_t *env, int i
 
     BALL *b = &ctx->balls[i];
 
-    if (env->frame == b->waitingFrame)
+    if (env->frame >= b->waitingFrame)
     {
         b->nextFrame = env->frame + 10;
         b->ballState = b->waitMode;

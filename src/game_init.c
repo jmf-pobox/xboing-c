@@ -306,6 +306,7 @@ game_ctx_t *game_create(int argc, char *argv[])
         highscore_io_read(score_path, &ctx->hs_global);
     if (paths_score_file_personal(&ctx->paths, score_path, sizeof(score_path)) == PATHS_OK)
         highscore_io_read(score_path, &ctx->hs_personal);
+    ctx->highscore_request_type = HIGHSCORE_TYPE_PERSONAL;
 
     /* ---- Phase 2: SDL2 platform modules --------------------------------- */
 
@@ -962,7 +963,8 @@ static void stub_tick(void *user_data)
 static void stub_render(double alpha, void *user_data)
 {
     game_ctx_t *ctx = user_data;
-    ctx->render_alpha = alpha;
+    sdl2_state_mode_t mode = sdl2_state_current(ctx->state);
+    ctx->render_alpha = (mode == SDL2ST_PAUSE) ? 0.0 : alpha;
     game_render_frame(ctx);
 
     if (ctx->vc_mode >= 0)
