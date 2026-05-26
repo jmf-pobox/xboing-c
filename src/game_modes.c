@@ -245,11 +245,7 @@ static void mode_pause_enter(sdl2_state_mode_t mode, void *ud)
 static void mode_pause_update(sdl2_state_mode_t mode, void *ud)
 {
     (void)mode;
-    game_ctx_t *ctx = ud;
-
-    /* Only check for unpause */
-    if (sdl2_input_just_pressed(ctx->input, SDL2I_PAUSE))
-        sdl2_state_transition(ctx->state, SDL2ST_GAME);
+    (void)ud;
 }
 
 static void mode_pause_exit(sdl2_state_mode_t mode, void *ud)

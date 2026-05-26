@@ -186,9 +186,6 @@ void game_input_update(game_ctx_t *ctx)
                 }
             }
 
-            /* P key pauses */
-            if (sdl2_input_just_pressed(ctx->input, SDL2I_PAUSE))
-                sdl2_state_transition(ctx->state, SDL2ST_PAUSE);
 
             /* D: kill an active ball — original/main.c:475-483. */
             if (sdl2_input_just_pressed(ctx->input, SDL2I_KILL_BALL))
@@ -295,6 +292,16 @@ void game_input_global(game_ctx_t *ctx)
                       mode == SDL2ST_PREVIEW || mode == SDL2ST_KEYS || mode == SDL2ST_KEYSEDIT ||
                       mode == SDL2ST_HIGHSCORE || mode == SDL2ST_BONUS);
 
+    /* P: pause/unpause — handled here (once per frame) not in
+     * game_input_update (per tick) to prevent multi-tick toggle. */
+    if (sdl2_input_just_pressed(ctx->input, SDL2I_PAUSE))
+    {
+        if (mode == SDL2ST_GAME)
+            sdl2_state_transition(ctx->state, SDL2ST_PAUSE);
+        else if (mode == SDL2ST_PAUSE)
+            sdl2_state_transition(ctx->state, SDL2ST_GAME);
+    }
+
     /* S: toggle visual SFX — original/main.c:639 handleIntroKeys */
     if (is_attract && sdl2_input_just_pressed(ctx->input, SDL2I_TOGGLE_SFX))
     {
@@ -344,7 +351,7 @@ void game_input_global(game_ctx_t *ctx)
         bool shift = sdl2_input_shift_held(ctx->input);
         ctx->highscore_request_type =
             shift ? HIGHSCORE_TYPE_PERSONAL : HIGHSCORE_TYPE_GLOBAL;
-        sdl2_loop_set_speed(ctx->loop, SDL2L_MAX_SPEED);
+        sdl2_loop_set_speed(ctx->loop, SDL2L_DEFAULT_SPEED);
         sdl2_state_transition(ctx->state, SDL2ST_HIGHSCORE);
         if (ctx->audio)
             sdl2_audio_play(ctx->audio, "toggle");
@@ -405,7 +412,7 @@ void game_input_global(game_ctx_t *ctx)
         sdl2_state_mode_t next = game_callbacks_attract_next(mode);
         if (next != SDL2ST_NONE)
         {
-            sdl2_loop_set_speed(ctx->loop, SDL2L_MAX_SPEED);
+            sdl2_loop_set_speed(ctx->loop, SDL2L_DEFAULT_SPEED);
             sdl2_state_transition(ctx->state, next);
         }
     }

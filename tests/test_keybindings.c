@@ -244,7 +244,7 @@ static void test_gameplay_pause(void **vstate)
 {
     game_ctx_t *ctx = ((kb_fixture_t *)*vstate)->ctx;
     inject_key(ctx, SDL_SCANCODE_P);
-    sdl2_state_update(ctx->state);
+    game_input_global(ctx);
     assert_int_equal(sdl2_state_current(ctx->state), SDL2ST_PAUSE);
 }
 
