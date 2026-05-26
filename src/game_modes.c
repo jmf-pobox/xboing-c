@@ -72,9 +72,18 @@ static int quit_pending;
 static int abort_pending;
 static int level_pending;
 
-void game_modes_set_quit_pending(void) { quit_pending = 1; }
-void game_modes_set_abort_pending(void) { abort_pending = 1; }
-void game_modes_set_level_pending(void) { level_pending = 1; }
+void game_modes_set_quit_pending(void)
+{
+    quit_pending = 1;
+}
+void game_modes_set_abort_pending(void)
+{
+    abort_pending = 1;
+}
+void game_modes_set_level_pending(void)
+{
+    level_pending = 1;
+}
 
 static void start_new_game(game_ctx_t *ctx)
 {

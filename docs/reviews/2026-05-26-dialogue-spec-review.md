@@ -46,8 +46,8 @@ to the DIALOGUE background case using the same `is_attract` pattern.
 
 ## Non-Blocking Findings
 
-5. Question sprite: use original's `(DIALOGUE_WIDTH/2)-16` formula,
-   not texture-width centering, for pixel match.
-6. Message y=by+10, shadow at +2 handled by sdl2_font_draw_shadow.
-7. Close animation: defer to follow-up, document as ADR.
-8. Add test: Q-while-dialogue-open does not set quit_pending.
+- Question sprite: use original's `(DIALOGUE_WIDTH/2)-16` formula,
+  not texture-width centering, for pixel match.
+- Message y=by+10, shadow at +2 handled by sdl2_font_draw_shadow.
+- Close animation: defer to follow-up, document as ADR.
+- Add test: Q-while-dialogue-open does not set quit_pending.

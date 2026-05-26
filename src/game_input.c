@@ -18,8 +18,8 @@
 #include <SDL2/SDL.h>
 
 #include "ball_system.h"
-#include "dialogue_system.h"
 #include "block_system.h"
+#include "dialogue_system.h"
 #include "gun_system.h"
 #include "level_system.h"
 #include "message_system.h"
@@ -382,8 +382,8 @@ void game_input_global(game_ctx_t *ctx)
             }
             else if (sdl2_state_push_dialogue(ctx->state) == SDL2ST_OK)
             {
-                dialogue_system_open(ctx->dialogue, "Abort current game? [y/n]",
-                                     DIALOGUE_ICON_TEXT, DIALOGUE_VALIDATION_YES_NO);
+                dialogue_system_open(ctx->dialogue, "Abort current game? [y/n]", DIALOGUE_ICON_TEXT,
+                                     DIALOGUE_VALIDATION_YES_NO);
                 game_modes_set_abort_pending();
             }
         }
@@ -421,8 +421,8 @@ void game_input_global(game_ctx_t *ctx)
     {
         if (sdl2_state_push_dialogue(ctx->state) == SDL2ST_OK)
         {
-            dialogue_system_open(ctx->dialogue, "Exit XBoing you wimp? [y/n]",
-                                 DIALOGUE_ICON_TEXT, DIALOGUE_VALIDATION_YES_NO);
+            dialogue_system_open(ctx->dialogue, "Exit XBoing you wimp? [y/n]", DIALOGUE_ICON_TEXT,
+                                 DIALOGUE_VALIDATION_YES_NO);
             game_modes_set_quit_pending();
         }
     }

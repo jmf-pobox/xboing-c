@@ -43,7 +43,8 @@ render switch to draw its full content, then overlay the dialogue.
 ### Q Key (game_input.c)
 
 Replace immediate SDL_QUIT with:
-```
+
+```c
 if (just_pressed(QUIT) && mode != SDL2ST_EDIT && mode != SDL2ST_DIALOGUE)
 {
     if (sdl2_state_push_dialogue(state) == SDL2ST_OK)
@@ -56,18 +57,21 @@ if (just_pressed(QUIT) && mode != SDL2ST_EDIT && mode != SDL2ST_DIALOGUE)
 ```
 
 Critical guards:
+
 - `mode != SDL2ST_DIALOGUE` prevents setting quit_pending during an
   already-open dialogue (finding #2)
 - `quit_pending` set ONLY inside `push == OK` block
 
 Result consumed in `mode_dialogue_exit()`:
+
 - If quit_pending && not cancelled && input[0]=='y': SDL_PushEvent(QUIT)
 - Otherwise: quit_pending=0, resume
 
 ### Escape Key (game_input.c)
 
 Stays inside the existing `if (mode == SDL2ST_GAME)` block (finding #3):
-```
+
+```c
 if (just_pressed(ABORT))
 {
     if (prev == SDL2ST_EDIT)
@@ -81,6 +85,7 @@ if (just_pressed(ABORT))
 ```
 
 Result consumed in `mode_game_enter()`:
+
 - abort_pending check is FIRST, before any prev-based logic (finding #1)
 - After pop_dialogue, `sdl2_state_previous()` returns SDL2ST_DIALOGUE,
   not the pre-dialogue mode — the flag carries the intent, prev is
@@ -91,6 +96,7 @@ Result consumed in `mode_game_enter()`:
 ### Pending Flag Pattern
 
 Follows established `wisdom_pending` pattern in game_modes.c:
+
 - `static int quit_pending, abort_pending` in game_modes.c
 - Setter functions exposed via game_modes.h
 - Reset in `start_new_game()`
@@ -120,6 +126,7 @@ visual polish item. Will document as ADR when implemented.
 ### Tests
 
 Unit tests (dialogue_system pure C, no SDL):
+
 - YES_NO 'y' + Return → not cancelled, input="y"
 - YES_NO 'n' + Return → not cancelled, input="n"
 - YES_NO Escape → cancelled
@@ -129,6 +136,7 @@ Unit tests (dialogue_system pure C, no SDL):
 - State transitions: MAP → TEXT → UNMAP → FINISHED
 
 Integration tests:
+
 - Q opens dialogue (check sdl2_state_current == SDL2ST_DIALOGUE)
 - Q during existing dialogue does NOT set quit_pending (finding #8)
 - Q dialogue 'n' resumes previous mode
