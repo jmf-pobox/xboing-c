@@ -16,4 +16,10 @@
  */
 void game_modes_register(game_ctx_t *ctx);
 
+/* Dialogue result pending flags — set by game_input.c before
+ * sdl2_state_push_dialogue, consumed by mode enter/exit handlers.
+ * Follows the wisdom_pending pattern (game_modes.c:69). */
+void game_modes_set_quit_pending(void);
+void game_modes_set_abort_pending(void);
+
 #endif /* GAME_MODES_H */

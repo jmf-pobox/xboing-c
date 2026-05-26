@@ -11,12 +11,14 @@
 
 #include "game_input.h"
 #include "game_callbacks.h"
+#include "game_modes.h"
 
 #include <stdio.h>
 
 #include <SDL2/SDL.h>
 
 #include "ball_system.h"
+#include "dialogue_system.h"
 #include "block_system.h"
 #include "gun_system.h"
 #include "level_system.h"
@@ -368,12 +370,22 @@ void game_input_global(game_ctx_t *ctx)
         if (sdl2_input_just_pressed(ctx->input, SDL2I_LOAD))
             input_load_game(ctx);
 
-        /* Escape returns to editor if play-testing */
+        /* Escape — original/main.c:506-508.
+         * If play-testing from editor: return to editor (no dialogue).
+         * Otherwise: "Abort current game? [y/n]" confirmation. */
         if (sdl2_input_just_pressed(ctx->input, SDL2I_ABORT))
         {
             sdl2_state_mode_t prev = sdl2_state_previous(ctx->state);
             if (prev == SDL2ST_EDIT)
+            {
                 sdl2_state_transition(ctx->state, SDL2ST_EDIT);
+            }
+            else if (sdl2_state_push_dialogue(ctx->state) == SDL2ST_OK)
+            {
+                dialogue_system_open(ctx->dialogue, "Abort current game? [y/n]",
+                                     DIALOGUE_ICON_TEXT, DIALOGUE_VALIDATION_YES_NO);
+                game_modes_set_abort_pending();
+            }
         }
     }
 
@@ -383,16 +395,19 @@ void game_input_global(game_ctx_t *ctx)
         (mode == SDL2ST_GAME || is_attract))
         sdl2_state_transition(ctx->state, SDL2ST_EDIT);
 
-    /* Q: quit — original/main.c:864.  Skip in editor mode (original
-     * routes editor to handleEditorKeys, not handleMiscKeys).
-     * Original shows YesNoDialogue confirmation first; we quit
-     * immediately as a first pass.  Dialogue integration deferred. */
-    if (sdl2_input_just_pressed(ctx->input, SDL2I_QUIT) &&
-        sdl2_state_current(ctx->state) != SDL2ST_EDIT)
+    /* Q: quit with confirmation — original/main.c:864-868.
+     * "Exit XBoing you wimp? [y/n]" YesNoDialogue.
+     * Blocked in EDIT (editor has own Q handler) and DIALOGUE
+     * (prevent setting quit_pending during unrelated dialogue). */
+    if (sdl2_input_just_pressed(ctx->input, SDL2I_QUIT) && mode != SDL2ST_EDIT &&
+        mode != SDL2ST_DIALOGUE)
     {
-        SDL_Event quit_event = {0};
-        quit_event.type = SDL_QUIT;
-        SDL_PushEvent(&quit_event);
+        if (sdl2_state_push_dialogue(ctx->state) == SDL2ST_OK)
+        {
+            dialogue_system_open(ctx->dialogue, "Exit XBoing you wimp? [y/n]",
+                                 DIALOGUE_ICON_TEXT, DIALOGUE_VALIDATION_YES_NO);
+            game_modes_set_quit_pending();
+        }
     }
 
     /* C: cycle attract screens — original/main.c:554-605.
