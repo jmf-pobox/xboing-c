@@ -364,8 +364,7 @@ void game_input_update(game_ctx_t *ctx)
 
     /* S key toggles visual SFX per original/main.c:639.
      * Skip when Shift held — Shift+S is a debug cheat (screen shake). */
-    if (!sdl2_input_shift_held(ctx->input) &&
-        sdl2_input_just_pressed(ctx->input, SDL2I_TOGGLE_SFX))
+    if (!sdl2_input_shift_held(ctx->input) && sdl2_input_just_pressed(ctx->input, SDL2I_TOGGLE_SFX))
     {
         int was = sfx_system_get_enabled(ctx->sfx);
         sfx_system_set_enabled(ctx->sfx, !was);
