@@ -99,6 +99,8 @@ typedef struct game_ctx
     highscore_table_t hs_global;
     highscore_table_t hs_personal;
 
+    highscore_type_t highscore_request_type;
+
     /* --- Game state (replaces legacy globals from main.c) ---------------- */
     int level_number;     /* Current level (1-based) */
     int lives_left;       /* Remaining lives */

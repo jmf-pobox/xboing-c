@@ -306,6 +306,7 @@ game_ctx_t *game_create(int argc, char *argv[])
         highscore_io_read(score_path, &ctx->hs_global);
     if (paths_score_file_personal(&ctx->paths, score_path, sizeof(score_path)) == PATHS_OK)
         highscore_io_read(score_path, &ctx->hs_personal);
+    ctx->highscore_request_type = HIGHSCORE_TYPE_PERSONAL;
 
     /* ---- Phase 2: SDL2 platform modules --------------------------------- */
 

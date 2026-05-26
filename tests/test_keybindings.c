@@ -379,6 +379,30 @@ static void test_global_audio_toggle(void **vstate)
     assert_false(sdl2_audio_is_muted(ctx->audio));
 }
 
+static void test_global_highscore_h_global(void **vstate)
+{
+    game_ctx_t *ctx = ((kb_fixture_t *)*vstate)->ctx;
+    inject_key(ctx, SDL_SCANCODE_H);
+    game_input_global(ctx);
+    assert_int_equal(sdl2_state_current(ctx->state), SDL2ST_HIGHSCORE);
+    assert_int_equal(ctx->highscore_request_type, HIGHSCORE_TYPE_GLOBAL);
+}
+
+static void test_global_highscore_H_personal(void **vstate)
+{
+    game_ctx_t *ctx = ((kb_fixture_t *)*vstate)->ctx;
+    sdl2_input_begin_frame(ctx->input);
+    SDL_Event e = {0};
+    e.type = SDL_KEYDOWN;
+    e.key.keysym.scancode = SDL_SCANCODE_H;
+    e.key.keysym.mod = KMOD_LSHIFT;
+    e.key.repeat = 0;
+    sdl2_input_process_event(ctx->input, &e);
+    game_input_global(ctx);
+    assert_int_equal(sdl2_state_current(ctx->state), SDL2ST_HIGHSCORE);
+    assert_int_equal(ctx->highscore_request_type, HIGHSCORE_TYPE_PERSONAL);
+}
+
 static void test_attract_cycle_table(void **vstate)
 {
     (void)vstate;
@@ -438,6 +462,8 @@ int main(void)
         cmocka_unit_test_setup_teardown(test_global_fullscreen_no_crash, setup_attract, teardown),
         cmocka_unit_test_setup_teardown(test_global_quit_pushes_event, setup_attract, teardown),
         cmocka_unit_test_setup_teardown(test_global_audio_toggle, setup_attract, teardown),
+        cmocka_unit_test_setup_teardown(test_global_highscore_h_global, setup_attract, teardown),
+        cmocka_unit_test_setup_teardown(test_global_highscore_H_personal, setup_attract, teardown),
     };
 
     const struct CMUnitTest scoping_tests[] = {
