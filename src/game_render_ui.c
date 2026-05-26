@@ -12,6 +12,7 @@
 
 #include <SDL2/SDL.h>
 
+#include "block_types.h"
 #include "bonus_system.h"
 #include "demo_system.h"
 #include "game_context.h"
@@ -515,23 +516,52 @@ void game_render_demo(const game_ctx_t *ctx)
         }
     }
 
-    /* Ball trail animation */
+    /* Ball trail + decorations + paddle — all drawn during BLOCKS state.
+     * Order matches original/demo.c DoBlocks: trail → half-block → paddle. */
     if (state >= DEMO_STATE_BLOCKS)
     {
+        SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
+
+        /* Ball trail animation */
         const demo_ball_pos_t *trail = NULL;
         int count = demo_system_get_ball_trail(ctx->demo, &trail);
-
         for (int i = 0; i < count; i++)
         {
             const char *key = sprite_ball_key(trail[i].frame_index);
             sdl2_texture_info_t tex;
             if (sdl2_texture_get(ctx->texture, key, &tex) == SDL2T_OK)
             {
-                SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
                 SDL_Rect dst = {PLAY_AREA_X + trail[i].x, PLAY_AREA_Y + trail[i].y, tex.width,
                                 tex.height};
                 SDL_RenderCopy(sdl, tex.texture, NULL, &dst);
             }
+        }
+
+        /* Half-disintegrated block at (col=2, row=12) per original/demo.c:173-176 */
+        const char *exkey = sprite_block_explode_key(YELLOW_BLK, 1);
+        sdl2_texture_info_t etex;
+        if (sdl2_texture_get(ctx->texture, exkey, &etex) == SDL2T_OK)
+        {
+            SDL_Rect dst = {PLAY_AREA_X + 110, PLAY_AREA_Y + 384, etex.width, etex.height};
+            SDL_RenderCopy(sdl, etex.texture, NULL, &dst);
+        }
+
+        /* Paddle + left arrow per original/demo.c:178-182 */
+        int px = PLAY_AREA_X + PLAY_AREA_W / 2;
+        int py = PLAY_AREA_Y + PLAY_AREA_H - 90;
+
+        sdl2_texture_info_t ptex;
+        if (sdl2_texture_get(ctx->texture, SPR_PADDLE_HUGE, &ptex) == SDL2T_OK)
+        {
+            SDL_Rect dst = {px - 35, py, ptex.width, ptex.height};
+            SDL_RenderCopy(sdl, ptex.texture, NULL, &dst);
+        }
+
+        sdl2_texture_info_t atex;
+        if (sdl2_texture_get(ctx->texture, SPR_LEFT_ARROW, &atex) == SDL2T_OK)
+        {
+            SDL_Rect dst = {px - 75, py - 1, atex.width, atex.height};
+            SDL_RenderCopy(sdl, atex.texture, NULL, &dst);
         }
     }
 
@@ -607,26 +637,93 @@ void game_render_keys(const game_ctx_t *ctx)
 
     render_play_area_frame(ctx, state == KEYS_STATE_SPARKLE);
 
+    /* XBOING title image per original/keys.c:309 DoIntroTitle */
     if (state >= KEYS_STATE_TITLE)
     {
-        SDL_Color white = {255, 255, 255, 255};
-        sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TITLE, "Game Controls",
-                                      PLAY_AREA_Y + 20, white, PLAY_AREA_W);
+        sdl2_texture_info_t tex;
+        if (sdl2_texture_get(ctx->texture, SPR_TITLE_BIG, &tex) == SDL2T_OK)
+        {
+            int tx = PLAY_AREA_X + (PLAY_AREA_W - tex.width) / 2;
+            SDL_Rect dst = {tx, PLAY_AREA_Y + 10, tex.width, tex.height};
+            SDL_RenderCopy(sdl2_renderer_get(ctx->renderer), tex.texture, NULL, &dst);
+        }
     }
 
     if (state >= KEYS_STATE_TEXT)
     {
+        SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
+        SDL_Color red = {255, 0, 0, 255};
+        SDL_Color yellow = {255, 255, 0, 255};
+        SDL_Color green = {0, 255, 0, 255};
+        SDL_Color tan_clr = {210, 180, 140, 255};
+
+        /* "- Game Controls -" title per original/keys.c:143 */
+        sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TITLE, "- Game Controls -",
+                                      PLAY_AREA_Y + 120, red, PLAY_AREA_W + 2 * PLAY_AREA_X);
+
+        /* Horizontal separator line per original/keys.c:147-148 */
+        int line_y = PLAY_AREA_Y + 160;
+        SDL_SetRenderDrawColor(sdl, 0, 0, 0, 255);
+        SDL_RenderDrawLine(sdl, PLAY_AREA_X + 32, line_y + 2, PLAY_AREA_X + PLAY_AREA_W - 28,
+                           line_y + 2);
+        SDL_SetRenderDrawColor(sdl, 255, 255, 255, 255);
+        SDL_RenderDrawLine(sdl, PLAY_AREA_X + 30, line_y, PLAY_AREA_X + PLAY_AREA_W - 30, line_y);
+
+        /* Mouse sprite + arrows + paddle labels per original/keys.c:151-162.
+         * mouse_y already includes PLAY_AREA_Y via line_y. */
+        int mouse_y = line_y + 18;
+        int cx = PLAY_AREA_X + PLAY_AREA_W / 2;
+
+        sdl2_texture_info_t mtex;
+        if (sdl2_texture_get(ctx->texture, SPR_MOUSE, &mtex) == SDL2T_OK)
+        {
+            SDL_Rect dst = {cx - 17, mouse_y, mtex.width, mtex.height};
+            SDL_RenderCopy(sdl, mtex.texture, NULL, &dst);
+        }
+
+        sdl2_texture_info_t latex;
+        if (sdl2_texture_get(ctx->texture, SPR_LEFT_ARROW, &latex) == SDL2T_OK)
+        {
+            SDL_Rect dst = {cx - 17 - 10 - 35, mouse_y + 28, latex.width, latex.height};
+            SDL_RenderCopy(sdl, latex.texture, NULL, &dst);
+        }
+        sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_TEXT, "Paddle left",
+                              cx - 17 - 10 - 35 - 40 - 60, mouse_y + 28, green);
+
+        sdl2_texture_info_t ratex;
+        if (sdl2_texture_get(ctx->texture, SPR_RIGHT_ARROW, &ratex) == SDL2T_OK)
+        {
+            SDL_Rect dst = {cx + 17 + 10, mouse_y + 28, ratex.width, ratex.height};
+            SDL_RenderCopy(sdl, ratex.texture, NULL, &dst);
+        }
+        sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_TEXT, "Paddle right", cx + 17 + 10 + 40,
+                              mouse_y + 28, green);
+
+        /* Key bindings — two columns, yellow, textFont with shadow
+         * per original/keys.c:164-246 */
         const keys_binding_entry_t *bindings = NULL;
         int count = keys_system_get_game_bindings(ctx->keys, &bindings);
 
-        SDL_Color yellow = {255, 255, 0, 255};
         for (int i = 0; i < count; i++)
         {
             int x = (bindings[i].column == 0) ? PLAY_AREA_X + 30 : PLAY_AREA_X + 280;
             int row = (bindings[i].column == 0) ? i : i - 10;
-            sdl2_font_draw(ctx->font, SDL2F_FONT_COPY, bindings[i].text, x,
-                           PLAY_AREA_Y + 90 + row * 24, yellow);
+            sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_TEXT, bindings[i].text, x,
+                                  PLAY_AREA_Y + 250 + row * 27, yellow);
         }
+
+        /* Bottom separator line per original/keys.c:249-250 */
+        int bot_y = PLAY_AREA_Y + 250 + 10 * 27 + 10;
+        SDL_SetRenderDrawColor(sdl, 0, 0, 0, 255);
+        SDL_RenderDrawLine(sdl, PLAY_AREA_X + 32, bot_y + 2, PLAY_AREA_X + PLAY_AREA_W - 28,
+                           bot_y + 2);
+        SDL_SetRenderDrawColor(sdl, 255, 255, 255, 255);
+        SDL_RenderDrawLine(sdl, PLAY_AREA_X + 30, bot_y, PLAY_AREA_X + PLAY_AREA_W - 30, bot_y);
+
+        /* "Insert coin" per original/keys.c:252-253 */
+        sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TEXT, "Insert coin to start the game",
+                                      PLAY_AREA_Y + PLAY_AREA_H - 30, tan_clr,
+                                      PLAY_AREA_W + 2 * PLAY_AREA_X);
     }
 
     if (state == KEYS_STATE_SPARKLE)

@@ -22,8 +22,8 @@ static const demo_ball_pos_t ball_trail[DEMO_BALL_TRAIL_COUNT] = {
 
 /* Descriptive text from legacy DoBlocks(). */
 static const demo_text_line_t demo_text[DEMO_TEXT_LINES] = {
-    {"Ball hits the paddle", 300, DEMO_PLAY_HEIGHT - 140},
-    {"and bounces back.", 300, DEMO_PLAY_HEIGHT - 120},
+    {"Ball hits the paddle", 300, DEMO_PLAY_HEIGHT - 130},
+    {"and bounces back.", 300, DEMO_PLAY_HEIGHT - 110},
     {"Ball hits block", 30, DEMO_PLAY_HEIGHT - 170},
     {"and rebounds.", 30, DEMO_PLAY_HEIGHT - 150},
     {"Paddle moves left to intercept ball.", 160, DEMO_PLAY_HEIGHT - 60},

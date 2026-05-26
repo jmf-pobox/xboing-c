@@ -11,13 +11,13 @@
 
 #include "game_input.h"
 #include "game_callbacks.h"
-#include "game_rules.h"
 
 #include <stdio.h>
 
+#include <SDL2/SDL.h>
+
 #include "ball_system.h"
 #include "block_system.h"
-#include "eyedude_system.h"
 #include "gun_system.h"
 #include "level_system.h"
 #include "message_system.h"
@@ -25,8 +25,10 @@
 #include "paths.h"
 #include "savegame_io.h"
 #include "score_system.h"
+#include "sdl2_audio.h"
 #include "sdl2_input.h"
 #include "sdl2_loop.h"
+#include "sdl2_renderer.h"
 #include "sdl2_state.h"
 #include "sfx_system.h"
 #include "special_system.h"
@@ -138,149 +140,6 @@ static void input_load_game(game_ctx_t *ctx)
 }
 
 /* =========================================================================
- * Speed keys — 1-9 change game speed
- * ========================================================================= */
-
-static void input_check_speed(game_ctx_t *ctx)
-{
-    for (int s = 1; s <= 9; s++)
-    {
-        sdl2_input_action_t action = (sdl2_input_action_t)(SDL2I_SPEED_1 + s - 1);
-        if (sdl2_input_just_pressed(ctx->input, action))
-        {
-            sdl2_loop_set_speed(ctx->loop, s);
-            break;
-        }
-    }
-}
-
-/* =========================================================================
- * Debug cheat codes — only active when ctx->debug_mode is true
- *
- * All cheats require Shift held:
- *   Shift+N  — skip level (clear blocks → bonus → next)
- *   Shift+D  — kill ball (force ball death)
- *   Shift+G  — game over (set lives=0, kill ball)
- *   Shift+L  — add 5 lives
- *   Shift+A  — max ammo (20 bullets)
- *   Shift+E  — spawn EyeDude
- *   Shift+S  — trigger screen shake
- *   Shift+1..9 — jump to level 10/20/30/.../90
- * ========================================================================= */
-
-/* Debounce state for debug keys — prevents repeat firing */
-static Uint32 debug_last_fire[SDL_NUM_SCANCODES];
-
-static bool debug_key_edge(game_ctx_t *ctx, SDL_Scancode sc)
-{
-    (void)ctx;
-    const Uint8 *keys = SDL_GetKeyboardState(NULL);
-    Uint32 now = SDL_GetTicks();
-    if (keys[sc] && (now - debug_last_fire[sc] > 300))
-    {
-        debug_last_fire[sc] = now;
-        return true;
-    }
-    return false;
-}
-
-static void input_debug_cheats(game_ctx_t *ctx)
-{
-    if (!ctx->debug_mode)
-        return;
-
-    const Uint8 *keys = SDL_GetKeyboardState(NULL);
-    int shift = keys[SDL_SCANCODE_LSHIFT] || keys[SDL_SCANCODE_RSHIFT];
-    if (!shift)
-        return;
-
-    int frame = (int)sdl2_state_frame(ctx->state);
-
-    /* Shift+N: skip level */
-    if (debug_key_edge(ctx, SDL_SCANCODE_N))
-    {
-        for (int r = 0; r < 18; r++)
-            for (int c = 0; c < 9; c++)
-                block_system_clear(ctx->block, r, c);
-        message_system_set(ctx->message, "[DEBUG] Level skipped", 1, frame);
-    }
-
-    /* Shift+D: kill ball */
-    if (debug_key_edge(ctx, SDL_SCANCODE_D))
-    {
-        ball_system_env_t env = game_callbacks_ball_env(ctx);
-        for (int i = 0; i < 5; i++)
-        {
-            enum BallStates st = ball_system_get_state(ctx->ball, i);
-            if (st == BALL_ACTIVE || st == BALL_READY)
-                ball_system_change_mode(ctx->ball, &env, i, BALL_POP);
-        }
-        message_system_set(ctx->message, "[DEBUG] Ball killed", 1, frame);
-    }
-
-    /* Shift+G: game over */
-    if (debug_key_edge(ctx, SDL_SCANCODE_G))
-    {
-        ctx->lives_left = 0;
-        ball_system_env_t env = game_callbacks_ball_env(ctx);
-        for (int i = 0; i < 5; i++)
-        {
-            if (ball_system_get_state(ctx->ball, i) != BALL_NONE)
-                ball_system_change_mode(ctx->ball, &env, i, BALL_POP);
-        }
-        message_system_set(ctx->message, "[DEBUG] Game over triggered", 1, frame);
-    }
-
-    /* Shift+L: add 5 lives */
-    if (debug_key_edge(ctx, SDL_SCANCODE_L))
-    {
-        ctx->lives_left += 5;
-        char buf[64];
-        snprintf(buf, sizeof(buf), "[DEBUG] Lives: %d", ctx->lives_left);
-        message_system_set(ctx->message, buf, 1, frame);
-    }
-
-    /* Shift+A: max ammo */
-    if (debug_key_edge(ctx, SDL_SCANCODE_A))
-    {
-        gun_system_set_ammo(ctx->gun, GUN_MAX_AMMO);
-        gun_system_set_unlimited(ctx->gun, 1);
-        message_system_set(ctx->message, "[DEBUG] Max ammo + unlimited", 1, frame);
-    }
-
-    /* Shift+E: spawn EyeDude */
-    if (debug_key_edge(ctx, SDL_SCANCODE_E))
-    {
-        eyedude_system_set_state(ctx->eyedude, EYEDUDE_STATE_RESET);
-        message_system_set(ctx->message, "[DEBUG] EyeDude spawned", 1, frame);
-    }
-
-    /* Shift+S: trigger shake */
-    if (debug_key_edge(ctx, SDL_SCANCODE_S))
-    {
-        sfx_system_set_mode(ctx->sfx, SFX_MODE_SHAKE);
-        sfx_system_set_end_frame(ctx->sfx, frame + 100);
-        message_system_set(ctx->message, "[DEBUG] Shake!", 1, frame);
-    }
-
-    /* Shift+1..9: jump to level 10/20/.../90 */
-    for (int s = 1; s <= 9; s++)
-    {
-        SDL_Scancode sc = (SDL_Scancode)(SDL_SCANCODE_1 + s - 1);
-        if (debug_key_edge(ctx, sc))
-        {
-            ctx->level_number = s * 10;
-            game_rules_next_level(ctx);
-            sdl2_state_transition(ctx->state, SDL2ST_GAME);
-            char buf[64];
-            snprintf(buf, sizeof(buf), "[DEBUG] Jump to level %d", ctx->level_number);
-            message_system_set(ctx->message, buf, 1, frame);
-            break;
-        }
-    }
-}
-
-/* =========================================================================
  * Public API
  * ========================================================================= */
 
@@ -331,13 +190,8 @@ void game_input_update(game_ctx_t *ctx)
             if (sdl2_input_just_pressed(ctx->input, SDL2I_LOAD))
                 input_load_game(ctx);
 
-            /* Speed keys 1-9 (only without Shift — Shift+1..9 are debug cheats) */
-            if (!sdl2_input_shift_held(ctx->input))
-                input_check_speed(ctx);
-
-            /* E key enters editor (not Shift+E which is EyeDude cheat) */
-            if (!sdl2_input_shift_held(ctx->input) &&
-                sdl2_input_just_pressed(ctx->input, SDL2I_ENTER_EDITOR))
+            /* E key enters editor */
+            if (sdl2_input_just_pressed(ctx->input, SDL2I_ENTER_EDITOR))
                 sdl2_state_transition(ctx->state, SDL2ST_EDIT);
 
             /* Escape returns to editor if play-testing */
@@ -347,16 +201,127 @@ void game_input_update(game_ctx_t *ctx)
                 if (prev == SDL2ST_EDIT)
                     sdl2_state_transition(ctx->state, SDL2ST_EDIT);
             }
-
-            /* Debug cheat codes (Shift+key, --debug only) */
-            input_debug_cheats(ctx);
             break;
 
         default:
             /* E key enters editor from any attract screen */
-            if (!sdl2_input_shift_held(ctx->input) &&
-                sdl2_input_just_pressed(ctx->input, SDL2I_ENTER_EDITOR))
+            if (sdl2_input_just_pressed(ctx->input, SDL2I_ENTER_EDITOR))
                 sdl2_state_transition(ctx->state, SDL2ST_EDIT);
             break;
     }
+}
+
+/* =========================================================================
+ * Global input — mode-independent keys
+ *
+ * Matches original/main.c handleMiscKeys (lines 814-872) +
+ * handleSpeedKeys (lines 741-803).  Called from ALL modes via
+ * default-case fallthrough in the original.
+ *
+ * Called once per visual frame from game_main.c, NOT from stub_tick
+ * (which fires multiple times per frame at high speed levels,
+ * causing toggle keys to multi-fire and net to zero).
+ * ========================================================================= */
+
+static const char *warp_message(int speed)
+{
+    switch (speed)
+    {
+        case 1:
+            return "Warp 1 - Slow";
+        case 5:
+            return "Warp 5 - Medium";
+        case 9:
+            return "Warp 9 - Fast";
+        default:
+        {
+            static char buf[16];
+            snprintf(buf, sizeof(buf), "Warp %d", speed);
+            return buf;
+        }
+    }
+}
+
+void game_input_global(game_ctx_t *ctx)
+{
+    int frame = (int)sdl2_state_frame(ctx->state);
+    sdl2_state_mode_t mode = sdl2_state_current(ctx->state);
+
+    /* Attract-mode allowlist — matches original/main.c:898-905.
+     * S key (SFX) and 1-9 (speed) only fire from these modes. */
+    int is_attract = (mode == SDL2ST_INTRO || mode == SDL2ST_INSTRUCT || mode == SDL2ST_DEMO ||
+                      mode == SDL2ST_PREVIEW || mode == SDL2ST_KEYS || mode == SDL2ST_KEYSEDIT ||
+                      mode == SDL2ST_HIGHSCORE || mode == SDL2ST_BONUS);
+
+    /* S: toggle visual SFX — original/main.c:639 handleIntroKeys */
+    if (is_attract && sdl2_input_just_pressed(ctx->input, SDL2I_TOGGLE_SFX))
+    {
+        int was = sfx_system_get_enabled(ctx->sfx);
+        sfx_system_set_enabled(ctx->sfx, !was);
+        message_system_set(ctx->message, was ? "- SFX OFF -" : "- SFX ON -", 1, frame);
+    }
+
+    /* 1-9: set warp speed — original/main.c:741 handleSpeedKeys */
+    if (is_attract)
+    {
+        for (int s = 1; s <= 9; s++)
+        {
+            sdl2_input_action_t action = (sdl2_input_action_t)(SDL2I_SPEED_1 + s - 1);
+            if (sdl2_input_just_pressed(ctx->input, action))
+            {
+                sdl2_loop_set_speed(ctx->loop, s);
+                message_system_set(ctx->message, warp_message(s), 1, frame);
+                if (ctx->audio)
+                    sdl2_audio_play(ctx->audio, "tone");
+                break;
+            }
+        }
+    }
+
+    /* +/-: volume up/down — original/main.c:822 */
+    if (ctx->audio)
+    {
+        if (sdl2_input_just_pressed(ctx->input, SDL2I_VOLUME_UP))
+        {
+            int vol = sdl2_audio_volume_up(ctx->audio);
+            char str[32];
+            snprintf(str, sizeof(str), "Maximum volume: %d%%", vol);
+            message_system_set(ctx->message, str, 1, frame);
+        }
+        else if (sdl2_input_just_pressed(ctx->input, SDL2I_VOLUME_DOWN))
+        {
+            int vol = sdl2_audio_volume_down(ctx->audio);
+            char str[32];
+            snprintf(str, sizeof(str), "Maximum volume: %d%%", vol);
+            message_system_set(ctx->message, str, 1, frame);
+        }
+    }
+
+    /* I: fullscreen toggle — original/main.c:853 (XIconifyWindow).
+     * Modernized as fullscreen toggle since SDL2 window management
+     * differs from X11 iconify semantics. See ADR in docs/DESIGN.md. */
+    if (sdl2_input_just_pressed(ctx->input, SDL2I_ICONIFY))
+        sdl2_renderer_toggle_fullscreen(ctx->renderer);
+
+    /* G: toggle keyboard/mouse control — original/main.c:859 */
+    if (sdl2_input_just_pressed(ctx->input, SDL2I_TOGGLE_CONTROL))
+    {
+        ctx->config.use_keys = !ctx->config.use_keys;
+        message_system_set(ctx->message, ctx->config.use_keys ? "Control: Keys" : "Control: Mouse",
+                           1, frame);
+    }
+
+    /* Q: quit — original/main.c:864.  Skip in editor mode (original
+     * routes editor to handleEditorKeys, not handleMiscKeys).
+     * Original shows YesNoDialogue confirmation first; we quit
+     * immediately as a first pass.  Dialogue integration deferred. */
+    if (sdl2_input_just_pressed(ctx->input, SDL2I_QUIT) &&
+        sdl2_state_current(ctx->state) != SDL2ST_EDIT)
+    {
+        SDL_Event quit_event = {0};
+        quit_event.type = SDL_QUIT;
+        SDL_PushEvent(&quit_event);
+    }
+
+    /* A: audio toggle — deferred, no sdl2_audio enable/disable API */
 }

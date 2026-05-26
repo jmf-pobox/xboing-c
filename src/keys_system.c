@@ -18,7 +18,7 @@ static const keys_binding_entry_t game_bindings[KEYS_GAME_BINDINGS_COUNT] = {
     /* Left column */
     {"<s> = Sfx On/Off", 0},
     {"<P> = Pause/Resume", 0},
-    {"<I> = Iconify Quickly", 0},
+    {"<I> = Toggle Fullscreen", 0},
     {"<h> = Roll of Honour", 0},
     {"<H> = Personal scores", 0},
     {"<d> = Kill Ball", 0},
