@@ -151,102 +151,11 @@ static void input_load_game(game_ctx_t *ctx)
 void game_input_update(game_ctx_t *ctx)
 {
     sdl2_state_mode_t mode = sdl2_state_current(ctx->state);
-    int frame = (int)sdl2_state_frame(ctx->state);
 
-    switch (mode)
+    if (mode == SDL2ST_GAME)
     {
-        case SDL2ST_GAME:
-            input_update_paddle(ctx);
-            input_launch_ball(ctx);
-
-            /* K key: dual-use — activate waiting ball first, then shoot.
-             * original/main.c:490-494: ActivateWaitingBall first; if no
-             * ball is waiting (returns -1), shootBullet. */
-            if (sdl2_input_just_pressed(ctx->input, SDL2I_SHOOT))
-            {
-                ball_system_env_t benv = game_callbacks_ball_env(ctx);
-                if (ball_system_activate_waiting(ctx->ball, &benv) == -1)
-                {
-                    gun_system_env_t genv = game_callbacks_gun_env(ctx);
-                    gun_system_shoot(ctx->gun, &genv);
-                }
-            }
-
-            /* Mouse click: same dual-use as K — original/main.c:357-366.
-             * Uses edge-trigger to fire once per click, not once per frame. */
-            if (sdl2_input_mouse_just_pressed(ctx->input, SDL_BUTTON_LEFT) ||
-                sdl2_input_mouse_just_pressed(ctx->input, SDL_BUTTON_MIDDLE) ||
-                sdl2_input_mouse_just_pressed(ctx->input, SDL_BUTTON_RIGHT))
-            {
-                ball_system_env_t benv = game_callbacks_ball_env(ctx);
-                if (ball_system_activate_waiting(ctx->ball, &benv) == -1)
-                {
-                    gun_system_env_t genv = game_callbacks_gun_env(ctx);
-                    gun_system_shoot(ctx->gun, &genv);
-                }
-            }
-
-
-            /* D: kill an active ball — original/main.c:475-483. */
-            if (sdl2_input_just_pressed(ctx->input, SDL2I_KILL_BALL))
-            {
-                int idx = ball_system_get_active_index(ctx->ball);
-                if (idx >= 0)
-                {
-                    ball_system_env_t benv = game_callbacks_ball_env(ctx);
-                    ball_system_change_mode(ctx->ball, &benv, idx, BALL_POP);
-                }
-            }
-
-            /* T: tilt the board — original/main.c:451-473.
-             * MAX_TILTS=3 per level; resets in mode_game_enter. */
-            if (sdl2_input_just_pressed(ctx->input, SDL2I_TILT))
-            {
-                int idx = ball_system_get_active_index(ctx->ball);
-                if (idx >= 0)
-                {
-                    if (ctx->user_tilts < 3)
-                    {
-                        ball_system_env_t benv = game_callbacks_ball_env(ctx);
-                        ball_system_do_tilt(ctx->ball, &benv, idx);
-                        ctx->user_tilts++;
-                        int left = 3 - ctx->user_tilts;
-                        char msg[64];
-                        snprintf(msg, sizeof(msg), "You have %d %s left!", left,
-                                 left == 1 ? "tilt" : "tilts");
-                        message_system_set(ctx->message, msg, 1, frame);
-                    }
-                    else
-                    {
-                        message_system_set(ctx->message, "Maximum tilts reached!", 1, frame);
-                    }
-                }
-            }
-
-            /* Z saves, X loads */
-            if (sdl2_input_just_pressed(ctx->input, SDL2I_SAVE))
-                input_save_game(ctx);
-            if (sdl2_input_just_pressed(ctx->input, SDL2I_LOAD))
-                input_load_game(ctx);
-
-            /* E key enters editor */
-            if (sdl2_input_just_pressed(ctx->input, SDL2I_ENTER_EDITOR))
-                sdl2_state_transition(ctx->state, SDL2ST_EDIT);
-
-            /* Escape returns to editor if play-testing */
-            if (sdl2_input_just_pressed(ctx->input, SDL2I_ABORT))
-            {
-                sdl2_state_mode_t prev = sdl2_state_previous(ctx->state);
-                if (prev == SDL2ST_EDIT)
-                    sdl2_state_transition(ctx->state, SDL2ST_EDIT);
-            }
-            break;
-
-        default:
-            /* E key enters editor from any attract screen */
-            if (sdl2_input_just_pressed(ctx->input, SDL2I_ENTER_EDITOR))
-                sdl2_state_transition(ctx->state, SDL2ST_EDIT);
-            break;
+        input_update_paddle(ctx);
+        input_launch_ball(ctx);
     }
 }
 
@@ -391,6 +300,87 @@ void game_input_global(game_ctx_t *ctx)
         if (ctx->audio)
             sdl2_audio_play(ctx->audio, "toggle");
     }
+
+    /* --- Gameplay keys (GAME mode only) --- */
+    if (mode == SDL2ST_GAME)
+    {
+        /* K: shoot/activate — original/main.c:490-494 */
+        if (sdl2_input_just_pressed(ctx->input, SDL2I_SHOOT))
+        {
+            ball_system_env_t benv = game_callbacks_ball_env(ctx);
+            if (ball_system_activate_waiting(ctx->ball, &benv) == -1)
+            {
+                gun_system_env_t genv = game_callbacks_gun_env(ctx);
+                gun_system_shoot(ctx->gun, &genv);
+            }
+        }
+
+        /* Mouse click: same dual-use as K — original/main.c:357-366 */
+        if (sdl2_input_mouse_just_pressed(ctx->input, SDL_BUTTON_LEFT) ||
+            sdl2_input_mouse_just_pressed(ctx->input, SDL_BUTTON_MIDDLE) ||
+            sdl2_input_mouse_just_pressed(ctx->input, SDL_BUTTON_RIGHT))
+        {
+            ball_system_env_t benv = game_callbacks_ball_env(ctx);
+            if (ball_system_activate_waiting(ctx->ball, &benv) == -1)
+            {
+                gun_system_env_t genv = game_callbacks_gun_env(ctx);
+                gun_system_shoot(ctx->gun, &genv);
+            }
+        }
+
+        /* D: kill an active ball — original/main.c:475-483 */
+        if (sdl2_input_just_pressed(ctx->input, SDL2I_KILL_BALL))
+        {
+            int idx = ball_system_get_active_index(ctx->ball);
+            if (idx >= 0)
+            {
+                ball_system_env_t benv = game_callbacks_ball_env(ctx);
+                ball_system_change_mode(ctx->ball, &benv, idx, BALL_POP);
+            }
+        }
+
+        /* T: tilt the board — original/main.c:451-473 */
+        if (sdl2_input_just_pressed(ctx->input, SDL2I_TILT))
+        {
+            int idx = ball_system_get_active_index(ctx->ball);
+            if (idx >= 0)
+            {
+                if (ctx->user_tilts < 3)
+                {
+                    ball_system_env_t benv = game_callbacks_ball_env(ctx);
+                    ball_system_do_tilt(ctx->ball, &benv, idx);
+                    ctx->user_tilts++;
+                    int left = 3 - ctx->user_tilts;
+                    char msg[64];
+                    snprintf(msg, sizeof(msg), "You have %d %s left!", left,
+                             left == 1 ? "tilt" : "tilts");
+                    message_system_set(ctx->message, msg, 1, frame);
+                }
+                else
+                {
+                    message_system_set(ctx->message, "Maximum tilts reached!", 1, frame);
+                }
+            }
+        }
+
+        /* Z saves, X loads */
+        if (sdl2_input_just_pressed(ctx->input, SDL2I_SAVE))
+            input_save_game(ctx);
+        if (sdl2_input_just_pressed(ctx->input, SDL2I_LOAD))
+            input_load_game(ctx);
+
+        /* Escape returns to editor if play-testing */
+        if (sdl2_input_just_pressed(ctx->input, SDL2I_ABORT))
+        {
+            sdl2_state_mode_t prev = sdl2_state_previous(ctx->state);
+            if (prev == SDL2ST_EDIT)
+                sdl2_state_transition(ctx->state, SDL2ST_EDIT);
+        }
+    }
+
+    /* E: enter editor — works from GAME and attract modes */
+    if (sdl2_input_just_pressed(ctx->input, SDL2I_ENTER_EDITOR) && mode != SDL2ST_EDIT)
+        sdl2_state_transition(ctx->state, SDL2ST_EDIT);
 
     /* Q: quit — original/main.c:864.  Skip in editor mode (original
      * routes editor to handleEditorKeys, not handleMiscKeys).

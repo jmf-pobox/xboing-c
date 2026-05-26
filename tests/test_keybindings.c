@@ -252,7 +252,7 @@ static void test_gameplay_editor(void **vstate)
 {
     game_ctx_t *ctx = ((kb_fixture_t *)*vstate)->ctx;
     inject_key(ctx, SDL_SCANCODE_E);
-    sdl2_state_update(ctx->state);
+    game_input_global(ctx);
     assert_int_equal(sdl2_state_current(ctx->state), SDL2ST_EDIT);
 }
 
@@ -322,7 +322,7 @@ static void test_gameplay_kill_ball(void **vstate)
     launch_ball(ctx);
     assert_true(ball_system_get_active_count(ctx->ball) > 0);
     inject_key(ctx, SDL_SCANCODE_D);
-    sdl2_state_update(ctx->state);
+    game_input_global(ctx);
     assert_int_equal(ball_system_get_active_index(ctx->ball), -1);
 }
 
@@ -332,7 +332,7 @@ static void test_gameplay_tilt(void **vstate)
     launch_ball(ctx);
     int before_tilts = ctx->user_tilts;
     inject_key(ctx, SDL_SCANCODE_T);
-    sdl2_state_update(ctx->state);
+    game_input_global(ctx);
     assert_int_equal(ctx->user_tilts, before_tilts + 1);
 }
 
@@ -342,7 +342,7 @@ static void test_gameplay_tilt_max_reached(void **vstate)
     launch_ball(ctx);
     ctx->user_tilts = 3;
     inject_key(ctx, SDL_SCANCODE_T);
-    sdl2_state_update(ctx->state);
+    game_input_global(ctx);
     assert_int_equal(ctx->user_tilts, 3);
 }
 
