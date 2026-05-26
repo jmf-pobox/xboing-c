@@ -14,6 +14,8 @@
 
 #include <stdio.h>
 
+#include <SDL2/SDL.h>
+
 #include "ball_system.h"
 #include "block_system.h"
 #include "gun_system.h"
@@ -23,8 +25,10 @@
 #include "paths.h"
 #include "savegame_io.h"
 #include "score_system.h"
+#include "sdl2_audio.h"
 #include "sdl2_input.h"
 #include "sdl2_loop.h"
+#include "sdl2_renderer.h"
 #include "sdl2_state.h"
 #include "sfx_system.h"
 #include "special_system.h"
@@ -136,23 +140,6 @@ static void input_load_game(game_ctx_t *ctx)
 }
 
 /* =========================================================================
- * Speed keys — 1-9 change game speed
- * ========================================================================= */
-
-static void input_check_speed(game_ctx_t *ctx)
-{
-    for (int s = 1; s <= 9; s++)
-    {
-        sdl2_input_action_t action = (sdl2_input_action_t)(SDL2I_SPEED_1 + s - 1);
-        if (sdl2_input_just_pressed(ctx->input, action))
-        {
-            sdl2_loop_set_speed(ctx->loop, s);
-            break;
-        }
-    }
-}
-
-/* =========================================================================
  * Public API
  * ========================================================================= */
 
@@ -203,9 +190,6 @@ void game_input_update(game_ctx_t *ctx)
             if (sdl2_input_just_pressed(ctx->input, SDL2I_LOAD))
                 input_load_game(ctx);
 
-            /* Speed keys 1-9 */
-            input_check_speed(ctx);
-
             /* E key enters editor */
             if (sdl2_input_just_pressed(ctx->input, SDL2I_ENTER_EDITOR))
                 sdl2_state_transition(ctx->state, SDL2ST_EDIT);
@@ -225,15 +209,117 @@ void game_input_update(game_ctx_t *ctx)
                 sdl2_state_transition(ctx->state, SDL2ST_EDIT);
             break;
     }
+}
 
-    /* Global keys — work from any mode per original handleMiscKeys/handleIntroKeys */
+/* =========================================================================
+ * Global input — mode-independent keys
+ *
+ * Matches original/main.c handleMiscKeys (lines 814-872) +
+ * handleSpeedKeys (lines 741-803).  Called from ALL modes via
+ * default-case fallthrough in the original.
+ *
+ * Called once per visual frame from game_main.c, NOT from stub_tick
+ * (which fires multiple times per frame at high speed levels,
+ * causing toggle keys to multi-fire and net to zero).
+ * ========================================================================= */
 
-    /* S key toggles visual SFX per original/main.c:639 */
+static const char *warp_message(int speed)
+{
+    switch (speed)
+    {
+        case 1:
+            return "Warp 1 - Slow";
+        case 5:
+            return "Warp 5 - Medium";
+        case 9:
+            return "Warp 9 - Fast";
+        default:
+        {
+            static char buf[16];
+            snprintf(buf, sizeof(buf), "Warp %d", speed);
+            return buf;
+        }
+    }
+}
+
+void game_input_global(game_ctx_t *ctx)
+{
+    int frame = (int)sdl2_state_frame(ctx->state);
+
+    /* S: toggle visual SFX — original/main.c:639 */
     if (sdl2_input_just_pressed(ctx->input, SDL2I_TOGGLE_SFX))
     {
         int was = sfx_system_get_enabled(ctx->sfx);
         sfx_system_set_enabled(ctx->sfx, !was);
-        int frame = (int)sdl2_state_frame(ctx->state);
         message_system_set(ctx->message, was ? "- SFX OFF -" : "- SFX ON -", 1, frame);
     }
+
+    /* 1-9: set warp speed — original/main.c:741 handleSpeedKeys.
+     * Original only fires from attract modes (handleIntroKeys default).
+     * Allowlist matches original/main.c:898-905 exactly. */
+    sdl2_state_mode_t mode = sdl2_state_current(ctx->state);
+    if (mode == SDL2ST_INTRO || mode == SDL2ST_INSTRUCT || mode == SDL2ST_DEMO ||
+        mode == SDL2ST_PREVIEW || mode == SDL2ST_KEYS || mode == SDL2ST_KEYSEDIT ||
+        mode == SDL2ST_HIGHSCORE || mode == SDL2ST_BONUS)
+    {
+        for (int s = 1; s <= 9; s++)
+        {
+            sdl2_input_action_t action = (sdl2_input_action_t)(SDL2I_SPEED_1 + s - 1);
+            if (sdl2_input_just_pressed(ctx->input, action))
+            {
+                sdl2_loop_set_speed(ctx->loop, s);
+                message_system_set(ctx->message, warp_message(s), 1, frame);
+                if (ctx->audio)
+                    sdl2_audio_play(ctx->audio, "tone");
+                break;
+            }
+        }
+    }
+
+    /* +/-: volume up/down — original/main.c:822 */
+    if (ctx->audio)
+    {
+        if (sdl2_input_just_pressed(ctx->input, SDL2I_VOLUME_UP))
+        {
+            int vol = sdl2_audio_volume_up(ctx->audio);
+            char str[32];
+            snprintf(str, sizeof(str), "Maximum volume: %d%%", vol);
+            message_system_set(ctx->message, str, 1, frame);
+        }
+        else if (sdl2_input_just_pressed(ctx->input, SDL2I_VOLUME_DOWN))
+        {
+            int vol = sdl2_audio_volume_down(ctx->audio);
+            char str[32];
+            snprintf(str, sizeof(str), "Maximum volume: %d%%", vol);
+            message_system_set(ctx->message, str, 1, frame);
+        }
+    }
+
+    /* I: fullscreen toggle — original/main.c:853 (XIconifyWindow).
+     * Modernized as fullscreen toggle since SDL2 window management
+     * differs from X11 iconify semantics. See ADR in DESIGN.md. */
+    if (sdl2_input_just_pressed(ctx->input, SDL2I_ICONIFY))
+        sdl2_renderer_toggle_fullscreen(ctx->renderer);
+
+    /* G: toggle keyboard/mouse control — original/main.c:859 */
+    if (sdl2_input_just_pressed(ctx->input, SDL2I_TOGGLE_CONTROL))
+    {
+        ctx->config.use_keys = !ctx->config.use_keys;
+        message_system_set(ctx->message, ctx->config.use_keys ? "Control: Keys" : "Control: Mouse",
+                           1, frame);
+    }
+
+    /* Q: quit — original/main.c:864.  Skip in editor mode (original
+     * routes editor to handleEditorKeys, not handleMiscKeys).
+     * Original shows YesNoDialogue confirmation first; we quit
+     * immediately as a first pass.  Dialogue integration deferred. */
+    if (sdl2_input_just_pressed(ctx->input, SDL2I_QUIT) &&
+        sdl2_state_current(ctx->state) != SDL2ST_EDIT)
+    {
+        SDL_Event quit_event;
+        quit_event.type = SDL_QUIT;
+        SDL_PushEvent(&quit_event);
+    }
+
+    /* A: audio toggle — deferred, no sdl2_audio enable/disable API */
 }

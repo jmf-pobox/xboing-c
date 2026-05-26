@@ -449,6 +449,27 @@ Every code change follows this pipeline. Steps are ordered — do not skip ahead
 
 1. Create a feature branch from master: `git checkout -b <prefix>/short-description master`. Use branch prefixes from Branch Discipline below.
 
+### Phase 2.5: Design (for non-trivial changes)
+
+Any change that introduces a new public API, touches the main loop,
+restructures how modules interact, or adds a new subsystem must go
+through a structured design exercise before implementation:
+
+1. Read the original source to understand the problem space and the
+   existing solution's architecture.
+2. Launch a design agent (`code-architect`) to produce a blueprint.
+3. Launch a peer review agent (`code-reviewer`) on the design to
+   find flaws — multi-tick issues, priority ordering, guard
+   conditions, behavioral regressions.
+4. Incorporate review findings. Update the plan.
+5. Write an ADR in `docs/DESIGN.md` for key decisions.
+6. Get user approval on the final plan.
+7. Only then proceed to Phase 3.
+
+Do not skip this for "simple" changes that turn out to involve
+architectural decisions. If you find yourself reverting code, you
+skipped the design phase.
+
 ### Phase 3: Implement (TDD when feasible)
 
 1. Write failing tests first when feasible — new functions, behavior changes, bug reproductions. Not required for docs-only, config, or template changes.
