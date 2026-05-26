@@ -155,12 +155,7 @@ void game_input_update(game_ctx_t *ctx)
     switch (mode)
     {
         case SDL2ST_GAME:
-        {
-            /* Original: frame%5 (PADDLE_ANIMATE_DELAY).  frame%4 is ~25%
-             * faster, which feels better on modern displays. */
-            unsigned long frame = sdl2_state_frame(ctx->state);
-            if ((frame % 4) == 0)
-                input_update_paddle(ctx);
+            input_update_paddle(ctx);
             input_launch_ball(ctx);
 
             /* K key: dual-use — activate waiting ball first, then shoot.
@@ -212,7 +207,6 @@ void game_input_update(game_ctx_t *ctx)
                     sdl2_state_transition(ctx->state, SDL2ST_EDIT);
             }
             break;
-        }
 
         default:
             /* E key enters editor from any attract screen */

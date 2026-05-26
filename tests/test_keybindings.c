@@ -259,8 +259,7 @@ static void test_gameplay_paddle_left(void **vstate)
     game_ctx_t *ctx = ((kb_fixture_t *)*vstate)->ctx;
     int before = paddle_system_get_pos(ctx->paddle);
     inject_key(ctx, SDL_SCANCODE_J);
-    for (int i = 0; i < 6; i++)
-        sdl2_state_update(ctx->state);
+    sdl2_state_update(ctx->state);
     int after = paddle_system_get_pos(ctx->paddle);
     assert_true(after < before);
 }
@@ -270,8 +269,7 @@ static void test_gameplay_paddle_right(void **vstate)
     game_ctx_t *ctx = ((kb_fixture_t *)*vstate)->ctx;
     int before = paddle_system_get_pos(ctx->paddle);
     inject_key(ctx, SDL_SCANCODE_L);
-    for (int i = 0; i < 6; i++)
-        sdl2_state_update(ctx->state);
+    sdl2_state_update(ctx->state);
     int after = paddle_system_get_pos(ctx->paddle);
     assert_true(after > before);
 }
@@ -281,8 +279,7 @@ static void test_gameplay_paddle_left_arrow(void **vstate)
     game_ctx_t *ctx = ((kb_fixture_t *)*vstate)->ctx;
     int before = paddle_system_get_pos(ctx->paddle);
     inject_key(ctx, SDL_SCANCODE_LEFT);
-    for (int i = 0; i < 6; i++)
-        sdl2_state_update(ctx->state);
+    sdl2_state_update(ctx->state);
     int after = paddle_system_get_pos(ctx->paddle);
     assert_true(after < before);
 }
@@ -292,8 +289,7 @@ static void test_gameplay_paddle_right_arrow(void **vstate)
     game_ctx_t *ctx = ((kb_fixture_t *)*vstate)->ctx;
     int before = paddle_system_get_pos(ctx->paddle);
     inject_key(ctx, SDL_SCANCODE_RIGHT);
-    for (int i = 0; i < 6; i++)
-        sdl2_state_update(ctx->state);
+    sdl2_state_update(ctx->state);
     int after = paddle_system_get_pos(ctx->paddle);
     assert_true(after > before);
 }
