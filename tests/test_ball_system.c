@@ -1480,20 +1480,27 @@ static void test_guide_advances_only_at_8x_frame_rate(void **state)
     ball_system_t *ctx = ball_system_create(NULL, NULL, NULL);
     assert_non_null(ctx);
 
-    /* Add a ball using a large starting frame so nextFrame
-     * (env.frame + BIRTH_FRAME_RATE = 1005) sits past the test loop.
-     * Otherwise the BALL_READY auto-activate guard at
-     * src/ball_system.c:403 (`env->frame == nextFrame`) would fire
-     * mid-test and pull the ball out of READY state. */
-    ball_system_env_t env = make_env(1000);
+    /* Add a ball at frame 0 and move to BALL_READY.  change_mode(READY)
+     * doesn't set nextFrame, but ball_system_add sets it to
+     * env.frame + BIRTH_FRAME_RATE = 5.  The BALL_READY auto-activate
+     * guard fires at env->frame >= nextFrame, so we need nextFrame
+     * ahead of our test range.  Transition through the create animation
+     * naturally to reach READY with a proper nextFrame. */
+    ball_system_env_t env = make_env(0);
     int idx = ball_system_add(ctx, &env, 247, 522, 0, 0, NULL);
     assert_int_not_equal(idx, -1);
-    ball_system_status_t st = ball_system_change_mode(ctx, &env, idx, BALL_READY);
-    assert_int_equal(st, BALL_SYS_OK);
+
+    /* Run create animation to completion (BIRTH_SLIDES=8 * BIRTH_FRAME_RATE=5
+     * = 40 frames), reaching BALL_READY with nextFrame = 40 + 3000 = 3040. */
+    for (int f = 1; f <= 50; f++)
+    {
+        env.frame = f;
+        ball_system_update(ctx, &env);
+    }
 
     /* Capture initial guide state. */
     ball_system_guide_info_t g0 = ball_system_get_guide_info(ctx);
-    int base = 2000; /* multiple of 40, well past nextFrame=1005 */
+    int base = 80; /* multiple of 40, well below nextFrame ~3040 */
 
     /* Drive frames base+1..base+39: outer modulus fires at multiples of
      * BALL_FRAME_RATE.  None of those are multiples of
