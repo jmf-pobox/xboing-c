@@ -292,3 +292,27 @@ void sdl2_renderer_get_window_size(const sdl2_renderer_t *ctx, int *w, int *h)
     }
     SDL_GetWindowSize(ctx->window, w, h);
 }
+
+int sdl2_renderer_save_screenshot(const sdl2_renderer_t *ctx, const char *path)
+{
+    if (ctx == NULL || ctx->renderer == NULL || path == NULL)
+    {
+        return -1;
+    }
+    int w = ctx->logical_width;
+    int h = ctx->logical_height;
+    SDL_Surface *surf = SDL_CreateRGBSurfaceWithFormat(0, w, h, 32, SDL_PIXELFORMAT_RGBA32);
+    if (surf == NULL)
+    {
+        return -1;
+    }
+    if (SDL_RenderReadPixels(ctx->renderer, NULL, SDL_PIXELFORMAT_RGBA32, surf->pixels,
+                             surf->pitch) != 0)
+    {
+        SDL_FreeSurface(surf);
+        return -1;
+    }
+    int rc = SDL_SaveBMP(surf, path);
+    SDL_FreeSurface(surf);
+    return rc;
+}

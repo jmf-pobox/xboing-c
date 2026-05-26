@@ -617,6 +617,13 @@ if(SDL2_FOUND AND SDL2_IMAGE_FOUND AND SDL2_MIXER_FOUND AND SDL2_TTF_FOUND)
     xboing_add_integration_test(test_keybindings)
     set_tests_properties(test_keybindings PROPERTIES TIMEOUT 30)
 
+    xboing_add_integration_test(test_attract_screenshots)
+    set_tests_properties(test_attract_screenshots PROPERTIES
+        TIMEOUT 120
+        ENVIRONMENT "SDL_VIDEODRIVER=offscreen;SDL_AUDIODRIVER=dummy"
+        LABELS "visual;asan-only"
+        DISABLED TRUE)
+
     # Convenience target: cmake --build build-coverage --target test-coverage
     # Requires: build with --coverage flags:
     #   cmake -B build-coverage -DCMAKE_BUILD_TYPE=Debug \

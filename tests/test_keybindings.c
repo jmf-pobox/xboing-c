@@ -306,6 +306,26 @@ static void test_attract_c_cycles_screen(void **vstate)
     assert_int_equal(sdl2_state_current(ctx->state), SDL2ST_INSTRUCT);
 }
 
+static void test_attract_c_full_cycle_order(void **vstate)
+{
+    game_ctx_t *ctx = ((kb_fixture_t *)*vstate)->ctx;
+
+    /* Matches natural callback chain: game_callbacks.c keys_cb_on_finished,
+     * demo_cb_on_finished(PREVIEW), highscore_cb_on_finished. */
+    static const sdl2_state_mode_t expected[] = {
+        SDL2ST_INSTRUCT, SDL2ST_DEMO,      SDL2ST_KEYS,    SDL2ST_KEYSEDIT,
+        SDL2ST_PREVIEW,  SDL2ST_HIGHSCORE,  SDL2ST_INTRO,
+    };
+
+    assert_int_equal(sdl2_state_current(ctx->state), SDL2ST_INTRO);
+    for (int i = 0; i < 7; i++)
+    {
+        inject_key(ctx, SDL_SCANCODE_C);
+        game_input_global(ctx);
+        assert_int_equal(sdl2_state_current(ctx->state), expected[i]);
+    }
+}
+
 /* =========================================================================
  * Test registration
  * ========================================================================= */
@@ -341,6 +361,7 @@ int main(void)
 
     const struct CMUnitTest attract_tests[] = {
         cmocka_unit_test_setup_teardown(test_attract_c_cycles_screen, setup_attract, teardown),
+        cmocka_unit_test_setup_teardown(test_attract_c_full_cycle_order, setup_attract, teardown),
     };
 
     int rc = 0;
