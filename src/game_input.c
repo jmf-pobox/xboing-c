@@ -245,22 +245,24 @@ static const char *warp_message(int speed)
 void game_input_global(game_ctx_t *ctx)
 {
     int frame = (int)sdl2_state_frame(ctx->state);
+    sdl2_state_mode_t mode = sdl2_state_current(ctx->state);
 
-    /* S: toggle visual SFX — original/main.c:639 */
-    if (sdl2_input_just_pressed(ctx->input, SDL2I_TOGGLE_SFX))
+    /* Attract-mode allowlist — matches original/main.c:898-905.
+     * S key (SFX) and 1-9 (speed) only fire from these modes. */
+    int is_attract = (mode == SDL2ST_INTRO || mode == SDL2ST_INSTRUCT || mode == SDL2ST_DEMO ||
+                      mode == SDL2ST_PREVIEW || mode == SDL2ST_KEYS || mode == SDL2ST_KEYSEDIT ||
+                      mode == SDL2ST_HIGHSCORE || mode == SDL2ST_BONUS);
+
+    /* S: toggle visual SFX — original/main.c:639 handleIntroKeys */
+    if (is_attract && sdl2_input_just_pressed(ctx->input, SDL2I_TOGGLE_SFX))
     {
         int was = sfx_system_get_enabled(ctx->sfx);
         sfx_system_set_enabled(ctx->sfx, !was);
         message_system_set(ctx->message, was ? "- SFX OFF -" : "- SFX ON -", 1, frame);
     }
 
-    /* 1-9: set warp speed — original/main.c:741 handleSpeedKeys.
-     * Original only fires from attract modes (handleIntroKeys default).
-     * Allowlist matches original/main.c:898-905 exactly. */
-    sdl2_state_mode_t mode = sdl2_state_current(ctx->state);
-    if (mode == SDL2ST_INTRO || mode == SDL2ST_INSTRUCT || mode == SDL2ST_DEMO ||
-        mode == SDL2ST_PREVIEW || mode == SDL2ST_KEYS || mode == SDL2ST_KEYSEDIT ||
-        mode == SDL2ST_HIGHSCORE || mode == SDL2ST_BONUS)
+    /* 1-9: set warp speed — original/main.c:741 handleSpeedKeys */
+    if (is_attract)
     {
         for (int s = 1; s <= 9; s++)
         {
