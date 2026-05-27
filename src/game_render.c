@@ -57,8 +57,8 @@
 #define OFFSET_X 35
 #define PLAY_AREA_X OFFSET_X
 #define PLAY_AREA_Y 60
-#define PLAY_AREA_W 495
-#define PLAY_AREA_H 580
+#define PLAY_AREA_W GAME_PLAY_WIDTH
+#define PLAY_AREA_H GAME_PLAY_HEIGHT
 
 /* Border thickness — matches legacy playWindow border_width=2 */
 #define BORDER_THICKNESS 2

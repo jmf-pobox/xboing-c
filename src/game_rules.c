@@ -29,12 +29,6 @@
 #include "sdl2_state.h"
 #include "special_system.h"
 
-/* Play area constants */
-#define GAME_PLAY_WIDTH 495
-#define GAME_PLAY_HEIGHT 580
-#define GAME_COL_WIDTH (GAME_PLAY_WIDTH / 9)
-#define GAME_ROW_HEIGHT (GAME_PLAY_HEIGHT / 18)
-
 /* Legacy bonus spawning constants */
 #define BONUS_SEED 2000
 

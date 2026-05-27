@@ -56,6 +56,15 @@ typedef struct dialogue_system dialogue_system_t;
 /* highscore_system_t already typedef'd via highscore_system.h above */
 
 /* =========================================================================
+ * Play area geometry — original/include/stage.h PLAY_WIDTH/PLAY_HEIGHT
+ * ========================================================================= */
+
+#define GAME_PLAY_WIDTH 495
+#define GAME_PLAY_HEIGHT 580
+#define GAME_COL_WIDTH (GAME_PLAY_WIDTH / 9)
+#define GAME_ROW_HEIGHT (GAME_PLAY_HEIGHT / 18)
+
+/* =========================================================================
  * Master context
  * ========================================================================= */
 

@@ -658,13 +658,13 @@ static void update_a_ball(ball_system_t *ctx, const ball_system_env_t *env, int 
                 if (ctx->callbacks.on_block_hit != NULL)
                 {
                     int hit_result = ctx->callbacks.on_block_hit(row, col, i, ctx->user_data);
-                    if (hit_result == 2)
+                    if (hit_result == BLOCK_HIT_TELEPORT)
                     {
                         teleport_ball(ctx, env, i);
                         randomise_velocity(ctx, env, i);
                         return;
                     }
-                    if (hit_result != 0)
+                    if (hit_result != BLOCK_HIT_BOUNCE)
                     {
                         return;
                     }

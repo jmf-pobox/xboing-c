@@ -55,12 +55,6 @@
  * MODE_GAME — core gameplay
  * ========================================================================= */
 
-/* Play area constants */
-#define GAME_PLAY_WIDTH 495
-#define GAME_PLAY_HEIGHT 580
-#define GAME_COL_WIDTH (GAME_PLAY_WIDTH / 9)
-#define GAME_ROW_HEIGHT (GAME_PLAY_HEIGHT / 18)
-
 /* Play area position in window (from legacy stage.c) */
 #define PLAY_AREA_X 35
 #define PLAY_AREA_Y 60

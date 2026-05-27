@@ -33,18 +33,16 @@ typedef enum
 } block_system_status_t;
 
 /* =========================================================================
- * Collision region results
- *
- * Sequential values matching BALL_REGION_* in ball_system.h.
+ * Collision region results — aliases for COLLISION_REGION_* in block_types.h.
  * block_system_check_region() can be used directly as the check_region
  * callback for ball_system_t.
  * ========================================================================= */
 
-#define BLOCK_REGION_NONE 0
-#define BLOCK_REGION_TOP 1
-#define BLOCK_REGION_BOTTOM 2
-#define BLOCK_REGION_LEFT 3
-#define BLOCK_REGION_RIGHT 4
+#define BLOCK_REGION_NONE COLLISION_REGION_NONE
+#define BLOCK_REGION_TOP COLLISION_REGION_TOP
+#define BLOCK_REGION_BOTTOM COLLISION_REGION_BOTTOM
+#define BLOCK_REGION_LEFT COLLISION_REGION_LEFT
+#define BLOCK_REGION_RIGHT COLLISION_REGION_RIGHT
 
 /* =========================================================================
  * Constants — match legacy blocks.h values
@@ -263,14 +261,12 @@ void block_system_advance_animations(block_system_t *ctx, int frame);
 int block_system_decrement_gun_hit(block_system_t *ctx, int row, int col);
 
 /*
- * Decrement counter_slide on a COUNTER_BLK at (row, col) by one.
- * Returns the new counter_slide value (>= 0), or -1 on error (NULL ctx,
- * out-of-bounds, unoccupied, or wrong block type).
- *
- * Does NOT trigger explosion — caller must call block_system_explode
- * when the returned value reaches 0.  Matches original/ball.c:824-826.
+ * Handle a ball hitting a COUNTER_BLK at (row, col).
+ * If counter_slide is already 0: return 0 (caller should explode).
+ * Otherwise: decrement counter_slide, return 1 (block survives).
+ * Returns -1 on error.  Matches original/ball.c:820-827.
  */
-int block_system_decrement_counter(block_system_t *ctx, int row, int col);
+int block_system_ball_hit_counter(block_system_t *ctx, int row, int col);
 
 /*
  * Handle a ball hitting a BLACK_BLK at (row, col).

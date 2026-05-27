@@ -1013,7 +1013,7 @@ int block_system_decrement_gun_hit(block_system_t *ctx, int row, int col)
     return 0;
 }
 
-int block_system_decrement_counter(block_system_t *ctx, int row, int col)
+int block_system_ball_hit_counter(block_system_t *ctx, int row, int col)
 {
     if (ctx == NULL || row < 0 || row >= MAX_ROW || col < 0 || col >= MAX_COL)
         return -1;
@@ -1022,10 +1022,11 @@ int block_system_decrement_counter(block_system_t *ctx, int row, int col)
     if (!bp->occupied || bp->block_type != COUNTER_BLK)
         return -1;
 
-    if (bp->counter_slide > 0)
-        bp->counter_slide--;
+    if (bp->counter_slide == 0)
+        return 0;
 
-    return bp->counter_slide;
+    bp->counter_slide--;
+    return 1;
 }
 
 int block_system_check_black_hit(block_system_t *ctx, int row, int col, int frame)
