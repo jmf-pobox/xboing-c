@@ -1054,7 +1054,7 @@ static void game_render_dialogue(const game_ctx_t *ctx)
     if (input != NULL && input[0] != '\0')
     {
         SDL_Color yellow = {255, 255, 0, 255};
-        sdl2_font_metrics_t m;
+        sdl2_font_metrics_t m = {0, 0};
         int inp_x = bx + 10;
         if (sdl2_font_measure(ctx->font, SDL2F_FONT_TEXT, input, &m) == SDL2F_OK)
             inp_x = bx + (bw - m.width) / 2;
@@ -1158,6 +1158,12 @@ void game_render_frame(const game_ctx_t *ctx)
                     break;
                 case SDL2ST_KEYSEDIT:
                     game_render_keysedit(ctx);
+                    break;
+                case SDL2ST_BONUS:
+                    game_render_bonus(ctx);
+                    break;
+                case SDL2ST_PRESENTS:
+                    game_render_presents(ctx);
                     break;
                 default:
                     break;
