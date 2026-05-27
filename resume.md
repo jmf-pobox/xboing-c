@@ -100,27 +100,26 @@ All 8 attract screens have golden references and polished rendering:
 
 ### Inner Loop: Current Branch
 
-`fix/attract-pixel-polish` — 3 commits, pushed to remote.
+`fix/attract-pixel-polish` — ready for PR.
 
-Remaining before PR:
+Additional work this session:
 
-1. Local code review
-2. `make check`
-3. User verification of all three screens
-4. PR creation + Copilot review rounds + merge
+- Visual capture infrastructure extended to all 8 attract screens
+- `visual_capture.sh` FIFO hang fix (game exit without DONE signal)
+- `make visual-check` screen list expanded from 3 to 8
+- Window title changed to "- XBoing II -" (matching original)
+- Keysedit: alternating green text, shadow on key bindings, wider spacing
+- Highscore: spacing fixes, time/date color for current score highlight
+- Preview: cycling backgrounds, removed spurious title overlay
+- `make dogfood` updated for new window title
 
 ### Known Issues
 
-- `.claude/rules/` path-scoped rules not loading consistently
-  (known bug #16853; investigating glob pattern format)
-- KEYSEDIT bottom status bar partially cut off (vertical spacing)
 - Screenshot test disabled in non-ASan builds (SDL_mixer teardown)
-- Visual capture scripts not committed (manual capture via .tmp/)
+- Font width slightly wider than original (Liberation Sans vs Helvetica)
 
 ### What's Next
 
-1. Finish PR for attract pixel polish (review + merge)
-2. Fix KEYSEDIT bottom spacing
-3. Resolve .claude/rules loading
-4. Gameplay screens: bonus, level complete, game over
-5. Remaining polish: animation timing, sparkle effects
+1. PR for attract pixel polish (review + merge)
+2. Gameplay screens: bonus, level complete, game over
+3. Remaining polish: animation timing, sparkle effects

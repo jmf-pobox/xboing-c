@@ -118,7 +118,7 @@ visual-check-setup: ## Set up the managed venv and Python deps for `make visual-
 
 visual-check: build ## LLM-based visual-fidelity comparison (modern vs. tests/golden/original/). Reads ANTHROPIC_API_KEY from env or `secret-tool lookup service anthropic`. Run `make visual-check-setup` once to install deps.
 	@if [ -n "$$DISPLAY" ]; then \
-		for screen in presents intro instruct; do \
+		for screen in presents intro instruct demo keys keysedit preview highscore; do \
 			if ! [ -d .tmp/visual-check/modern/$$screen ]; then \
 				echo "Capturing modern $$screen screenshots..."; \
 				BUILD_DIR=$(BUILD_DIR) scripts/visual_capture.sh modern "$$screen:200" .tmp/visual-check/modern/; \
@@ -155,7 +155,7 @@ dogfood: deb ## Install .deb, launch xboing from .tmp/, verify window opens (req
 	sleep 3
 	if [ -n "$$DISPLAY" ] || [ -n "$$WAYLAND_DISPLAY" ]; then \
 	    if command -v xwininfo >/dev/null 2>&1; then \
-	        xwininfo -name XBoing > .tmp/dogfood-window.txt 2>&1 || { \
+	        xwininfo -name "- XBoing II -" > .tmp/dogfood-window.txt 2>&1 || { \
 	            echo "FAIL: xboing window not detected"; \
 	            kill "$$(cat .tmp/dogfood.pid)" 2>/dev/null || true; \
 	            rm -f .tmp/dogfood.pid; \

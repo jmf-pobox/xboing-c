@@ -15,7 +15,6 @@
 #include <SDL2/SDL.h>
 
 #include "block_types.h"
-#include "level_system.h"
 #include "bonus_system.h"
 #include "demo_system.h"
 #include "game_context.h"
@@ -23,13 +22,13 @@
 #include "highscore_system.h"
 #include "intro_system.h"
 #include "keys_system.h"
+#include "level_system.h"
 #include "presents_system.h"
 #include "sdl2_font.h"
 #include "sdl2_renderer.h"
+#include "sdl2_state.h"
 #include "sdl2_texture.h"
 #include "sprite_catalog.h"
-
-#include "sdl2_state.h"
 
 /* Layout constants from legacy stage.c */
 #define OFFSET_X 35
@@ -611,12 +610,35 @@ void game_render_preview(const game_ctx_t *ctx)
 
     SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
 
-    /* Blocks first (behind title text) — original/preview.c draws blocks
-     * via SetupNewLevel which populates playWindow, then title on top */
+    /* Background tile — original/preview.c:118 cycles backgrounds 2-5 */
+    int level = demo_system_get_preview_level(ctx->demo);
+    int bgrnd = (level % 4) + 2;
+    const char *bg_key = sprite_background_key(bgrnd);
+    sdl2_texture_info_t bg;
+    if (sdl2_texture_get(ctx->texture, bg_key, &bg) == SDL2T_OK && bg.width > 0 && bg.height > 0)
+    {
+        for (int ty = PLAY_AREA_Y; ty < PLAY_AREA_Y + PLAY_AREA_H; ty += bg.height)
+        {
+            for (int tx = PLAY_AREA_X; tx < PLAY_AREA_X + PLAY_AREA_W; tx += bg.width)
+            {
+                int dw = bg.width;
+                int dh = bg.height;
+                if (tx + dw > PLAY_AREA_X + PLAY_AREA_W)
+                    dw = PLAY_AREA_X + PLAY_AREA_W - tx;
+                if (ty + dh > PLAY_AREA_Y + PLAY_AREA_H)
+                    dh = PLAY_AREA_Y + PLAY_AREA_H - ty;
+                SDL_Rect src = {0, 0, dw, dh};
+                SDL_Rect dst = {tx, ty, dw, dh};
+                SDL_RenderCopy(sdl, bg.texture, &src, &dst);
+            }
+        }
+    }
+
+    /* Blocks on top of background — original/preview.c:130 */
     if (state >= DEMO_STATE_BLOCKS)
         game_render_blocks(ctx);
 
-    /* Red border — original uses red XSetWindowBorder on playWindow */
+    /* Red border — original/preview.c uses red XSetWindowBorder */
     if (state == DEMO_STATE_SPARKLE)
     {
         game_render_border_glow(ctx);
@@ -638,15 +660,7 @@ void game_render_preview(const game_ctx_t *ctx)
         SDL_RenderFillRect(sdl, &right);
     }
 
-    /* Title on top of blocks — original/preview.c:102 */
-    SDL_Color white = {255, 255, 255, 255};
-    int level = demo_system_get_preview_level(ctx->demo);
-    char title[64];
-    snprintf(title, sizeof(title), "Preview - Level %d", level);
-    sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TITLE, title, PLAY_AREA_Y + 20, white,
-                                  PLAY_AREA_W + 2 * PLAY_AREA_X);
-
-    /* Level name at bottom — original/preview.c:121 */
+    /* Level name at bottom — original/preview.c:133-134 */
     const char *level_title = level_system_get_title(ctx->level);
     if (level_title && level_title[0] != '\0')
     {
@@ -811,13 +825,11 @@ void game_render_keysedit(const game_ctx_t *ctx)
     {
         SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
         SDL_Color red = {255, 0, 0, 255};
-        SDL_Color green = {0, 255, 0, 255};
         SDL_Color yellow = {255, 255, 0, 255};
 
         /* "- Level Editor Controls -" in red — original/keysedit.c:153 */
-        sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TITLE,
-                                      "- Level Editor Controls -", PLAY_AREA_Y + 120, red,
-                                      PLAY_AREA_W + 2 * PLAY_AREA_X);
+        sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TITLE, "- Level Editor Controls -",
+                                      PLAY_AREA_Y + 120, red, PLAY_AREA_W + 2 * PLAY_AREA_X);
 
         /* Separator line — original/keysedit.c:157 */
         int line_y = PLAY_AREA_Y + 160;
@@ -827,16 +839,23 @@ void game_render_keysedit(const game_ctx_t *ctx)
         SDL_SetRenderDrawColor(sdl, 255, 255, 255, 255);
         SDL_RenderDrawLine(sdl, PLAY_AREA_X + 30, line_y, PLAY_AREA_X + PLAY_AREA_W - 30, line_y);
 
-        /* Description text — original/keysedit.c:160-180 */
+        /* Description text — original/keysedit.c:138-146, alternating greens */
+        SDL_Color green_bright = {0, 255, 0, 255};
+        SDL_Color green_dark = {0, 187, 0, 255};
         const keys_info_line_t *info = NULL;
         int info_count = keys_system_get_editor_info(ctx->keys, &info);
         int text_y = line_y + 20;
+        int j = 0;
         for (int i = 0; i < info_count; i++)
         {
             if (info[i].text)
-                sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_COPY, info[i].text, text_y,
-                                              green, PLAY_AREA_W + 2 * PLAY_AREA_X);
-            text_y += 18;
+            {
+                SDL_Color clr = (j % 2) ? green_bright : green_dark;
+                sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_COPY, info[i].text, text_y, clr,
+                                              PLAY_AREA_W + 2 * PLAY_AREA_X);
+                j++;
+            }
+            text_y += 24;
         }
 
         /* Key bindings — original/keysedit.c:186-210 */
@@ -847,22 +866,23 @@ void game_render_keysedit(const game_ctx_t *ctx)
         {
             int x = (bindings[i].column == 0) ? PLAY_AREA_X + 30 : PLAY_AREA_X + 270;
             int row = (bindings[i].column == 0) ? i : i - 5;
-            sdl2_font_draw(ctx->font, SDL2F_FONT_COPY, bindings[i].text, x, start_y + row * 24,
-                           yellow);
+            sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_TEXT, bindings[i].text, x,
+                                  start_y + row * 30, yellow);
         }
 
         /* Bottom separator — original/keysedit.c:215 */
-        int bot_y = start_y + 5 * 24 + 15;
+        int bot_y = start_y + 5 * 30 + 15;
         SDL_SetRenderDrawColor(sdl, 0, 0, 0, 255);
         SDL_RenderDrawLine(sdl, PLAY_AREA_X + 32, bot_y + 2, PLAY_AREA_X + PLAY_AREA_W - 28,
                            bot_y + 2);
         SDL_SetRenderDrawColor(sdl, 255, 255, 255, 255);
         SDL_RenderDrawLine(sdl, PLAY_AREA_X + 30, bot_y, PLAY_AREA_X + PLAY_AREA_W - 30, bot_y);
 
-        /* "Insert coin to start the game" footer — original/keysedit.c:218 */
+        /* "Insert coin to start the game" — original/keysedit.c:201-202 */
         SDL_Color tan_clr = {210, 180, 140, 255};
-        sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_COPY, "Insert coin to start the game",
-                                      bot_y + 10, tan_clr, PLAY_AREA_W + 2 * PLAY_AREA_X);
+        sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TEXT, "Insert coin to start the game",
+                                      PLAY_AREA_Y + PLAY_AREA_H - 30, tan_clr,
+                                      PLAY_AREA_W + 2 * PLAY_AREA_X);
     }
 
     if (state == KEYS_STATE_SPARKLE)
@@ -1051,9 +1071,9 @@ void game_render_highscore(const game_ctx_t *ctx)
     sdl2_texture_info_t earth;
     if (sdl2_texture_get(ctx->texture, SPR_PRESENTS_EARTH, &earth) == SDL2T_OK)
     {
-        int ex = PLAY_AREA_X + PLAY_AREA_W / 2 - 200;
-        int ey = PLAY_AREA_Y + PLAY_AREA_H / 2 - 160;
-        SDL_Rect dst = {ex, ey, 400, 400};
+        int ex = PLAY_AREA_X + PLAY_AREA_W / 2 - earth.width / 2;
+        int ey = PLAY_AREA_Y + PLAY_AREA_H / 2 - earth.height / 2 + 40;
+        SDL_Rect dst = {ex, ey, earth.width, earth.height};
         SDL_RenderCopy(sdl, earth.texture, NULL, &dst);
     }
 
@@ -1083,8 +1103,7 @@ void game_render_highscore(const game_ctx_t *ctx)
     sdl2_texture_info_t title_tex;
     if (sdl2_texture_get(ctx->texture, SPR_HIGHSCORE, &title_tex) == SDL2T_OK)
     {
-        SDL_Rect dst = {PLAY_AREA_X + 59 - 35, PLAY_AREA_Y + 20, title_tex.width,
-                        title_tex.height};
+        SDL_Rect dst = {PLAY_AREA_X + 59 - 35, PLAY_AREA_Y + 20, title_tex.width, title_tex.height};
         SDL_RenderCopy(sdl, title_tex.texture, NULL, &dst);
     }
 
@@ -1098,26 +1117,26 @@ void game_render_highscore(const game_ctx_t *ctx)
     int ym = PLAY_AREA_Y + 75;
     int fw = PLAY_AREA_W + 2 * PLAY_AREA_X;
     sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TEXT, "Boing Master", ym, red, fw);
-    ym += 22;
+    ym += 31;
 
     const highscore_table_t *table = highscore_system_get_table(ctx->highscore_display);
     if (table && table->entries[0].name[0] != '\0')
     {
         sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TITLE, table->entries[0].name, ym,
                                       yellow, fw);
-        ym += 26;
+        ym += 31;
         sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_COPY, table->master_text, ym, green,
                                       fw);
-        ym += 22;
+        ym += 44;
     }
     else
     {
         sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TITLE, "To be announced!", ym, yellow,
                                       fw);
-        ym += 26;
+        ym += 31;
         sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_COPY, "Anyone play this game?", ym,
                                       green, fw);
-        ym += 22;
+        ym += 44;
     }
 
     /* Section title — original/highscore.c:248-252 */
@@ -1144,7 +1163,7 @@ void game_render_highscore(const game_ctx_t *ctx)
         sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_TEXT, "Date", xg, y, yellow);
         sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_TEXT, "Player", xn, y, yellow);
 
-        y += 22;
+        y += 24;
         SDL_SetRenderDrawColor(sdl, 0, 0, 0, 255);
         SDL_RenderDrawLine(sdl, PLAY_AREA_X + 22, y + 2, PLAY_AREA_X + PLAY_AREA_W - 18, y + 2);
         SDL_SetRenderDrawColor(sdl, 255, 255, 255, 255);
@@ -1161,12 +1180,16 @@ void game_render_highscore(const game_ctx_t *ctx)
             char buf[80];
             SDL_Color rank_clr = tan_clr;
             SDL_Color score_clr = red;
+            SDL_Color time_clr = tan_clr;
+            SDL_Color date_clr = white;
             SDL_Color name_clr = yellow;
 
             if (table->entries[i].score == current && current > 0)
             {
                 rank_clr = green;
                 score_clr = green;
+                time_clr = green;
+                date_clr = green;
                 name_clr = green;
             }
 
@@ -1190,18 +1213,18 @@ void game_render_highscore(const game_ctx_t *ctx)
                 {
                     snprintf(buf, sizeof(buf), "--");
                 }
-                sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_TEXT, buf, xt, y, tan_clr);
+                sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_TEXT, buf, xt, y, time_clr);
 
                 if (table->entries[i].timestamp > 0)
                 {
                     time_t t = (time_t)table->entries[i].timestamp;
-                    struct tm *tm = localtime(&t);
+                    const struct tm *tm = localtime(&t);
                     if (tm)
                     {
                         static const char *months[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun",
                                                        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
-                        snprintf(buf, sizeof(buf), "%02d %s %02d", tm->tm_mday,
-                                 months[tm->tm_mon], tm->tm_year % 100);
+                        snprintf(buf, sizeof(buf), "%02d %s %02d", tm->tm_mday, months[tm->tm_mon],
+                                 tm->tm_year % 100);
                     }
                     else
                     {
@@ -1212,7 +1235,7 @@ void game_render_highscore(const game_ctx_t *ctx)
                 {
                     snprintf(buf, sizeof(buf), "--");
                 }
-                sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_TEXT, buf, xg, y, white);
+                sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_TEXT, buf, xg, y, date_clr);
 
                 sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_TEXT, table->entries[i].name, xn, y,
                                       name_clr);
@@ -1228,7 +1251,7 @@ void game_render_highscore(const game_ctx_t *ctx)
                 sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_TEXT, "--", xn, y, yellow);
             }
 
-            y += 22;
+            y += 28;
         }
 
         /* Bottom separator — original/highscore.c:379-381 */

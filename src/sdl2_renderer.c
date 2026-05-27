@@ -29,7 +29,7 @@ sdl2_renderer_config_t sdl2_renderer_config_defaults(void)
     cfg.scale = SDL2R_DEFAULT_SCALE;
     cfg.fullscreen = false;
     cfg.vsync = true;
-    cfg.title = "XBoing";
+    cfg.title = "- XBoing II -";
     return cfg;
 }
 

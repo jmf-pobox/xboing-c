@@ -32,7 +32,7 @@ static void test_config_defaults(void **state)
     assert_false(cfg.fullscreen);
     assert_true(cfg.vsync);
     assert_non_null(cfg.title);
-    assert_string_equal(cfg.title, "XBoing");
+    assert_string_equal(cfg.title, "- XBoing II -");
 }
 
 /* =========================================================================
