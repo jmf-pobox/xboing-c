@@ -233,6 +233,9 @@ static void mode_game_update(sdl2_state_mode_t mode, void *ud)
     block_system_update_explosions(ctx->block, (int)sdl2_state_frame(ctx->state),
                                    game_callbacks_on_block_finalize, ctx);
 
+    /* Ball→eyedude collision — original/ball.c:1339-1347 */
+    game_rules_check_ball_eyedude(ctx);
+
     /* EyeDude character */
     eyedude_system_update(ctx->eyedude, (int)sdl2_state_frame(ctx->state), GAME_PLAY_WIDTH);
 

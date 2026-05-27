@@ -101,25 +101,12 @@ static int ball_cb_on_block_hit(int row, int col, int ball_index, void *ud)
         return 0;
 
     int frame = (int)sdl2_state_frame(ctx->state);
+    int killer = special_system_is_active(ctx->special, SPECIAL_KILLER);
 
-    /*
-     * Hit-time effects only.  Score, BOMB chain, BONUSX2/X4 toggles, and
-     * BULLET/MAXAMMO/TIMER/BONUS pickups defer to the explosion finalize
-     * callback — matches original/blocks.c:1547 (AddToScore) and the
-     * per-type switch at original/blocks.c:1550-1637.
-     *
-     * Hit-time effects below match original/ball.c call sites: paddle
-     * toggles (:896, :915, :930, :959), ball split (:974), extra life
-     * (:945).  Sound continues at hit time per
-     * original/blocks.c:1868 (PlaySoundForBlock inside DrawBlock(KILL_BLK)).
-     */
     switch (block_type)
     {
         case DEATH_BLK:
             (void)block_system_explode(ctx->block, row, col, frame);
-            /* Kill the ball: transition to BALL_POP so the pop animation
-             * runs and BALL_EVT_DIED fires.  ball_index must be live here.
-             * Matches original/ball.c:851 — ClearBallNow(display, window, i). */
             {
                 ball_system_env_t benv = game_callbacks_ball_env(ctx);
                 ball_system_change_mode(ctx->ball, &benv, ball_index, BALL_POP);
@@ -127,71 +114,90 @@ static int ball_cb_on_block_hit(int row, int col, int ball_index, void *ud)
             return 1;
 
         case BOMB_BLK:
-            /* Source detonation — chain reaction is at finalize, not hit time. */
             (void)block_system_explode(ctx->block, row, col, frame);
             if (ctx->audio)
                 sdl2_audio_play(ctx->audio, "bomb");
-            return 0;
+            return killer ? 1 : 0;
 
         case REVERSE_BLK:
             (void)block_system_explode(ctx->block, row, col, frame);
             paddle_system_toggle_reverse(ctx->paddle);
-            return 0;
+            return killer ? 1 : 0;
 
         case MULTIBALL_BLK:
         {
             (void)block_system_explode(ctx->block, row, col, frame);
             ball_system_env_t env = game_callbacks_ball_env(ctx);
             ball_system_split(ctx->ball, &env);
-            return 0;
+            return killer ? 1 : 0;
         }
 
         case STICKY_BLK:
             (void)block_system_explode(ctx->block, row, col, frame);
             special_system_set(ctx->special, SPECIAL_STICKY, 1);
             paddle_system_set_sticky(ctx->paddle, 1);
-            return 0;
+            return killer ? 1 : 0;
 
         case PAD_SHRINK_BLK:
             (void)block_system_explode(ctx->block, row, col, frame);
-            paddle_system_change_size(ctx->paddle, 1); /* shrink */
-            return 0;
+            paddle_system_change_size(ctx->paddle, 1);
+            return killer ? 1 : 0;
 
         case PAD_EXPAND_BLK:
             (void)block_system_explode(ctx->block, row, col, frame);
-            paddle_system_change_size(ctx->paddle, 0); /* expand */
-            return 0;
+            paddle_system_change_size(ctx->paddle, 0);
+            return killer ? 1 : 0;
 
         case MGUN_BLK:
-            /* original/blocks.c MGUN_BLK case: only enables fastGun.
-             * Unlimited is exclusively MAXAMMO_BLK's effect. */
             (void)block_system_explode(ctx->block, row, col, frame);
             special_system_set(ctx->special, SPECIAL_FAST_GUN, 1);
-            return 0;
+            return killer ? 1 : 0;
 
         case WALLOFF_BLK:
             (void)block_system_explode(ctx->block, row, col, frame);
             special_system_set(ctx->special, SPECIAL_NO_WALLS, 1);
-            return 0;
+            return killer ? 1 : 0;
 
         case EXTRABALL_BLK:
             (void)block_system_explode(ctx->block, row, col, frame);
             ctx->lives_left++;
-            return 0;
+            return killer ? 1 : 0;
+
+        case COUNTER_BLK:
+            if (killer)
+            {
+                (void)block_system_explode(ctx->block, row, col, frame);
+                return 1;
+            }
+            {
+                block_system_render_info_t bi;
+                block_system_get_render_info(ctx->block, row, col, &bi);
+                if (bi.counter_slide == 0)
+                {
+                    (void)block_system_explode(ctx->block, row, col, frame);
+                    return 0;
+                }
+                block_system_decrement_counter(ctx->block, row, col);
+                return 0;
+            }
+
+        case BLACK_BLK:
+        {
+            int survives = block_system_check_black_hit(ctx->block, row, col, frame);
+            if (survives > 0)
+                return 0;
+            (void)block_system_explode(ctx->block, row, col, frame);
+            return killer ? 1 : 0;
+        }
 
         case HYPERSPACE_BLK:
-            /* Immune to explosion (original/blocks.c:1821-1822) — clear
-             * directly to absorb the ball. */
-            block_system_clear(ctx->block, row, col);
-            return 1; /* Absorb ball (teleport in full impl) */
+            if (ctx->audio)
+                sdl2_audio_play(ctx->audio, "hyperspace");
+            return 2;
 
         default:
-            /* Includes BONUSX2_BLK, BONUSX4_BLK, BULLET_BLK, MAXAMMO_BLK,
-             * TIMER_BLK, BONUS_BLK, BLACK_BLK, ROAMER_BLK, and all colored
-             * blocks — all of these defer to finalize-time effects via
-             * game_callbacks_on_block_finalize. */
             (void)block_system_explode(ctx->block, row, col, frame);
-            return 0;
+            return killer ? 1 : 0;
     }
 }
 

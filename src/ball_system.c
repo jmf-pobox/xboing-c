@@ -657,9 +657,15 @@ static void update_a_ball(ball_system_t *ctx, const ball_system_env_t *env, int 
                 /* Delegate block handling to callback */
                 if (ctx->callbacks.on_block_hit != NULL)
                 {
-                    if (ctx->callbacks.on_block_hit(row, col, i, ctx->user_data) != 0)
+                    int hit_result = ctx->callbacks.on_block_hit(row, col, i, ctx->user_data);
+                    if (hit_result == 2)
                     {
-                        /* Callback says ball should NOT bounce (killer, teleport, etc.) */
+                        teleport_ball(ctx, env, i);
+                        randomise_velocity(ctx, env, i);
+                        return;
+                    }
+                    if (hit_result != 0)
+                    {
                         return;
                     }
                 }

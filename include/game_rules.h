@@ -31,4 +31,12 @@ void game_rules_ball_died(game_ctx_t *ctx);
  */
 void game_rules_next_level(game_ctx_t *ctx);
 
+/*
+ * Check if any active ball overlaps the eyedude.
+ * On hit: set eyedude to DIE state. Score, sound, and message fire
+ * via eyedude_system_update's own callbacks on the next tick.
+ * Matches original/ball.c:1339-1347 + original/eyedude.c:372-383.
+ */
+void game_rules_check_ball_eyedude(game_ctx_t *ctx);
+
 #endif /* GAME_RULES_H */
