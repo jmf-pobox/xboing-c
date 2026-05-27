@@ -1013,6 +1013,37 @@ int block_system_decrement_gun_hit(block_system_t *ctx, int row, int col)
     return 0;
 }
 
+int block_system_decrement_counter(block_system_t *ctx, int row, int col)
+{
+    if (ctx == NULL || row < 0 || row >= MAX_ROW || col < 0 || col >= MAX_COL)
+        return -1;
+
+    block_entry_t *bp = &ctx->blocks[row][col];
+    if (!bp->occupied || bp->block_type != COUNTER_BLK)
+        return -1;
+
+    if (bp->counter_slide > 0)
+        bp->counter_slide--;
+
+    return bp->counter_slide;
+}
+
+int block_system_check_black_hit(block_system_t *ctx, int row, int col, int frame)
+{
+    if (ctx == NULL || row < 0 || row >= MAX_ROW || col < 0 || col >= MAX_COL)
+        return -1;
+
+    block_entry_t *bp = &ctx->blocks[row][col];
+    if (!bp->occupied || bp->block_type != BLACK_BLK)
+        return -1;
+
+    if (frame <= bp->next_frame)
+        return 0;
+
+    bp->next_frame = frame + 30;
+    return 1;
+}
+
 /* =========================================================================
  * Utility
  * ========================================================================= */

@@ -262,6 +262,28 @@ void block_system_advance_animations(block_system_t *ctx, int frame);
  */
 int block_system_decrement_gun_hit(block_system_t *ctx, int row, int col);
 
+/*
+ * Decrement counter_slide on a COUNTER_BLK at (row, col) by one.
+ * Returns the new counter_slide value (>= 0), or -1 on error (NULL ctx,
+ * out-of-bounds, unoccupied, or wrong block type).
+ *
+ * Does NOT trigger explosion — caller must call block_system_explode
+ * when the returned value reaches 0.  Matches original/ball.c:824-826.
+ */
+int block_system_decrement_counter(block_system_t *ctx, int row, int col);
+
+/*
+ * Handle a ball hitting a BLACK_BLK at (row, col).
+ * Implements the timed cooldown from original/ball.c:986-1004:
+ *   - If cooldown expired (frame > next_frame): flash BLACKHIT visual,
+ *     set next_frame = frame + 30, return 1 (block survives).
+ *   - If within cooldown (frame <= next_frame): return 0 (block should
+ *     be exploded by caller).
+ *
+ * Returns -1 on error (NULL, out-of-bounds, wrong type).
+ */
+int block_system_check_black_hit(block_system_t *ctx, int row, int col, int frame);
+
 /* =========================================================================
  * Collision detection — designed as ball_system callbacks
  *

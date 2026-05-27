@@ -14,6 +14,7 @@
 #include <stdlib.h>
 
 #include "ball_system.h"
+#include "ball_types.h"
 #include "block_system.h"
 #include "block_types.h"
 #include "eyedude_system.h"
@@ -305,4 +306,31 @@ void game_rules_check(game_ctx_t *ctx)
     /* Bonus block spawning */
     int frame = (int)sdl2_state_frame(ctx->state);
     try_spawn_bonus(ctx, frame);
+}
+
+void game_rules_check_ball_eyedude(game_ctx_t *ctx)
+{
+    if (!ctx || !ctx->eyedude || !ctx->ball)
+        return;
+
+    if (eyedude_system_get_state(ctx->eyedude) != EYEDUDE_STATE_WALK)
+        return;
+
+    for (int i = 0; i < MAX_BALLS; i++)
+    {
+        enum BallStates bs = ball_system_get_state(ctx->ball, i);
+        if (bs != BALL_ACTIVE)
+            continue;
+
+        int bx = 0;
+        int by = 0;
+        if (ball_system_get_position(ctx->ball, i, &bx, &by) != BALL_SYS_OK)
+            continue;
+
+        if (eyedude_system_check_collision(ctx->eyedude, bx, by, BALL_WC, BALL_HC))
+        {
+            eyedude_system_set_state(ctx->eyedude, EYEDUDE_STATE_DIE);
+            return;
+        }
+    }
 }
