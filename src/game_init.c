@@ -808,6 +808,59 @@ static const char *vc_instruct_name(int s)
     }
 }
 
+static const char *vc_demo_name(int s)
+{
+    switch (s)
+    {
+        case DEMO_STATE_TITLE:
+            return "title";
+        case DEMO_STATE_BLOCKS:
+            return "blocks";
+        case DEMO_STATE_TEXT:
+            return "text";
+        case DEMO_STATE_SPARKLE:
+            return "sparkle";
+        case DEMO_STATE_WAIT:
+            return "wait";
+        default:
+            return NULL;
+    }
+}
+
+static const char *vc_keys_name(int s)
+{
+    switch (s)
+    {
+        case KEYS_STATE_TITLE:
+            return "title";
+        case KEYS_STATE_TEXT:
+            return "text";
+        case KEYS_STATE_SPARKLE:
+            return "sparkle";
+        case KEYS_STATE_WAIT:
+            return "wait";
+        default:
+            return NULL;
+    }
+}
+
+static const char *vc_highscore_name(int s)
+{
+    switch (s)
+    {
+        case HIGHSCORE_STATE_TITLE:
+            return "title";
+        case HIGHSCORE_STATE_SHOW:
+            return "show";
+        case HIGHSCORE_STATE_SPARKLE:
+            return "sparkle";
+        case HIGHSCORE_STATE_WAIT:
+            return "wait";
+        default:
+            return NULL;
+    }
+}
+
 static void vc_signal_modern(const char *mode_name, const char *substate, int seq)
 {
     printf("XBOING_SNAPSHOT %s/%s/%03d\n", mode_name, substate, seq);
@@ -815,7 +868,8 @@ static void vc_signal_modern(const char *mode_name, const char *substate, int se
     SDL_Delay(100);
 }
 
-static void vc_check(game_ctx_t *ctx, int pre_presents, int pre_credits, int pre_intro)
+static void vc_check(game_ctx_t *ctx, int pre_presents, int pre_credits, int pre_intro,
+                     int pre_demo, int pre_keys, int pre_highscore)
 {
     static sdl2_state_mode_t prev_mode = SDL2ST_NONE;
     static unsigned long next_capture_frame = 0;
@@ -840,6 +894,7 @@ static void vc_check(game_ctx_t *ctx, int pre_presents, int pre_credits, int pre
         prev_mode = mode;
         cur_subname = NULL;
         seq = 0;
+        return;
     }
 
     int vc_active = (ctx->vc_mode == 99 || ctx->vc_mode == (int)mode);
@@ -898,6 +953,36 @@ static void vc_check(game_ctx_t *ctx, int pre_presents, int pre_credits, int pre
         post_sub = (int)intro_system_get_state(ctx->intro);
         mode_str = "instruct";
     }
+    else if (mode == SDL2ST_DEMO)
+    {
+        pre_sub = pre_demo;
+        post_sub = (int)demo_system_get_state(ctx->demo);
+        mode_str = "demo";
+    }
+    else if (mode == SDL2ST_PREVIEW)
+    {
+        pre_sub = pre_demo;
+        post_sub = (int)demo_system_get_state(ctx->demo);
+        mode_str = "preview";
+    }
+    else if (mode == SDL2ST_KEYS)
+    {
+        pre_sub = pre_keys;
+        post_sub = (int)keys_system_get_state(ctx->keys);
+        mode_str = "keys";
+    }
+    else if (mode == SDL2ST_KEYSEDIT)
+    {
+        pre_sub = pre_keys;
+        post_sub = (int)keys_system_get_state(ctx->keys);
+        mode_str = "keysedit";
+    }
+    else if (mode == SDL2ST_HIGHSCORE)
+    {
+        pre_sub = pre_highscore;
+        post_sub = (int)highscore_system_get_state(ctx->highscore_display);
+        mode_str = "highscore";
+    }
 
     if (!mode_str)
         return;
@@ -909,6 +994,12 @@ static void vc_check(game_ctx_t *ctx, int pre_presents, int pre_credits, int pre
         name_fn = vc_intro_name;
     else if (mode == SDL2ST_INSTRUCT)
         name_fn = vc_instruct_name;
+    else if (mode == SDL2ST_DEMO || mode == SDL2ST_PREVIEW)
+        name_fn = vc_demo_name;
+    else if (mode == SDL2ST_KEYS || mode == SDL2ST_KEYSEDIT)
+        name_fn = vc_keys_name;
+    else if (mode == SDL2ST_HIGHSCORE)
+        name_fn = vc_highscore_name;
 
     if (!name_fn)
         return;
@@ -948,6 +1039,9 @@ static void vc_check(game_ctx_t *ctx, int pre_presents, int pre_credits, int pre
 static int vc_pre_presents_state;
 static int vc_pre_credits_stage;
 static int vc_pre_intro_state;
+static int vc_pre_demo_state;
+static int vc_pre_keys_state;
+static int vc_pre_highscore_state;
 
 static void stub_tick(void *user_data)
 {
@@ -956,6 +1050,9 @@ static void stub_tick(void *user_data)
     vc_pre_presents_state = (int)presents_system_get_state(ctx->presents);
     vc_pre_credits_stage = presents_system_get_credits_stage(ctx->presents);
     vc_pre_intro_state = (int)intro_system_get_state(ctx->intro);
+    vc_pre_demo_state = (int)demo_system_get_state(ctx->demo);
+    vc_pre_keys_state = (int)keys_system_get_state(ctx->keys);
+    vc_pre_highscore_state = (int)highscore_system_get_state(ctx->highscore_display);
 
     sdl2_state_update(ctx->state);
 }
@@ -968,7 +1065,8 @@ static void stub_render(double alpha, void *user_data)
     game_render_frame(ctx);
 
     if (ctx->vc_mode >= 0)
-        vc_check(ctx, vc_pre_presents_state, vc_pre_credits_stage, vc_pre_intro_state);
+        vc_check(ctx, vc_pre_presents_state, vc_pre_credits_stage, vc_pre_intro_state,
+                 vc_pre_demo_state, vc_pre_keys_state, vc_pre_highscore_state);
 }
 
 /* =========================================================================

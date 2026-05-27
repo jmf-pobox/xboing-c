@@ -43,7 +43,7 @@ OUT_DIR="$(cd "$OUT_DIR" && pwd)"
 find_xboing_window() {
     local target_pid="$1"
     xwininfo -root -tree 2>/dev/null \
-        | awk 'tolower($0) ~ /"xboing" "xboing"/ { print $1 }' \
+        | awk 'tolower($0) ~ /xboing/ { print $1 }' \
         | while read -r win_id; do
             local pid_line pid
             pid_line=$(xprop -id "$win_id" _NET_WM_PID 2>/dev/null)
@@ -75,7 +75,7 @@ XPID=$!
 WIN_ID=""
 COUNT=0
 
-while IFS= read -r -t 300 line < "$FIFO"; do
+while IFS= read -r -t 300 line; do
     case "$line" in
         XBOING_SNAPSHOT\ *)
             name="${line#XBOING_SNAPSHOT }"
@@ -101,7 +101,9 @@ while IFS= read -r -t 300 line < "$FIFO"; do
             break
             ;;
     esac
-done
+done < "$FIFO"
+
+echo "Done. $COUNT images captured in $OUT_DIR"
 
 kill "$XPID" 2>/dev/null || true
 wait "$XPID" 2>/dev/null || true
