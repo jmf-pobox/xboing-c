@@ -170,10 +170,14 @@ static int ball_cb_on_block_hit(int row, int col, int ball_index, void *ud)
                 return 1;
             }
             {
-                int remaining = block_system_decrement_counter(ctx->block, row, col);
-                if (remaining > 0)
+                block_system_render_info_t bi;
+                block_system_get_render_info(ctx->block, row, col, &bi);
+                if (bi.counter_slide == 0)
+                {
+                    (void)block_system_explode(ctx->block, row, col, frame);
                     return 0;
-                (void)block_system_explode(ctx->block, row, col, frame);
+                }
+                block_system_decrement_counter(ctx->block, row, col);
                 return 0;
             }
 

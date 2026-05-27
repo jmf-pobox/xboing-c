@@ -275,8 +275,8 @@ int block_system_decrement_counter(block_system_t *ctx, int row, int col);
 /*
  * Handle a ball hitting a BLACK_BLK at (row, col).
  * Implements the timed cooldown from original/ball.c:986-1004:
- *   - If cooldown expired (frame > next_frame): flash BLACKHIT visual,
- *     set next_frame = frame + 30, return 1 (block survives).
+ *   - If cooldown expired (frame > next_frame): set next_frame =
+ *     frame + 30, return 1 (block survives, caller renders BLACKHIT).
  *   - If within cooldown (frame <= next_frame): return 0 (block should
  *     be exploded by caller).
  *
