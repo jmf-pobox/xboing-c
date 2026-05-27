@@ -10,6 +10,8 @@
 
 #include "game_render_ui.h"
 
+#include <time.h>
+
 #include <SDL2/SDL.h>
 
 #include "block_types.h"
@@ -975,14 +977,48 @@ void game_render_highscore(const game_ctx_t *ctx)
     if (state == HIGHSCORE_STATE_NONE)
         return;
 
+    SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
+
+    /* Space background — original/highscore.c:188 BACKGROUND_SPACE */
+    sdl2_texture_info_t space_bg;
+    if (sdl2_texture_get(ctx->texture, SPR_BGRND_SPACE, &space_bg) == SDL2T_OK &&
+        space_bg.width > 0 && space_bg.height > 0)
+    {
+        for (int ty = PLAY_AREA_Y; ty < PLAY_AREA_Y + PLAY_AREA_H; ty += space_bg.height)
+        {
+            for (int tx = PLAY_AREA_X; tx < PLAY_AREA_X + PLAY_AREA_W; tx += space_bg.width)
+            {
+                int dw = space_bg.width;
+                int dh = space_bg.height;
+                if (tx + dw > PLAY_AREA_X + PLAY_AREA_W)
+                    dw = PLAY_AREA_X + PLAY_AREA_W - tx;
+                if (ty + dh > PLAY_AREA_Y + PLAY_AREA_H)
+                    dh = PLAY_AREA_Y + PLAY_AREA_H - ty;
+                SDL_Rect src = {0, 0, dw, dh};
+                SDL_Rect dst = {tx, ty, dw, dh};
+                SDL_RenderCopy(sdl, space_bg.texture, &src, &dst);
+            }
+        }
+    }
+
+    /* Earth globe — original/highscore.c:192-193 */
+    sdl2_texture_info_t earth;
+    if (sdl2_texture_get(ctx->texture, SPR_PRESENTS_EARTH, &earth) == SDL2T_OK)
+    {
+        int ex = PLAY_AREA_X + PLAY_AREA_W / 2 - 200;
+        int ey = PLAY_AREA_Y + PLAY_AREA_H / 2 - 160;
+        SDL_Rect dst = {ex, ey, 400, 400};
+        SDL_RenderCopy(sdl, earth.texture, NULL, &dst);
+    }
+
+    /* Red border — original/highscore.c uses red XSetWindowBorder */
     if (state == HIGHSCORE_STATE_SPARKLE)
     {
         game_render_border_glow(ctx);
     }
     else
     {
-        SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
-        SDL_SetRenderDrawColor(sdl, 0, 200, 0, 255);
+        SDL_SetRenderDrawColor(sdl, 200, 0, 0, 255);
         int bx = PLAY_AREA_X - 2;
         int by = PLAY_AREA_Y - 2;
         int bw = PLAY_AREA_W + 4;
@@ -997,84 +1033,163 @@ void game_render_highscore(const game_ctx_t *ctx)
         SDL_RenderFillRect(sdl, &right);
     }
 
+    /* "HIGH SCORES" title bitmap — original/highscore.c:191 at (59,20) */
+    sdl2_texture_info_t title_tex;
+    if (sdl2_texture_get(ctx->texture, SPR_HIGHSCORE, &title_tex) == SDL2T_OK)
+    {
+        SDL_Rect dst = {PLAY_AREA_X + 59 - 35, PLAY_AREA_Y + 20, title_tex.width,
+                        title_tex.height};
+        SDL_RenderCopy(sdl, title_tex.texture, NULL, &dst);
+    }
+
     SDL_Color white = {255, 255, 255, 255};
     SDL_Color yellow = {255, 255, 0, 255};
     SDL_Color green = {0, 255, 0, 255};
     SDL_Color red = {255, 80, 80, 255};
+    SDL_Color tan_clr = {210, 180, 140, 255};
 
-    /* Title */
+    /* "Boing Master" + name + wisdom — original/highscore.c:229-241 */
+    int ym = PLAY_AREA_Y + 75;
+    int fw = PLAY_AREA_W + 2 * PLAY_AREA_X;
+    sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TEXT, "Boing Master", ym, red, fw);
+    ym += 22;
+
+    const highscore_table_t *table = highscore_system_get_table(ctx->highscore_display);
+    if (table && table->entries[0].name[0] != '\0')
+    {
+        sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TITLE, table->entries[0].name, ym,
+                                      yellow, fw);
+        ym += 26;
+        sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_COPY, table->master_text, ym, green,
+                                      fw);
+        ym += 22;
+    }
+    else
+    {
+        sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TITLE, "To be announced!", ym, yellow,
+                                      fw);
+        ym += 26;
+        sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_COPY, "Anyone play this game?", ym,
+                                      green, fw);
+        ym += 22;
+    }
+
+    /* Section title — original/highscore.c:248-252 */
     highscore_type_t type = highscore_system_get_type(ctx->highscore_display);
-    const char *title = (type == HIGHSCORE_TYPE_GLOBAL) ? "Hall of Fame" : "Personal Best";
-    sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TITLE, title, PLAY_AREA_Y + 20, red,
-                                  PLAY_AREA_W);
+    const char *section =
+        (type == HIGHSCORE_TYPE_GLOBAL) ? "- The Roll of Honour -" : "- Personal Best -";
+    sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TEXT, section, ym, red, fw);
 
-    /* Score table */
+    /* Column headers + table — original/highscore.c:254-381 */
     if (state >= HIGHSCORE_STATE_SHOW)
     {
-        const highscore_table_t *table = highscore_system_get_table(ctx->highscore_display);
+        int xr = PLAY_AREA_X + 30;
+        int xs = xr + 30;
+        int xl = xs + 75;
+        int xt = xl + 40;
+        int xg = xt + 65;
+        int xn = xg + 95;
+        int y = PLAY_AREA_Y + 200;
+
+        sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_TEXT, "#", xr, y, yellow);
+        sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_TEXT, "Score", xs, y, yellow);
+        sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_TEXT, "L", xl, y, yellow);
+        sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_TEXT, "Time", xt, y, yellow);
+        sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_TEXT, "Date", xg, y, yellow);
+        sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_TEXT, "Player", xn, y, yellow);
+
+        y += 22;
+        SDL_SetRenderDrawColor(sdl, 0, 0, 0, 255);
+        SDL_RenderDrawLine(sdl, PLAY_AREA_X + 22, y + 2, PLAY_AREA_X + PLAY_AREA_W - 18, y + 2);
+        SDL_SetRenderDrawColor(sdl, 255, 255, 255, 255);
+        SDL_RenderDrawLine(sdl, PLAY_AREA_X + 20, y, PLAY_AREA_X + PLAY_AREA_W - 20, y);
+        y += 18;
+
         if (!table)
             return;
 
-        /* Boing master name and words of wisdom (above table) */
-        int ym = PLAY_AREA_Y + 55;
-        if (table->master_name[0] != '\0')
-        {
-            sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TITLE, table->master_name, ym,
-                                          yellow, PLAY_AREA_W);
-            ym += 25;
-
-            if (table->master_text[0] != '\0')
-            {
-                sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_DATA, table->master_text, ym,
-                                              green, PLAY_AREA_W);
-            }
-        }
-        ym += 25;
-
-        /* Column positions for fixed alignment */
-        int col_rank = PLAY_AREA_X + 20;
-        int col_name = PLAY_AREA_X + 55;
-        int col_score = PLAY_AREA_X + 280;
-        int col_score_w = 80; /* right-edge offset for score right-alignment */
-        int col_level = PLAY_AREA_X + 380;
-
         unsigned long current = highscore_system_get_current_score(ctx->highscore_display);
 
-        int row = 0;
         for (int i = 0; i < HIGHSCORE_NUM_ENTRIES; i++)
         {
-            if (table->entries[i].score == 0)
-                continue;
+            char buf[80];
+            SDL_Color rank_clr = tan_clr;
+            SDL_Color score_clr = red;
+            SDL_Color name_clr = yellow;
 
-            int y = ym + row * 32;
-            row++;
+            if (table->entries[i].score == current && current > 0)
+            {
+                rank_clr = green;
+                score_clr = green;
+                name_clr = green;
+            }
 
-            /* Highlight the player's score */
-            SDL_Color clr = (table->entries[i].score == current) ? green : white;
+            if (table->entries[i].score > 0)
+            {
+                snprintf(buf, sizeof(buf), "%d", i + 1);
+                sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_TEXT, buf, xr, y, rank_clr);
 
-            /* Rank */
-            char rank_buf[8];
-            snprintf(rank_buf, sizeof(rank_buf), "%2d.", i + 1);
-            sdl2_font_draw(ctx->font, SDL2F_FONT_DATA, rank_buf, col_rank, y, clr);
+                snprintf(buf, sizeof(buf), "%lu", table->entries[i].score);
+                sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_TEXT, buf, xs, y, score_clr);
 
-            /* Name */
-            sdl2_font_draw(ctx->font, SDL2F_FONT_DATA, table->entries[i].name, col_name, y, clr);
+                snprintf(buf, sizeof(buf), "%lu", table->entries[i].level);
+                sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_TEXT, buf, xl, y, green);
 
-            /* Score (right-aligned) */
-            char score_buf[24];
-            snprintf(score_buf, sizeof(score_buf), "%lu", table->entries[i].score);
-            sdl2_font_metrics_t sm;
-            int score_w = 0;
-            if (sdl2_font_measure(ctx->font, SDL2F_FONT_DATA, score_buf, &sm) == SDL2F_OK)
-                score_w = sm.width;
-            sdl2_font_draw(ctx->font, SDL2F_FONT_DATA, score_buf, col_score + col_score_w - score_w,
-                           y, clr);
+                if (table->entries[i].game_time > 0)
+                {
+                    unsigned long gt = table->entries[i].game_time;
+                    snprintf(buf, sizeof(buf), "%lu'%lu'%lu\"", gt / 3600, gt / 60, gt % 60);
+                }
+                else
+                {
+                    snprintf(buf, sizeof(buf), "--");
+                }
+                sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_TEXT, buf, xt, y, tan_clr);
 
-            /* Level */
-            char level_buf[16];
-            snprintf(level_buf, sizeof(level_buf), "Lv.%lu", table->entries[i].level);
-            sdl2_font_draw(ctx->font, SDL2F_FONT_DATA, level_buf, col_level, y, clr);
+                if (table->entries[i].timestamp > 0)
+                {
+                    time_t t = (time_t)table->entries[i].timestamp;
+                    struct tm *tm = localtime(&t);
+                    if (tm)
+                    {
+                        static const char *months[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                                                       "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+                        snprintf(buf, sizeof(buf), "%02d %s %02d", tm->tm_mday,
+                                 months[tm->tm_mon], tm->tm_year % 100);
+                    }
+                    else
+                    {
+                        snprintf(buf, sizeof(buf), "--");
+                    }
+                }
+                else
+                {
+                    snprintf(buf, sizeof(buf), "--");
+                }
+                sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_TEXT, buf, xg, y, white);
+
+                sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_TEXT, table->entries[i].name, xn, y,
+                                      name_clr);
+            }
+            else
+            {
+                snprintf(buf, sizeof(buf), "%d", i + 1);
+                sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_TEXT, buf, xr, y, tan_clr);
+                sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_TEXT, "--", xs, y, red);
+                sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_TEXT, "--", xl, y, green);
+                sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_TEXT, "--", xt, y, tan_clr);
+                sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_TEXT, "--", xg, y, white);
+                sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_TEXT, "--", xn, y, yellow);
+            }
+
+            y += 22;
         }
+
+        /* Bottom separator — original/highscore.c:379-381 */
+        SDL_SetRenderDrawColor(sdl, 0, 0, 0, 255);
+        SDL_RenderDrawLine(sdl, PLAY_AREA_X + 22, y + 2, PLAY_AREA_X + PLAY_AREA_W - 18, y + 2);
+        SDL_SetRenderDrawColor(sdl, 255, 255, 255, 255);
+        SDL_RenderDrawLine(sdl, PLAY_AREA_X + 20, y, PLAY_AREA_X + PLAY_AREA_W - 20, y);
     }
 
     /* Title sparkle */
@@ -1089,7 +1204,8 @@ void game_render_highscore(const game_ctx_t *ctx)
         }
     }
 
-    /* "Press SPACE to continue" */
-    sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_COPY, "Press SPACE to continue",
-                                  PLAY_AREA_Y + PLAY_AREA_H - 40, yellow, PLAY_AREA_W);
+    /* "Insert coin to start the game" — original/highscore.c:196 */
+    sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TEXT, "Insert coin to start the game",
+                                  PLAY_AREA_Y + PLAY_AREA_H - 40, tan_clr,
+                                  PLAY_AREA_W + 2 * PLAY_AREA_X);
 }
