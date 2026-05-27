@@ -15,6 +15,16 @@ pkg_check_modules(SDL2_IMAGE REQUIRED SDL2_image)
 pkg_check_modules(SDL2_MIXER REQUIRED SDL2_mixer)
 pkg_check_modules(SDL2_TTF   REQUIRED SDL2_ttf)
 
+# Homebrew installs SDL2 sub-libraries in per-package Cellar paths that are
+# not on the default linker search path.  Propagate LIBRARY_DIRS so that
+# bare -lSDL2_image / -lSDL2_mixer / -lSDL2_ttf flags resolve correctly.
+link_directories(
+    ${SDL2_LIBRARY_DIRS}
+    ${SDL2_IMAGE_LIBRARY_DIRS}
+    ${SDL2_MIXER_LIBRARY_DIRS}
+    ${SDL2_TTF_LIBRARY_DIRS}
+)
+
 # --- Compiler warning policy ------------------------------------------------
 
 include(CheckCCompilerFlag)
