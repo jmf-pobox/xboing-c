@@ -1,127 +1,126 @@
-# Session Resume — XBoing Visual Fidelity
+# Session Resume — XBoing Modernization
 
-**Last session date:** 2026-05-09
-**Master at:** `c1a3a48`
-**Branch:** clean master, no outstanding branches
+**Date:** 2026-05-27
+**Master at:** `548d56b` (PR #126 merged)
+**Active branch:** `fix/attract-pixel-polish` (3 commits, not yet PR'd)
 
-## What was accomplished
+## What We Accomplished This Session
 
-### Visual fidelity audit — baskets 2–6 (PRs #103–#107)
+### Keybinding Infrastructure (PR #124, merged)
 
-All 6 baskets of the comprehensive visual-fidelity audit are shipped.
-12 beads closed across 5 PRs.  Each PR went through 2–4 rounds of
-Copilot review with all findings addressed in-band.
+Built comprehensive keybinding test infrastructure (28 CMocka tests)
+covering all implemented key bindings. Test-driven development found
+and fixed multiple bugs:
 
-| PR | Basket | Summary |
-|---|---|---|
-| #102 | 1 | Block animation frames (shipped pre-session) |
-| #103 | 2 | Block composite rendering (DROP/RANDOM/BULLET sprite keys + text overlays) |
-| #104 | 3 | Block explosion lifecycle state machine (40-tick KILL_BLK animation, hit-time vs finalize-time side-effect split, 14 cmocka tests) |
-| #105 | 4 | Level info panel (right-anchor lives + level number to match original/level.c layout) |
-| #106 | 5 | Bonus screen (coin-by-coin + bullet-by-bullet sprite animation replacing static text) |
-| #107 | 6 | Quick fixes (guide rate ×8, NoWalls green border, presents letter spacing, eyedude bullet collision + double-award bug fix) |
+- C key cycle handler was missing entirely
+- C key cycle order wrong (PREVIEW/HIGHSCORE swapped vs natural cycle)
+- J/L paddle keys ignored in mouse mode (keyboard and mouse both ran
+  every frame; mouse overwrote keyboard)
+- Paddle speed 5x too fast (original gates with PADDLE_ANIMATE_DELAY=5)
+- Smooth paddle interpolation (VELOCITY=4px/frame, every frame)
+- Ball stuck in BALL_CREATE state (exact-frame == checks; changed to >=)
+- P pause toggled on/off within one frame (just_pressed in per-tick code)
+- All just_pressed handlers moved from per-tick to once-per-frame
+- D kill ball, T tilt, A audio mute, H/h highscores, G toggle sound
 
-### Visual-fidelity screenshot-testing methodology (PRs #108–#109)
+Extracted attract cycle order into `game_callbacks_attract_next()` as
+single source of truth — both C-key and natural callbacks use it.
 
-Built a methodology for catching visual divergences between the 1996
-original and the modern SDL2 port, using screenshots + LLM comparison.
+### Dialogue System (PR #125, merged)
 
-**Phase 1 (PR #108):** Capture infrastructure.
+Pixel-match dialogue renderer rewriting `game_render_dialogue()` to
+match original/dialogue.c: stone tile background, 4px red border,
+TEXT_ICON sprite, green shadow-centred message, white separator,
+yellow input text or question mark sprite. User verified identical.
 
-- Patched `original/main.c` with `-snapshot N` flag (advances N frames,
-  emits READY on stdout, sleeps 2 s for capture).
-- `scripts/capture_original.sh` drives original/xboing under any X
-  server, captures by window ID filtered by `_NET_WM_PID`.
-- 4 reference PNGs committed to `tests/golden/original/`.
-- `tests/golden/regions.h` with crop coordinates (currently unused
-  under revised plan but available).
+- Q key: "Exit XBoing you wimp? [y/n]" confirmation dialogue
+- Escape key: "Abort current game? [y/n]" during gameplay
+- W key: "Input game starting level number." numeric dialogue
+- Pending flag pattern (quit/abort/level_pending) following
+  wisdom_pending precedent
+- Ball jitter fix during dialogue (render_alpha frozen)
+- Dialogue sounds wired (click/key/tone)
+- Full design with peer review (4 blocking findings addressed)
 
-**Phase 2 slice 1 (PR #109):** LLM comparison loop.
+### Documentation Restructuring (PR #126, merged)
 
-- Revised methodology: collapsed the SSIM/hash pyramid into a single
-  LLM-comparison phase per maintainer direction.
-- `scripts/llm_compare.py` — compares two PNGs via Anthropic API,
-  reads API key from env or `secret-tool lookup service anthropic`.
-- `scripts/visual_check.py` — batch driver reading a YAML manifest,
-  runs self-comparison sanity checks + original-vs-modern pairs.
-- `tests/visual-check-manifest.yaml` — 4 pairs (2 self-comparison
-  sanity, 2 real checks).
-- `make visual-check` target.
-- Thin slice validated: 6/6 LLM runs returned correct verdicts.
-  Self-comparison → equivalent ✓; real pairs → diff with actionable
-  findings ✓.  Cost: ~$0.07/pair.
-- CLAUDE.md Phase 6 (Ship) tightened to make PR monitoring
-  non-negotiable for every PR.
+CLAUDE.md reduced from 741 to 136 lines based on Anthropic's
+200-line recommendation. Research showed instruction adherence
+degrades uniformly as CLAUDE.md length increases.
 
-### Findings from the visual-check pipeline
+New architecture:
 
-The LLM identified these concrete divergences on the home screen
-(presents/intro):
+- **Tier 1:** Root CLAUDE.md (136 lines) — behavioral contract + @imports
+- **Tier 2:** @-imported docs — BUILDING.md, TESTING.md, GIT.md, WORKFLOW.md
+- **Tier 3:** .claude/rules/ — path-scoped rules for C code, tests,
+  Makefile, scripts, delegation, markdown, CI, CLAUDE.md maintenance
+- **Tier 4:** Sub-directory CLAUDE.md — original/, tests/, src/, .github/
 
-1. **"Made in Australia" caption missing** from modern presents screen.
-2. **Copyright line missing** from modern presents screen.
-3. **Modern jumps to "presents XBoing II" phase too fast** — at
-   modern-1s, original is still showing just flag + earth.
-4. **"Welcome, prepare for battle."** green text appears on modern
-   intro where it shouldn't (stray gameplay message leaking onto
-   attract screen).
-5. **XBOING letter stamping is wrong phase** — original at frame 2500
-   shows mid-stamp (only "X" visible); modern at 8s shows fully-
-   stamped title overlapping the globe.
+Added `original/CLAUDE.md` with module mapping, key constants,
+coordinate systems, font names, and citation rules for reading the
+1996 source.
 
-These are documented in:
+docs/TESTING.md now has 5-layer pyramid including Layer 4 (visual
+fidelity) which was the missing layer that caused process failures.
 
-- `docs/research/2026-05-08-llm-comparison-slice-findings.md`
-- `.tmp/slice-experiment/` (captured PNGs + raw JSON results)
+### Attract Loop Pixel Polish (branch, in progress)
 
-## Next step: Option A — true up the home screen
+Golden references captured for all 8 attract screens. Three remaining
+screens polished:
 
-The maintainer approved using the existing pipeline to drive a real
-fix on the presents/intro screen.  This validates the methodology
-by using it to fix the very divergences it found.
+| Screen | Status | LLM Judge Result |
+|--------|--------|------------------|
+| KEYSEDIT | Done | 1 minor (bottom spacing) |
+| HIGHSCORE | Done | Glow phase varies (correct behavior) |
+| PREVIEW | Done | Content differs by level (expected) |
 
-### Implementation plan
+### Infrastructure
 
-1. **Read original presents/intro code** to understand the correct
-   phase sequence:
-   - `original/presents.c` — DrawTitleText, letters, sparkle, text
-   - `original/intro.c` — intro state machine
-   - Map the timing (which text appears when, frame delays between
-     phases)
+- Quarry enabled and synced for this project (semantic search active)
+- xdotool installed for automated screenshot capture
+- Highscore file generator for populating original binary's score table
+- Automated filmstrip capture script (15s intervals, 6 min cycle)
 
-2. **Read modern equivalents:**
-   - `src/presents_system.c` — the modern state machine
-   - `src/game_render_ui.c game_render_presents` — the render path
-   - Identify why the phase sequence diverges:
-     - Missing "Made in Australia" text
-     - Missing copyright line
-     - Phase timing too fast (modern arrives at "presents" before
-       original does)
-     - "Welcome, prepare for battle." message leak
+## Where We Are
 
-3. **Patch the modern code** to match original's phase sequence.
+### Outer Loop: Attract Cycle Visual Fidelity
 
-4. **Re-run `make visual-check`** — verify the LLM findings drop to
-   "equivalent" or minor-only for both presents-early and intro-late
-   pairs.
+All 8 attract screens have golden references and polished rendering:
 
-5. **Ship as a PR** with the standard Phase 6 protocol (Copilot
-   review, 2–4 rounds, merge on convergence).
+| Screen | Golden | Polished | Shipped |
+|--------|--------|----------|---------|
+| Presents | ✓ | ✓ | PR #116 |
+| Intro | ✓ | ✓ | PR #115 |
+| Instruct | ✓ | ✓ | PR #115 |
+| Demo | ✓ | ✓ | PR #123 |
+| Keys | ✓ | ✓ | PR #123 |
+| Keysedit | ✓ | ✓ | On branch |
+| Highscore | ✓ | ✓ | On branch |
+| Preview | ✓ | ✓ | On branch |
 
-### Open beads
+### Inner Loop: Current Branch
 
-| Bead | Priority | Description |
-|---|---|---|
-| xboing-c-ktp | P2 | Phase 2 (revised): modern capture + LLM comparison loop — expand state catalog beyond presents/intro |
-| xboing-c-hty | P3 | Game RNG never seeded — port original/init.c:825 srand |
-| xboing-c-y7s | P1 | Visual fidelity audit epic (parent) |
+`fix/attract-pixel-polish` — 3 commits, pushed to remote.
 
-### Environment notes
+Remaining before PR:
 
-- Python venv at `.tmp/venv/` (uv-managed, `~/.local/bin/uv`).
-  Contains `anthropic` + `pyyaml`.
-- Anthropic API key stored in gnome-keyring: `secret-tool lookup
-  service anthropic`.
-- MCP `request_copilot_review` has been intermittently failing with
-  "invalid session" — Copilot still receives reviews from auto-
-  triggers on push.  Cron-driven polling continues to work.
+1. Local code review
+2. `make check`
+3. User verification of all three screens
+4. PR creation + Copilot review rounds + merge
+
+### Known Issues
+
+- `.claude/rules/` path-scoped rules not loading consistently
+  (known bug #16853; investigating glob pattern format)
+- KEYSEDIT bottom status bar partially cut off (vertical spacing)
+- Screenshot test disabled in non-ASan builds (SDL_mixer teardown)
+- Visual capture scripts not committed (manual capture via .tmp/)
+
+### What's Next
+
+1. Finish PR for attract pixel polish (review + merge)
+2. Fix KEYSEDIT bottom spacing
+3. Resolve .claude/rules loading
+4. Gameplay screens: bonus, level complete, game over
+5. Remaining polish: animation timing, sparkle effects
