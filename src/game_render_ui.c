@@ -747,31 +747,54 @@ void game_render_keysedit(const game_ctx_t *ctx)
 
     render_play_area_frame(ctx, state == KEYS_STATE_SPARKLE);
 
+    /* XBOING title image — same as KEYS screen, original/keysedit.c:147 */
     if (state >= KEYS_STATE_TITLE)
     {
-        SDL_Color white = {255, 255, 255, 255};
-        sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TITLE, "Editor Controls",
-                                      PLAY_AREA_Y + 20, white, PLAY_AREA_W);
+        sdl2_texture_info_t tex;
+        if (sdl2_texture_get(ctx->texture, SPR_TITLE_BIG, &tex) == SDL2T_OK)
+        {
+            int tx = PLAY_AREA_X + (PLAY_AREA_W - tex.width) / 2;
+            SDL_Rect dst = {tx, PLAY_AREA_Y + 10, tex.width, tex.height};
+            SDL_RenderCopy(sdl2_renderer_get(ctx->renderer), tex.texture, NULL, &dst);
+        }
     }
 
     if (state >= KEYS_STATE_TEXT)
     {
+        SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
+        SDL_Color red = {255, 0, 0, 255};
+        SDL_Color green = {0, 255, 0, 255};
+        SDL_Color yellow = {255, 255, 0, 255};
+
+        /* "- Level Editor Controls -" in red — original/keysedit.c:153 */
+        sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TITLE,
+                                      "- Level Editor Controls -", PLAY_AREA_Y + 120, red,
+                                      PLAY_AREA_W + 2 * PLAY_AREA_X);
+
+        /* Separator line — original/keysedit.c:157 */
+        int line_y = PLAY_AREA_Y + 160;
+        SDL_SetRenderDrawColor(sdl, 0, 0, 0, 255);
+        SDL_RenderDrawLine(sdl, PLAY_AREA_X + 32, line_y + 2, PLAY_AREA_X + PLAY_AREA_W - 28,
+                           line_y + 2);
+        SDL_SetRenderDrawColor(sdl, 255, 255, 255, 255);
+        SDL_RenderDrawLine(sdl, PLAY_AREA_X + 30, line_y, PLAY_AREA_X + PLAY_AREA_W - 30, line_y);
+
+        /* Description text — original/keysedit.c:160-180 */
         const keys_info_line_t *info = NULL;
         int info_count = keys_system_get_editor_info(ctx->keys, &info);
-
-        SDL_Color green = {0, 255, 0, 255};
+        int text_y = line_y + 20;
         for (int i = 0; i < info_count; i++)
         {
             if (info[i].text)
-                sdl2_font_draw(ctx->font, SDL2F_FONT_COPY, info[i].text, PLAY_AREA_X + 30,
-                               PLAY_AREA_Y + 90 + i * 22, green);
+                sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_COPY, info[i].text, text_y,
+                                              green, PLAY_AREA_W + 2 * PLAY_AREA_X);
+            text_y += 18;
         }
 
+        /* Key bindings — original/keysedit.c:186-210 */
         const keys_binding_entry_t *bindings = NULL;
         int bind_count = keys_system_get_editor_bindings(ctx->keys, &bindings);
-
-        SDL_Color yellow = {255, 255, 0, 255};
-        int start_y = PLAY_AREA_Y + 90 + info_count * 22 + 20;
+        int start_y = text_y + 20;
         for (int i = 0; i < bind_count; i++)
         {
             int x = (bindings[i].column == 0) ? PLAY_AREA_X + 30 : PLAY_AREA_X + 270;
@@ -779,6 +802,19 @@ void game_render_keysedit(const game_ctx_t *ctx)
             sdl2_font_draw(ctx->font, SDL2F_FONT_COPY, bindings[i].text, x, start_y + row * 24,
                            yellow);
         }
+
+        /* Bottom separator — original/keysedit.c:215 */
+        int bot_y = start_y + 5 * 24 + 15;
+        SDL_SetRenderDrawColor(sdl, 0, 0, 0, 255);
+        SDL_RenderDrawLine(sdl, PLAY_AREA_X + 32, bot_y + 2, PLAY_AREA_X + PLAY_AREA_W - 28,
+                           bot_y + 2);
+        SDL_SetRenderDrawColor(sdl, 255, 255, 255, 255);
+        SDL_RenderDrawLine(sdl, PLAY_AREA_X + 30, bot_y, PLAY_AREA_X + PLAY_AREA_W - 30, bot_y);
+
+        /* "Insert coin to start the game" footer — original/keysedit.c:218 */
+        SDL_Color tan_clr = {210, 180, 140, 255};
+        sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_COPY, "Insert coin to start the game",
+                                      bot_y + 10, tan_clr, PLAY_AREA_W + 2 * PLAY_AREA_X);
     }
 
     if (state == KEYS_STATE_SPARKLE)
