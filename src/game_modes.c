@@ -935,11 +935,14 @@ static void mode_dialogue_update(sdl2_state_mode_t mode, void *ud)
     (void)mode;
     game_ctx_t *ctx = ud;
 
-    dialogue_system_update(ctx->dialogue);
-
+    /* Read sound before update — update() clears the sound field
+     * (dialogue_system.c:113-114), but key_input() sets it during
+     * event processing before this tick runs. */
     dialogue_sound_t snd = dialogue_system_get_sound(ctx->dialogue);
     if (snd.name && ctx->audio)
         sdl2_audio_play(ctx->audio, snd.name);
+
+    dialogue_system_update(ctx->dialogue);
 
     if (dialogue_system_is_finished(ctx->dialogue))
     {
