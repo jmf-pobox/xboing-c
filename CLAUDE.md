@@ -102,7 +102,8 @@ regardless of how confident the rest of the workflow feels:
 
 **Default rule when in doubt about a shared-state action:** stop and
 ask. The cost of pausing for one message is trivial; the cost of an
-unwanted action is hours of recovery and trust.
+unwanted action is hours of recovery and trust. See `docs/GIT.md`
+for the full list of destructive operations and safe alternatives.
 
 ## Modernization Principles
 
@@ -255,19 +256,20 @@ Reformat files only when you are already modifying them for another reason — n
 - Include guards: `#ifndef MODULE_NAME_H` / `#define MODULE_NAME_H`
 - System includes before project includes, alphabetized within each group
 
+## Git and PR Workflow
+
+**Read `docs/GIT.md` in full before creating any branch or PR.**
+
+Covers branch protection (master rejects direct pushes), branch
+prefixes, commit messages, PR creation, monitoring cron, Copilot
+review rounds, thread resolution, merge gate, post-merge cleanup,
+conflict resolution, and session close protocol. Mandatory reading.
+
 ## CI Workflows
 
-### `lint.yml` — Static Analysis
-
-Runs clang-format check, clang-tidy, and cppcheck on push to main and PRs.
-
-### `test.yml` — Build, Test, and Sanitizers
-
-Matrix build: Debug and Sanitizers (ASan + UBSan). Runs CMocka tests via ctest.
-
-### `docs.yml` — Markdown Lint
-
-Runs markdownlint on all `.md` files.
+See `docs/GIT.md` for CI workflow details. Summary: `lint.yml`
+(format + cppcheck), `test.yml` (debug + ASan builds), `docs.yml`
+(markdownlint).
 
 ## Development Lifecycle
 
@@ -423,93 +425,19 @@ point — the code is already verified to be correct.
 
 ### Phase 6: Ship (active monitoring; merge on review convergence)
 
-**This is mandatory and automatic for every PR — no exceptions for
-"trivial" PRs, "docs-only" PRs, or "I'll get to it later." A PR that
-sits open without active monitoring is a process failure. If you push
-new commits to an open PR, you must re-arm monitoring AND re-request
-Copilot review on the new commit; previous reviews refer to the old
-SHA and don't carry forward.**
+**Read `docs/GIT.md` in full for the detailed PR workflow: monitoring,
+review rounds, thread resolution, merge gate, and cleanup.**
 
-1. Commit with conventional message format (`type(scope): description`). `make check` must pass.
-2. `git push -u origin <branch>` then create the PR via the MCP GitHub tools (`mcp__github__create_pull_request`) or `gh pr create`.
-3. **Arm active monitoring immediately after `gh pr create` returns,
-   in the same turn:**
-   - `gh pr checks <number> --watch` in the background.
-   - A 2–3 minute cron polling `gh pr view <number> --json reviews,comments,reviewDecision,state,mergeable,statusCheckRollup`.
-   The cron must continue until the PR merges. If you push new commits,
-   the same cron is fine — it polls the latest state. Don't create a
-   second cron.
-4. Request Copilot review (`mcp__github__request_copilot_review`).
-   **Do this immediately after step 3 in the same turn, AND every
-   time you push a new commit to the PR branch** — Copilot does not
-   auto-re-review on push.
-5. **For each new finding on the latest commit:** address it inline in
-   this PR — no follow-up bds, no "pre-existing" excuses. Run `make check`.
-   Plain `git push` (not force, not rebase). Resolve the corresponding
-   conversation thread. Thread resolution is the one workflow operation
-   without a structured MCP tool today; use `gh api graphql`
-   `resolveReviewThread` mutation as the documented exception to the
-   "prefer MCP over `gh api graphql`" Tool Usage rule. After pushing
-   fixes, return to step 4 — re-request Copilot review on the new SHA.
-6. **Round budget: 2–4 rounds typical, until findings are de minimis.**
-   A round = (new commit pushed) → (Copilot or Cursor review) →
-   (findings addressed + threads resolved). After ~4 rounds, the
-   reviewer typically returns an empty pass — that's convergence.
-   Don't quit early on round 1 just because you addressed all current
-   findings; new findings often surface on round 2 once the easy ones
-   clear. Don't grind past round 5; if findings keep multiplying,
-   something is wrong with the change itself.
-7. **Handle base conflicts via merge, never via rebase.** If the branch
-   goes `CONFLICTING`: click "Update branch" in the PR UI, or
-   `git fetch origin master && git merge origin/master` then `git push`.
-   This preserves commit SHAs and keeps reviewer state attached. **Never
-   `git rebase` or `git push --force` on a branch with an open PR.**
-8. **Merge when reviews converge — when the last round produces no new
-   substantive findings.** A large change typically goes through 3–5
-   rounds before reviews stop adding value. The merge gate is:
-   - All CI checks green on the latest commit.
-   - The most recent reviewer pass produced no actionable findings (an
-     empty review, a "no high-confidence vulnerabilities" Cursor pass,
-     a Copilot summary with zero new comments — *not* lingering threads
-     from earlier rounds that are still open).
-   - Every conversation thread is resolved.
-   That's the convergence signal. When it's met: merge. Don't wait for
-   explicit human approval — the convergence *is* the approval.
-9. Merge: `gh pr merge <number> --squash --delete-branch`.
+Summary: create PR → arm 2-min cron → request Copilot review →
+address findings → resolve threads → re-request review → merge on
+convergence → post-merge cleanup. No exceptions for trivial PRs.
 
 ### Phase 7: Close
 
-**Cleanup is mandatory after every merge — no asking, no waiting for the
-user to confirm.** A merged PR with the local branch left behind is
-unfinished work.
+**Read `docs/GIT.md` — Post-Merge Cleanup section.**
 
-1. `bd close <id>` for completed beads.
-2. `bd sync` to sync beads state.
-3. **Clean up local and remote.** Run all four steps in sequence after
-   `gh pr merge <number> --squash --delete-branch` returns success:
-   1. `git checkout master`
-   2. `git pull --ff-only origin master` — fast-forward to the merge
-      commit (refuse to pull non-fast-forward; investigate if it does)
-   3. `git branch -d <branch>` — drop the local tracking branch.
-      **Order matters here**: do this *before* the prune in step 4.
-      A squash-merge creates a new SHA on master, so the local
-      branch's tip is not reachable from master post-merge. `git
-      branch -d` only succeeds because the remote-tracking ref
-      `refs/remotes/origin/<branch>` still exists and points at the
-      same SHA — git counts that as "merged into an upstream." You
-      will see a warning ("not yet merged to HEAD") — that warning
-      is expected and harmless; the branch is deleted. If the order
-      gets reversed (prune before delete) `-d` will refuse, and
-      `-D` is the right escape hatch *only* after verifying the
-      branch has no commits beyond `origin/<branch>` via
-      `git log <branch> ^master`.
-   4. `git fetch --prune origin` — clear stale remote-tracking refs
-      for branches deleted upstream (covers branches deleted by
-      other contributors / agents, not just yours)
-
-   The `--delete-branch` flag on the merge already deletes the remote
-   branch; the local branch and stale refs need explicit cleanup. Do
-   all four every time — it's four commands, not a judgment call.
+After every merge: `bd close`, `bd sync`, then the four-step local
+cleanup (checkout master, pull, delete branch, prune).
 
 ## Workflow Tiers
 
@@ -676,41 +604,13 @@ The session itself runs as `claude` (Claude Agento, COO/VP Engineering) — the 
 
 ## Branch Discipline
 
-Feature work goes on feature branches. Never commit directly to master.
+See `docs/GIT.md` for branch prefixes, commit message format, and
+the no-rebase/no-force-push rule. Key points:
 
-| Prefix | Use |
-| -------- | ----- |
-| `feat/` | New features, new systems |
-| `fix/` | Bug fixes |
-| `refactor/` | Modernization, restructuring (no behavior change) |
-| `port/` | Platform porting work |
-| `docs/` | Documentation only |
-| `test/` | Test additions or infrastructure |
-| `chore/` | Tooling, packaging, dotfiles, bd state sync |
-| `style/` | Format-only or lint-only passes |
-
-**Never `git rebase` or `git push --force` on a branch with an open
-PR.** Force-push rewrites commit SHAs, which orphans every reviewer's
-in-flight comments (Copilot/Cursor anchor reviews to SHAs). Resolve
-base conflicts via merge — `git merge origin/master` or "Update branch"
-in the PR UI — both preserve SHAs.
-
-**Plain English over git internals.** In PR discussion, say "the latest
-commit" or paste the SHA. Avoid "HEAD" in user-facing prose.
-
-## Commit Message Format
-
-`type(scope): description`
-
-| Prefix | Use |
-| -------- | ----- |
-| `feat:` | New feature or capability |
-| `fix:` | Bug fix |
-| `refactor:` | Code modernization, no behavior change |
-| `test:` | Adding or updating tests |
-| `port:` | Platform-specific changes |
-| `build:` | CMake, CI, dependency changes |
-| `docs:` | Documentation |
+- **master has branch protection.** Never push directly.
+- Feature branches: `<prefix>/short-description` from master.
+- Commits: `type(scope): description` (conventional format).
+- Never rebase or force-push a branch with an open PR.
 
 ## Issue Tracking (bd)
 
@@ -779,7 +679,8 @@ Always run `bd sync` before ending a session. See AGENTS.md for the full landing
 
 ## Session Close Protocol
 
-Before ending any session, follow AGENTS.md landing-the-plane workflow. Work is **not** complete until `git push` succeeds.
+See `docs/GIT.md` — Session Close Protocol. Work is **not** complete
+until `git push` succeeds.
 
 ## What NOT to Change Without Care
 
