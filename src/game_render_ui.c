@@ -15,6 +15,7 @@
 #include <SDL2/SDL.h>
 
 #include "block_types.h"
+#include "level_system.h"
 #include "bonus_system.h"
 #include "demo_system.h"
 #include "game_context.h"
@@ -608,15 +609,60 @@ void game_render_preview(const game_ctx_t *ctx)
     if (state == DEMO_STATE_NONE)
         return;
 
+    SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
+
+    /* Blocks first (behind title text) — original/preview.c draws blocks
+     * via SetupNewLevel which populates playWindow, then title on top */
+    if (state >= DEMO_STATE_BLOCKS)
+        game_render_blocks(ctx);
+
+    /* Red border — original uses red XSetWindowBorder on playWindow */
+    if (state == DEMO_STATE_SPARKLE)
+    {
+        game_render_border_glow(ctx);
+    }
+    else
+    {
+        SDL_SetRenderDrawColor(sdl, 200, 0, 0, 255);
+        int bx = PLAY_AREA_X - 2;
+        int by = PLAY_AREA_Y - 2;
+        int bw = PLAY_AREA_W + 4;
+        int bh = PLAY_AREA_H + 4;
+        SDL_Rect top = {bx, by, bw, 2};
+        SDL_Rect bottom = {bx, by + bh - 2, bw, 2};
+        SDL_Rect left = {bx, by, 2, bh};
+        SDL_Rect right = {bx + bw - 2, by, 2, bh};
+        SDL_RenderFillRect(sdl, &top);
+        SDL_RenderFillRect(sdl, &bottom);
+        SDL_RenderFillRect(sdl, &left);
+        SDL_RenderFillRect(sdl, &right);
+    }
+
+    /* Title on top of blocks — original/preview.c:102 */
     SDL_Color white = {255, 255, 255, 255};
     int level = demo_system_get_preview_level(ctx->demo);
     char title[64];
     snprintf(title, sizeof(title), "Preview - Level %d", level);
     sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TITLE, title, PLAY_AREA_Y + 20, white,
-                                  PLAY_AREA_W);
+                                  PLAY_AREA_W + 2 * PLAY_AREA_X);
 
-    if (state >= DEMO_STATE_BLOCKS)
-        game_render_blocks(ctx);
+    /* Level name at bottom — original/preview.c:121 */
+    const char *level_title = level_system_get_title(ctx->level);
+    if (level_title && level_title[0] != '\0')
+    {
+        SDL_Color red = {255, 0, 0, 255};
+        char name_buf[80];
+        snprintf(name_buf, sizeof(name_buf), "- %s -", level_title);
+        sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TEXT, name_buf,
+                                      PLAY_AREA_Y + PLAY_AREA_H - 60, red,
+                                      PLAY_AREA_W + 2 * PLAY_AREA_X);
+    }
+
+    /* "Insert coin to start the game" — original/preview.c:130 */
+    SDL_Color tan_clr = {210, 180, 140, 255};
+    sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TEXT, "Insert coin to start the game",
+                                  PLAY_AREA_Y + PLAY_AREA_H - 35, tan_clr,
+                                  PLAY_AREA_W + 2 * PLAY_AREA_X);
 
     if (state == DEMO_STATE_SPARKLE)
     {
