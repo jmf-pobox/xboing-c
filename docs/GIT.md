@@ -210,9 +210,9 @@ branch; the local branch and stale refs need explicit cleanup.
 
 | Workflow | Triggers | What it runs |
 |----------|----------|-------------|
-| `lint.yml` | Push to main, PRs | clang-format, cppcheck |
-| `test.yml` | Push to main, PRs | Matrix: Debug + ASan builds, ctest |
-| `docs.yml` | Push to main, PRs | markdownlint |
+| `lint.yml` | Push to master, PRs | clang-format, cppcheck |
+| `test.yml` | Push to master, PRs | Matrix: Debug + ASan builds, ctest |
+| `docs.yml` | Push to master, PRs | markdownlint |
 
 ## Session Close Protocol
 
@@ -225,7 +225,7 @@ Before ending any session, work is **not complete** until
 4. Push to remote (mandatory):
 
    ```bash
-   git pull --rebase
+   git pull --ff-only origin master
    bd dolt push
    git push
    ```

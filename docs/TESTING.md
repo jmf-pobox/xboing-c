@@ -119,6 +119,10 @@ sprite changes, font changes, layout adjustments, dialogue overlays.
 
 ### Golden reference capture
 
+Requires an X11 display (`DISPLAY` must be set). The capture scripts
+use ImageMagick `import` which needs a live X server. Headless CI
+uses the offscreen pixel comparison instead (see below).
+
 Capture screenshots of the original binary as reference:
 
 ```bash
@@ -171,7 +175,9 @@ compares direct-entry vs C-key-entry screenshots pixel-by-pixel.
 Use `offscreen` for any test that needs real rendered output.
 
 This test is disabled in the default ctest suite (crashes in non-ASan
-builds due to a pre-existing SDL_mixer teardown bug). Run under ASan:
+builds due to a pre-existing SDL_mixer teardown bug — `Mix_FreeChunk`
+frees a non-malloc'd pointer during `game_destroy`). ASan's allocator
+tolerates this; glibc's does not. Run under ASan:
 
 ```bash
 SDL_VIDEODRIVER=offscreen SDL_AUDIODRIVER=dummy \

@@ -23,7 +23,7 @@ ctest --test-dir build-asan --output-on-failure
 ### Debian Package
 
 ```bash
-sudo apt install build-essential devscripts debhelper cmake \
+sudo apt install build-essential devscripts debhelper cmake lintian \
     libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev libcmocka-dev
 dpkg-buildpackage -us -uc -b
 sudo dpkg -i ../xboing_*.deb        # installs /usr/games/xboing
@@ -32,7 +32,7 @@ sudo dpkg -i ../xboing_*.deb        # installs /usr/games/xboing
 ### Dependencies (Source Build)
 
 `libsdl2-dev`, `libsdl2-image-dev`, `libsdl2-mixer-dev`,
-`libsdl2-ttf-dev`, `libcmocka-dev`.
+`libsdl2-ttf-dev`, `libcmocka-dev`, `pkg-config`.
 
 ### CLion
 
@@ -83,7 +83,7 @@ Key targets:
 | **clang-format** | Code formatting | `apt install clang-format` |
 | **clang-tidy** | Deep semantic static analysis | `apt install clang-tidy` |
 | **cppcheck** | Syntactic static analysis | `apt install cppcheck` |
-| **CMocka** | Unit test framework (v2.0+, TAP 14) | `apt install libcmocka-dev` |
+| **CMocka** | Unit test framework | `apt install libcmocka-dev` |
 | **Valgrind** | Memory debugging | `apt install valgrind` |
 | **shellcheck** | Shell script linting | `apt install shellcheck` |
 | **ImageMagick** | Screenshot capture (`import`) | `apt install imagemagick` |

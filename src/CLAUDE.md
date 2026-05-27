@@ -34,6 +34,6 @@ default to relative paths. Runtime overrides: `XBOING_SCORE_FILE`,
 - `.clang-format` at repo root: LLVM base, 4-space indent, 100 columns, Allman braces
 - `snake_case` functions/variables, `UPPER_SNAKE_CASE` macros/constants
 - Module-prefix public APIs: `ball_system_update()`, `sfx_system_get_enabled()`
-- Every `.c` has a `.h`. Include guards: `#ifndef MODULE_NAME_H`
+- Library modules have a `.h` in `include/`. Entry points (`game_main.c`) may not. Include guards: `#ifndef MODULE_NAME_H`
 - System includes first (alphabetized), blank line, project includes (alphabetized)
 - Reformat only files you're already modifying (except dedicated formatting passes)

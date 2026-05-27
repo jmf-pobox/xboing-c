@@ -27,7 +27,7 @@ set -euo pipefail
 
 ## Style
 
-- `shellcheck` clean — part of `make check`
+- `shellcheck` clean (run manually; not yet in `make check`)
 - No bashisms when POSIX sh suffices
 - `[[ ]]` over `[ ]` when bash features are needed
 - `local` for function-scoped variables
