@@ -152,9 +152,17 @@ gh api graphql -f query='mutation {
 
 ### Merge Gate
 
+**Never merge on the first green CI pass.** You must wait for at
+least one reviewer to respond. CI green is necessary but not
+sufficient.
+
 Merge when ALL of these are true:
 
 - All CI checks green on the latest commit
+- At least one reviewer has responded (Copilot, Cursor, bugbot, or
+  human). The only exception: if bugbot has not responded after 6
+  minutes of polling, you may treat that as a clean pass and merge
+  — but only for bugbot, not for other requested reviewers.
 - The most recent reviewer pass produced no actionable findings
   (empty review, "no high-confidence vulnerabilities" Cursor pass,
   Copilot summary with zero new comments)
