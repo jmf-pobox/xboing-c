@@ -127,52 +127,13 @@ When approaching this codebase, work in this order:
 
 **Do not skip to step 7.** Steps 1-6 build the safety net that makes step 7 possible.
 
-## Build Commands
+## Build and Toolchain
 
-```bash
-cmake --preset debug                          # Configure (build/, Debug)
-cmake --build build                           # Build the game and all tests
-ctest --test-dir build --output-on-failure    # Run unit + integration tests
-./build/xboing                                # Run the game
-```
+**Read `docs/BUILDING.md` in full before writing any code.**
 
-**Sanitizer build** (ASan + UBSan):
-
-```bash
-cmake --preset asan                           # Configure (build-asan/)
-cmake --build build-asan
-ctest --test-dir build-asan --output-on-failure
-```
-
-**Build a Debian package** (Ubuntu/Debian):
-
-```bash
-sudo apt install build-essential devscripts debhelper cmake \
-    libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev libcmocka-dev
-dpkg-buildpackage -us -uc -b
-sudo dpkg -i ../xboing_*.deb        # installs /usr/games/xboing
-```
-
-**Dependencies (source build):** `libsdl2-dev`, `libsdl2-image-dev`, `libsdl2-mixer-dev`, `libsdl2-ttf-dev`, `libcmocka-dev`.
-
-**CLion:** the `debug` and `asan` CMake presets in `CMakePresets.json` are pre-wired — open the project, pick a preset, build. Do **not** run `cmake .` in the repo root (it pollutes the source tree).
-
-The legacy 1996 Xlib build (`original/Makefile`, `original/xboing`) is preserved verbatim in `original/` for reference; it is not the active build. The top-level `Makefile` is the modern wrapper around CMake described above.
-
-## Toolchain
-
-| Tool | Purpose | Install |
-| ------ | --------- | --------- |
-| **gcc / clang** | Compilation with strict warnings | `apt install gcc clang` |
-| **CMake** | Build system | `apt install cmake` |
-| **clang-format** | Code formatting | `apt install clang-format` |
-| **clang-tidy** | Deep semantic static analysis | `apt install clang-tidy` |
-| **cppcheck** | Syntactic static analysis (catches different issues than clang-tidy) | `apt install cppcheck` |
-| **CMocka** | Unit test framework (v2.0+, supports TAP 14) | `apt install libcmocka-dev` |
-| **Valgrind** | Memory debugging | `apt install valgrind` |
-| **shellcheck** | Shell script linting | `apt install shellcheck` |
-| **bd** | Issue tracking with dependency chains | [github.com/steveyegge/beads](https://github.com/steveyegge/beads) |
-| **ethos** | Identity / mission / pipeline framework. `ethos doctor` must report all PASS at session start. | [github.com/punt-labs/ethos](https://github.com/punt-labs/ethos) |
+Covers build commands, dependencies, CMake presets, quality gates,
+compiler warnings, sanitizer builds, Makefile targets, and packaging.
+Mandatory reading — not optional, not summarized here.
 
 ## Tool Usage
 
@@ -225,139 +186,13 @@ The entire repository is indexed in a **quarry** semantic search collection (`xb
 
 **Keep the index fresh:** Run `/ingest .` after large merges or multi-file changes to ensure search results reflect the current codebase.
 
-## Quality Gates
-
-Run before every commit. Zero warnings, zero errors, all tests green.
-
-```bash
-# Build with strict warnings (treat warnings as errors)
-cmake --build build --config Debug 2>&1 | grep -c "warning:" && exit 1
-
-# Static analysis
-clang-tidy src/**/*.c -- -I include/
-cppcheck --enable=warning,style,performance,portability --error-exitcode=1 src/
-
-# Formatting check
-clang-format --dry-run --Werror src/**/*.c src/**/*.h include/**/*.h
-
-# Unit tests
-ctest --test-dir build --output-on-failure
-
-# Sanitizer tests (separate build)
-cmake -B build-asan -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer"
-cmake --build build-asan
-ctest --test-dir build-asan --output-on-failure
-
-# Shell scripts
-shellcheck scripts/*.sh
-
-# Markdown lint (if any .md files changed)
-npx markdownlint-cli2 "*.{md,markdown}"
-```
-
-**Run quality gates locally before creating a PR.** Never let CI catch something you could have caught on your own machine.
-
-### Compiler Warnings Policy
-
-The base warning set for all translation units:
-
-```text
--Wall -Wextra -Wpedantic -Werror
--Wconversion -Wshadow -Wdouble-promotion
--Wformat=2 -Wformat-overflow=2
--Wnull-dereference -Wuninitialized
--Wstrict-prototypes -Wold-style-definition
-```
-
-For legacy files not yet modernized, suppress specific warnings per-file in CMakeLists.txt rather than globally weakening the policy. Track each suppression as a bead to resolve.
-
-### Sanitizer Builds
-
-| Sanitizer | What it catches | Flag |
-| ----------- | ---------------- | ------ |
-| AddressSanitizer (ASan) | Buffer overflows, use-after-free, double-free, stack overflow | `-fsanitize=address` |
-| UndefinedBehaviorSanitizer (UBSan) | Integer overflow, null deref, alignment, shift errors | `-fsanitize=undefined` |
-| MemorySanitizer (MSan) | Reads of uninitialized memory (clang only, Linux only) | `-fsanitize=memory` |
-
-ASan + UBSan run in CI on every PR. MSan and Valgrind are periodic deep checks. **This is critical for a 20-year-old C codebase.** Expect to find memory bugs. Sanitizers are not optional — they are the primary safety net during modernization.
-
 ## Testing Strategy
 
-Testing a game is harder than testing a library. Most game code has tight coupling to global state, hardware, and frame timing. The strategy is to progressively decouple and test at every layer.
+**Read `docs/TESTING.md` in full before writing any code or tests.**
 
-### Layer 1: Unit Tests (CMocka)
-
-Pure logic with no side effects. Highest-value, lowest-cost testing.
-
-**What to test:**
-
-- Math utilities (collision geometry, trig paddle bounce, velocity clamping)
-- State machines (game modes, ball states, block states, bonus sequence)
-- Serialization (save/load round-trips, level file parsing, config parsing)
-- Game rules (scoring, block point values, extra life thresholds, multipliers)
-- String handling and text processing
-
-**How to make legacy code testable:**
-
-- Extract pure functions from modules that mix logic with I/O
-- Introduce seams: pass function pointers instead of calling globals directly
-- Replace `#include`-coupled singletons with struct pointers passed as parameters
-- One test file per source file: `tests/test_<module>.c`
-
-### Layer 2: Integration Tests
-
-Multiple subsystems working together, but still deterministic.
-
-**What to test:**
-
-- Game loop ticking with fixed timestep (no real clock)
-- Ball-block-paddle interaction lifecycle
-- Level loading -> block spawning -> state verification
-- Save -> load -> verify round-trip
-
-**How to set up:**
-
-- Create a headless build configuration that stubs rendering and audio
-- Replace platform I/O with in-memory equivalents
-- Fixed random seed for reproducibility
-
-### Layer 3: Replay / Golden Tests
-
-Record inputs, replay deterministically, compare results.
-
-**What to test:**
-
-- Full game sequences (menu -> gameplay -> victory/defeat)
-- Known bug reproduction
-- Performance regression (frame time during replay)
-
-**How to set up:**
-
-- Implement an input recording/playback system early in modernization
-- Ensure deterministic updates (fixed timestep, seeded RNG)
-- Store golden files in `tests/golden/`
-- CI compares replay output against golden files
-
-### Layer 4: Fuzz Testing
-
-Feed malformed data to parsers and deserializers.
-
-**What to fuzz:**
-
-- Level file parsers
-- Save file deserializers
-- Config file parsers
-- Asset loaders
-
-**Tools:** libFuzzer (built into clang) or AFL++.
-
-### Testing Priority for Modernization
-
-1. **Sanitizer builds first** — find memory bugs in existing code before any changes
-2. **Serialization round-trips** — save/load is the highest-risk area for data loss
-3. **Game rule unit tests** — capture current behavior before touching game logic
-4. **Input replay infrastructure** — enables regression testing everything else
-5. **Parser fuzz tests** — old C parsers are where the security and stability bugs live
+Covers 5 testing layers (unit, integration, replay/golden, visual
+fidelity, fuzz), the visual capture workflow, CI coverage, and how
+to add tests at each layer. Mandatory reading.
 
 ## Architecture
 
