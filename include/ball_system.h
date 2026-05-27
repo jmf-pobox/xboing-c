@@ -98,10 +98,9 @@ typedef struct
 
     /*
      * Block hit: called when a ball strikes a block.
-     * Returns BLOCK_HIT_BOUNCE (0), BLOCK_HIT_ABSORB (1), or
-     * BLOCK_HIT_TELEPORT (2).
+     * Returns BLOCK_HIT_BOUNCE, BLOCK_HIT_ABSORB, or BLOCK_HIT_TELEPORT.
      */
-    int (*on_block_hit)(int row, int col, int ball_index, void *ud);
+    block_hit_result_t (*on_block_hit)(int row, int col, int ball_index, void *ud);
 
     /*
      * Cell availability query for teleport.

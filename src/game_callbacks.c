@@ -86,7 +86,7 @@ static int ball_cb_check_region(int row, int col, int bx, int by, int bdx, void 
  * Returns nonzero if ball should NOT bounce (e.g., DEATH_BLK kills ball,
  * HYPERSPACE_BLK teleports — these absorb the hit).
  */
-static int ball_cb_on_block_hit(int row, int col, int ball_index, void *ud)
+static block_hit_result_t ball_cb_on_block_hit(int row, int col, int ball_index, void *ud)
 {
     game_ctx_t *ctx = ud;
 
@@ -349,10 +349,7 @@ static void ball_cb_on_event(ball_system_event_t event, int ball_index, void *ud
  * Gun system callbacks
  * ========================================================================= */
 
-/*
- * Check if bullet at (bx, by) hits any block in the grid.
- * Iterates all occupied blocks and checks AABB overlap.
- */
+/* Check if bullet at (bx, by) hits a block. Narrows to 3x3 neighborhood. */
 static int gun_cb_check_block_hit(int bx, int by, int *out_row, int *out_col, void *ud)
 {
     const game_ctx_t *ctx = ud;
