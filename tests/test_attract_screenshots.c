@@ -254,6 +254,23 @@ static void test_all_screens(void **vstate)
     assert_int_equal(failures, 0);
 }
 
+static void test_capture_dialogue(void **vstate)
+{
+    (void)vstate;
+    game_ctx_t *ctx = g_ctx;
+
+    sdl2_state_transition(ctx->state, SDL2ST_INTRO);
+    advance_ticks(ctx, 50);
+
+    inject_key(ctx, SDL_SCANCODE_Q);
+    game_input_global(ctx);
+    assert_int_equal(sdl2_state_current(ctx->state), SDL2ST_DIALOGUE);
+
+    advance_ticks(ctx, 5);
+    capture_and_save(ctx, ".tmp/dialogue_q.bmp");
+    fprintf(stderr, "Captured .tmp/dialogue_q.bmp\n");
+}
+
 /* =========================================================================
  * Runner
  * ========================================================================= */
@@ -262,6 +279,7 @@ int main(void)
 {
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(test_all_screens),
+        cmocka_unit_test(test_capture_dialogue),
     };
     return cmocka_run_group_tests(tests, group_setup, group_teardown);
 }

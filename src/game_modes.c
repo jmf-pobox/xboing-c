@@ -65,8 +65,25 @@
 #define PLAY_AREA_X 35
 #define PLAY_AREA_Y 60
 
-/* Flag for boing master "words of wisdom" dialogue flow */
+/* Dialogue result pending flags — set before push_dialogue, consumed
+ * in mode exit/enter handlers.  See game_modes.h for API. */
 static int wisdom_pending;
+static int quit_pending;
+static int abort_pending;
+static int level_pending;
+
+void game_modes_set_quit_pending(void)
+{
+    quit_pending = 1;
+}
+void game_modes_set_abort_pending(void)
+{
+    abort_pending = 1;
+}
+void game_modes_set_level_pending(void)
+{
+    level_pending = 1;
+}
 
 static void start_new_game(game_ctx_t *ctx)
 {
@@ -77,6 +94,9 @@ static void start_new_game(game_ctx_t *ctx)
     ctx->game_active = true;
     ctx->score_submitted = false;
     wisdom_pending = 0;
+    quit_pending = 0;
+    abort_pending = 0;
+    level_pending = 0;
     ctx->game_start = time(NULL);
     ctx->paused_seconds = 0;
     ctx->bonus_block_active = false;
@@ -134,6 +154,26 @@ static void mode_game_enter(sdl2_state_mode_t mode, void *ud)
 {
     (void)mode;
     game_ctx_t *ctx = ud;
+
+    /* Abort dialogue result — checked first because sdl2_state_previous()
+     * returns SDL2ST_DIALOGUE after pop, not the pre-dialogue mode.
+     * The flag carries the intent.  See peer review finding #1. */
+    if (abort_pending)
+    {
+        abort_pending = 0;
+        if (!dialogue_system_was_cancelled(ctx->dialogue))
+        {
+            const char *ans = dialogue_system_get_input(ctx->dialogue);
+            if (ans && (ans[0] == 'y' || ans[0] == 'Y'))
+            {
+                ctx->game_active = false;
+                ctx->highscore_request_type = HIGHSCORE_TYPE_PERSONAL;
+                sdl2_state_transition(ctx->state, SDL2ST_HIGHSCORE);
+                return;
+            }
+        }
+        return;
+    }
 
     sdl2_state_mode_t prev = sdl2_state_previous(ctx->state);
 
@@ -895,6 +935,13 @@ static void mode_dialogue_update(sdl2_state_mode_t mode, void *ud)
     (void)mode;
     game_ctx_t *ctx = ud;
 
+    /* Read sound before update — update() clears the sound field
+     * (dialogue_system.c:113-114), but key_input() sets it during
+     * event processing before this tick runs. */
+    dialogue_sound_t snd = dialogue_system_get_sound(ctx->dialogue);
+    if (snd.name && ctx->audio)
+        sdl2_audio_play(ctx->audio, snd.name);
+
     dialogue_system_update(ctx->dialogue);
 
     if (dialogue_system_is_finished(ctx->dialogue))
@@ -906,8 +953,51 @@ static void mode_dialogue_update(sdl2_state_mode_t mode, void *ud)
 static void mode_dialogue_exit(sdl2_state_mode_t mode, void *ud)
 {
     (void)mode;
-    (void)ud;
+    game_ctx_t *ctx = ud;
     SDL_StopTextInput();
+
+    if (quit_pending)
+    {
+        quit_pending = 0;
+        if (!dialogue_system_was_cancelled(ctx->dialogue))
+        {
+            const char *ans = dialogue_system_get_input(ctx->dialogue);
+            if (ans && (ans[0] == 'y' || ans[0] == 'Y'))
+            {
+                SDL_Event quit_event = {0};
+                quit_event.type = SDL_QUIT;
+                SDL_PushEvent(&quit_event);
+            }
+        }
+    }
+
+    /* W key: set starting level — original/level.c:245-282 */
+    if (level_pending)
+    {
+        level_pending = 0;
+        if (!dialogue_system_was_cancelled(ctx->dialogue))
+        {
+            const char *ans = dialogue_system_get_input(ctx->dialogue);
+            if (ans && ans[0] != '\0')
+            {
+                int num = atoi(ans);
+                int frame = (int)sdl2_state_frame(ctx->state);
+                if (num > 0 && num <= LEVEL_MAX_NUM)
+                {
+                    ctx->start_level = num;
+                    char msg[64];
+                    snprintf(msg, sizeof(msg), "Starting level set to %d", num);
+                    message_system_set(ctx->message, msg, 1, frame);
+                }
+                else
+                {
+                    char msg[64];
+                    snprintf(msg, sizeof(msg), "Invalid - level range [1-%d]", LEVEL_MAX_NUM);
+                    message_system_set(ctx->message, msg, 1, frame);
+                }
+            }
+        }
+    }
 }
 
 /* =========================================================================

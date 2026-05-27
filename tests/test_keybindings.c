@@ -51,14 +51,6 @@ static void inject_key(game_ctx_t *ctx, SDL_Scancode sc)
     sdl2_input_process_event(ctx->input, &e);
 }
 
-static void drain_sdl_quit_events(void)
-{
-    SDL_Event discard;
-    SDL_PumpEvents();
-    while (SDL_PeepEvents(&discard, 1, SDL_GETEVENT, SDL_QUIT, SDL_QUIT) > 0)
-    {
-    }
-}
 
 /* =========================================================================
  * Fixtures
@@ -180,17 +172,31 @@ static void test_global_fullscreen_no_crash(void **vstate)
     /* SDL dummy driver — no observable fullscreen change, just no crash */
 }
 
-static void test_global_quit_pushes_event(void **vstate)
+static void test_global_quit_opens_dialogue(void **vstate)
 {
     game_ctx_t *ctx = ((kb_fixture_t *)*vstate)->ctx;
-    drain_sdl_quit_events();
     inject_key(ctx, SDL_SCANCODE_Q);
     game_input_global(ctx);
-    SDL_PumpEvents();
-    SDL_Event found;
-    int count = SDL_PeepEvents(&found, 1, SDL_PEEKEVENT, SDL_QUIT, SDL_QUIT);
-    assert_true(count > 0);
-    drain_sdl_quit_events();
+    assert_int_equal(sdl2_state_current(ctx->state), SDL2ST_DIALOGUE);
+}
+
+static void test_quit_blocked_during_dialogue(void **vstate)
+{
+    game_ctx_t *ctx = ((kb_fixture_t *)*vstate)->ctx;
+    inject_key(ctx, SDL_SCANCODE_Q);
+    game_input_global(ctx);
+    assert_int_equal(sdl2_state_current(ctx->state), SDL2ST_DIALOGUE);
+    inject_key(ctx, SDL_SCANCODE_Q);
+    game_input_global(ctx);
+    assert_int_equal(sdl2_state_current(ctx->state), SDL2ST_DIALOGUE);
+}
+
+static void test_global_set_level_opens_dialogue(void **vstate)
+{
+    game_ctx_t *ctx = ((kb_fixture_t *)*vstate)->ctx;
+    inject_key(ctx, SDL_SCANCODE_W);
+    game_input_global(ctx);
+    assert_int_equal(sdl2_state_current(ctx->state), SDL2ST_DIALOGUE);
 }
 
 /* =========================================================================
@@ -227,13 +233,9 @@ static void test_speed_blocked_in_game(void **vstate)
 static void test_quit_blocked_in_editor(void **vstate)
 {
     game_ctx_t *ctx = ((kb_fixture_t *)*vstate)->ctx;
-    drain_sdl_quit_events();
     inject_key(ctx, SDL_SCANCODE_Q);
     game_input_global(ctx);
-    SDL_PumpEvents();
-    SDL_Event found;
-    int count = SDL_PeepEvents(&found, 1, SDL_PEEKEVENT, SDL_QUIT, SDL_QUIT);
-    assert_int_equal(count, 0);
+    assert_int_equal(sdl2_state_current(ctx->state), SDL2ST_EDIT);
 }
 
 /* =========================================================================
@@ -460,7 +462,10 @@ int main(void)
         cmocka_unit_test_setup_teardown(test_global_speed_9, setup_attract, teardown),
         cmocka_unit_test_setup_teardown(test_global_control_toggle, setup_attract, teardown),
         cmocka_unit_test_setup_teardown(test_global_fullscreen_no_crash, setup_attract, teardown),
-        cmocka_unit_test_setup_teardown(test_global_quit_pushes_event, setup_attract, teardown),
+        cmocka_unit_test_setup_teardown(test_global_quit_opens_dialogue, setup_attract, teardown),
+        cmocka_unit_test_setup_teardown(test_quit_blocked_during_dialogue, setup_attract, teardown),
+        cmocka_unit_test_setup_teardown(test_global_set_level_opens_dialogue, setup_attract,
+                                        teardown),
         cmocka_unit_test_setup_teardown(test_global_audio_toggle, setup_attract, teardown),
         cmocka_unit_test_setup_teardown(test_global_highscore_h_global, setup_attract, teardown),
         cmocka_unit_test_setup_teardown(test_global_highscore_H_personal, setup_attract, teardown),
