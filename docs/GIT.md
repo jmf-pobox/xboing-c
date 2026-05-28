@@ -110,22 +110,33 @@ exceptions for "trivial" or "docs-only" PRs.**
    Expect findings; address them; push fixes; re-request review;
    resolve threads. Skipping rounds means rushing the PR.
 
-### Review Rounds
+### Two-Loop Process
+
+PR workflow is two concurrent loops, not a sequence:
+
+**Inner loop (review cycle):** When feedback arrives, act
+immediately — do NOT wait for the next outer-loop tick. Each finding
+triggers an inner iteration:
+
+1. Read the finding the moment it arrives.
+2. Address it in code (or counter-argue if it's wrong).
+3. Run `make check`.
+4. Commit and `git push` (not force, not rebase).
+5. Resolve the conversation thread via `gh api graphql`
+   `resolveReviewThread` mutation. This is the one workflow
+   operation without a structured MCP tool — it is the documented
+   exception to the "prefer MCP over `gh api graphql`" rule.
+6. Re-request Copilot review on the new SHA.
+
+**Outer loop (merge gate):** The `/loop` cron polls every 2 minutes
+checking the merge gate checklist below. It only fires `gh pr merge`
+when every checklist item is satisfied. The outer loop never bypasses
+the inner loop — if feedback arrives between outer-loop ticks, you
+handle it then and there, not on the next tick.
 
 **Re-request Copilot review every time you push a new commit.**
 Copilot does not auto-re-review on push. Previous reviews refer to
 the old SHA and don't carry forward.
-
-For each new finding on the latest commit:
-
-1. Address the finding in code.
-2. Run `make check`.
-3. Commit and `git push` (not force, not rebase).
-4. Resolve the conversation thread via `gh api graphql`
-   `resolveReviewThread` mutation. This is the one workflow operation
-   without a structured MCP tool — it is the documented exception to
-   the "prefer MCP over `gh api graphql`" rule.
-5. Re-request Copilot review on the new SHA.
 
 **Round budget:** 2-4 rounds typical. A round = push → review →
 address findings → resolve threads. After ~4 rounds the reviewer
