@@ -135,8 +135,15 @@ function merge_gate_satisfied(state):
         return false
 
     # 2. EVERY reviewer responded on latest_sha
-    for reviewer in [copilot, cursor, every_requested_human]:
+    for reviewer in [cursor, every_requested_human]:
         if not has_review_on(reviewer, latest_sha):
+            return false
+    # Copilot silence-after-fix exception: if Copilot reviewed an
+    # earlier SHA but hasn't re-reviewed latest_sha after 10 minutes
+    # (5 full 2-min loops), and CI is green, treat as approval.
+    # Applies only after Copilot has reviewed at least one SHA.
+    if not has_review_on(copilot, latest_sha):
+        if not has_any_review(copilot) or copilot_wait < 10_minutes:
             return false
     # Bugbot exception: skip only if 3 full 2-min loops elapsed
     if bugbot_missing(latest_sha) and bugbot_wait < 6_minutes:
@@ -175,8 +182,13 @@ Key invariants:
    approval" shortcut.
 3. Every push restarts the gate — new CI run, fresh reviews
    required on the new SHA.
-4. Bugbot is the only reviewer with a timeout exception (6 min =
-   3 loops).
+4. Two reviewers have timeout exceptions:
+   - **Bugbot**: 6 min (3 loops) — if never reviewed.
+   - **Copilot silence-after-fix**: 10 min (5 loops) — if Copilot
+     reviewed at least one earlier SHA but didn't re-review the
+     latest after a push. Copilot stays silent when it has nothing
+     new to say or when the PR exceeds 20k lines. Does not apply
+     to Copilot's first review.
 5. A "summary only / no comments" review counts as a clean pass
    on that reviewer for that SHA — but only if it is on the
    **latest** SHA.
@@ -280,10 +292,20 @@ gh api graphql -f query='mutation {
      2-minute loop iterations (6 minutes total) with all other
      reviewers in and CI green, you may treat bugbot as a clean
      pass. This exception applies to bugbot only.
-   - **No exception for Copilot, Cursor, or humans.** A review
-     summary with zero comments still counts as a response, but
-     only after the reviewer's full review (not just an
-     auto-generated overview) is posted.
+   - **Copilot silence-after-fix exception**: after Copilot has
+     reviewed at least one earlier SHA on the PR, if a push doesn't
+     trigger a fresh Copilot review within 10 minutes (5 full
+     2-minute loop iterations) AND CI is green AND all other
+     reviewers are in, you may treat Copilot as approving the new
+     SHA. Copilot does not always re-review after a push — it stays
+     silent when it has nothing new to say or when the PR exceeds
+     20k lines. This applies only when Copilot has already reviewed
+     the PR at least once (so the silence is "no new feedback",
+     not "first review missing").
+   - **No exception for Cursor or humans.** A review summary with
+     zero comments still counts as a response, but only after the
+     reviewer's full review (not just an auto-generated overview)
+     is posted.
 
 3. **[ ] All CI checks are green on the latest commit.** If you
    pushed fixes, wait for the new CI run to complete. Old CI
