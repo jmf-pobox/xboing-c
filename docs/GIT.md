@@ -91,18 +91,24 @@ The following modify shared state in ways that are hard to reverse.
 **Arm active monitoring in the same turn as PR creation — no
 exceptions for "trivial" or "docs-only" PRs.**
 
-1. A 2-minute recurring cron polling:
+1. Set up `/loop` with a 2-minute interval polling the PR. The
+   `/loop` invocation MUST be created in the same turn as the PR.
+   Polling command:
 
    ```bash
    gh pr view <number> --json reviews,comments,reviewDecision,state,mergeable,statusCheckRollup
    ```
 
-   The cron must continue until the PR merges. If you push new
-   commits, the same cron is fine — it polls the latest state.
-   Don't create a second cron.
+   The loop must continue until the PR merges. If you push new
+   commits, the same loop is fine — it polls the latest state.
+   Don't create a second loop.
 
 2. Request Copilot review immediately:
    `mcp__plugin_github_github__request_copilot_review`.
+
+3. **A normal review cycle is 2–6 rounds of feedback, not zero.**
+   Expect findings; address them; push fixes; re-request review;
+   resolve threads. Skipping rounds means rushing the PR.
 
 ### Review Rounds
 
@@ -152,24 +158,24 @@ gh api graphql -f query='mutation {
 
 ### Merge Gate
 
-**Never merge on the first green CI pass.** You must wait for at
-least one reviewer to respond. CI green is necessary but not
-sufficient.
+**Never merge on the first green CI pass. Never merge after a single
+reviewer responds.** You must wait for EVERY reviewer to respond.
 
 Merge when ALL of these are true:
 
 - All CI checks green on the latest commit
-- At least one reviewer has responded (Copilot, Cursor, bugbot, or
-  human). The only exception: if bugbot has not responded after 6
-  minutes of polling, you may treat that as a clean pass and merge
-  — but only for bugbot, not for other requested reviewers.
-- The most recent reviewer pass produced no actionable findings
-  (empty review, "no high-confidence vulnerabilities" Cursor pass,
-  Copilot summary with zero new comments)
+- **EVERY** configured reviewer has responded: Copilot, Cursor, and
+  any human reviewer. The ONLY exception is bugbot: if bugbot has
+  not responded after **3 full 2-minute loop iterations (6 minutes
+  total)** with all other reviewers in and CI green, you may treat
+  bugbot as a clean pass. This exception applies to bugbot only —
+  never to Copilot, Cursor, or humans.
+- The most recent pass from each reviewer produced no actionable
+  findings (empty review, "no high-confidence vulnerabilities"
+  Cursor pass, Copilot summary with zero new comments)
 - Every conversation thread is resolved
 
-That's the convergence signal. When it's met: merge. Don't wait for
-explicit human approval — convergence is the approval.
+That's the convergence signal. When it's met: merge.
 
 ### Merge Command
 
