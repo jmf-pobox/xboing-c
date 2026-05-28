@@ -156,26 +156,47 @@ gh api graphql -f query='mutation {
 }'
 ```
 
-### Merge Gate
+### Merge Gate Checklist
 
-**Never merge on the first green CI pass. Never merge after a single
-reviewer responds.** You must wait for EVERY reviewer to respond.
+**Never merge until every item below is checked.** No exceptions for
+"trivial" or "docs-only" PRs.
 
-Merge when ALL of these are true:
+1. **[ ] Received and addressed at least one round of feedback.**
+   A normal review cycle is 2–6 rounds. Zero rounds means you
+   rushed. You must have a substantive review (not just a summary)
+   from at least one reviewer, with findings either addressed or
+   confirmed as non-issues.
 
-- All CI checks green on the latest commit
-- **EVERY** configured reviewer has responded: Copilot, Cursor, and
-  any human reviewer. The ONLY exception is bugbot: if bugbot has
-  not responded after **3 full 2-minute loop iterations (6 minutes
-  total)** with all other reviewers in and CI green, you may treat
-  bugbot as a clean pass. This exception applies to bugbot only —
-  never to Copilot, Cursor, or humans.
-- The most recent pass from each reviewer produced no actionable
-  findings (empty review, "no high-confidence vulnerabilities"
-  Cursor pass, Copilot summary with zero new comments)
-- Every conversation thread is resolved
+2. **[ ] Waited for a response from EVERY reviewer.** The reviewers
+   are Copilot, Cursor, any human reviewer, and bugbot. Wait for
+   each one across each push.
+   - **Bugbot exception**: if bugbot has not responded after 3 full
+     2-minute loop iterations (6 minutes total) with all other
+     reviewers in and CI green, you may treat bugbot as a clean
+     pass. This exception applies to bugbot only.
+   - **No exception for Copilot, Cursor, or humans.** A review
+     summary with zero comments still counts as a response, but
+     only after the reviewer's full review (not just an
+     auto-generated overview) is posted.
 
-That's the convergence signal. When it's met: merge.
+3. **[ ] All CI checks are green on the latest commit.** If you
+   pushed fixes, wait for the new CI run to complete. Old CI
+   results don't count.
+
+4. **[ ] Every conversation thread is resolved.** Run the
+   `resolveReviewThread` mutation for each thread you addressed.
+   Unresolved threads block merge.
+
+5. **[ ] Re-requested Copilot review after each push.** Copilot
+   does not auto-re-review. Previous reviews refer to old SHAs.
+
+6. **[ ] Most recent pass from each reviewer produced no actionable
+   findings.** "No high-confidence vulnerabilities" from Cursor,
+   empty review from Copilot, or "looks good" from a human all
+   qualify. Open findings block merge.
+
+When every box is checked: merge with `gh pr merge <N> --squash
+--delete-branch`. Then do post-merge cleanup per the section below.
 
 ### Merge Command
 
