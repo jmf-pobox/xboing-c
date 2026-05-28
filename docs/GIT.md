@@ -148,9 +148,14 @@ function merge_gate_satisfied(state):
         copilot_wait = minutes_since_push(latest_sha)
         if not has_any_review(copilot) or copilot_wait < 10:
             return false
-    # Bugbot exception: skip only if 3 full 2-min loops elapsed since
-    # the PR was opened (minutes_since_pr_opened()).
-    if bugbot_missing() and minutes_since_pr_opened() < 6:
+    # Bugbot exception: applies ONLY when bugbot has never reviewed
+    # the PR (treated as "not configured" after 6 minutes from open).
+    # If bugbot reviewed any earlier SHA, it is required on latest_sha
+    # like any other reviewer.
+    if has_any_review(bugbot):
+        if not has_review_on(bugbot, latest_sha):
+            return false
+    elif minutes_since_pr_opened() < 6:
         return false
 
     # 3. CI green on latest_sha
@@ -188,8 +193,9 @@ Key invariants:
    required on the new SHA, subject only to the explicit timeout
    exceptions in invariant 4.
 4. Two reviewers have timeout exceptions to invariant 3:
-   - **Bugbot**: 6 min (3 loops) measured from PR open — if bugbot
-     never reviewed.
+   - **Bugbot**: 6 min (3 loops) measured from PR open — applies
+     ONLY if bugbot never reviewed the PR at all. Once bugbot
+     reviews any SHA, it is required on the latest SHA.
    - **Copilot silence-after-fix**: 10 min (5 loops) measured from
      the push that created the latest SHA — if Copilot reviewed at
      least one earlier SHA but didn't re-review the latest. Copilot
@@ -294,11 +300,14 @@ gh api graphql -f query='mutation {
 2. **[ ] Waited for a response from EVERY reviewer.** The reviewers
    are Copilot, Cursor, any human reviewer, and bugbot. Wait for
    each one across each push.
-   - **Bugbot exception**: if bugbot has not posted a review after
-     3 full 2-minute loop iterations (6 minutes total) **measured
-     from PR open** with all other reviewers in and CI green, you
-     may treat bugbot as a clean pass. This exception applies to
-     bugbot only.
+   - **Bugbot exception**: applies ONLY when bugbot has never
+     posted a review on the PR (treated as "not configured"). If
+     6 minutes (3 full 2-minute loop iterations) have elapsed
+     **since PR open** with all other reviewers in and CI green,
+     you may treat the absent bugbot as a clean pass. If bugbot
+     reviewed any earlier SHA, it is required on the latest SHA
+     just like Cursor and human reviewers — this exception does
+     not apply.
    - **Copilot silence-after-fix exception**: after Copilot has
      reviewed at least one earlier SHA on the PR, if Copilot hasn't
      posted a review on the latest SHA within 10 minutes (5 full
