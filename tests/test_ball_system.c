@@ -1600,9 +1600,9 @@ static void test_restore_active_ball_roundtrip(void **state)
     ball_system_t *ctx = ball_system_create(NULL, NULL, NULL);
 
     /* Restore a moving ball into slot 0. */
-    ball_system_status_t st =
-        ball_system_restore(ctx, 0, /*active*/ 1, BALL_ACTIVE, /*x*/ 247, /*y*/ 520,
-                            /*dx*/ 3, /*dy*/ -4, /*wait_mode*/ BALL_NONE);
+    ball_system_status_t st = ball_system_restore(
+        ctx, 0, /*current_frame*/ 100, /*active*/ 1, BALL_ACTIVE, /*x*/ 247, /*y*/ 520,
+        /*dx*/ 3, /*dy*/ -4, /*wait_mode*/ BALL_NONE);
     assert_int_equal(st, BALL_SYS_OK);
 
     assert_int_equal(ball_system_get_state(ctx, 0), BALL_ACTIVE);
@@ -1627,7 +1627,7 @@ static void test_restore_ball_create_becomes_ready(void **state)
     (void)state;
     ball_system_t *ctx = ball_system_create(NULL, NULL, NULL);
 
-    ball_system_restore(ctx, 0, 1, BALL_CREATE, 100, 100, 0, 0, BALL_NONE);
+    ball_system_restore(ctx, 0, 100, 1, BALL_CREATE, 100, 100, 0, 0, BALL_NONE);
 
     assert_int_equal(ball_system_get_state(ctx, 0), BALL_READY);
 
@@ -1639,14 +1639,69 @@ static void test_restore_invalid_index(void **state)
     (void)state;
     ball_system_t *ctx = ball_system_create(NULL, NULL, NULL);
     assert_int_equal(
-        ball_system_restore(ctx, -1, 1, BALL_ACTIVE, 0, 0, 0, 0, BALL_NONE),
+        ball_system_restore(ctx, -1, 100, 1, BALL_ACTIVE, 0, 0, 0, 0, BALL_NONE),
         BALL_SYS_ERR_INVALID_INDEX);
     assert_int_equal(
-        ball_system_restore(ctx, MAX_BALLS, 1, BALL_ACTIVE, 0, 0, 0, 0, BALL_NONE),
+        ball_system_restore(ctx, MAX_BALLS, 100, 1, BALL_ACTIVE, 0, 0, 0, 0, BALL_NONE),
         BALL_SYS_ERR_INVALID_INDEX);
     assert_int_equal(
-        ball_system_restore(NULL, 0, 1, BALL_ACTIVE, 0, 0, 0, 0, BALL_NONE),
+        ball_system_restore(NULL, 0, 100, 1, BALL_ACTIVE, 0, 0, 0, 0, BALL_NONE),
         BALL_SYS_ERR_NULL_ARG);
+    ball_system_destroy(ctx);
+}
+
+/* Restored BALL_ACTIVE must not auto-tilt on first tick after restore
+ * (would randomize dx/dy and defeat the restored velocity). */
+static void test_restore_active_no_auto_tilt_first_tick(void **state)
+{
+    (void)state;
+    test_cb_log_t log = {0};
+    ball_system_callbacks_t cbs = make_test_callbacks();
+    ball_system_t *ctx = ball_system_create(&cbs, &log, NULL);
+
+    int save_frame = 1000;
+    ball_system_restore(ctx, 0, save_frame, /*active*/ 1, BALL_ACTIVE, /*x*/ 247, /*y*/ 400,
+                        /*dx*/ 3, /*dy*/ -4, /*wait_mode*/ BALL_NONE);
+
+    /* Tick one frame after restore.  No auto-tilt message should fire. */
+    ball_system_env_t env = make_env(save_frame + 1);
+    ball_system_update(ctx, &env);
+
+    /* No message means lastPaddleHitFrame was correctly set far in the
+     * future (current + PADDLE_BALL_FRAME_TILT), not 0. */
+    if (log.message_count > 0)
+    {
+        assert_string_not_equal(log.last_message, "Auto Tilt Activated");
+    }
+
+    /* Velocity preserved (no tilt randomization). */
+    int dx, dy;
+    ball_system_get_velocity(ctx, 0, &dx, &dy);
+    assert_int_equal(dx, 3);
+    assert_int_equal(dy, -4);
+
+    ball_system_destroy(ctx);
+}
+
+/* Restored BALL_READY must not auto-activate on first tick after restore. */
+static void test_restore_ready_no_auto_activate_first_tick(void **state)
+{
+    (void)state;
+    test_cb_log_t log = {0};
+    ball_system_callbacks_t cbs = make_test_callbacks();
+    ball_system_t *ctx = ball_system_create(&cbs, &log, NULL);
+
+    int save_frame = 1000;
+    ball_system_restore(ctx, 0, save_frame, 1, BALL_READY, 247, 528, 0, 0, BALL_NONE);
+
+    /* Tick one frame after restore.  Should still be in BALL_READY (the
+     * auto-activate timer was set to save_frame + BIRTH_FRAME_RATE, so
+     * at save_frame + 1 it has not yet expired). */
+    ball_system_env_t env = make_env(save_frame + 1);
+    ball_system_update(ctx, &env);
+
+    assert_int_equal(ball_system_get_state(ctx, 0), BALL_READY);
+
     ball_system_destroy(ctx);
 }
 
@@ -1728,6 +1783,8 @@ int main(void)
         cmocka_unit_test(test_restore_active_ball_roundtrip),
         cmocka_unit_test(test_restore_ball_create_becomes_ready),
         cmocka_unit_test(test_restore_invalid_index),
+        cmocka_unit_test(test_restore_active_no_auto_tilt_first_tick),
+        cmocka_unit_test(test_restore_ready_no_auto_activate_first_tick),
     };
     return cmocka_run_group_tests(tests, NULL, NULL);
 }

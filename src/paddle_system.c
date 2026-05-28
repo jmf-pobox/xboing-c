@@ -382,6 +382,7 @@ void paddle_system_set_pos(paddle_system_t *ctx, int pos)
     ctx->prev_pos = pos;
     ctx->dx = 0;
     ctx->moving = 0;
+    ctx->old_mouse_x = 0;
 }
 
 int paddle_system_get_dx(const paddle_system_t *ctx)

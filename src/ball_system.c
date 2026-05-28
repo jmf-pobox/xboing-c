@@ -1244,9 +1244,9 @@ enum BallStates ball_system_get_wait_mode(const ball_system_t *ctx, int index)
     return ctx->balls[index].waitMode;
 }
 
-ball_system_status_t ball_system_restore(ball_system_t *ctx, int index, int active,
-                                         enum BallStates state, int x, int y, int dx, int dy,
-                                         enum BallStates wait_mode)
+ball_system_status_t ball_system_restore(ball_system_t *ctx, int index, int current_frame,
+                                         int active, enum BallStates state, int x, int y, int dx,
+                                         int dy, enum BallStates wait_mode)
 {
     if (ctx == NULL)
     {
@@ -1277,10 +1277,13 @@ ball_system_status_t ball_system_restore(ball_system_t *ctx, int index, int acti
     b->slide = 0;
     b->radius = (float)BALL_WIDTH / 2.0f;
     b->mass = MIN_BALL_MASS;
-    b->nextFrame = 0;
+    /* Frame-relative deadlines computed from current_frame to prevent
+     * immediate auto-activate (READY) or auto-tilt (ACTIVE) on the next
+     * update tick.  Values match freshly-added ball semantics. */
+    b->nextFrame = current_frame + BIRTH_FRAME_RATE;
     b->waitingFrame = 0;
-    b->lastPaddleHitFrame = 0;
-    b->last_move_frame = ctx->last_update_frame;
+    b->lastPaddleHitFrame = current_frame + PADDLE_BALL_FRAME_TILT;
+    b->last_move_frame = current_frame;
     b->newMode = BALL_NONE;
 
     return BALL_SYS_OK;

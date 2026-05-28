@@ -286,13 +286,20 @@ enum BallStates ball_system_get_wait_mode(const ball_system_t *ctx, int index);
 /*
  * Restore a ball slot directly from saved state.  Sets all physics fields
  * (active, state, position, velocity, wait_mode).  Used by save/load.
- * Resets nextFrame, waitingFrame, and lastPaddleHitFrame to 0 so the
- * state machine reinitializes on first update.  BALL_CREATE in the save
- * data is restored as BALL_READY (skip the spawn animation).
+ *
+ * Frame-based deadlines are computed from `current_frame`:
+ *   - nextFrame      = current_frame + BIRTH_FRAME_RATE   (READY → ACTIVE timer)
+ *   - lastPaddleHitFrame = current_frame + PADDLE_BALL_FRAME_TILT  (auto-tilt guard)
+ *   - waitingFrame   = 0  (WAIT state restored via wait_mode parameter)
+ * These defaults match a freshly-added ball, preventing immediate
+ * auto-activation or auto-tilt on the first post-restore tick.
+ *
+ * BALL_CREATE in the save data is restored as BALL_READY (skip the spawn
+ * animation).
  */
-ball_system_status_t ball_system_restore(ball_system_t *ctx, int index, int active,
-                                         enum BallStates state, int x, int y, int dx, int dy,
-                                         enum BallStates wait_mode);
+ball_system_status_t ball_system_restore(ball_system_t *ctx, int index, int current_frame,
+                                         int active, enum BallStates state, int x, int y, int dx,
+                                         int dy, enum BallStates wait_mode);
 
 /* =========================================================================
  * Utility
