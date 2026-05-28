@@ -147,70 +147,172 @@ make modern-screen SCREEN=intro INTERVAL=200
 
 Saves to `.tmp/visual-check/modern/<mode>/`.
 
+### How the capture pipeline works
+
+`scripts/visual_capture.sh` launches the binary with
+`-visual-capture <mode>`, reads `XBOING_SNAPSHOT mode/substate/seq`
+lines from stdout via a FIFO, and captures the X11 window via
+ImageMagick `import` on every signal. The script terminates on
+`XBOING_SNAPSHOT_DONE` OR when the binary exits (FIFO EOF).
+
+**Requires a visible X11 display.** `import -window` needs a real
+window — headless runs (`SDL_VIDEODRIVER=offscreen`) won't work.
+Use `make capture` targets on a workstation, not in CI.
+
+### Adding a new screen to the capture pipeline
+
+Adding a new screen (e.g., bonus, gameover) requires changes in
+**four** places. Missing any one of them causes silent failures.
+
+1. **`src/game_init.c`** — add a name function and `vc_check` branch:
+
+   ```c
+   static const char *vc_bonus_name(int s)
+   {
+       switch (s) {
+           case BONUS_STATE_TITLE: return "title";
+           case BONUS_STATE_SHOW:  return "show";
+           /* Persistent / WAIT states MUST be named — they're how
+            * interval-sampling catches frames after fast transitions. */
+           case BONUS_STATE_WAIT:  return "wait";
+           default: return NULL;
+       }
+   }
+   ```
+
+   Add a pre-state snapshot for the mode's system in `stub_tick`,
+   and a branch in `vc_check` that selects the right name function
+   based on the SDL mode.
+
+2. **`src/sdl2_cli.c`** — map the screen name to its `SDL2ST_*` mode
+   value in the `-visual-capture` argument parser.
+
+3. **`Makefile`** — add the screen to the `visual-check` target's
+   screen list:
+
+   ```makefile
+   for screen in presents intro instruct demo keys keysedit \
+                 preview highscore bonus; do ...
+   ```
+
+4. **Capture and commit the golden:**
+
+   ```bash
+   make golden-screen SCREEN=bonus INTERVAL=200
+   git add tests/golden/original/bonus/
+   ```
+
+### State-transition gotchas
+
+Some screens transition through multiple sub-states in a single
+tick because of `ATTRACT_FRAME_MULTIPLIER=6` (each game tick runs
+6 sub-system updates). The `vc_check` logic catches this via two
+paths:
+
+- **Pre/post transition detection** — signals the *pre* state's
+  name when the tick changes the state
+- **Persistent-state interval sampling** — signals every `INTERVAL`
+  frames while a state is held (e.g., WAIT, SPARKLE)
+
+If your screen only produces one screenshot named `title-000.png`
+when more states exist, check that the persistent states (typically
+WAIT) are named in your `vc_*_name()` function. An unnamed state
+returns NULL from the name function and never gets sampled.
+
+### Build dependency gotcha
+
+CMake's Makefile generator sometimes misses dependencies when you
+change a `.c` file that's compiled into a static library —
+`xboing` won't relink even though the underlying source changed.
+Symptoms: code changes in `game_init.c` don't appear in
+`./build/xboing`.
+
+**Fix:** reconfigure to refresh dependency tracking:
+
+```bash
+cmake --preset debug
+cmake --build build --target xboing
+```
+
+A `touch src/<file>.c` workaround works but may not invalidate the
+linked static library. Reconfiguring is the safe path.
+
+### Capturing original goldens
+
+```bash
+make golden-screen SCREEN=intro INTERVAL=200    # one screen
+make golden-all INTERVAL=200                     # all attract screens
+```
+
+The original binary supports `-visual-capture <mode>` directly.
+Goldens land in `tests/golden/original/<mode>/` and are committed.
+
+### Capturing dialogue / pause overlays
+
+These screens require key injection. Use `xdotool` against the
+running window:
+
+```bash
+./original/xboing &
+sleep 2
+xdotool search --name "XBoing" key q       # open quit dialogue
+sleep 0.3
+import -window "$(xdotool search --name 'XBoing' | head -1)" \
+    tests/golden/original/dialogue/quit-000.png
+pkill -f xboing
+```
+
+For programmatic capture in tests, see
+`tests/test_attract_screenshots.c::test_capture_dialogue` —
+uses `SDL_VIDEODRIVER=offscreen` + `sdl2_renderer_save_screenshot`.
+
 ### LLM judge comparison
 
 ```bash
-make visual-check                               # compare all screens
+make visual-check                               # compare all 8 screens
 ```
 
-Or targeted:
+The Makefile target captures any missing modern screenshots first,
+then runs `scripts/visual_check.py` which compares each modern
+screenshot to its golden via Claude vision API and reports findings
+in JSON.
+
+Targeted single-screen comparison:
 
 ```bash
 .tmp/venv/bin/python scripts/llm_compare.py \
-    --original tests/golden/original/intro/TITLE-000.png \
-    --modern .tmp/visual-check/modern/intro/TITLE-000.png \
-    --screen intro
+    --original tests/golden/original/preview/level-000.png \
+    --modern .tmp/visual-check/modern/preview/wait-002.png \
+    --screen preview
 ```
 
-Requires `ANTHROPIC_API_KEY`. Run `make visual-check-setup` once to
-install Python dependencies.
+Requires `ANTHROPIC_API_KEY`. Run `make visual-check-setup` once.
+
+### User verification
+
+Open both images side-by-side via two eog instances:
+
+```bash
+eog tests/golden/original/preview/level-000.png &
+eog .tmp/visual-check/modern/preview/wait-002.png &
+```
+
+Each instance is a separate window — arrange them on screen for
+direct comparison.
 
 ### Headless pixel comparison
 
 `tests/test_attract_screenshots.c` captures framebuffers using
-`SDL_VIDEODRIVER=offscreen` (real rendering without a display). It
-compares direct-entry vs C-key-entry screenshots pixel-by-pixel.
+`SDL_VIDEODRIVER=offscreen` (real rendering without a display).
+Use `offscreen`, NOT `dummy` — `dummy` produces black pixels.
 
-**Important:** `SDL_VIDEODRIVER=dummy` produces no pixels (all black).
-Use `offscreen` for any test that needs real rendered output.
-
-This test is disabled in the default ctest suite (crashes in non-ASan
-builds due to a pre-existing SDL_mixer teardown bug — `Mix_FreeChunk`
-frees a non-malloc'd pointer during `game_destroy`). ASan's allocator
-tolerates this; glibc's does not. Run under ASan:
+This test is disabled in the default ctest suite (crashes in
+non-ASan builds due to a pre-existing SDL_mixer teardown bug).
+Run under ASan:
 
 ```bash
 SDL_VIDEODRIVER=offscreen SDL_AUDIODRIVER=dummy \
     ./build-asan/tests/test_attract_screenshots
-```
-
-### Capturing overlays (dialogue, pause)
-
-For screens that require user interaction (Q dialogue, pause overlay):
-
-1. Enter the base mode programmatically
-2. Inject the key that triggers the overlay
-3. Tick a few frames for the overlay to render
-4. Capture via `sdl2_renderer_save_screenshot` or `capture_and_save`
-
-Example in `test_attract_screenshots.c::test_capture_dialogue`.
-
-### Adding golden references for new screens
-
-1. Check if the original can reach the screen via the attract cycle
-   or `-visual-capture` flag
-2. If not (e.g., dialogue), automate with `xdotool` to send keystrokes
-   to the running original binary, then capture with `import`
-3. Save to `tests/golden/original/<screen>/`
-4. Commit the golden files
-
-### User verification
-
-Open images in eog — one at a time (eog does not support side-by-side):
-
-```bash
-eog .tmp/original_screenshot.png    # close when done
-eog .tmp/modern_screenshot.png      # compare mentally
 ```
 
 ### Definition of Done gates 4-6
