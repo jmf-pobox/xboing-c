@@ -86,6 +86,101 @@ The following modify shared state in ways that are hard to reverse.
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 ```
 
+### Process (pseudocode)
+
+```text
+function create_pr(branch, title, body):
+    make_check()                       # quality gates before push
+    git push -u origin {branch}
+    pr_num = gh pr create --title --body
+    schedule_loop("*/2 * * * *", poll_and_check(pr_num))
+    return pr_num
+
+
+# Outer loop — fires every 2 minutes via /loop cron
+function poll_and_check(pr_num):
+    state = gh pr view {pr_num} \
+        --json reviews,comments,statusCheckRollup
+
+    # Inner loop runs here, synchronously, before any merge check
+    for each new_finding in state.unaddressed_comments:
+        address_immediately(new_finding, pr_num)
+
+    if merge_gate_satisfied(state):
+        gh pr merge {pr_num} --squash --delete-branch
+        post_merge_cleanup()
+        cancel_loop()
+
+
+# Inner loop — runs whenever feedback arrives, not deferred to tick
+function address_immediately(finding, pr_num):
+    if finding.is_valid:
+        edit_code_to_fix(finding)
+        make_check()                   # must pass locally
+        git commit -m "fix: address <reviewer> finding"
+        git push                       # triggers fresh CI + auto re-review
+    else:
+        counter_argue(finding, pr_num) # comment back explaining why
+
+    resolve_review_thread(finding.thread_id)
+
+
+# Merge gate checklist — every item must be true
+function merge_gate_satisfied(state):
+    latest_sha = state.head_sha
+
+    # 1. At least one round of substantive feedback received and
+    #    addressed
+    if no_substantive_review_yet(state, latest_sha):
+        return false
+
+    # 2. EVERY reviewer responded on latest_sha
+    for reviewer in [copilot, cursor, every_requested_human]:
+        if not has_review_on(reviewer, latest_sha):
+            return false
+    # Bugbot exception: skip only if 3 full 2-min loops elapsed
+    if bugbot_missing(latest_sha) and bugbot_wait < 6_minutes:
+        return false
+
+    # 3. CI green on latest_sha
+    if any(c.conclusion != "SUCCESS" for c in state.checks_on(latest_sha)):
+        return false
+
+    # 4. All review threads resolved
+    if any(t.isResolved == false for t in state.threads):
+        return false
+
+    # 5. Re-requested Copilot after each push (auto for Copilot)
+
+    # 6. Most recent pass from each reviewer has no actionable findings
+    for reviewer in state.reviewers:
+        if reviewer.latest_review.has_actionable_findings:
+            return false
+
+    return true
+
+
+function post_merge_cleanup():
+    git checkout master
+    git pull --ff-only origin master
+    git branch -d {branch}
+    git fetch --prune origin
+```
+
+Key invariants:
+
+1. The inner loop never defers. Feedback arrives → read the moment
+   it appears → address before the next merge-gate check.
+2. The outer loop is the only path to merge. No "convergence is
+   approval" shortcut.
+3. Every push restarts the gate — new CI run, fresh reviews
+   required on the new SHA.
+4. Bugbot is the only reviewer with a timeout exception (6 min =
+   3 loops).
+5. A "summary only / no comments" review counts as a clean pass
+   on that reviewer for that SHA — but only if it is on the
+   **latest** SHA.
+
 ### Monitoring (mandatory, immediate)
 
 **Arm active monitoring in the same turn as PR creation — no
