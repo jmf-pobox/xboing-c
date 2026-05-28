@@ -740,6 +740,81 @@ static void test_gun_hit_null_ctx(void **state)
 }
 
 /* =========================================================================
+ * Group 10: Savegame v2 accessors
+ * ========================================================================= */
+
+static void test_get_black_next_frame_roundtrip(void **state)
+{
+    (void)state;
+    block_system_t *ctx = make_ctx();
+
+    block_system_add(ctx, 4, 2, BLACK_BLK, 0, 0);
+    /* Initial value should be 0 (no cooldown active). */
+    assert_int_equal(block_system_get_black_next_frame(ctx, 4, 2), 0);
+
+    block_system_set_black_next_frame(ctx, 4, 2, 1540);
+    assert_int_equal(block_system_get_black_next_frame(ctx, 4, 2), 1540);
+
+    block_system_destroy(ctx);
+}
+
+static void test_get_black_next_frame_wrong_type(void **state)
+{
+    (void)state;
+    block_system_t *ctx = make_ctx();
+
+    block_system_add(ctx, 0, 0, RED_BLK, 0, 0);
+    /* Wrong block type → returns 0. */
+    assert_int_equal(block_system_get_black_next_frame(ctx, 0, 0), 0);
+
+    /* Set is a no-op on wrong type. */
+    block_system_set_black_next_frame(ctx, 0, 0, 999);
+    assert_int_equal(block_system_get_black_next_frame(ctx, 0, 0), 0);
+
+    block_system_destroy(ctx);
+}
+
+static void test_get_random_roundtrip(void **state)
+{
+    (void)state;
+    block_system_t *ctx = make_ctx();
+
+    block_system_add(ctx, 3, 3, RED_BLK, 0, 0);
+    assert_int_equal(block_system_get_random(ctx, 3, 3), 0);
+
+    block_system_set_random(ctx, 3, 3, 1);
+    assert_int_equal(block_system_get_random(ctx, 3, 3), 1);
+
+    /* Set normalizes truthy values to 1. */
+    block_system_set_random(ctx, 3, 3, 42);
+    assert_int_equal(block_system_get_random(ctx, 3, 3), 1);
+
+    block_system_set_random(ctx, 3, 3, 0);
+    assert_int_equal(block_system_get_random(ctx, 3, 3), 0);
+
+    block_system_destroy(ctx);
+}
+
+static void test_savegame_accessors_unoccupied(void **state)
+{
+    (void)state;
+    block_system_t *ctx = make_ctx();
+
+    /* Unoccupied cell — getters return 0, setters are no-ops. */
+    assert_int_equal(block_system_get_black_next_frame(ctx, 5, 5), 0);
+    assert_int_equal(block_system_get_random(ctx, 5, 5), 0);
+
+    block_system_set_black_next_frame(ctx, 5, 5, 100);
+    block_system_set_random(ctx, 5, 5, 1);
+
+    /* Still zero — set didn't write. */
+    assert_int_equal(block_system_get_black_next_frame(ctx, 5, 5), 0);
+    assert_int_equal(block_system_get_random(ctx, 5, 5), 0);
+
+    block_system_destroy(ctx);
+}
+
+/* =========================================================================
  * Test runner
  * ========================================================================= */
 
@@ -799,6 +874,12 @@ int main(void)
         cmocka_unit_test(test_gun_hit_mgun_requires_three_hits),
         cmocka_unit_test(test_gun_hit_counter_blk_requires_three_hits),
         cmocka_unit_test(test_gun_hit_null_ctx),
+
+        /* Group 10: Savegame v2 accessors */
+        cmocka_unit_test(test_get_black_next_frame_roundtrip),
+        cmocka_unit_test(test_get_black_next_frame_wrong_type),
+        cmocka_unit_test(test_get_random_roundtrip),
+        cmocka_unit_test(test_savegame_accessors_unoccupied),
     };
 
     return cmocka_run_group_tests(tests, NULL, NULL);

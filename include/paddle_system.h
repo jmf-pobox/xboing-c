@@ -158,6 +158,10 @@ void paddle_system_set_sticky(paddle_system_t *ctx, int on);
 /* Return paddle center X position. */
 int paddle_system_get_pos(const paddle_system_t *ctx);
 
+/* Set paddle center X position (clamped to play-area bounds).  Used by
+ * savegame restore.  Resets prev_pos and dx to avoid spurious motion. */
+void paddle_system_set_pos(paddle_system_t *ctx, int pos);
+
 /*
  * Return paddle movement delta since last update.
  *

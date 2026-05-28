@@ -1045,6 +1045,54 @@ int block_system_check_black_hit(block_system_t *ctx, int row, int col, int fram
     return 1;
 }
 
+int block_system_get_black_next_frame(const block_system_t *ctx, int row, int col)
+{
+    if (ctx == NULL || row < 0 || row >= MAX_ROW || col < 0 || col >= MAX_COL)
+        return 0;
+
+    const block_entry_t *bp = &ctx->blocks[row][col];
+    if (!bp->occupied || bp->block_type != BLACK_BLK)
+        return 0;
+
+    return bp->next_frame;
+}
+
+void block_system_set_black_next_frame(block_system_t *ctx, int row, int col, int next_frame)
+{
+    if (ctx == NULL || row < 0 || row >= MAX_ROW || col < 0 || col >= MAX_COL)
+        return;
+
+    block_entry_t *bp = &ctx->blocks[row][col];
+    if (!bp->occupied || bp->block_type != BLACK_BLK)
+        return;
+
+    bp->next_frame = next_frame;
+}
+
+int block_system_get_random(const block_system_t *ctx, int row, int col)
+{
+    if (ctx == NULL || row < 0 || row >= MAX_ROW || col < 0 || col >= MAX_COL)
+        return 0;
+
+    const block_entry_t *bp = &ctx->blocks[row][col];
+    if (!bp->occupied)
+        return 0;
+
+    return bp->random;
+}
+
+void block_system_set_random(block_system_t *ctx, int row, int col, int random)
+{
+    if (ctx == NULL || row < 0 || row >= MAX_ROW || col < 0 || col >= MAX_COL)
+        return;
+
+    block_entry_t *bp = &ctx->blocks[row][col];
+    if (!bp->occupied)
+        return;
+
+    bp->random = random ? 1 : 0;
+}
+
 /* =========================================================================
  * Utility
  * ========================================================================= */

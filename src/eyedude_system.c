@@ -104,6 +104,42 @@ eyedude_state_t eyedude_system_get_state(const eyedude_system_t *ctx)
     return ctx->state;
 }
 
+eyedude_save_state_t eyedude_system_get_save_state(const eyedude_system_t *ctx)
+{
+    eyedude_save_state_t s = {0};
+    if (ctx == NULL)
+    {
+        s.state = EYEDUDE_STATE_NONE;
+        s.dir = EYEDUDE_DIR_DEAD;
+        return s;
+    }
+    s.state = ctx->state;
+    s.dir = ctx->direction;
+    s.x = ctx->x;
+    s.y = ctx->y;
+    s.slide = ctx->slide;
+    s.inc = ctx->inc;
+    s.turn = ctx->turn;
+    return s;
+}
+
+void eyedude_system_restore(eyedude_system_t *ctx, const eyedude_save_state_t *s)
+{
+    if (ctx == NULL || s == NULL)
+    {
+        return;
+    }
+    ctx->state = s->state;
+    ctx->direction = s->dir;
+    ctx->x = s->x;
+    ctx->y = s->y;
+    ctx->oldx = s->x;
+    ctx->oldy = s->y;
+    ctx->slide = s->slide;
+    ctx->inc = s->inc;
+    ctx->turn = s->turn;
+}
+
 /* =========================================================================
  * Per-state handlers
  * ========================================================================= */

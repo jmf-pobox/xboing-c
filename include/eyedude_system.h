@@ -119,6 +119,21 @@ void eyedude_system_set_state(eyedude_system_t *ctx, eyedude_state_t state);
 /* Get the current state */
 eyedude_state_t eyedude_system_get_state(const eyedude_system_t *ctx);
 
+/* Full save/restore — captures internal slide/inc/turn fields that
+ * the render-info getter does not expose.  Used by savegame v2. */
+typedef struct
+{
+    eyedude_state_t state;
+    eyedude_dir_t dir;
+    int x, y;
+    int slide;
+    int inc;
+    int turn;
+} eyedude_save_state_t;
+
+eyedude_save_state_t eyedude_system_get_save_state(const eyedude_system_t *ctx);
+void eyedude_system_restore(eyedude_system_t *ctx, const eyedude_save_state_t *s);
+
 /* =========================================================================
  * Per-frame update
  * ========================================================================= */

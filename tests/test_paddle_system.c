@@ -585,6 +585,58 @@ static void test_render_info_prev_pos_tracks_prior_tick(void **state)
 }
 
 /* =========================================================================
+ * Group 12: Savegame v2 — set_pos accessor
+ * ========================================================================= */
+
+static void test_set_pos_roundtrip(void **state)
+{
+    (void)state;
+    paddle_system_t *ctx = paddle_system_create(PLAY_WIDTH, PLAY_HEIGHT, MAIN_WIDTH, NULL);
+    paddle_system_set_size(ctx, PADDLE_SIZE_HUGE);
+
+    paddle_system_set_pos(ctx, 200);
+    assert_int_equal(paddle_system_get_pos(ctx), 200);
+    /* dx and motion cleared after explicit set. */
+    assert_int_equal(paddle_system_get_dx(ctx), 0);
+
+    paddle_system_destroy(ctx);
+}
+
+static void test_set_pos_clamps_left(void **state)
+{
+    (void)state;
+    paddle_system_t *ctx = paddle_system_create(PLAY_WIDTH, PLAY_HEIGHT, MAIN_WIDTH, NULL);
+    paddle_system_set_size(ctx, PADDLE_SIZE_HUGE);
+
+    paddle_system_set_pos(ctx, -100);
+    int pos = paddle_system_get_pos(ctx);
+    /* Should clamp to half-width of paddle (HUGE = 70px → 35 half). */
+    assert_int_equal(pos, 35);
+
+    paddle_system_destroy(ctx);
+}
+
+static void test_set_pos_clamps_right(void **state)
+{
+    (void)state;
+    paddle_system_t *ctx = paddle_system_create(PLAY_WIDTH, PLAY_HEIGHT, MAIN_WIDTH, NULL);
+    paddle_system_set_size(ctx, PADDLE_SIZE_HUGE);
+
+    paddle_system_set_pos(ctx, 10000);
+    int pos = paddle_system_get_pos(ctx);
+    /* Should clamp to PLAY_WIDTH - half (495 - 35 = 460). */
+    assert_int_equal(pos, PLAY_WIDTH - 35);
+
+    paddle_system_destroy(ctx);
+}
+
+static void test_set_pos_null_safe(void **state)
+{
+    (void)state;
+    paddle_system_set_pos(NULL, 200); /* no crash */
+}
+
+/* =========================================================================
  * Test registration
  * ========================================================================= */
 
@@ -641,6 +693,12 @@ int main(void)
         cmocka_unit_test(test_render_info_after_size_change),
         cmocka_unit_test(test_render_info_prev_pos_after_reset),
         cmocka_unit_test(test_render_info_prev_pos_tracks_prior_tick),
+
+        /* Group 12: Savegame v2 accessors */
+        cmocka_unit_test(test_set_pos_roundtrip),
+        cmocka_unit_test(test_set_pos_clamps_left),
+        cmocka_unit_test(test_set_pos_clamps_right),
+        cmocka_unit_test(test_set_pos_null_safe),
     };
 
     return cmocka_run_group_tests(tests, NULL, NULL);
