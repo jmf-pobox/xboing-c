@@ -111,8 +111,7 @@ typedef struct
     int hit_col;
     int hit_region;
     int check_count;
-    /* on_block_hit: return value (0 = bounce, nonzero = no bounce) */
-    int block_hit_return;
+    block_hit_result_t block_hit_return;
     int block_hit_count;
     int block_hit_row;
     int block_hit_col;
@@ -136,7 +135,7 @@ static int cb_check_region(int row, int col, int bx, int by, int bdx, void *ud)
     return BALL_REGION_NONE;
 }
 
-static int cb_on_block_hit(int row, int col, int ball_index, void *ud)
+static block_hit_result_t cb_on_block_hit(int row, int col, int ball_index, void *ud)
 {
     test_block_cb_t *bc = (test_block_cb_t *)ud;
     (void)ball_index;

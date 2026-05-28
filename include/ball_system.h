@@ -13,6 +13,7 @@
  */
 
 #include "ball_types.h"
+#include "block_types.h"
 
 /* =========================================================================
  * Status codes
@@ -46,11 +47,11 @@ typedef enum
  * Matches legacy XRectInRegion() usage in ball.c CheckRegions()
  * ========================================================================= */
 
-#define BALL_REGION_NONE 0
-#define BALL_REGION_TOP 1
-#define BALL_REGION_BOTTOM 2
-#define BALL_REGION_LEFT 3
-#define BALL_REGION_RIGHT 4
+#define BALL_REGION_NONE COLLISION_REGION_NONE
+#define BALL_REGION_TOP COLLISION_REGION_TOP
+#define BALL_REGION_BOTTOM COLLISION_REGION_BOTTOM
+#define BALL_REGION_LEFT COLLISION_REGION_LEFT
+#define BALL_REGION_RIGHT COLLISION_REGION_RIGHT
 
 /* =========================================================================
  * Environment struct — replaces extern globals, passed per-frame
@@ -73,6 +74,17 @@ typedef struct
 } ball_system_env_t;
 
 /* =========================================================================
+ * Block-hit result codes — returned by the on_block_hit callback
+ * ========================================================================= */
+
+typedef enum
+{
+    BLOCK_HIT_BOUNCE = 0,
+    BLOCK_HIT_ABSORB = 1,
+    BLOCK_HIT_TELEPORT = 2,
+} block_hit_result_t;
+
+/* =========================================================================
  * Callback table — side effects injected by the integration layer
  * ========================================================================= */
 
@@ -86,9 +98,9 @@ typedef struct
 
     /*
      * Block hit: called when a ball strikes a block.
-     * Returns nonzero if ball should NOT bounce (killer block, teleport, etc.).
+     * Returns BLOCK_HIT_BOUNCE, BLOCK_HIT_ABSORB, or BLOCK_HIT_TELEPORT.
      */
-    int (*on_block_hit)(int row, int col, int ball_index, void *ud);
+    block_hit_result_t (*on_block_hit)(int row, int col, int ball_index, void *ud);
 
     /*
      * Cell availability query for teleport.

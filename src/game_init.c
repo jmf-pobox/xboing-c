@@ -64,11 +64,7 @@
  * Play area constants (from stage.h, duplicated to avoid legacy headers)
  * ========================================================================= */
 
-#define GAME_PLAY_WIDTH 495
-#define GAME_PLAY_HEIGHT 580
 #define GAME_MAIN_WIDTH 70
-#define GAME_COL_WIDTH (GAME_PLAY_WIDTH / 9)    /* 55 */
-#define GAME_ROW_HEIGHT (GAME_PLAY_HEIGHT / 18) /* 32 */
 
 /* =========================================================================
  * Forward declarations for stub callbacks (game_main.c provides real ones)
