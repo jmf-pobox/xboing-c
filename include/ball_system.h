@@ -276,6 +276,24 @@ ball_system_status_t ball_system_get_render_info(const ball_system_t *ctx, int i
 /* Get guide direction indicator state. */
 ball_system_guide_info_t ball_system_get_guide_info(const ball_system_t *ctx);
 
+/* Get ball velocity components.  Returns BALL_SYS_ERR_INVALID_INDEX on bad index. */
+ball_system_status_t ball_system_get_velocity(const ball_system_t *ctx, int index, int *out_dx,
+                                              int *out_dy);
+
+/* Get ball waitMode field.  Returns BALL_NONE on invalid index. */
+enum BallStates ball_system_get_wait_mode(const ball_system_t *ctx, int index);
+
+/*
+ * Restore a ball slot directly from saved state.  Sets all physics fields
+ * (active, state, position, velocity, wait_mode).  Used by save/load.
+ * Resets nextFrame, waitingFrame, and lastPaddleHitFrame to 0 so the
+ * state machine reinitializes on first update.  BALL_CREATE in the save
+ * data is restored as BALL_READY (skip the spawn animation).
+ */
+ball_system_status_t ball_system_restore(ball_system_t *ctx, int index, int active,
+                                         enum BallStates state, int x, int y, int dx, int dy,
+                                         enum BallStates wait_mode);
+
 /* =========================================================================
  * Utility
  * ========================================================================= */

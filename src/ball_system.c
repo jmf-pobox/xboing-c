@@ -1218,6 +1218,74 @@ ball_system_guide_info_t ball_system_get_guide_info(const ball_system_t *ctx)
     return info;
 }
 
+ball_system_status_t ball_system_get_velocity(const ball_system_t *ctx, int index, int *out_dx,
+                                              int *out_dy)
+{
+    if (ctx == NULL || out_dx == NULL || out_dy == NULL)
+    {
+        return BALL_SYS_ERR_NULL_ARG;
+    }
+    if (index < 0 || index >= MAX_BALLS)
+    {
+        return BALL_SYS_ERR_INVALID_INDEX;
+    }
+
+    *out_dx = ctx->balls[index].dx;
+    *out_dy = ctx->balls[index].dy;
+    return BALL_SYS_OK;
+}
+
+enum BallStates ball_system_get_wait_mode(const ball_system_t *ctx, int index)
+{
+    if (ctx == NULL || index < 0 || index >= MAX_BALLS)
+    {
+        return BALL_NONE;
+    }
+    return ctx->balls[index].waitMode;
+}
+
+ball_system_status_t ball_system_restore(ball_system_t *ctx, int index, int active,
+                                         enum BallStates state, int x, int y, int dx, int dy,
+                                         enum BallStates wait_mode)
+{
+    if (ctx == NULL)
+    {
+        return BALL_SYS_ERR_NULL_ARG;
+    }
+    if (index < 0 || index >= MAX_BALLS)
+    {
+        return BALL_SYS_ERR_INVALID_INDEX;
+    }
+
+    BALL *b = &ctx->balls[index];
+
+    /* Skip the spawn animation: BALL_CREATE in save data restores as
+     * BALL_READY.  Matches spec design — see docs/specs/2026-05-28-savegame-v2.md. */
+    enum BallStates restored_state = (state == BALL_CREATE) ? BALL_READY : state;
+
+    b->active = active;
+    b->ballState = restored_state;
+    b->waitMode = wait_mode;
+    b->ballx = x;
+    b->bally = y;
+    b->oldx = x;
+    b->oldy = y;
+    b->render_from_x = x;
+    b->render_from_y = y;
+    b->dx = dx;
+    b->dy = dy;
+    b->slide = 0;
+    b->radius = (float)BALL_WIDTH / 2.0f;
+    b->mass = MIN_BALL_MASS;
+    b->nextFrame = 0;
+    b->waitingFrame = 0;
+    b->lastPaddleHitFrame = 0;
+    b->last_move_frame = ctx->last_update_frame;
+    b->newMode = BALL_NONE;
+
+    return BALL_SYS_OK;
+}
+
 /* =========================================================================
  * Public API — Utility
  * ========================================================================= */

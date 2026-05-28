@@ -361,6 +361,29 @@ int paddle_system_get_pos(const paddle_system_t *ctx)
     return ctx->pos;
 }
 
+void paddle_system_set_pos(paddle_system_t *ctx, int pos)
+{
+    if (!ctx)
+    {
+        return;
+    }
+
+    int half = pixel_width_for_size(ctx->size_type) / 2;
+    if (pos < half)
+    {
+        pos = half;
+    }
+    if (pos > ctx->play_width - half)
+    {
+        pos = ctx->play_width - half;
+    }
+
+    ctx->pos = pos;
+    ctx->prev_pos = pos;
+    ctx->dx = 0;
+    ctx->moving = 0;
+}
+
 int paddle_system_get_dx(const paddle_system_t *ctx)
 {
     if (!ctx)

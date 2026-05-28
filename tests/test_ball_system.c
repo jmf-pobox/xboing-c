@@ -1539,6 +1539,117 @@ static void test_guide_advances_only_at_8x_frame_rate(void **state)
     ball_system_destroy(ctx);
 }
 
+/* =========================================================================
+ * Savegame v2 accessors — get_velocity, get_wait_mode, restore
+ * ========================================================================= */
+
+static void test_get_velocity_default_zero(void **state)
+{
+    (void)state;
+    ball_system_t *ctx = ball_system_create(NULL, NULL, NULL);
+
+    int dx = 99, dy = 99;
+    ball_system_status_t st = ball_system_get_velocity(ctx, 0, &dx, &dy);
+    assert_int_equal(st, BALL_SYS_OK);
+    /* Default ball slot has zero velocity. */
+    assert_int_equal(dx, 0);
+    assert_int_equal(dy, 0);
+
+    ball_system_destroy(ctx);
+}
+
+static void test_get_velocity_invalid_index(void **state)
+{
+    (void)state;
+    ball_system_t *ctx = ball_system_create(NULL, NULL, NULL);
+
+    int dx = 0, dy = 0;
+    assert_int_equal(ball_system_get_velocity(ctx, -1, &dx, &dy),
+                     BALL_SYS_ERR_INVALID_INDEX);
+    assert_int_equal(ball_system_get_velocity(ctx, MAX_BALLS, &dx, &dy),
+                     BALL_SYS_ERR_INVALID_INDEX);
+
+    ball_system_destroy(ctx);
+}
+
+static void test_get_velocity_null_args(void **state)
+{
+    (void)state;
+    ball_system_t *ctx = ball_system_create(NULL, NULL, NULL);
+    int dx = 0, dy = 0;
+    assert_int_equal(ball_system_get_velocity(NULL, 0, &dx, &dy), BALL_SYS_ERR_NULL_ARG);
+    assert_int_equal(ball_system_get_velocity(ctx, 0, NULL, &dy), BALL_SYS_ERR_NULL_ARG);
+    assert_int_equal(ball_system_get_velocity(ctx, 0, &dx, NULL), BALL_SYS_ERR_NULL_ARG);
+    ball_system_destroy(ctx);
+}
+
+static void test_get_wait_mode_default(void **state)
+{
+    (void)state;
+    ball_system_t *ctx = ball_system_create(NULL, NULL, NULL);
+    assert_int_equal(ball_system_get_wait_mode(ctx, 0), BALL_NONE);
+    /* Invalid index also returns BALL_NONE (sentinel). */
+    assert_int_equal(ball_system_get_wait_mode(ctx, -1), BALL_NONE);
+    assert_int_equal(ball_system_get_wait_mode(NULL, 0), BALL_NONE);
+    ball_system_destroy(ctx);
+}
+
+static void test_restore_active_ball_roundtrip(void **state)
+{
+    (void)state;
+    ball_system_t *ctx = ball_system_create(NULL, NULL, NULL);
+
+    /* Restore a moving ball into slot 0. */
+    ball_system_status_t st =
+        ball_system_restore(ctx, 0, /*active*/ 1, BALL_ACTIVE, /*x*/ 247, /*y*/ 520,
+                            /*dx*/ 3, /*dy*/ -4, /*wait_mode*/ BALL_NONE);
+    assert_int_equal(st, BALL_SYS_OK);
+
+    assert_int_equal(ball_system_get_state(ctx, 0), BALL_ACTIVE);
+    int bx, by;
+    ball_system_get_position(ctx, 0, &bx, &by);
+    assert_int_equal(bx, 247);
+    assert_int_equal(by, 520);
+
+    int dx, dy;
+    ball_system_get_velocity(ctx, 0, &dx, &dy);
+    assert_int_equal(dx, 3);
+    assert_int_equal(dy, -4);
+
+    assert_int_equal(ball_system_get_wait_mode(ctx, 0), BALL_NONE);
+
+    ball_system_destroy(ctx);
+}
+
+/* spec: BALL_CREATE in save data restores as BALL_READY (skip spawn animation). */
+static void test_restore_ball_create_becomes_ready(void **state)
+{
+    (void)state;
+    ball_system_t *ctx = ball_system_create(NULL, NULL, NULL);
+
+    ball_system_restore(ctx, 0, 1, BALL_CREATE, 100, 100, 0, 0, BALL_NONE);
+
+    assert_int_equal(ball_system_get_state(ctx, 0), BALL_READY);
+
+    ball_system_destroy(ctx);
+}
+
+static void test_restore_invalid_index(void **state)
+{
+    (void)state;
+    ball_system_t *ctx = ball_system_create(NULL, NULL, NULL);
+    assert_int_equal(
+        ball_system_restore(ctx, -1, 1, BALL_ACTIVE, 0, 0, 0, 0, BALL_NONE),
+        BALL_SYS_ERR_INVALID_INDEX);
+    assert_int_equal(
+        ball_system_restore(ctx, MAX_BALLS, 1, BALL_ACTIVE, 0, 0, 0, 0, BALL_NONE),
+        BALL_SYS_ERR_INVALID_INDEX);
+    assert_int_equal(
+        ball_system_restore(NULL, 0, 1, BALL_ACTIVE, 0, 0, 0, 0, BALL_NONE),
+        BALL_SYS_ERR_NULL_ARG);
+    ball_system_destroy(ctx);
+}
+
 int main(void)
 {
     const struct CMUnitTest tests[] = {
@@ -1608,6 +1719,15 @@ int main(void)
         cmocka_unit_test(test_split_full_shows_message),
         /* Group 13: Guide animation rate (basket 6, xboing-c-xny) */
         cmocka_unit_test(test_guide_advances_only_at_8x_frame_rate),
+
+        /* Group 14: Savegame v2 accessors */
+        cmocka_unit_test(test_get_velocity_default_zero),
+        cmocka_unit_test(test_get_velocity_invalid_index),
+        cmocka_unit_test(test_get_velocity_null_args),
+        cmocka_unit_test(test_get_wait_mode_default),
+        cmocka_unit_test(test_restore_active_ball_roundtrip),
+        cmocka_unit_test(test_restore_ball_create_becomes_ready),
+        cmocka_unit_test(test_restore_invalid_index),
     };
     return cmocka_run_group_tests(tests, NULL, NULL);
 }

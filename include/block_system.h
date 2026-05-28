@@ -280,6 +280,22 @@ int block_system_ball_hit_counter(block_system_t *ctx, int row, int col);
  */
 int block_system_check_black_hit(block_system_t *ctx, int row, int col, int frame);
 
+/*
+ * Save/restore accessors for fields needed by savegame v2.
+ *
+ * get_black_next_frame returns the BLACK_BLK cooldown frame, or 0 if
+ *   the cell is not a BLACK_BLK or out of bounds.
+ * set_black_next_frame writes the cooldown frame back during restore.
+ *   No-op on error.
+ * get_random returns 1 if the cell is occupied and has the random flag,
+ *   0 otherwise.
+ * set_random sets the random flag on an occupied cell.  No-op on error.
+ */
+int block_system_get_black_next_frame(const block_system_t *ctx, int row, int col);
+void block_system_set_black_next_frame(block_system_t *ctx, int row, int col, int next_frame);
+int block_system_get_random(const block_system_t *ctx, int row, int col);
+void block_system_set_random(block_system_t *ctx, int row, int col, int random);
+
 /* =========================================================================
  * Collision detection — designed as ball_system callbacks
  *
