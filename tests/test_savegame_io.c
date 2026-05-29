@@ -312,7 +312,11 @@ static void test_v2_roundtrip_all_fields(void **state)
     assert_int_equal(loaded.paddle_size_type, 5);
     assert_int_equal(loaded.paddle_reverse, 1);
     assert_int_equal(loaded.paddle_sticky, 0);
+    assert_int_equal(loaded.paddle_size, 50);
     assert_int_equal(loaded.gun_unlimited, 1);
+    assert_int_equal(loaded.lives_left, 3);
+    assert_int_equal(loaded.start_level, 1);
+    assert_int_equal(loaded.num_bullets, 6);
 
     /* Nested: specials */
     assert_int_equal(loaded.specials.saving, 1);
@@ -440,12 +444,15 @@ static void test_level_sparse_omits_empty(void **state)
     savegame_io_result_t r = savegame_level_write(tmp_path, &orig);
     assert_int_equal(r, SAVEGAME_IO_OK);
 
-    /* Verify the file contains an empty cells array. */
+    /* Verify the file contains an empty cells array.  Read the raw
+     * file and check that no cell objects appear between the array
+     * brackets — the sparse writer must omit unoccupied cells. */
     FILE *fp = fopen(tmp_path, "r");
     assert_non_null(fp);
-    fseek(fp, 0, SEEK_END);
+    assert_int_equal(fseek(fp, 0, SEEK_END), 0);
     long sz = ftell(fp);
-    fseek(fp, 0, SEEK_SET);
+    assert_true(sz >= 0);
+    assert_int_equal(fseek(fp, 0, SEEK_SET), 0);
     char *buf = malloc((size_t)sz + 1);
     assert_non_null(buf);
     size_t nread = fread(buf, 1, (size_t)sz, fp);
@@ -453,8 +460,30 @@ static void test_level_sparse_omits_empty(void **state)
     buf[sz] = '\0';
     fclose(fp);
 
-    assert_non_null(strstr(buf, "\"cells\": [\n"));
+    /* "cells": [\n   ]\n  — i.e., no '{' between the brackets. */
+    char *cells_start = strstr(buf, "\"cells\": [");
+    assert_non_null(cells_start);
+    char *cells_end = strstr(cells_start, "]");
+    assert_non_null(cells_end);
+    assert_null(memchr(cells_start, '{', (size_t)(cells_end - cells_start)));
     free(buf);
+
+    /* Round-trip: empty grid loads back as empty grid. */
+    savegame_level_t loaded;
+    r = savegame_level_read(tmp_path, &loaded);
+    assert_int_equal(r, SAVEGAME_IO_OK);
+    int occupied_count = 0;
+    for (int row = 0; row < MAX_ROW; row++)
+    {
+        for (int col = 0; col < MAX_COL; col++)
+        {
+            if (loaded.cells[row][col].occupied)
+            {
+                occupied_count++;
+            }
+        }
+    }
+    assert_int_equal(occupied_count, 0);
 }
 
 static void test_level_version_rejected(void **state)
