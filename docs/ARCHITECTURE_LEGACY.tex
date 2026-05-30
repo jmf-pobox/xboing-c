@@ -231,7 +231,7 @@ The application creates 11 windows: one top-level \code{mainWindow} and 10 child
 
 \begin{table}[htbp]
 \centering
-\caption{Window hierarchy with positions and dimensions \specref{2}.}
+\caption{Window hierarchy with positions and dimensions (from \file{stage.c}; \file{SPECIFICATION.md} lists older 565$\times$710 dimensions).}
 \label{tab:windows}
 \begin{tabularx}{\textwidth}{lllX}
 \toprule
@@ -585,7 +585,7 @@ void handleEventLoop(Display *display) {
 }
 \end{lstlisting}
 
-\func{sleepSync} calls \code{XSync(display, False)} followed by \code{usleep(ms * 300)}. The 300$\times$ multiplier was hand-tuned for mid-1990s workstation performance.
+\func{sleepSync} calls \code{XSync(display, False)} followed by \code{usleep(ms * 300)}. The archived source comments this as ``tuned for modern hardware''---the original multiplier was larger and was adjusted during initial modernization.
 
 \subsection{Frame Timing}
 \label{sec:frame-timing}
@@ -1221,7 +1221,7 @@ K\&R prototype guards & The original headers wrapped function prototypes in \cod
 Compile-time paths & File system paths are baked in via \code{-D} flags. The binary can only run from the repo root unless environment variables are set. Incompatible with FHS installation (\file{/usr/share/}, \file{/usr/games/}). \\
 \midrule
 
-Hand-tuned frame timing & \func{sleepSync} multiplies the delay by 300 ($\mu$s factor). This constant was tuned for specific hardware and makes frame timing unpredictable on modern systems. No vsync support. \\
+Hand-tuned frame timing & \func{sleepSync} multiplies the delay by 300 ($\mu$s factor). The archived source labels this ``tuned for modern hardware'' (the original used a larger constant). Frame timing remains unpredictable across hardware. No vsync support. \\
 \midrule
 
 Private colormap & The PseudoColor colormap causes color flashing when the window manager switches focus on modern TrueColor displays---the private colormap overwrites colors used by other applications. \\

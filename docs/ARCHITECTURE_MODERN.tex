@@ -104,7 +104,7 @@ Five principles governed every decision:
 \subsection{Structural Overview}
 \label{sec:struct-overview}
 
-The codebase is organized into three directories: \filename{src/*.c} (source), \filename{include/*.h} (headers), and \filename{tests/} (unit tests, integration tests, fuzz harnesses). Each source module compiles to a static library; the executable links all libraries. Three CMake presets (\code{debug}, \code{asan}, \code{install}) cover development, sanitizer, and installation builds. ADRs are recorded in \filename{docs/DESIGN.md}.
+The codebase is organized into three directories: \filename{src/*.c} (source), \filename{include/*.h} (headers), and \filename{tests/} (unit tests, integration tests, fuzz harnesses). Platform and game system modules each compile to a static library; the integration layer (\filename{game\_*.c}) compiles directly into the executable, which links all libraries. Three CMake presets (\code{debug}, \code{asan}, \code{install}) cover development, sanitizer, and installation builds. ADRs are recorded in \filename{docs/DESIGN.md}.
 
 
 % =============================================================================
@@ -672,8 +672,8 @@ Six UI sequencer modules implement attract-mode and post-game screens. All follo
 \modulename{intro\_system} & \adref{026} & 2 modes (intro + instructions), block descriptions table, sparkle \\
 \modulename{demo\_system} & \adref{027} & 2 modes (demo + preview), ball trail data, random level loading \\
 \modulename{keys\_system} & \adref{028} & 2 modes (game + editor controls), static key binding tables \\
-\modulename{dialogue\_system} & --- & 4 validation modes (text, numeric, printable, yes/no), input buffer \\
-\modulename{highscore\_system} & --- & Title sparkle, row sparkle, specials timing, score display \\
+\modulename{dialogue\_system} & \adref{029} & 4 validation modes (text, numeric, printable, yes/no), input buffer \\
+\modulename{highscore\_system} & \adref{030} & Title sparkle, row sparkle, specials timing, score display \\
 \bottomrule
 \end{tabularx}
 \end{table}
