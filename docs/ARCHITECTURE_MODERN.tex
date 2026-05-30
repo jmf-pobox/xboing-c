@@ -292,7 +292,7 @@ Manages the SDL2 window and GPU-accelerated renderer (\adref{004}).
 Logical resolution & 575$\times$720 pixels \\
 Default scale & 2$\times$ (physical 1150$\times$1440) \\
 Window flags & \code{SDL\_WINDOW\_SHOWN | SDL\_WINDOW\_RESIZABLE} \\
-Fullscreen mode & \code{SDL\_WINDOW\_FULLSCREEN\_DESKTOP} (toggle via F11) \\
+Fullscreen mode & \code{SDL\_WINDOW\_FULLSCREEN\_DESKTOP} (toggle via \code{I} key) \\
 Scaling filter & \code{SDL\_HINT\_RENDER\_SCALE\_QUALITY = "nearest"} \\
 VSync & Enabled by default (\code{SDL\_RENDERER\_PRESENTVSYNC}) \\
 Fallback & Software renderer if GPU acceleration unavailable \\
@@ -1063,7 +1063,7 @@ Not registered as ctest targets (they run indefinitely). Manually invoked: \code
 \label{sec:cicd}
 % =============================================================================
 
-Three GitHub Actions workflows run on every push to \code{master} and every PR.
+Three GitHub Actions workflows. \code{test.yml} and \code{lint.yml} run on every push to \code{master} and every PR. \code{docs.yml} is path-filtered to Markdown files (\code{**/*.md}).
 
 \begin{figure}[h]
 \centering
