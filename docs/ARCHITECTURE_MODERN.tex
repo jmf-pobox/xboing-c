@@ -149,7 +149,7 @@ Each module compiles to a static library (\code{.a}). Libraries fall into five c
     \item[Persistence] \modulename{highscore\_io}, \modulename{savegame\_io}, \modulename{config\_io}, \modulename{paths}
 \end{description}
 
-One executable links all libraries: \code{xboing\_sdl2}, built only when all four SDL2 packages are found.
+One executable links all libraries: \code{xboing}, built only when all four SDL2 packages are found.
 
 \subsection{Compiler Warning Policy}
 \label{sec:warnings}
@@ -187,7 +187,7 @@ All targets compile with \code{-Werror} and the following warning set:
 The \code{install} preset (\adref{003}) produces an FHS-compliant installation:
 
 \begin{lstlisting}[language={}, numbers=none, frame=none]
-/usr/bin/xboing_sdl2
+/usr/bin/xboing
 /usr/share/xboing/levels/*.data
 /usr/share/xboing/sounds/*.wav
 /usr/share/xboing/fonts/*.ttf
@@ -686,7 +686,7 @@ The attract mode cycle runs: PRESENTS $\rightarrow$ INTRO $\rightarrow$ INSTRUCT
 \label{sec:integration}
 % =============================================================================
 
-Eight source files in \filename{src/game\_*.c} wire the platform and system layers together. None are compiled as libraries; they are compiled directly into the \code{xboing\_sdl2} executable.
+Eight source files in \filename{src/game\_*.c} wire the platform and system layers together. None are compiled as libraries; they are compiled directly into the \code{xboing} executable.
 
 \subsection{Game Context (\structname{game\_ctx\_t})}
 \label{sec:game-context}
@@ -971,7 +971,7 @@ Per-frame state from other systems is packaged into const structs (e.g., \struct
 \subsection{Test Framework}
 \label{sec:test-framework}
 
-CMocka v2.0+ with TAP 14 output.
+CMocka, discovered via \code{pkg-config}.
 
 \begin{figure}[h]
 \centering
@@ -1143,7 +1143,7 @@ Three GitHub Actions workflows run on every push to \code{master} and every PR.
 ]
 
 % Integration layer
-\node[mod=blue!15] (exe) at (0, 8) {xboing\_sdl2};
+\node[mod=blue!15] (exe) at (0, 8) {xboing};
 
 % SDL2 platform row
 \node[mod=orange!15] (rend) at (-6, 6) {sdl2\_renderer};
