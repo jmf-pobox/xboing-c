@@ -4,6 +4,7 @@ Priority: optional
 Maintainer: Justin Freeman <jmf@pobox.com>
 Build-Depends: debhelper-compat (= 13),
                cmake (>= 3.16),
+               pkg-config,
                libsdl2-dev,
                libsdl2-image-dev,
                libsdl2-mixer-dev,
@@ -15,7 +16,9 @@ Rules-Requires-Root: no
 
 Package: xboing
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}
+Depends: ${shlibs:Depends},
+         ${misc:Depends},
+         fonts-liberation
 Description: Classic breakout-style arcade game
  XBoing is a blockout-style arcade game where you control a paddle to
  bounce a ball and destroy blocks. Originally created in 1993 for X11

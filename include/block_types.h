@@ -52,4 +52,14 @@
 #define MAX_ROW 18
 #define MAX_COL 9
 
+/* =========================================================================
+ * Collision region codes — shared by ball_system and block_system
+ * ========================================================================= */
+
+#define COLLISION_REGION_NONE 0
+#define COLLISION_REGION_TOP 1
+#define COLLISION_REGION_BOTTOM 2
+#define COLLISION_REGION_LEFT 3
+#define COLLISION_REGION_RIGHT 4
+
 #endif /* BLOCK_TYPES_H */

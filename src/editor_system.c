@@ -9,9 +9,11 @@
 
 #include "editor_system.h"
 
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 
 /* =========================================================================
  * Internal constants
@@ -49,7 +51,8 @@ struct editor_system
     char level_title[EDITOR_LEVEL_NAME_MAX];
 
     /* Configuration */
-    char levels_dir[512];
+    char levels_dir_readable[512]; /* for load operations */
+    char levels_dir_writable[512]; /* for save operations */
     int no_sound;
 };
 
@@ -119,11 +122,47 @@ static void erase_block(editor_system_t *ctx, int row, int col)
 }
 
 /* =========================================================================
+ * Internal helpers
+ * ========================================================================= */
+
+/*
+ * Recursive mkdir for a two-level-deep path.
+ * Splits on '/', calls mkdir() for each component, treats EEXIST as success.
+ * Returns 0 on success, -1 on failure (errno set).
+ */
+static int mkdir_p(const char *path, mode_t mode)
+{
+    char tmp[512];
+    size_t len = strlen(path);
+    if (len == 0 || len >= sizeof(tmp))
+        return -1;
+    memcpy(tmp, path, len + 1);
+
+    /* Strip trailing slash. */
+    if (tmp[len - 1] == '/')
+        tmp[--len] = '\0';
+
+    for (size_t i = 1; i <= len; i++)
+    {
+        if (tmp[i] == '/' || tmp[i] == '\0')
+        {
+            char saved = tmp[i];
+            tmp[i] = '\0';
+            if (mkdir(tmp, mode) != 0 && errno != EEXIST)
+                return -1;
+            tmp[i] = saved;
+        }
+    }
+    return 0;
+}
+
+/* =========================================================================
  * Lifecycle
  * ========================================================================= */
 
 editor_system_t *editor_system_create(const editor_system_callbacks_t *callbacks, void *user_data,
-                                      const char *levels_dir, int no_sound)
+                                      const char *levels_dir_readable,
+                                      const char *levels_dir_writable, int no_sound)
 {
     editor_system_t *ctx = calloc(1, sizeof(*ctx));
     if (ctx == NULL)
@@ -142,8 +181,12 @@ editor_system_t *editor_system_create(const editor_system_callbacks_t *callbacks
     ctx->level_number = 0;
     ctx->no_sound = no_sound;
 
-    if (levels_dir != NULL)
-        snprintf(ctx->levels_dir, sizeof(ctx->levels_dir), "%s", levels_dir);
+    if (levels_dir_readable != NULL)
+        snprintf(ctx->levels_dir_readable, sizeof(ctx->levels_dir_readable), "%s",
+                 levels_dir_readable);
+    if (levels_dir_writable != NULL)
+        snprintf(ctx->levels_dir_writable, sizeof(ctx->levels_dir_writable), "%s",
+                 levels_dir_writable);
 
     return ctx;
 }
@@ -161,7 +204,7 @@ static void do_load_level(editor_system_t *ctx)
 {
     char path[1024];
 
-    snprintf(path, sizeof(path), "%s/editor.data", ctx->levels_dir);
+    snprintf(path, sizeof(path), "%s/editor.data", ctx->levels_dir_readable);
 
     if (ctx->cb.on_load_level != NULL)
     {
@@ -677,7 +720,7 @@ static void do_load(editor_system_t *ctx)
     if (num > 0 && num <= EDITOR_MAX_LEVELS)
     {
         char path[1024];
-        snprintf(path, sizeof(path), "%s/level%02d.data", ctx->levels_dir, num);
+        snprintf(path, sizeof(path), "%s/level%02d.data", ctx->levels_dir_readable, num);
 
         if (ctx->cb.on_load_level != NULL && ctx->cb.on_load_level(path, ctx->user_data))
         {
@@ -718,8 +761,16 @@ static void do_save(editor_system_t *ctx)
     int num = atoi(input);
     if (num > 0 && num <= EDITOR_MAX_LEVELS)
     {
+        /* Ensure writable dir exists before first save. */
+        if (mkdir_p(ctx->levels_dir_writable, 0755) != 0)
+        {
+            if (ctx->cb.on_error != NULL)
+                ctx->cb.on_error("Sorry, unable to create levels directory.", ctx->user_data);
+            return;
+        }
+
         char path[1024];
-        snprintf(path, sizeof(path), "%s/level%02d.data", ctx->levels_dir, num);
+        snprintf(path, sizeof(path), "%s/level%02d.data", ctx->levels_dir_writable, num);
 
         if (ctx->cb.on_save_level != NULL && ctx->cb.on_save_level(path, ctx->user_data))
         {

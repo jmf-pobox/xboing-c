@@ -1,0 +1,17 @@
+{
+  // Inherit rule config from .markdownlint.json (MD013/MD033/MD041 disabled).
+  "config": {
+    "extends": ".markdownlint.json"
+  },
+  // Default glob: lint every .md / .markdown file in the repo.
+  "globs": ["**/*.{md,markdown}"],
+  // Skip directories whose .md files we don't own or shouldn't touch.
+  "ignores": [
+    "node_modules/**",
+    "build/**",
+    "build-*/**",
+    ".tmp/**",
+    ".beads/**",
+    "original/**"
+  ]
+}

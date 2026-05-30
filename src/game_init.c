@@ -20,6 +20,7 @@
 #include "game_render.h"
 #include "game_rules.h"
 
+#include <dirent.h> /* opendir/closedir for asset-dir readability check */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -56,16 +57,14 @@
 #include "sdl2_texture.h"
 #include "sfx_system.h"
 #include "special_system.h"
+#include "xboing_paths.h"
+#include "xboing_version.h"
 
 /* =========================================================================
  * Play area constants (from stage.h, duplicated to avoid legacy headers)
  * ========================================================================= */
 
-#define GAME_PLAY_WIDTH 495
-#define GAME_PLAY_HEIGHT 580
 #define GAME_MAIN_WIDTH 70
-#define GAME_COL_WIDTH (GAME_PLAY_WIDTH / 9)    /* 55 */
-#define GAME_ROW_HEIGHT (GAME_PLAY_HEIGHT / 18) /* 32 */
 
 /* =========================================================================
  * Forward declarations for stub callbacks (game_main.c provides real ones)
@@ -77,6 +76,121 @@ static void stub_render(double alpha, void *user_data);
 
 /* Level → block system bridge callback */
 static void on_level_add_block(int row, int col, int block_type, int counter_slide, void *ud);
+
+/* Informational-flag handlers (xboing -help / -version / -setup / -scores). */
+static void print_usage(FILE *out);
+static void print_setup_info(const paths_config_t *cfg);
+static void print_scores(const paths_config_t *cfg);
+
+/* Return non-zero if path is a directory we can list.  opendir() succeeds
+ * iff the path exists, is a directory, and is readable + executable for
+ * us — which is exactly the condition the subsequent directory scan
+ * needs.  stat()+S_ISDIR alone wouldn't catch a perms-locked dir; the
+ * later scan would still fail, just with a worse error message. */
+static int asset_dir_exists(const char *path)
+{
+    DIR *d = opendir(path);
+    if (d == NULL)
+        return 0;
+    closedir(d);
+    return 1;
+}
+
+/* =========================================================================
+ * Informational flag output
+ * ========================================================================= */
+
+static void print_usage(FILE *out)
+{
+    fprintf(out, "Usage: xboing [OPTIONS]\n"
+                 "\n"
+                 "Game options:\n"
+                 "  -speed <1-9>        Game speed (1=slowest, 9=fastest, default 5)\n"
+                 "  -startlevel <1-80>  Start at the given level (default 1)\n"
+                 "  -keys               Use keyboard control (default: mouse)\n"
+                 "  -nickname <name>    Set high-score nickname\n"
+                 "  -debug              Enable debug mode\n"
+                 "  -grab               Grab pointer to window\n"
+                 "\n"
+                 "Audio options:\n"
+                 "  -sound              Enable sound (default)\n"
+                 "  -nosound            Disable all audio\n"
+                 "  -nosfx              Disable sound effects (keep music)\n"
+                 "  -maxvol <0-100>     Maximum volume\n"
+                 "\n"
+                 "Information (these print and exit):\n"
+                 "  -help, -usage       Show this help\n"
+                 "  -version            Show version\n"
+                 "  -setup              Show resolved configuration paths\n"
+                 "  -scores             Show the global high-score table\n");
+}
+
+static void print_setup_info(const paths_config_t *cfg)
+{
+    char buf[PATHS_MAX_PATH];
+    printf("xboing %s configuration:\n\n", XBOING_VERSION);
+    printf("  HOME              = %s\n", cfg->home);
+    printf("  XDG_DATA_HOME     = %s\n", cfg->xdg_data_home);
+    printf("  XDG_CONFIG_HOME   = %s\n", cfg->xdg_config_home);
+    if (cfg->xboing_levels_dir[0])
+        printf("  XBOING_LEVELS_DIR = %s\n", cfg->xboing_levels_dir);
+    if (cfg->xboing_sound_dir[0])
+        printf("  XBOING_SOUND_DIR  = %s\n", cfg->xboing_sound_dir);
+    if (cfg->xboing_score_file[0])
+        printf("  XBOING_SCORE_FILE = %s\n", cfg->xboing_score_file);
+    printf("\nResolved paths:\n");
+    if (paths_levels_dir_readable(cfg, buf, sizeof(buf)) == PATHS_OK)
+        printf("  Levels dir            = %s\n", buf);
+    if (paths_levels_dir_writable(cfg, buf, sizeof(buf)) == PATHS_OK)
+        printf("  Levels dir (editor)   = %s\n", buf);
+    if (paths_sounds_dir_readable(cfg, buf, sizeof(buf)) == PATHS_OK)
+        printf("  Sounds dir            = %s\n", buf);
+    if (paths_score_file_global(cfg, buf, sizeof(buf)) == PATHS_OK)
+        printf("  Score file (global)   = %s\n", buf);
+    if (paths_score_file_personal(cfg, buf, sizeof(buf)) == PATHS_OK)
+        printf("  Score file (personal) = %s\n", buf);
+    if (paths_user_data_dir(cfg, buf, sizeof(buf)) == PATHS_OK)
+        printf("  User data dir         = %s\n", buf);
+}
+
+static void print_scores(const paths_config_t *cfg)
+{
+    char path[PATHS_MAX_PATH];
+    if (paths_score_file_global(cfg, path, sizeof(path)) != PATHS_OK)
+    {
+        fprintf(stderr, "xboing -scores: cannot resolve global score file path\n");
+        return;
+    }
+
+    highscore_table_t table;
+    highscore_io_init_table(&table);
+    highscore_io_result_t r = highscore_io_read(path, &table);
+    if (r == HIGHSCORE_IO_ERR_OPEN)
+    {
+        printf("No scores recorded yet (%s does not exist).\n", path);
+        return;
+    }
+    if (r != HIGHSCORE_IO_OK)
+    {
+        fprintf(stderr, "xboing -scores: failed to read %s (code %d)\n", path, (int)r);
+        return;
+    }
+
+    printf("High scores from %s:\n\n", path);
+    if (table.master_name[0])
+        printf("  Master: %s — \"%s\"\n\n", table.master_name, table.master_text);
+    int shown = 0;
+    for (int i = 0; i < HIGHSCORE_NUM_ENTRIES; i++)
+    {
+        if (table.entries[i].score == 0)
+            continue;
+        printf("  %2d. %-20s %10lu  level %2lu\n", i + 1, table.entries[i].name,
+               table.entries[i].score, table.entries[i].level);
+        shown++;
+    }
+    if (shown == 0)
+        printf("  (no scored entries)\n");
+}
 
 /* =========================================================================
  * game_create
@@ -98,17 +212,21 @@ game_ctx_t *game_create(int argc, char *argv[])
     const char *bad_option = NULL;
     sdl2_cli_status_t cli_status = sdl2_cli_parse(argc, argv, &cli, &bad_option);
 
-    if (cli_status == SDL2C_EXIT_HELP || cli_status == SDL2C_EXIT_VERSION)
+    /* Handle informational flags that don't need paths first. */
+    if (cli_status == SDL2C_EXIT_HELP)
     {
+        print_usage(stdout);
         free(ctx);
-        return NULL; /* Caller should exit 0 */
+        return NULL;
     }
-    if (cli_status == SDL2C_EXIT_SETUP || cli_status == SDL2C_EXIT_SCORES)
+    if (cli_status == SDL2C_EXIT_VERSION)
     {
+        printf("xboing %s (SDL2 modernization)\n", XBOING_VERSION);
         free(ctx);
-        return NULL; /* Caller should print info and exit 0 */
+        return NULL;
     }
-    if (cli_status != SDL2C_OK)
+    /* Only abort on real errors here — SETUP and SCORES need paths first. */
+    if (cli_status != SDL2C_OK && cli_status != SDL2C_EXIT_SETUP && cli_status != SDL2C_EXIT_SCORES)
     {
         fprintf(stderr, "Error: %s", sdl2_cli_status_string(cli_status));
         if (bad_option)
@@ -122,6 +240,20 @@ game_ctx_t *game_create(int argc, char *argv[])
     if (paths_init(&ctx->paths) != PATHS_OK)
     {
         fprintf(stderr, "game_create: failed to initialize paths\n");
+        free(ctx);
+        return NULL;
+    }
+
+    /* Informational flags that depend on resolved paths. */
+    if (cli_status == SDL2C_EXIT_SETUP)
+    {
+        print_setup_info(&ctx->paths);
+        free(ctx);
+        return NULL;
+    }
+    if (cli_status == SDL2C_EXIT_SCORES)
+    {
+        print_scores(&ctx->paths);
         free(ctx);
         return NULL;
     }
@@ -156,7 +288,10 @@ game_ctx_t *game_create(int argc, char *argv[])
     ctx->level_number = ctx->config.start_level;
     ctx->start_level = ctx->config.start_level;
     ctx->lives_left = 3;
+    ctx->bonus_count = 0;
     ctx->debug_mode = cli.debug;
+    ctx->vc_mode = cli.visual_capture_mode;
+    ctx->vc_interval = cli.visual_capture_interval;
 
     /* Load high score tables */
     highscore_io_init_table(&ctx->hs_global);
@@ -167,6 +302,7 @@ game_ctx_t *game_create(int argc, char *argv[])
         highscore_io_read(score_path, &ctx->hs_global);
     if (paths_score_file_personal(&ctx->paths, score_path, sizeof(score_path)) == PATHS_OK)
         highscore_io_read(score_path, &ctx->hs_personal);
+    ctx->highscore_request_type = HIGHSCORE_TYPE_PERSONAL;
 
     /* ---- Phase 2: SDL2 platform modules --------------------------------- */
 
@@ -186,10 +322,23 @@ game_ctx_t *game_create(int argc, char *argv[])
         goto fail;
     }
 
-    /* Texture cache */
+    /* Texture cache.  Resolution order (matches paths.c's level/sound
+     * file lookup, freedesktop XDG Base Directory spec):
+     *   1. $XDG_DATA_DIRS/xboing/images  (handles --prefix=/usr,
+     *      /usr/local, etc. transparently — same mechanism Debian
+     *      games and GNOME apps use)
+     *   2. XBOING_INSTALLED_IMAGES_DIR  (compile-time fallback for
+     *      unusual installs not in $XDG_DATA_DIRS)
+     *   3. cwd-relative "assets/images"  (dev mode default in
+     *      sdl2_texture_config_defaults) */
+    char tex_dir[PATHS_MAX_PATH];
     {
         sdl2_texture_config_t tcfg = sdl2_texture_config_defaults();
         tcfg.renderer = sdl2_renderer_get(ctx->renderer);
+        if (paths_install_data_dir(&ctx->paths, "images", tex_dir, sizeof(tex_dir)) == PATHS_OK)
+            tcfg.base_dir = tex_dir;
+        else if (asset_dir_exists(XBOING_INSTALLED_IMAGES_DIR))
+            tcfg.base_dir = XBOING_INSTALLED_IMAGES_DIR;
         sdl2_texture_status_t ts;
         ctx->texture = sdl2_texture_create(&tcfg, &ts);
         if (!ctx->texture)
@@ -200,10 +349,15 @@ game_ctx_t *game_create(int argc, char *argv[])
         }
     }
 
-    /* Font */
+    /* Font.  Same XDG-first resolution as texture cache above. */
+    char font_dir[PATHS_MAX_PATH];
     {
         sdl2_font_config_t fcfg = sdl2_font_config_defaults();
         fcfg.renderer = sdl2_renderer_get(ctx->renderer);
+        if (paths_install_data_dir(&ctx->paths, "fonts", font_dir, sizeof(font_dir)) == PATHS_OK)
+            fcfg.font_dir = font_dir;
+        else if (asset_dir_exists(XBOING_INSTALLED_FONTS_DIR))
+            fcfg.font_dir = XBOING_INSTALLED_FONTS_DIR;
         sdl2_font_status_t fs;
         ctx->font = sdl2_font_create(&fcfg, &fs);
         if (!ctx->font)
@@ -213,10 +367,16 @@ game_ctx_t *game_create(int argc, char *argv[])
         }
     }
 
-    /* Audio (optional — game works without sound) */
+    /* Audio (optional — game works without sound).  Same XDG-first
+     * resolution as the texture and font subsystems. */
+    char sound_dir[PATHS_MAX_PATH];
     if (ctx->config.sound)
     {
         sdl2_audio_config_t acfg = sdl2_audio_config_defaults();
+        if (paths_install_data_dir(&ctx->paths, "sounds", sound_dir, sizeof(sound_dir)) == PATHS_OK)
+            acfg.sound_dir = sound_dir;
+        else if (asset_dir_exists(XBOING_INSTALLED_SOUNDS_DIR))
+            acfg.sound_dir = XBOING_INSTALLED_SOUNDS_DIR;
         sdl2_audio_status_t as;
         ctx->audio = sdl2_audio_create(&acfg, &as);
         if (!ctx->audio)
@@ -403,9 +563,12 @@ game_ctx_t *game_create(int argc, char *argv[])
     /* Editor system (callbacks wired by game_callbacks.c) */
     {
         editor_system_callbacks_t ecb = game_callbacks_editor();
-        char levels_dir[PATHS_MAX_PATH] = "levels";
-        paths_levels_dir(&ctx->paths, levels_dir, sizeof(levels_dir));
-        ctx->editor = editor_system_create(&ecb, ctx, levels_dir, !ctx->config.sound);
+        char levels_dir_r[PATHS_MAX_PATH] = "levels";
+        char levels_dir_w[PATHS_MAX_PATH] = "levels";
+        paths_levels_dir_readable(&ctx->paths, levels_dir_r, sizeof(levels_dir_r));
+        paths_levels_dir_writable(&ctx->paths, levels_dir_w, sizeof(levels_dir_w));
+        ctx->editor =
+            editor_system_create(&ecb, ctx, levels_dir_r, levels_dir_w, !ctx->config.sound);
         if (!ctx->editor)
         {
             fprintf(stderr, "game_create: editor system creation failed\n");
@@ -578,20 +741,328 @@ void game_destroy(game_ctx_t *ctx)
  * Stub callbacks (replaced by game_modes.c / game_callbacks.c)
  * ========================================================================= */
 
+static const char *vc_presents_name(int s)
+{
+    switch (s)
+    {
+        case PRESENTS_STATE_FLAG:
+            return "flag";
+        case PRESENTS_STATE_TEXT1:
+            return "text1";
+        case PRESENTS_STATE_TEXT2:
+            return "text2";
+        case PRESENTS_STATE_TEXT3:
+            return "text3";
+        case PRESENTS_STATE_TEXT_CLEAR:
+            return "text-clear";
+        case PRESENTS_STATE_LETTERS:
+            return "letters";
+        case PRESENTS_STATE_SHINE:
+            return "shine";
+        case PRESENTS_STATE_SPECIAL_TEXT1:
+            return "typewriter1";
+        case PRESENTS_STATE_SPECIAL_TEXT2:
+            return "typewriter2";
+        case PRESENTS_STATE_SPECIAL_TEXT3:
+            return "typewriter3";
+        case PRESENTS_STATE_CLEAR:
+            return "wipe";
+        default:
+            return NULL;
+    }
+}
+
+static const char *vc_intro_name(int s)
+{
+    switch (s)
+    {
+        case INTRO_STATE_TITLE:
+            return "title";
+        case INTRO_STATE_BLOCKS:
+            return "blocks";
+        case INTRO_STATE_TEXT:
+            return "text";
+        case INTRO_STATE_EXPLODE:
+            return "explode";
+        default:
+            return NULL;
+    }
+}
+
+static const char *vc_instruct_name(int s)
+{
+    switch (s)
+    {
+        case INTRO_STATE_TITLE:
+            return "title";
+        case INTRO_STATE_TEXT:
+            return "text";
+        case INTRO_STATE_EXPLODE:
+            return "sparkle";
+        default:
+            return NULL;
+    }
+}
+
+static const char *vc_demo_name(int s)
+{
+    switch (s)
+    {
+        case DEMO_STATE_TITLE:
+            return "title";
+        case DEMO_STATE_BLOCKS:
+            return "blocks";
+        case DEMO_STATE_TEXT:
+            return "text";
+        case DEMO_STATE_SPARKLE:
+            return "sparkle";
+        case DEMO_STATE_WAIT:
+            return "wait";
+        default:
+            return NULL;
+    }
+}
+
+static const char *vc_keys_name(int s)
+{
+    switch (s)
+    {
+        case KEYS_STATE_TITLE:
+            return "title";
+        case KEYS_STATE_TEXT:
+            return "text";
+        case KEYS_STATE_SPARKLE:
+            return "sparkle";
+        case KEYS_STATE_WAIT:
+            return "wait";
+        default:
+            return NULL;
+    }
+}
+
+static const char *vc_highscore_name(int s)
+{
+    switch (s)
+    {
+        case HIGHSCORE_STATE_TITLE:
+            return "title";
+        case HIGHSCORE_STATE_SHOW:
+            return "show";
+        case HIGHSCORE_STATE_SPARKLE:
+            return "sparkle";
+        case HIGHSCORE_STATE_WAIT:
+            return "wait";
+        default:
+            return NULL;
+    }
+}
+
+static void vc_signal_modern(const char *mode_name, const char *substate, int seq)
+{
+    printf("XBOING_SNAPSHOT %s/%s/%03d\n", mode_name, substate, seq);
+    fflush(stdout);
+    SDL_Delay(100);
+}
+
+static void vc_check(game_ctx_t *ctx, int pre_presents, int pre_credits, int pre_intro,
+                     int pre_demo, int pre_keys, int pre_highscore)
+{
+    static sdl2_state_mode_t prev_mode = SDL2ST_NONE;
+    static unsigned long next_capture_frame = 0;
+    static int seq = 0;
+    static const char *cur_subname = NULL;
+
+    sdl2_state_mode_t mode = sdl2_state_current(ctx->state);
+    unsigned long frame = sdl2_state_frame(ctx->state);
+
+    /* Check mode transition BEFORE the active-mode gate — when
+     * capturing a single mode, we need to detect the transition
+     * away from that mode and exit, even though the new mode
+     * isn't the one we're capturing. */
+    if (mode != prev_mode)
+    {
+        if (prev_mode != SDL2ST_NONE && ctx->vc_mode != 99 && ctx->vc_mode == (int)prev_mode)
+        {
+            printf("XBOING_SNAPSHOT_DONE\n");
+            fflush(stdout);
+            exit(0);
+        }
+        prev_mode = mode;
+        cur_subname = NULL;
+        seq = 0;
+        return;
+    }
+
+    int vc_active = (ctx->vc_mode == 99 || ctx->vc_mode == (int)mode);
+    if (!vc_active)
+        return;
+
+    int pre_sub = -1;
+    int post_sub = -1;
+    const char *mode_str = NULL;
+
+    if (mode == SDL2ST_PRESENTS)
+    {
+        pre_sub = pre_presents;
+        post_sub = (int)presents_system_get_state(ctx->presents);
+        mode_str = "presents";
+
+        /* Credits stage changes are invisible to sub-state detection
+         * (TEXT1/2/3 flash by within one update call). Use the
+         * persistent credits_stage field instead. */
+        int post_credits = presents_system_get_credits_stage(ctx->presents);
+        if (post_credits != pre_credits && post_credits > 0)
+        {
+            static const char *const credit_names[] = {NULL, "text1", "text2", "text3"};
+            const char *cn = credit_names[post_credits];
+            if (cn && cn != cur_subname)
+            {
+                seq = 0;
+                vc_signal_modern("presents", cn, seq);
+                seq++;
+                cur_subname = cn;
+                next_capture_frame = frame + (unsigned long)ctx->vc_interval;
+            }
+        }
+        else if (post_credits == 0 && pre_credits > 0)
+        {
+            const char *cn = "text-clear";
+            if (cn != cur_subname)
+            {
+                seq = 0;
+                vc_signal_modern("presents", cn, seq);
+                seq++;
+                cur_subname = cn;
+                next_capture_frame = frame + (unsigned long)ctx->vc_interval;
+            }
+        }
+    }
+    else if (mode == SDL2ST_INTRO)
+    {
+        pre_sub = pre_intro;
+        post_sub = (int)intro_system_get_state(ctx->intro);
+        mode_str = "intro";
+    }
+    else if (mode == SDL2ST_INSTRUCT)
+    {
+        pre_sub = pre_intro;
+        post_sub = (int)intro_system_get_state(ctx->intro);
+        mode_str = "instruct";
+    }
+    else if (mode == SDL2ST_DEMO)
+    {
+        pre_sub = pre_demo;
+        post_sub = (int)demo_system_get_state(ctx->demo);
+        mode_str = "demo";
+    }
+    else if (mode == SDL2ST_PREVIEW)
+    {
+        pre_sub = pre_demo;
+        post_sub = (int)demo_system_get_state(ctx->demo);
+        mode_str = "preview";
+    }
+    else if (mode == SDL2ST_KEYS)
+    {
+        pre_sub = pre_keys;
+        post_sub = (int)keys_system_get_state(ctx->keys);
+        mode_str = "keys";
+    }
+    else if (mode == SDL2ST_KEYSEDIT)
+    {
+        pre_sub = pre_keys;
+        post_sub = (int)keys_system_get_state(ctx->keys);
+        mode_str = "keysedit";
+    }
+    else if (mode == SDL2ST_HIGHSCORE)
+    {
+        pre_sub = pre_highscore;
+        post_sub = (int)highscore_system_get_state(ctx->highscore_display);
+        mode_str = "highscore";
+    }
+
+    if (!mode_str)
+        return;
+
+    const char *(*name_fn)(int) = NULL;
+    if (mode == SDL2ST_PRESENTS)
+        name_fn = vc_presents_name;
+    else if (mode == SDL2ST_INTRO)
+        name_fn = vc_intro_name;
+    else if (mode == SDL2ST_INSTRUCT)
+        name_fn = vc_instruct_name;
+    else if (mode == SDL2ST_DEMO || mode == SDL2ST_PREVIEW)
+        name_fn = vc_demo_name;
+    else if (mode == SDL2ST_KEYS || mode == SDL2ST_KEYSEDIT)
+        name_fn = vc_keys_name;
+    else if (mode == SDL2ST_HIGHSCORE)
+        name_fn = vc_highscore_name;
+
+    if (!name_fn)
+        return;
+
+    /* Content state ran this frame (pre != post). Signal pre name. */
+    const char *pre_name = name_fn(pre_sub);
+    if (pre_sub != post_sub && pre_name && pre_name != cur_subname)
+    {
+        seq = 0;
+        vc_signal_modern(mode_str, pre_name, seq);
+        seq++;
+        cur_subname = pre_name;
+        next_capture_frame = frame + (unsigned long)ctx->vc_interval;
+    }
+
+    /* Persistent state (pre == post, named) — interval sampling. */
+    const char *post_name = name_fn(post_sub);
+    if (pre_sub == post_sub && post_name)
+    {
+        if (post_name != cur_subname)
+        {
+            seq = 0;
+            vc_signal_modern(mode_str, post_name, seq);
+            seq++;
+            cur_subname = post_name;
+            next_capture_frame = frame + (unsigned long)ctx->vc_interval;
+        }
+        else if (frame >= next_capture_frame)
+        {
+            vc_signal_modern(mode_str, post_name, seq);
+            seq++;
+            next_capture_frame = frame + (unsigned long)ctx->vc_interval;
+        }
+    }
+}
+
+static int vc_pre_presents_state;
+static int vc_pre_credits_stage;
+static int vc_pre_intro_state;
+static int vc_pre_demo_state;
+static int vc_pre_keys_state;
+static int vc_pre_highscore_state;
+
 static void stub_tick(void *user_data)
 {
     game_ctx_t *ctx = user_data;
-    /* sdl2_state_update dispatches to mode-specific on_update handlers
-     * registered by game_modes_register() — gameplay logic, input, etc.
-     * all happen inside the mode handler. */
+
+    vc_pre_presents_state = (int)presents_system_get_state(ctx->presents);
+    vc_pre_credits_stage = presents_system_get_credits_stage(ctx->presents);
+    vc_pre_intro_state = (int)intro_system_get_state(ctx->intro);
+    vc_pre_demo_state = (int)demo_system_get_state(ctx->demo);
+    vc_pre_keys_state = (int)keys_system_get_state(ctx->keys);
+    vc_pre_highscore_state = (int)highscore_system_get_state(ctx->highscore_display);
+
     sdl2_state_update(ctx->state);
 }
 
 static void stub_render(double alpha, void *user_data)
 {
     game_ctx_t *ctx = user_data;
-    ctx->render_alpha = alpha;
+    sdl2_state_mode_t mode = sdl2_state_current(ctx->state);
+    ctx->render_alpha = (mode == SDL2ST_PAUSE || mode == SDL2ST_DIALOGUE) ? 0.0 : alpha;
     game_render_frame(ctx);
+
+    if (ctx->vc_mode >= 0)
+        vc_check(ctx, vc_pre_presents_state, vc_pre_credits_stage, vc_pre_intro_state,
+                 vc_pre_demo_state, vc_pre_keys_state, vc_pre_highscore_state);
 }
 
 /* =========================================================================

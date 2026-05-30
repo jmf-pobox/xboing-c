@@ -10,8 +10,11 @@
 
 #include "game_render_ui.h"
 
+#include <time.h>
+
 #include <SDL2/SDL.h>
 
+#include "block_types.h"
 #include "bonus_system.h"
 #include "demo_system.h"
 #include "game_context.h"
@@ -19,9 +22,11 @@
 #include "highscore_system.h"
 #include "intro_system.h"
 #include "keys_system.h"
+#include "level_system.h"
 #include "presents_system.h"
 #include "sdl2_font.h"
 #include "sdl2_renderer.h"
+#include "sdl2_state.h"
 #include "sdl2_texture.h"
 #include "sprite_catalog.h"
 
@@ -29,12 +34,63 @@
 #define OFFSET_X 35
 #define PLAY_AREA_X OFFSET_X
 #define PLAY_AREA_Y 60
-#define PLAY_AREA_W 495
-#define PLAY_AREA_H 580
+#define PLAY_AREA_W GAME_PLAY_WIDTH
+#define PLAY_AREA_H GAME_PLAY_HEIGHT
 
 /* =========================================================================
  * Helper: render a sparkle (star) frame at a position
  * ========================================================================= */
+
+/* Shared play-area frame: stone background tile + border.
+ * When glow is true, uses game_render_border_glow (SFX system state).
+ * When false, draws a static green border. */
+static void render_play_area_frame(const game_ctx_t *ctx, bool glow)
+{
+    SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
+    sdl2_texture_info_t bg;
+    if (sdl2_texture_get(ctx->texture, SPR_BGRND_MAIN, &bg) == SDL2T_OK && bg.width > 0 &&
+        bg.height > 0)
+    {
+        int tw = bg.width;
+        int th = bg.height;
+        for (int ty = PLAY_AREA_Y; ty < PLAY_AREA_Y + PLAY_AREA_H; ty += th)
+        {
+            for (int tx = PLAY_AREA_X; tx < PLAY_AREA_X + PLAY_AREA_W; tx += tw)
+            {
+                int dw = tw;
+                int dh = th;
+                if (tx + dw > PLAY_AREA_X + PLAY_AREA_W)
+                    dw = PLAY_AREA_X + PLAY_AREA_W - tx;
+                if (ty + dh > PLAY_AREA_Y + PLAY_AREA_H)
+                    dh = PLAY_AREA_Y + PLAY_AREA_H - ty;
+                SDL_Rect src = {0, 0, dw, dh};
+                SDL_Rect dst = {tx, ty, dw, dh};
+                SDL_RenderCopy(sdl, bg.texture, &src, &dst);
+            }
+        }
+    }
+
+    if (glow)
+    {
+        game_render_border_glow(ctx);
+    }
+    else
+    {
+        SDL_SetRenderDrawColor(sdl, 0, 200, 0, 255);
+        int bx = PLAY_AREA_X - 2;
+        int by = PLAY_AREA_Y - 2;
+        int bw = PLAY_AREA_W + 4;
+        int bh = PLAY_AREA_H + 4;
+        SDL_Rect top = {bx, by, bw, 2};
+        SDL_Rect bottom = {bx, by + bh - 2, bw, 2};
+        SDL_Rect left = {bx, by, 2, bh};
+        SDL_Rect right = {bx + bw - 2, by, 2, bh};
+        SDL_RenderFillRect(sdl, &top);
+        SDL_RenderFillRect(sdl, &bottom);
+        SDL_RenderFillRect(sdl, &left);
+        SDL_RenderFillRect(sdl, &right);
+    }
+}
 
 static void render_sparkle(const game_ctx_t *ctx, int x, int y, int frame_index)
 {
@@ -72,76 +128,112 @@ void game_render_presents(const game_ctx_t *ctx)
      * → typewriter → wipe.
      */
 
+    /*
+     * All presents content uses mainWindow-absolute coordinates — NO
+     * PLAY_AREA_X / PLAY_AREA_Y offset.  The original calls
+     * Presents(display, mainWindow) at original/main.c:1190, so all
+     * drawing lands at mainWindow (x, y) not playWindow (x, y).
+     * Only gameplay rendering (blocks, paddle, ball) uses the play-area
+     * offset.
+     */
+
     /* Flag + earth — always render once set (persists from FLAG state) */
     {
         presents_flag_info_t fi;
         presents_system_get_flag_info(ctx->presents, &fi);
 
-        /* flag_x is set to non-zero when FLAG state runs */
         if (fi.flag_x > 0 || fi.flag_y > 0)
         {
             sdl2_texture_info_t tex;
             if (sdl2_texture_get(ctx->texture, SPR_PRESENTS_FLAG, &tex) == SDL2T_OK)
             {
-                SDL_Rect dst = {PLAY_AREA_X + fi.flag_x, PLAY_AREA_Y + fi.flag_y, tex.width,
-                                tex.height};
+                SDL_Rect dst = {fi.flag_x, fi.flag_y, tex.width, tex.height};
                 SDL_RenderCopy(sdl, tex.texture, NULL, &dst);
             }
             if (sdl2_texture_get(ctx->texture, SPR_PRESENTS_EARTH, &tex) == SDL2T_OK)
             {
-                SDL_Rect dst = {PLAY_AREA_X + fi.earth_x, PLAY_AREA_Y + fi.earth_y, tex.width,
-                                tex.height};
+                SDL_Rect dst = {fi.earth_x, fi.earth_y, tex.width, tex.height};
                 SDL_RenderCopy(sdl, tex.texture, NULL, &dst);
             }
 
-            /* Copyright text at bottom */
             SDL_Color white = {255, 255, 255, 255};
-            sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_COPY,
-                                          "(c) 1993-1996 Justin C. Kibell",
-                                          PLAY_AREA_Y + fi.copyright_y, white, PLAY_AREA_W);
+            sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TEXT, "Made in Australia", 65,
+                                          white, SDL2R_LOGICAL_WIDTH);
+            sdl2_font_draw_shadow_centred(
+                ctx->font, SDL2F_FONT_COPY,
+                "\xc2\xa9 Copyright 1993-1997, Justin C. Kibell, All Rights Reserved",
+                fi.copyright_y, white, SDL2R_LOGICAL_WIDTH);
         }
     }
 
-    /* Author credits — query the active typewriter line to know progress.
-     * TEXT1/TEXT2/TEXT3 states each set one line of credits. After TEXT3,
-     * all three are visible until TEXT_CLEAR. We render based on whether
-     * the typewriter has been used (active_line >= 0 means past flag). */
+    /* Author credits — bitmap sprites sequenced per original/presents.c.
+     * Stage 1: "JUSTIN" at (140, 530).  Stage 2: adds "KIBELL" at (152, 584).
+     * Stage 3: replaces both with "presents" at (77, 562).
+     * Positions: center = (MAIN_WIDTH+PLAY_WIDTH)/2 = 282. */
     {
-        int active_line = presents_system_get_active_typewriter_line(ctx->presents);
-        presents_state_t state = presents_system_get_state(ctx->presents);
+        int credits_stage = presents_system_get_credits_stage(ctx->presents);
+        sdl2_texture_info_t tex;
 
-        /* Credits text appears after FLAG, before LETTERS */
-        if (active_line < 0 && state != PRESENTS_STATE_FLAG && state != PRESENTS_STATE_NONE)
+        if (credits_stage == 1 || credits_stage == 2)
         {
-            /* Between FLAG and LETTERS — show credits */
-            SDL_Color white = {255, 255, 255, 255};
-            SDL_Color yellow = {255, 255, 0, 255};
-
-            sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TEXT, "Justin C. Kibell",
-                                          PLAY_AREA_Y + 200, white, PLAY_AREA_W);
-            sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_COPY, "presents", PLAY_AREA_Y + 230,
-                                          yellow, PLAY_AREA_W);
-            sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TITLE, "XBoing II",
-                                          PLAY_AREA_Y + 270, white, PLAY_AREA_W);
+            if (sdl2_texture_get(ctx->texture, SPR_PRESENTS_JUSTIN, &tex) == SDL2T_OK)
+            {
+                SDL_Rect dst = {140, 530, tex.width, tex.height};
+                SDL_RenderCopy(sdl, tex.texture, NULL, &dst);
+            }
+        }
+        if (credits_stage == 2)
+        {
+            if (sdl2_texture_get(ctx->texture, SPR_PRESENTS_KIBELL, &tex) == SDL2T_OK)
+            {
+                SDL_Rect dst = {152, 584, tex.width, tex.height};
+                SDL_RenderCopy(sdl, tex.texture, NULL, &dst);
+            }
+        }
+        if (credits_stage == 3)
+        {
+            if (sdl2_texture_get(ctx->texture, SPR_PRESENTS, &tex) == SDL2T_OK)
+            {
+                SDL_Rect dst = {77, 562, tex.width, tex.height};
+                SDL_RenderCopy(sdl, tex.texture, NULL, &dst);
+            }
         }
     }
 
-    /* XBOING letter stamps — render if any letters have been placed */
+    /* XBOING letter stamps — variable per-letter widths matching
+     * original/presents.c:319-354 (mainWindow coordinates). */
     {
         presents_letter_info_t li;
         if (presents_system_get_letter_info(ctx->presents, &li))
         {
             static const char *const letter_keys[] = {SPR_TITLE_X, SPR_TITLE_B, SPR_TITLE_O,
                                                       SPR_TITLE_I, SPR_TITLE_N, SPR_TITLE_G};
+            static const int letter_widths[] = {71, 73, 83, 41, 85, 88};
+            int lx = 40;
             for (int i = 0; i <= li.letter_index && i < 6; i++)
             {
                 sdl2_texture_info_t tex;
                 if (sdl2_texture_get(ctx->texture, letter_keys[i], &tex) == SDL2T_OK)
                 {
-                    int lx = PLAY_AREA_X + 10 + i * 80;
-                    SDL_Rect dst = {lx, PLAY_AREA_Y + 250, tex.width, tex.height};
+                    SDL_Rect dst = {lx, 220, tex.width, tex.height};
                     SDL_RenderCopy(sdl, tex.texture, NULL, &dst);
                 }
+                lx += 10 + letter_widths[i];
+            }
+        }
+
+        /* "II" suffix after all 6 letters — original/presents.c:344-348
+         * draws two 'I' glyphs below the XBOING title. */
+        presents_ii_info_t ii;
+        if (presents_system_get_ii_info(ctx->presents, &ii))
+        {
+            sdl2_texture_info_t tex;
+            if (sdl2_texture_get(ctx->texture, SPR_TITLE_I, &tex) == SDL2T_OK)
+            {
+                SDL_Rect d1 = {ii.i1_x, ii.y, tex.width, tex.height};
+                SDL_RenderCopy(sdl, tex.texture, NULL, &d1);
+                SDL_Rect d2 = {ii.i2_x, ii.y, tex.width, tex.height};
+                SDL_RenderCopy(sdl, tex.texture, NULL, &d2);
             }
         }
     }
@@ -151,12 +243,15 @@ void game_render_presents(const game_ctx_t *ctx)
         presents_sparkle_info_t si;
         presents_system_get_sparkle_info(ctx->presents, &si);
         if (si.active)
-            render_sparkle(ctx, PLAY_AREA_X + si.x, PLAY_AREA_Y + si.y, si.frame_index);
+            render_sparkle(ctx, si.x, si.y, si.frame_index);
     }
 
-    /* Typewriter text lines — render visible chars for each line */
+    /* Typewriter text lines — centered within PRESENTS_TOTAL_WIDTH.
+     * ti.x_offset from the system is 0 (the system notes the
+     * integration layer should compute centering).  We measure the
+     * visible substring and center it horizontally. */
     {
-        SDL_Color green = {0, 255, 0, 255};
+        SDL_Color red = {255, 0, 0, 255};
         for (int line = 0; line < 3; line++)
         {
             presents_typewriter_info_t ti;
@@ -169,25 +264,32 @@ void game_render_presents(const game_ctx_t *ctx)
                     if (n > 255)
                         n = 255;
                     snprintf(buf, sizeof(buf), "%.*s", n, ti.text);
-                    sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_DATA, buf,
-                                          PLAY_AREA_X + ti.x_offset, PLAY_AREA_Y + ti.y, green);
+                    sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_DATA, buf, ti.y, red,
+                                                  PRESENTS_TOTAL_WIDTH);
                 }
             }
         }
     }
 
-    /* Curtain wipe — draw black rectangles closing from top and bottom */
+    /* Curtain wipe — draw black rectangles closing from top and bottom.
+     * Coordinates from the presents system use PRESENTS_TOTAL
+     * dimensions (565×710). */
     {
         presents_wipe_info_t wi;
         presents_system_get_wipe_info(ctx->presents, &wi);
         if (wi.top_y > 0 || wi.complete)
         {
             SDL_SetRenderDrawColor(sdl, 0, 0, 0, 255);
-            SDL_Rect top_rect = {PLAY_AREA_X, PLAY_AREA_Y, PLAY_AREA_W, wi.top_y};
-            SDL_Rect bot_rect = {PLAY_AREA_X, PLAY_AREA_Y + wi.bottom_y, PLAY_AREA_W,
-                                 PLAY_AREA_H - wi.bottom_y};
+            SDL_Rect top_rect = {0, 0, PRESENTS_TOTAL_WIDTH, wi.top_y};
+            SDL_Rect bot_rect = {0, wi.bottom_y, PRESENTS_TOTAL_WIDTH,
+                                 PRESENTS_TOTAL_HEIGHT - wi.bottom_y};
             SDL_RenderFillRect(sdl, &top_rect);
             SDL_RenderFillRect(sdl, &bot_rect);
+
+            /* Red lines at the wipe edges per original/presents.c:529-532 */
+            SDL_SetRenderDrawColor(sdl, 255, 0, 0, 255);
+            SDL_RenderDrawLine(sdl, 2, wi.top_y, PRESENTS_TOTAL_WIDTH - 2, wi.top_y);
+            SDL_RenderDrawLine(sdl, 2, wi.bottom_y - 1, PRESENTS_TOTAL_WIDTH - 2, wi.bottom_y - 1);
         }
     }
 }
@@ -204,6 +306,8 @@ void game_render_intro(const game_ctx_t *ctx)
     if (state == INTRO_STATE_NONE)
         return;
 
+    render_play_area_frame(ctx, state == INTRO_STATE_EXPLODE);
+
     /* Title */
     if (state >= INTRO_STATE_TITLE)
     {
@@ -216,19 +320,60 @@ void game_render_intro(const game_ctx_t *ctx)
         }
     }
 
-    /* Block descriptions table */
+    /* Block descriptions table.  Each entry's .type is an
+     * intro_block_type_t enum (0..21), NOT a block_types.h constant.
+     * The mapping table below translates to the correct sprite key.
+     * PADDLE and BULLET_ITEM are not block types and get their own
+     * sprite keys directly. */
     if (state >= INTRO_STATE_BLOCKS)
     {
+        /* Map INTRO_BLK_* → sprite key.  Order matches the
+         * intro_block_type_t enum in include/intro_system.h. */
+        static const char *const intro_sprite_keys[] = {
+            SPR_BLOCK_RED,        /* INTRO_BLK_RED         → RED_BLK */
+            SPR_BLOCK_ROAMER,     /* INTRO_BLK_ROAMER      → ROAMER_BLK */
+            SPR_BLOCK_PAD_EXPAND, /* INTRO_BLK_PAD_EXPAND  → PAD_EXPAND_BLK */
+            SPR_BLOCK_X2_1,       /* INTRO_BLK_BONUSX2     → BONUSX2_BLK */
+            SPR_BLOCK_LOTSAMMO,   /* INTRO_BLK_MAXAMMO     → MAXAMMO_BLK */
+            SPR_BLOCK_GREEN,      /* INTRO_BLK_DROP        → DROP_BLK */
+            SPR_BLOCK_YELLOW,     /* INTRO_BLK_BULLET      → BULLET_BLK */
+            SPR_BLOCK_HYPERSPACE, /* INTRO_BLK_HYPERSPACE  → HYPERSPACE_BLK */
+            SPR_BLOCK_REVERSE,    /* INTRO_BLK_REVERSE     → REVERSE_BLK */
+            SPR_BLOCK_MACHGUN,    /* INTRO_BLK_MGUN        → MGUN_BLK */
+            SPR_BLOCK_MULTIBALL,  /* INTRO_BLK_MULTIBALL   → MULTIBALL_BLK */
+            SPR_BLOCK_BONUS_1,    /* INTRO_BLK_BONUS       → BONUS_BLK */
+            SPR_BLOCK_COUNTER_5,  /* INTRO_BLK_COUNTER     → COUNTER_BLK (slide=5) */
+            SPR_BLOCK_CLOCK,      /* INTRO_BLK_TIMER       → TIMER_BLK */
+            SPR_BLOCK_BLACK,      /* INTRO_BLK_BLACK       → BLACK_BLK */
+            SPR_BLOCK_BOMB,       /* INTRO_BLK_BOMB        → BOMB_BLK */
+            SPR_PADDLE_SMALL,     /* INTRO_BLK_PADDLE      → paddle sprite */
+            SPR_BULLET,           /* INTRO_BLK_BULLET_ITEM → bullet sprite */
+            SPR_BLOCK_DEATH_1,    /* INTRO_BLK_DEATH       → DEATH_BLK */
+            SPR_BLOCK_EXTRABALL,  /* INTRO_BLK_EXTRABALL   → EXTRABALL_BLK */
+            SPR_BLOCK_WALLOFF,    /* INTRO_BLK_WALLOFF     → WALLOFF_BLK */
+            SPR_BLOCK_STICKY,     /* INTRO_BLK_STICKY      → STICKY_BLK */
+        };
+        _Static_assert(sizeof(intro_sprite_keys) / sizeof(intro_sprite_keys[0]) ==
+                           INTRO_BLOCK_TOTAL,
+                       "intro_sprite_keys must match intro_block_type_t enum count");
+
         const intro_block_entry_t *entries = NULL;
         int count = intro_system_get_block_table(ctx->intro, &entries);
 
-        SDL_Color white = {255, 255, 255, 255};
-        SDL_Color yellow = {255, 255, 0, 255};
+        /* Original uses green for all block descriptions
+         * (original/intro.c:207 etc.). */
+        SDL_Color green = {0, 255, 0, 255};
 
         for (int i = 0; i < count; i++)
         {
-            /* Draw block sprite */
-            const char *key = sprite_block_key(entries[i].type);
+            /* Draw block sprite using the corrected mapping. */
+            int type_idx = (int)entries[i].type;
+            const char *key = NULL;
+            if (type_idx >= 0 &&
+                type_idx < (int)(sizeof(intro_sprite_keys) / sizeof(intro_sprite_keys[0])))
+            {
+                key = intro_sprite_keys[type_idx];
+            }
             if (key)
             {
                 sdl2_texture_info_t tex;
@@ -241,19 +386,27 @@ void game_render_intro(const game_ctx_t *ctx)
                 }
             }
 
-            /* Draw description text */
+            /* Draw description text — all green per original. */
             if (entries[i].description)
             {
-                SDL_Color clr = (i % 2 == 0) ? white : yellow;
-                sdl2_font_draw(ctx->font, SDL2F_FONT_COPY, entries[i].description,
-                               PLAY_AREA_X + entries[i].x + 50, PLAY_AREA_Y + entries[i].y + 2,
-                               clr);
+                sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_TEXT, entries[i].description,
+                                      PLAY_AREA_X + entries[i].x + 60,
+                                      PLAY_AREA_Y + entries[i].y + 2, green);
             }
         }
+
+        /* "Insert coin to start the game" — inside the play area
+         * at the bottom, matching original/intro.c:302-305 which
+         * draws at y = PLAY_HEIGHT - 27 inside playWindow.  Original
+         * uses X11 "tann" color (tan). */
+        SDL_Color tan_clr = {210, 180, 140, 255};
+        sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TEXT, "Insert coin to start the game",
+                                      PLAY_AREA_Y + PLAY_AREA_H - 27, tan_clr,
+                                      PLAY_AREA_W + 2 * PLAY_AREA_X);
     }
 
     /* Sparkle */
-    if (state == INTRO_STATE_SPARKLE)
+    if (state == INTRO_STATE_EXPLODE)
     {
         intro_sparkle_info_t si;
         intro_system_get_sparkle_info(ctx->intro, &si);
@@ -273,42 +426,61 @@ void game_render_instruct(const game_ctx_t *ctx)
     if (state == INTRO_STATE_NONE)
         return;
 
-    /* Title */
+    render_play_area_frame(ctx, state == INTRO_STATE_EXPLODE);
+
+    /* XBOING title image — original/inst.c:219 calls DoIntroTitle
+     * which draws the same title sprite as the intro blocks screen. */
     if (state >= INTRO_STATE_TITLE)
     {
-        SDL_Color white = {255, 255, 255, 255};
-        sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TITLE, "Instructions", PLAY_AREA_Y + 20,
-                                      white, PLAY_AREA_W);
-    }
-
-    /* Instruction text lines */
-    if (state >= INTRO_STATE_TEXT)
-    {
-        const intro_instruct_line_t *lines = NULL;
-        int count = intro_system_get_instruct_text(ctx->intro, &lines);
-
-        SDL_Color white = {255, 255, 255, 255};
-        SDL_Color yellow = {255, 255, 0, 255};
-        SDL_Color green = {0, 255, 0, 255};
-
-        for (int i = 0; i < count; i++)
+        sdl2_texture_info_t tex;
+        if (sdl2_texture_get(ctx->texture, SPR_TITLE_BIG, &tex) == SDL2T_OK)
         {
-            if (lines[i].is_spacer)
-                continue;
-
-            SDL_Color clr = white;
-            if (lines[i].color_index == 1)
-                clr = yellow;
-            else if (lines[i].color_index == 2)
-                clr = green;
-
-            sdl2_font_draw(ctx->font, SDL2F_FONT_COPY, lines[i].text, PLAY_AREA_X + 30,
-                           PLAY_AREA_Y + 90 + i * 24, clr);
+            int tx = PLAY_AREA_X + (PLAY_AREA_W - tex.width) / 2;
+            SDL_Rect dst = {tx, PLAY_AREA_Y + 10, tex.width, tex.height};
+            SDL_RenderCopy(sdl2_renderer_get(ctx->renderer), tex.texture, NULL, &dst);
         }
     }
 
+    /* "- Instructions -" title + body text + "Insert coin" —
+     * all drawn during INTRO_STATE_TEXT per original/inst.c:134-163. */
+    if (state >= INTRO_STATE_TEXT)
+    {
+        /* Title: titleFont, y=110, red, centered across PLAY_WIDTH. */
+        SDL_Color red = {255, 0, 0, 255};
+        sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TITLE, "- Instructions -",
+                                      PLAY_AREA_Y + 110, red, PLAY_AREA_W + 2 * PLAY_AREA_X);
+
+        const intro_instruct_line_t *lines = NULL;
+        int count = intro_system_get_instruct_text(ctx->intro, &lines);
+
+        SDL_Color green_bright = {0, 255, 0, 255};
+        SDL_Color green_medium = {0, 187, 0, 255};
+
+        int y = PLAY_AREA_Y + 150;
+        for (int i = 0; i < count; i++)
+        {
+            if (lines[i].is_spacer)
+            {
+                y += 18;
+                continue;
+            }
+
+            SDL_Color clr = lines[i].color_index % 2 ? green_bright : green_medium;
+            sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_DATA, lines[i].text, y, clr,
+                                          PLAY_AREA_W + 2 * PLAY_AREA_X);
+            y += 18;
+        }
+
+        /* "Insert coin" — original/inst.c:163: textFont, tann,
+         * y = PLAY_HEIGHT - 40, centred across PLAY_WIDTH. */
+        SDL_Color tan_clr = {210, 180, 140, 255};
+        sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TEXT, "Insert coin to start the game",
+                                      PLAY_AREA_Y + PLAY_AREA_H - 40, tan_clr,
+                                      PLAY_AREA_W + 2 * PLAY_AREA_X);
+    }
+
     /* Sparkle */
-    if (state == INTRO_STATE_SPARKLE)
+    if (state == INTRO_STATE_EXPLODE)
     {
         intro_sparkle_info_t si;
         intro_system_get_sparkle_info(ctx->intro, &si);
@@ -327,31 +499,71 @@ void game_render_demo(const game_ctx_t *ctx)
     if (state == DEMO_STATE_NONE)
         return;
 
-    /* Title */
+    render_play_area_frame(ctx, state == DEMO_STATE_SPARKLE);
+
+    /* Blocks from demo.data — rendered after background, before title/trail */
+    if (state >= DEMO_STATE_BLOCKS)
+        game_render_blocks(ctx);
+
+    /* XBOING title image — same as intro/instruct per original/demo.c:117
+     * DrawIntroTitle(display, window, 10, 10). */
     if (state >= DEMO_STATE_TITLE)
     {
-        SDL_Color white = {255, 255, 255, 255};
-        sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TITLE, "Demonstration",
-                                      PLAY_AREA_Y + 20, white, PLAY_AREA_W);
+        sdl2_texture_info_t tex;
+        if (sdl2_texture_get(ctx->texture, SPR_TITLE_BIG, &tex) == SDL2T_OK)
+        {
+            int tx = PLAY_AREA_X + (PLAY_AREA_W - tex.width) / 2;
+            SDL_Rect dst = {tx, PLAY_AREA_Y + 10, tex.width, tex.height};
+            SDL_RenderCopy(sdl2_renderer_get(ctx->renderer), tex.texture, NULL, &dst);
+        }
     }
 
-    /* Ball trail animation */
+    /* Ball trail + decorations + paddle — all drawn during BLOCKS state.
+     * Order matches original/demo.c DoBlocks: trail → half-block → paddle. */
     if (state >= DEMO_STATE_BLOCKS)
     {
+        SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
+
+        /* Ball trail animation */
         const demo_ball_pos_t *trail = NULL;
         int count = demo_system_get_ball_trail(ctx->demo, &trail);
-
         for (int i = 0; i < count; i++)
         {
             const char *key = sprite_ball_key(trail[i].frame_index);
             sdl2_texture_info_t tex;
             if (sdl2_texture_get(ctx->texture, key, &tex) == SDL2T_OK)
             {
-                SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
                 SDL_Rect dst = {PLAY_AREA_X + trail[i].x, PLAY_AREA_Y + trail[i].y, tex.width,
                                 tex.height};
                 SDL_RenderCopy(sdl, tex.texture, NULL, &dst);
             }
+        }
+
+        /* Half-disintegrated block at (col=2, row=12) per original/demo.c:173-176 */
+        const char *exkey = sprite_block_explode_key(YELLOW_BLK, 1);
+        sdl2_texture_info_t etex;
+        if (sdl2_texture_get(ctx->texture, exkey, &etex) == SDL2T_OK)
+        {
+            SDL_Rect dst = {PLAY_AREA_X + 110, PLAY_AREA_Y + 384, etex.width, etex.height};
+            SDL_RenderCopy(sdl, etex.texture, NULL, &dst);
+        }
+
+        /* Paddle + left arrow per original/demo.c:178-182 */
+        int px = PLAY_AREA_X + PLAY_AREA_W / 2;
+        int py = PLAY_AREA_Y + PLAY_AREA_H - 90;
+
+        sdl2_texture_info_t ptex;
+        if (sdl2_texture_get(ctx->texture, SPR_PADDLE_HUGE, &ptex) == SDL2T_OK)
+        {
+            SDL_Rect dst = {px - 35, py, ptex.width, ptex.height};
+            SDL_RenderCopy(sdl, ptex.texture, NULL, &dst);
+        }
+
+        sdl2_texture_info_t atex;
+        if (sdl2_texture_get(ctx->texture, SPR_LEFT_ARROW, &atex) == SDL2T_OK)
+        {
+            SDL_Rect dst = {px - 75, py - 1, atex.width, atex.height};
+            SDL_RenderCopy(sdl, atex.texture, NULL, &dst);
         }
     }
 
@@ -361,13 +573,19 @@ void game_render_demo(const game_ctx_t *ctx)
         const demo_text_line_t *lines = NULL;
         int count = demo_system_get_demo_text(ctx->demo, &lines);
 
-        SDL_Color green = {0, 255, 0, 255};
+        SDL_Color yellow = {255, 255, 0, 255};
         for (int i = 0; i < count; i++)
         {
             if (lines[i].text)
-                sdl2_font_draw(ctx->font, SDL2F_FONT_DATA, lines[i].text, PLAY_AREA_X + lines[i].x,
-                               PLAY_AREA_Y + lines[i].y, green);
+                sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_DATA, lines[i].text,
+                                      PLAY_AREA_X + lines[i].x, PLAY_AREA_Y + lines[i].y, yellow);
         }
+
+        /* "Insert coin" per original/demo.c:241 */
+        SDL_Color tan_clr = {210, 180, 140, 255};
+        sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TEXT, "Insert coin to start the game",
+                                      PLAY_AREA_Y + PLAY_AREA_H - 27, tan_clr,
+                                      PLAY_AREA_W + 2 * PLAY_AREA_X);
     }
 
     /* Sparkle */
@@ -390,15 +608,75 @@ void game_render_preview(const game_ctx_t *ctx)
     if (state == DEMO_STATE_NONE)
         return;
 
-    SDL_Color white = {255, 255, 255, 255};
-    int level = demo_system_get_preview_level(ctx->demo);
-    char title[64];
-    snprintf(title, sizeof(title), "Preview - Level %d", level);
-    sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TITLE, title, PLAY_AREA_Y + 20, white,
-                                  PLAY_AREA_W);
+    SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
 
+    /* Background tile — original/preview.c:118 cycles backgrounds 2-5 */
+    int level = demo_system_get_preview_level(ctx->demo);
+    int bgrnd = (level % 4) + 2;
+    const char *bg_key = sprite_background_key(bgrnd);
+    sdl2_texture_info_t bg;
+    if (sdl2_texture_get(ctx->texture, bg_key, &bg) == SDL2T_OK && bg.width > 0 && bg.height > 0)
+    {
+        for (int ty = PLAY_AREA_Y; ty < PLAY_AREA_Y + PLAY_AREA_H; ty += bg.height)
+        {
+            for (int tx = PLAY_AREA_X; tx < PLAY_AREA_X + PLAY_AREA_W; tx += bg.width)
+            {
+                int dw = bg.width;
+                int dh = bg.height;
+                if (tx + dw > PLAY_AREA_X + PLAY_AREA_W)
+                    dw = PLAY_AREA_X + PLAY_AREA_W - tx;
+                if (ty + dh > PLAY_AREA_Y + PLAY_AREA_H)
+                    dh = PLAY_AREA_Y + PLAY_AREA_H - ty;
+                SDL_Rect src = {0, 0, dw, dh};
+                SDL_Rect dst = {tx, ty, dw, dh};
+                SDL_RenderCopy(sdl, bg.texture, &src, &dst);
+            }
+        }
+    }
+
+    /* Blocks on top of background — original/preview.c:130 */
     if (state >= DEMO_STATE_BLOCKS)
         game_render_blocks(ctx);
+
+    /* Red border — original/preview.c uses red XSetWindowBorder */
+    if (state == DEMO_STATE_SPARKLE)
+    {
+        game_render_border_glow(ctx);
+    }
+    else
+    {
+        SDL_SetRenderDrawColor(sdl, 200, 0, 0, 255);
+        int bx = PLAY_AREA_X - 2;
+        int by = PLAY_AREA_Y - 2;
+        int bw = PLAY_AREA_W + 4;
+        int bh = PLAY_AREA_H + 4;
+        SDL_Rect top = {bx, by, bw, 2};
+        SDL_Rect bottom = {bx, by + bh - 2, bw, 2};
+        SDL_Rect left = {bx, by, 2, bh};
+        SDL_Rect right = {bx + bw - 2, by, 2, bh};
+        SDL_RenderFillRect(sdl, &top);
+        SDL_RenderFillRect(sdl, &bottom);
+        SDL_RenderFillRect(sdl, &left);
+        SDL_RenderFillRect(sdl, &right);
+    }
+
+    /* Level name at bottom — original/preview.c:133-134 */
+    const char *level_title = level_system_get_title(ctx->level);
+    if (level_title && level_title[0] != '\0')
+    {
+        SDL_Color red = {255, 0, 0, 255};
+        char name_buf[80];
+        snprintf(name_buf, sizeof(name_buf), "- %s -", level_title);
+        sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TEXT, name_buf,
+                                      PLAY_AREA_Y + PLAY_AREA_H - 60, red,
+                                      PLAY_AREA_W + 2 * PLAY_AREA_X);
+    }
+
+    /* "Insert coin to start the game" — original/preview.c:130 */
+    SDL_Color tan_clr = {210, 180, 140, 255};
+    sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TEXT, "Insert coin to start the game",
+                                  PLAY_AREA_Y + PLAY_AREA_H - 35, tan_clr,
+                                  PLAY_AREA_W + 2 * PLAY_AREA_X);
 
     if (state == DEMO_STATE_SPARKLE)
     {
@@ -419,26 +697,95 @@ void game_render_keys(const game_ctx_t *ctx)
     if (state == KEYS_STATE_NONE)
         return;
 
+    render_play_area_frame(ctx, state == KEYS_STATE_SPARKLE);
+
+    /* XBOING title image per original/keys.c:309 DoIntroTitle */
     if (state >= KEYS_STATE_TITLE)
     {
-        SDL_Color white = {255, 255, 255, 255};
-        sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TITLE, "Game Controls",
-                                      PLAY_AREA_Y + 20, white, PLAY_AREA_W);
+        sdl2_texture_info_t tex;
+        if (sdl2_texture_get(ctx->texture, SPR_TITLE_BIG, &tex) == SDL2T_OK)
+        {
+            int tx = PLAY_AREA_X + (PLAY_AREA_W - tex.width) / 2;
+            SDL_Rect dst = {tx, PLAY_AREA_Y + 10, tex.width, tex.height};
+            SDL_RenderCopy(sdl2_renderer_get(ctx->renderer), tex.texture, NULL, &dst);
+        }
     }
 
     if (state >= KEYS_STATE_TEXT)
     {
+        SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
+        SDL_Color red = {255, 0, 0, 255};
+        SDL_Color yellow = {255, 255, 0, 255};
+        SDL_Color green = {0, 255, 0, 255};
+        SDL_Color tan_clr = {210, 180, 140, 255};
+
+        /* "- Game Controls -" title per original/keys.c:143 */
+        sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TITLE, "- Game Controls -",
+                                      PLAY_AREA_Y + 120, red, PLAY_AREA_W + 2 * PLAY_AREA_X);
+
+        /* Horizontal separator line per original/keys.c:147-148 */
+        int line_y = PLAY_AREA_Y + 160;
+        SDL_SetRenderDrawColor(sdl, 0, 0, 0, 255);
+        SDL_RenderDrawLine(sdl, PLAY_AREA_X + 32, line_y + 2, PLAY_AREA_X + PLAY_AREA_W - 28,
+                           line_y + 2);
+        SDL_SetRenderDrawColor(sdl, 255, 255, 255, 255);
+        SDL_RenderDrawLine(sdl, PLAY_AREA_X + 30, line_y, PLAY_AREA_X + PLAY_AREA_W - 30, line_y);
+
+        /* Mouse sprite + arrows + paddle labels per original/keys.c:151-162.
+         * mouse_y already includes PLAY_AREA_Y via line_y. */
+        int mouse_y = line_y + 18;
+        int cx = PLAY_AREA_X + PLAY_AREA_W / 2;
+
+        sdl2_texture_info_t mtex;
+        if (sdl2_texture_get(ctx->texture, SPR_MOUSE, &mtex) == SDL2T_OK)
+        {
+            SDL_Rect dst = {cx - 17, mouse_y, mtex.width, mtex.height};
+            SDL_RenderCopy(sdl, mtex.texture, NULL, &dst);
+        }
+
+        sdl2_texture_info_t latex;
+        if (sdl2_texture_get(ctx->texture, SPR_LEFT_ARROW, &latex) == SDL2T_OK)
+        {
+            SDL_Rect dst = {cx - 17 - 10 - 35, mouse_y + 28, latex.width, latex.height};
+            SDL_RenderCopy(sdl, latex.texture, NULL, &dst);
+        }
+        sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_TEXT, "Paddle left",
+                              cx - 17 - 10 - 35 - 40 - 60, mouse_y + 28, green);
+
+        sdl2_texture_info_t ratex;
+        if (sdl2_texture_get(ctx->texture, SPR_RIGHT_ARROW, &ratex) == SDL2T_OK)
+        {
+            SDL_Rect dst = {cx + 17 + 10, mouse_y + 28, ratex.width, ratex.height};
+            SDL_RenderCopy(sdl, ratex.texture, NULL, &dst);
+        }
+        sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_TEXT, "Paddle right", cx + 17 + 10 + 40,
+                              mouse_y + 28, green);
+
+        /* Key bindings — two columns, yellow, textFont with shadow
+         * per original/keys.c:164-246 */
         const keys_binding_entry_t *bindings = NULL;
         int count = keys_system_get_game_bindings(ctx->keys, &bindings);
 
-        SDL_Color yellow = {255, 255, 0, 255};
         for (int i = 0; i < count; i++)
         {
             int x = (bindings[i].column == 0) ? PLAY_AREA_X + 30 : PLAY_AREA_X + 280;
             int row = (bindings[i].column == 0) ? i : i - 10;
-            sdl2_font_draw(ctx->font, SDL2F_FONT_COPY, bindings[i].text, x,
-                           PLAY_AREA_Y + 90 + row * 24, yellow);
+            sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_TEXT, bindings[i].text, x,
+                                  PLAY_AREA_Y + 250 + row * 27, yellow);
         }
+
+        /* Bottom separator line per original/keys.c:249-250 */
+        int bot_y = PLAY_AREA_Y + 250 + 10 * 27 + 10;
+        SDL_SetRenderDrawColor(sdl, 0, 0, 0, 255);
+        SDL_RenderDrawLine(sdl, PLAY_AREA_X + 32, bot_y + 2, PLAY_AREA_X + PLAY_AREA_W - 28,
+                           bot_y + 2);
+        SDL_SetRenderDrawColor(sdl, 255, 255, 255, 255);
+        SDL_RenderDrawLine(sdl, PLAY_AREA_X + 30, bot_y, PLAY_AREA_X + PLAY_AREA_W - 30, bot_y);
+
+        /* "Insert coin" per original/keys.c:252-253 */
+        sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TEXT, "Insert coin to start the game",
+                                      PLAY_AREA_Y + PLAY_AREA_H - 30, tan_clr,
+                                      PLAY_AREA_W + 2 * PLAY_AREA_X);
     }
 
     if (state == KEYS_STATE_SPARKLE)
@@ -460,38 +807,82 @@ void game_render_keysedit(const game_ctx_t *ctx)
     if (state == KEYS_STATE_NONE)
         return;
 
+    render_play_area_frame(ctx, state == KEYS_STATE_SPARKLE);
+
+    /* XBOING title image — same as KEYS screen, original/keysedit.c:147 */
     if (state >= KEYS_STATE_TITLE)
     {
-        SDL_Color white = {255, 255, 255, 255};
-        sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TITLE, "Editor Controls",
-                                      PLAY_AREA_Y + 20, white, PLAY_AREA_W);
+        sdl2_texture_info_t tex;
+        if (sdl2_texture_get(ctx->texture, SPR_TITLE_BIG, &tex) == SDL2T_OK)
+        {
+            int tx = PLAY_AREA_X + (PLAY_AREA_W - tex.width) / 2;
+            SDL_Rect dst = {tx, PLAY_AREA_Y + 10, tex.width, tex.height};
+            SDL_RenderCopy(sdl2_renderer_get(ctx->renderer), tex.texture, NULL, &dst);
+        }
     }
 
     if (state >= KEYS_STATE_TEXT)
     {
+        SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
+        SDL_Color red = {255, 0, 0, 255};
+        SDL_Color yellow = {255, 255, 0, 255};
+
+        /* "- Level Editor Controls -" in red — original/keysedit.c:153 */
+        sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TITLE, "- Level Editor Controls -",
+                                      PLAY_AREA_Y + 120, red, PLAY_AREA_W + 2 * PLAY_AREA_X);
+
+        /* Separator line — original/keysedit.c:157 */
+        int line_y = PLAY_AREA_Y + 160;
+        SDL_SetRenderDrawColor(sdl, 0, 0, 0, 255);
+        SDL_RenderDrawLine(sdl, PLAY_AREA_X + 32, line_y + 2, PLAY_AREA_X + PLAY_AREA_W - 28,
+                           line_y + 2);
+        SDL_SetRenderDrawColor(sdl, 255, 255, 255, 255);
+        SDL_RenderDrawLine(sdl, PLAY_AREA_X + 30, line_y, PLAY_AREA_X + PLAY_AREA_W - 30, line_y);
+
+        /* Description text — original/keysedit.c:138-146, alternating greens */
+        SDL_Color green_bright = {0, 255, 0, 255};
+        SDL_Color green_dark = {0, 187, 0, 255};
         const keys_info_line_t *info = NULL;
         int info_count = keys_system_get_editor_info(ctx->keys, &info);
-
-        SDL_Color green = {0, 255, 0, 255};
+        int text_y = line_y + 20;
+        int j = 0;
         for (int i = 0; i < info_count; i++)
         {
             if (info[i].text)
-                sdl2_font_draw(ctx->font, SDL2F_FONT_COPY, info[i].text, PLAY_AREA_X + 30,
-                               PLAY_AREA_Y + 90 + i * 22, green);
+            {
+                SDL_Color clr = (j % 2) ? green_bright : green_dark;
+                sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_COPY, info[i].text, text_y, clr,
+                                              PLAY_AREA_W + 2 * PLAY_AREA_X);
+                j++;
+            }
+            text_y += 24;
         }
 
+        /* Key bindings — original/keysedit.c:186-210 */
         const keys_binding_entry_t *bindings = NULL;
         int bind_count = keys_system_get_editor_bindings(ctx->keys, &bindings);
-
-        SDL_Color yellow = {255, 255, 0, 255};
-        int start_y = PLAY_AREA_Y + 90 + info_count * 22 + 20;
+        int start_y = text_y + 20;
         for (int i = 0; i < bind_count; i++)
         {
             int x = (bindings[i].column == 0) ? PLAY_AREA_X + 30 : PLAY_AREA_X + 270;
             int row = (bindings[i].column == 0) ? i : i - 5;
-            sdl2_font_draw(ctx->font, SDL2F_FONT_COPY, bindings[i].text, x, start_y + row * 24,
-                           yellow);
+            sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_TEXT, bindings[i].text, x,
+                                  start_y + row * 30, yellow);
         }
+
+        /* Bottom separator — original/keysedit.c:215 */
+        int bot_y = start_y + 5 * 30 + 15;
+        SDL_SetRenderDrawColor(sdl, 0, 0, 0, 255);
+        SDL_RenderDrawLine(sdl, PLAY_AREA_X + 32, bot_y + 2, PLAY_AREA_X + PLAY_AREA_W - 28,
+                           bot_y + 2);
+        SDL_SetRenderDrawColor(sdl, 255, 255, 255, 255);
+        SDL_RenderDrawLine(sdl, PLAY_AREA_X + 30, bot_y, PLAY_AREA_X + PLAY_AREA_W - 30, bot_y);
+
+        /* "Insert coin to start the game" — original/keysedit.c:201-202 */
+        SDL_Color tan_clr = {210, 180, 140, 255};
+        sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TEXT, "Insert coin to start the game",
+                                      PLAY_AREA_Y + PLAY_AREA_H - 30, tan_clr,
+                                      PLAY_AREA_W + 2 * PLAY_AREA_X);
     }
 
     if (state == KEYS_STATE_SPARKLE)
@@ -535,11 +926,58 @@ void game_render_bonus(const game_ctx_t *ctx)
 
     if (state >= BONUS_STATE_BONUS)
     {
-        int coins = bonus_system_get_coins(ctx->bonus);
-        char buf[64];
-        snprintf(buf, sizeof(buf), "Bonus Coins: %d x 3000 = %d", coins, coins * 3000);
-        sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_DATA, buf, PLAY_AREA_Y + 200, green,
-                                      PLAY_AREA_W);
+        /* Animated coin row: draw one BONUS_BLK sprite per coin already
+         * consumed by the state machine (initial_coins - live_coins).
+         * Mirrors original/bonus.c:280-389 DoBonuses centred-row layout.
+         *
+         * Fallback labels for the non-animated paths in the original:
+         *   timer-void (time_bonus_secs == 0): bonus_system skips coin
+         *     drain entirely so initial > 0 yet drawn == 0 — show the
+         *     "Bonus coins void" message (original/bonus.c:288-303).
+         *   no-coins (initial == 0): "Sorry, no bonus coins collected"
+         *     (original/bonus.c:312-328).
+         *   super-bonus (initial > 8): one-shot "Super Bonus - N"
+         *     (original/bonus.c:330-351). */
+        int initial = bonus_system_get_initial_coins(ctx->bonus);
+        int live = bonus_system_get_coins(ctx->bonus);
+        int drawn = initial - live;
+        int time_secs = bonus_system_get_time_bonus_secs(ctx->bonus);
+        SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
+        int center_x = PLAY_AREA_X + PLAY_AREA_W / 2;
+        int row_y = PLAY_AREA_Y + 200;
+        sdl2_texture_info_t coin_tex;
+        if (time_secs == 0 && initial > 0)
+        {
+            sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_DATA,
+                                          "Bonus coins void - Timer ran out!", row_y, green,
+                                          PLAY_AREA_W);
+        }
+        else if (initial > 0 && initial <= 8 && drawn > 0 &&
+                 sdl2_texture_get(ctx->texture, SPR_BLOCK_BONUS_1, &coin_tex) == SDL2T_OK)
+        {
+            for (int i = 0; i < drawn && i < initial; i++)
+            {
+                SDL_Rect dst = {.x = bonus_row_item_x(center_x, initial, BONUS_COIN_STRIDE,
+                                                      BONUS_COIN_PADDING, i),
+                                .y = row_y,
+                                .w = coin_tex.width,
+                                .h = coin_tex.height};
+                SDL_RenderCopy(sdl, coin_tex.texture, NULL, &dst);
+            }
+        }
+        else if (initial == 0)
+        {
+            sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_DATA,
+                                          "Sorry, no bonus coins collected.", row_y, green,
+                                          PLAY_AREA_W);
+        }
+        else if (initial > 8)
+        {
+            char buf[64];
+            snprintf(buf, sizeof(buf), "Super Bonus - %d", initial);
+            sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TITLE, buf, row_y, green,
+                                          PLAY_AREA_W);
+        }
     }
 
     if (state >= BONUS_STATE_LEVEL)
@@ -551,8 +989,36 @@ void game_render_bonus(const game_ctx_t *ctx)
     }
 
     if (state >= BONUS_STATE_BULLET)
-        sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_DATA, "Bullet Bonus...",
-                                      PLAY_AREA_Y + 280, green, PLAY_AREA_W);
+    {
+        /* Animated bullet row: same pattern as coins but stride 10.
+         * Mirrors original/bonus.c:431-490 DoBullets. */
+        int initial_b = bonus_system_get_initial_bullets(ctx->bonus);
+        int live_b = bonus_system_get_bullets(ctx->bonus);
+        int drawn_b = initial_b - live_b;
+        SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
+        int center_x = PLAY_AREA_X + PLAY_AREA_W / 2;
+        int row_y = PLAY_AREA_Y + 280;
+        sdl2_texture_info_t bullet_tex;
+        if (initial_b > 0 && drawn_b > 0 &&
+            sdl2_texture_get(ctx->texture, SPR_BULLET, &bullet_tex) == SDL2T_OK)
+        {
+            for (int i = 0; i < drawn_b && i < initial_b; i++)
+            {
+                SDL_Rect dst = {.x = bonus_row_item_x(center_x, initial_b, BONUS_BULLET_STRIDE,
+                                                      BONUS_BULLET_PADDING, i),
+                                .y = row_y,
+                                .w = bullet_tex.width,
+                                .h = bullet_tex.height};
+                SDL_RenderCopy(sdl, bullet_tex.texture, NULL, &dst);
+            }
+        }
+        else if (initial_b == 0)
+        {
+            sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_DATA,
+                                          "You have used all your bullets. No bonus!", row_y, green,
+                                          PLAY_AREA_W);
+        }
+    }
 
     if (state >= BONUS_STATE_TIME)
         sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_DATA, "Time Bonus...",
@@ -577,84 +1043,222 @@ void game_render_highscore(const game_ctx_t *ctx)
     if (state == HIGHSCORE_STATE_NONE)
         return;
 
+    SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
+
+    /* Space background — original/highscore.c:188 BACKGROUND_SPACE */
+    sdl2_texture_info_t space_bg;
+    if (sdl2_texture_get(ctx->texture, SPR_BGRND_SPACE, &space_bg) == SDL2T_OK &&
+        space_bg.width > 0 && space_bg.height > 0)
+    {
+        for (int ty = PLAY_AREA_Y; ty < PLAY_AREA_Y + PLAY_AREA_H; ty += space_bg.height)
+        {
+            for (int tx = PLAY_AREA_X; tx < PLAY_AREA_X + PLAY_AREA_W; tx += space_bg.width)
+            {
+                int dw = space_bg.width;
+                int dh = space_bg.height;
+                if (tx + dw > PLAY_AREA_X + PLAY_AREA_W)
+                    dw = PLAY_AREA_X + PLAY_AREA_W - tx;
+                if (ty + dh > PLAY_AREA_Y + PLAY_AREA_H)
+                    dh = PLAY_AREA_Y + PLAY_AREA_H - ty;
+                SDL_Rect src = {0, 0, dw, dh};
+                SDL_Rect dst = {tx, ty, dw, dh};
+                SDL_RenderCopy(sdl, space_bg.texture, &src, &dst);
+            }
+        }
+    }
+
+    /* Earth globe — original/highscore.c:192-193 */
+    sdl2_texture_info_t earth;
+    if (sdl2_texture_get(ctx->texture, SPR_PRESENTS_EARTH, &earth) == SDL2T_OK)
+    {
+        int ex = PLAY_AREA_X + PLAY_AREA_W / 2 - earth.width / 2;
+        int ey = PLAY_AREA_Y + PLAY_AREA_H / 2 - earth.height / 2 + 40;
+        SDL_Rect dst = {ex, ey, earth.width, earth.height};
+        SDL_RenderCopy(sdl, earth.texture, NULL, &dst);
+    }
+
+    /* Red border — original/highscore.c uses red XSetWindowBorder */
+    if (state == HIGHSCORE_STATE_SPARKLE)
+    {
+        game_render_border_glow(ctx);
+    }
+    else
+    {
+        SDL_SetRenderDrawColor(sdl, 200, 0, 0, 255);
+        int bx = PLAY_AREA_X - 2;
+        int by = PLAY_AREA_Y - 2;
+        int bw = PLAY_AREA_W + 4;
+        int bh = PLAY_AREA_H + 4;
+        SDL_Rect top = {bx, by, bw, 2};
+        SDL_Rect bottom = {bx, by + bh - 2, bw, 2};
+        SDL_Rect left = {bx, by, 2, bh};
+        SDL_Rect right = {bx + bw - 2, by, 2, bh};
+        SDL_RenderFillRect(sdl, &top);
+        SDL_RenderFillRect(sdl, &bottom);
+        SDL_RenderFillRect(sdl, &left);
+        SDL_RenderFillRect(sdl, &right);
+    }
+
+    /* "HIGH SCORES" title bitmap — original/highscore.c:191 at (59,20) */
+    sdl2_texture_info_t title_tex;
+    if (sdl2_texture_get(ctx->texture, SPR_HIGHSCORE, &title_tex) == SDL2T_OK)
+    {
+        SDL_Rect dst = {PLAY_AREA_X + 59 - 35, PLAY_AREA_Y + 20, title_tex.width, title_tex.height};
+        SDL_RenderCopy(sdl, title_tex.texture, NULL, &dst);
+    }
+
     SDL_Color white = {255, 255, 255, 255};
     SDL_Color yellow = {255, 255, 0, 255};
     SDL_Color green = {0, 255, 0, 255};
     SDL_Color red = {255, 80, 80, 255};
+    SDL_Color tan_clr = {210, 180, 140, 255};
 
-    /* Title */
+    /* "Boing Master" + name + wisdom — original/highscore.c:229-241 */
+    int ym = PLAY_AREA_Y + 75;
+    int fw = PLAY_AREA_W + 2 * PLAY_AREA_X;
+    sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TEXT, "Boing Master", ym, red, fw);
+    ym += 31;
+
+    const highscore_table_t *table = highscore_system_get_table(ctx->highscore_display);
+    if (table && table->entries[0].name[0] != '\0')
+    {
+        sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TITLE, table->entries[0].name, ym,
+                                      yellow, fw);
+        ym += 31;
+        sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_COPY, table->master_text, ym, green,
+                                      fw);
+        ym += 44;
+    }
+    else
+    {
+        sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TITLE, "To be announced!", ym, yellow,
+                                      fw);
+        ym += 31;
+        sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_COPY, "Anyone play this game?", ym,
+                                      green, fw);
+        ym += 44;
+    }
+
+    /* Section title — original/highscore.c:248-252 */
     highscore_type_t type = highscore_system_get_type(ctx->highscore_display);
-    const char *title = (type == HIGHSCORE_TYPE_GLOBAL) ? "Hall of Fame" : "Personal Best";
-    sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TITLE, title, PLAY_AREA_Y + 20, red,
-                                  PLAY_AREA_W);
+    const char *section =
+        (type == HIGHSCORE_TYPE_GLOBAL) ? "- The Roll of Honour -" : "- Personal Best -";
+    sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TEXT, section, ym, red, fw);
 
-    /* Score table */
+    /* Column headers + table — original/highscore.c:254-381 */
     if (state >= HIGHSCORE_STATE_SHOW)
     {
-        const highscore_table_t *table = highscore_system_get_table(ctx->highscore_display);
+        int xr = PLAY_AREA_X + 30;
+        int xs = xr + 30;
+        int xl = xs + 75;
+        int xt = xl + 40;
+        int xg = xt + 65;
+        int xn = xg + 95;
+        int y = PLAY_AREA_Y + 200;
+
+        sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_TEXT, "#", xr, y, yellow);
+        sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_TEXT, "Score", xs, y, yellow);
+        sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_TEXT, "L", xl, y, yellow);
+        sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_TEXT, "Time", xt, y, yellow);
+        sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_TEXT, "Date", xg, y, yellow);
+        sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_TEXT, "Player", xn, y, yellow);
+
+        y += 24;
+        SDL_SetRenderDrawColor(sdl, 0, 0, 0, 255);
+        SDL_RenderDrawLine(sdl, PLAY_AREA_X + 22, y + 2, PLAY_AREA_X + PLAY_AREA_W - 18, y + 2);
+        SDL_SetRenderDrawColor(sdl, 255, 255, 255, 255);
+        SDL_RenderDrawLine(sdl, PLAY_AREA_X + 20, y, PLAY_AREA_X + PLAY_AREA_W - 20, y);
+        y += 18;
+
         if (!table)
             return;
 
-        /* Boing master name and words of wisdom (above table) */
-        int ym = PLAY_AREA_Y + 55;
-        if (table->master_name[0] != '\0')
-        {
-            sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TITLE, table->master_name, ym,
-                                          yellow, PLAY_AREA_W);
-            ym += 25;
-
-            if (table->master_text[0] != '\0')
-            {
-                sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_DATA, table->master_text, ym,
-                                              green, PLAY_AREA_W);
-            }
-        }
-        ym += 25;
-
-        /* Column positions for fixed alignment */
-        int col_rank = PLAY_AREA_X + 20;
-        int col_name = PLAY_AREA_X + 55;
-        int col_score = PLAY_AREA_X + 280;
-        int col_score_w = 80; /* right-edge offset for score right-alignment */
-        int col_level = PLAY_AREA_X + 380;
-
         unsigned long current = highscore_system_get_current_score(ctx->highscore_display);
 
-        int row = 0;
         for (int i = 0; i < HIGHSCORE_NUM_ENTRIES; i++)
         {
-            if (table->entries[i].score == 0)
-                continue;
+            char buf[80];
+            SDL_Color rank_clr = tan_clr;
+            SDL_Color score_clr = red;
+            SDL_Color time_clr = tan_clr;
+            SDL_Color date_clr = white;
+            SDL_Color name_clr = yellow;
 
-            int y = ym + row * 32;
-            row++;
+            if (table->entries[i].score == current && current > 0)
+            {
+                rank_clr = green;
+                score_clr = green;
+                time_clr = green;
+                date_clr = green;
+                name_clr = green;
+            }
 
-            /* Highlight the player's score */
-            SDL_Color clr = (table->entries[i].score == current) ? green : white;
+            if (table->entries[i].score > 0)
+            {
+                snprintf(buf, sizeof(buf), "%d", i + 1);
+                sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_TEXT, buf, xr, y, rank_clr);
 
-            /* Rank */
-            char rank_buf[8];
-            snprintf(rank_buf, sizeof(rank_buf), "%2d.", i + 1);
-            sdl2_font_draw(ctx->font, SDL2F_FONT_DATA, rank_buf, col_rank, y, clr);
+                snprintf(buf, sizeof(buf), "%lu", table->entries[i].score);
+                sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_TEXT, buf, xs, y, score_clr);
 
-            /* Name */
-            sdl2_font_draw(ctx->font, SDL2F_FONT_DATA, table->entries[i].name, col_name, y, clr);
+                snprintf(buf, sizeof(buf), "%lu", table->entries[i].level);
+                sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_TEXT, buf, xl, y, green);
 
-            /* Score (right-aligned) */
-            char score_buf[24];
-            snprintf(score_buf, sizeof(score_buf), "%lu", table->entries[i].score);
-            sdl2_font_metrics_t sm;
-            int score_w = 0;
-            if (sdl2_font_measure(ctx->font, SDL2F_FONT_DATA, score_buf, &sm) == SDL2F_OK)
-                score_w = sm.width;
-            sdl2_font_draw(ctx->font, SDL2F_FONT_DATA, score_buf, col_score + col_score_w - score_w,
-                           y, clr);
+                if (table->entries[i].game_time > 0)
+                {
+                    unsigned long gt = table->entries[i].game_time;
+                    snprintf(buf, sizeof(buf), "%lu'%lu'%lu\"", gt / 3600, gt / 60, gt % 60);
+                }
+                else
+                {
+                    snprintf(buf, sizeof(buf), "--");
+                }
+                sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_TEXT, buf, xt, y, time_clr);
 
-            /* Level */
-            char level_buf[16];
-            snprintf(level_buf, sizeof(level_buf), "Lv.%lu", table->entries[i].level);
-            sdl2_font_draw(ctx->font, SDL2F_FONT_DATA, level_buf, col_level, y, clr);
+                if (table->entries[i].timestamp > 0)
+                {
+                    time_t t = (time_t)table->entries[i].timestamp;
+                    const struct tm *tm = localtime(&t);
+                    if (tm)
+                    {
+                        static const char *months[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                                                       "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+                        snprintf(buf, sizeof(buf), "%02d %s %02d", tm->tm_mday, months[tm->tm_mon],
+                                 tm->tm_year % 100);
+                    }
+                    else
+                    {
+                        snprintf(buf, sizeof(buf), "--");
+                    }
+                }
+                else
+                {
+                    snprintf(buf, sizeof(buf), "--");
+                }
+                sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_TEXT, buf, xg, y, date_clr);
+
+                sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_TEXT, table->entries[i].name, xn, y,
+                                      name_clr);
+            }
+            else
+            {
+                snprintf(buf, sizeof(buf), "%d", i + 1);
+                sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_TEXT, buf, xr, y, tan_clr);
+                sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_TEXT, "--", xs, y, red);
+                sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_TEXT, "--", xl, y, green);
+                sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_TEXT, "--", xt, y, tan_clr);
+                sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_TEXT, "--", xg, y, white);
+                sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_TEXT, "--", xn, y, yellow);
+            }
+
+            y += 28;
         }
+
+        /* Bottom separator — original/highscore.c:379-381 */
+        SDL_SetRenderDrawColor(sdl, 0, 0, 0, 255);
+        SDL_RenderDrawLine(sdl, PLAY_AREA_X + 22, y + 2, PLAY_AREA_X + PLAY_AREA_W - 18, y + 2);
+        SDL_SetRenderDrawColor(sdl, 255, 255, 255, 255);
+        SDL_RenderDrawLine(sdl, PLAY_AREA_X + 20, y, PLAY_AREA_X + PLAY_AREA_W - 20, y);
     }
 
     /* Title sparkle */
@@ -669,7 +1273,8 @@ void game_render_highscore(const game_ctx_t *ctx)
         }
     }
 
-    /* "Press SPACE to continue" */
-    sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_COPY, "Press SPACE to continue",
-                                  PLAY_AREA_Y + PLAY_AREA_H - 40, yellow, PLAY_AREA_W);
+    /* "Insert coin to start the game" — original/highscore.c:196 */
+    sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TEXT, "Insert coin to start the game",
+                                  PLAY_AREA_Y + PLAY_AREA_H - 40, tan_clr,
+                                  PLAY_AREA_W + 2 * PLAY_AREA_X);
 }

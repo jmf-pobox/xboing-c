@@ -60,6 +60,7 @@ static int start_game_session(game_session_t *s, const replay_event_t *extra_scr
     if (!s->ctx)
         return -1;
 
+    s->ctx->config.use_keys = true;
     sdl2_state_transition(s->ctx->state, SDL2ST_PRESENTS);
     replay_init(&s->rctx, s->ctx, extra_script);
     return 0;

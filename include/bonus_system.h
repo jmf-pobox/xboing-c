@@ -158,6 +158,31 @@ void bonus_system_dec_coins(bonus_system_t *ctx);
 /* Return the current bonus coin count */
 int bonus_system_get_coins(const bonus_system_t *ctx);
 
+/*
+ * Return the initial coin count captured at bonus_system_begin.
+ * Used by the renderer to compute how many coin sprites to draw during
+ * the per-frame decrement animation: drawn = initial - live.
+ */
+int bonus_system_get_initial_coins(const bonus_system_t *ctx);
+
+/* Return the current bullet count (decrements during BONUS_STATE_BULLET) */
+int bonus_system_get_bullets(const bonus_system_t *ctx);
+
+/*
+ * Return the initial bullet count captured at bonus_system_begin.
+ * Renderer counterpart to bonus_system_get_initial_coins for bullet rows.
+ */
+int bonus_system_get_initial_bullets(const bonus_system_t *ctx);
+
+/*
+ * Return the level time-bonus seconds captured at bonus_system_begin.
+ * Renderer uses this to detect the "timer ran out" path: when
+ * time_bonus_secs == 0 the state machine skips coin animation and
+ * the renderer must show "Bonus coins void - Timer ran out!" instead.
+ * Matches original/bonus.c:288-303.
+ */
+int bonus_system_get_time_bonus_secs(const bonus_system_t *ctx);
+
 /* Reset the bonus coin count to 0 */
 void bonus_system_reset_coins(bonus_system_t *ctx);
 

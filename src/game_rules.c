@@ -14,6 +14,7 @@
 #include <stdlib.h>
 
 #include "ball_system.h"
+#include "ball_types.h"
 #include "block_system.h"
 #include "block_types.h"
 #include "eyedude_system.h"
@@ -27,12 +28,6 @@
 #include "sdl2_audio.h"
 #include "sdl2_state.h"
 #include "special_system.h"
-
-/* Play area constants */
-#define GAME_PLAY_WIDTH 495
-#define GAME_PLAY_HEIGHT 580
-#define GAME_COL_WIDTH (GAME_PLAY_WIDTH / 9)
-#define GAME_ROW_HEIGHT (GAME_PLAY_HEIGHT / 18)
 
 /* Legacy bonus spawning constants */
 #define BONUS_SEED 2000
@@ -211,19 +206,29 @@ void game_rules_next_level(game_ctx_t *ctx)
     if (title)
         message_system_set_default(ctx->message, title);
 
-    /* Reset paddle to center, place new ball */
+    /* Reset paddle to center, clear reverse, place new ball.
+     * Matches original/file.c:122 — SetReverseOff() inside SetupStage. */
     paddle_system_reset(ctx->paddle);
+    paddle_system_set_reverse(ctx->paddle, 0);
     paddle_system_set_size(ctx->paddle, PADDLE_SIZE_HUGE);
 
     ball_system_env_t env = game_callbacks_ball_env(ctx);
     ball_system_reset_start(ctx->ball, &env);
 
-    /* Give ammo for the new level */
+    /* Reset unlimited and give ammo for the new level.
+     * original/file.c:115 — SetUnlimitedBullets(False) before SetNumberBullets. */
+    gun_system_set_unlimited(ctx->gun, 0);
     gun_system_set_ammo(ctx->gun, GUN_AMMO_PER_LEVEL);
 
     /* Reset bonus spawning state */
     ctx->bonus_block_active = false;
     ctx->next_bonus_frame = 0;
+
+    /* Reset BONUS_BLK pickup counter — original calls ResetNumberBonus
+     * during level load (original/file.c:328-333).  Without this the
+     * killer-mode-at-10 threshold could be tripped by carrying BONUS_BLK
+     * pickups across multiple levels. */
+    ctx->bonus_count = 0;
 
     if (ctx->audio)
         sdl2_audio_play(ctx->audio, "applause");
@@ -255,10 +260,23 @@ void game_rules_ball_died(game_ctx_t *ctx)
         return;
     }
 
-    /* Still have lives — reset ball on paddle */
+    /* Still have lives — reset ball on paddle.
+     * Clear reverse here: matches original/level.c:492 — SetReverseOff()
+     * inside DeadBall, before ResetBallStart. */
     if (ctx->audio)
         sdl2_audio_play(ctx->audio, "balllost");
 
+    /* Grant +2 ammo as consolation — original/ball.c:1803-1805.
+     * Skip when unlimited is active: MAXAMMO_BLK sets ammo to GUN_MAX_AMMO+1
+     * as a sentinel, but gun_system_add_ammo clamps to GUN_MAX_AMMO, so the
+     * +2 here would silently reduce 21→20. */
+    if (!gun_system_get_unlimited(ctx->gun))
+    {
+        gun_system_add_ammo(ctx->gun);
+        gun_system_add_ammo(ctx->gun);
+    }
+
+    paddle_system_set_reverse(ctx->paddle, 0);
     ball_system_env_t env = game_callbacks_ball_env(ctx);
     ball_system_reset_start(ctx->ball, &env);
 }
@@ -282,4 +300,31 @@ void game_rules_check(game_ctx_t *ctx)
     /* Bonus block spawning */
     int frame = (int)sdl2_state_frame(ctx->state);
     try_spawn_bonus(ctx, frame);
+}
+
+void game_rules_check_ball_eyedude(game_ctx_t *ctx)
+{
+    if (!ctx || !ctx->eyedude || !ctx->ball)
+        return;
+
+    if (eyedude_system_get_state(ctx->eyedude) != EYEDUDE_STATE_WALK)
+        return;
+
+    for (int i = 0; i < MAX_BALLS; i++)
+    {
+        enum BallStates bs = ball_system_get_state(ctx->ball, i);
+        if (bs != BALL_ACTIVE)
+            continue;
+
+        int bx = 0;
+        int by = 0;
+        if (ball_system_get_position(ctx->ball, i, &bx, &by) != BALL_SYS_OK)
+            continue;
+
+        if (eyedude_system_check_collision(ctx->eyedude, bx, by, BALL_WC, BALL_HC))
+        {
+            eyedude_system_set_state(ctx->eyedude, EYEDUDE_STATE_DIE);
+            return;
+        }
+    }
 }

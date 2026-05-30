@@ -42,7 +42,7 @@
 #define INTRO_BLOCK_TEXT_OFFSET 60
 
 /* Instruction text */
-#define INSTRUCT_TEXT_LINES 20
+#define INSTRUCT_TEXT_LINES 21
 #define INSTRUCT_GAP 5
 
 /* =========================================================================
@@ -62,7 +62,7 @@ typedef enum
     INTRO_STATE_TITLE,
     INTRO_STATE_BLOCKS,
     INTRO_STATE_TEXT,
-    INTRO_STATE_SPARKLE,
+    INTRO_STATE_EXPLODE,
     INTRO_STATE_FINISH,
     INTRO_STATE_WAIT
 } intro_state_t;

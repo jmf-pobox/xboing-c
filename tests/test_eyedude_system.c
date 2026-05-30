@@ -445,6 +445,57 @@ static void test_null_safety(void **state)
 }
 
 /* =========================================================================
+ * Group 7: Savegame v2 — get_save_state / restore round-trip
+ * ========================================================================= */
+
+static void test_save_restore_roundtrip(void **state)
+{
+    (void)state;
+    eyedude_system_t *ctx = eyedude_system_create(NULL, NULL, NULL);
+
+    /* Drive into a known walk state by triggering reset → walk. */
+    eyedude_system_set_state(ctx, EYEDUDE_STATE_RESET);
+    eyedude_system_update(ctx, 60, 495);
+
+    eyedude_save_state_t snapshot = eyedude_system_get_save_state(ctx);
+
+    /* Destroy and recreate fresh — restore must repopulate everything. */
+    eyedude_system_destroy(ctx);
+    ctx = eyedude_system_create(NULL, NULL, NULL);
+
+    eyedude_system_restore(ctx, &snapshot);
+    eyedude_save_state_t after = eyedude_system_get_save_state(ctx);
+
+    assert_int_equal(after.state, snapshot.state);
+    assert_int_equal(after.dir, snapshot.dir);
+    assert_int_equal(after.x, snapshot.x);
+    assert_int_equal(after.y, snapshot.y);
+    assert_int_equal(after.slide, snapshot.slide);
+    assert_int_equal(after.inc, snapshot.inc);
+    assert_int_equal(after.turn, snapshot.turn);
+
+    eyedude_system_destroy(ctx);
+}
+
+static void test_save_state_null_ctx(void **state)
+{
+    (void)state;
+    eyedude_save_state_t s = eyedude_system_get_save_state(NULL);
+    assert_int_equal(s.state, EYEDUDE_STATE_NONE);
+}
+
+static void test_restore_null_args(void **state)
+{
+    (void)state;
+    /* No crash, no effect. */
+    eyedude_system_restore(NULL, NULL);
+
+    eyedude_system_t *ctx = eyedude_system_create(NULL, NULL, NULL);
+    eyedude_system_restore(ctx, NULL);
+    eyedude_system_destroy(ctx);
+}
+
+/* =========================================================================
  * Test runner
  * ========================================================================= */
 
@@ -478,6 +529,11 @@ int main(void)
 
         /* Group 6: Null safety */
         cmocka_unit_test(test_null_safety),
+
+        /* Group 7: Savegame v2 accessors */
+        cmocka_unit_test(test_save_restore_roundtrip),
+        cmocka_unit_test(test_save_state_null_ctx),
+        cmocka_unit_test(test_restore_null_args),
     };
 
     return cmocka_run_group_tests(tests, NULL, NULL);

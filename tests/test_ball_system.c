@@ -111,8 +111,7 @@ typedef struct
     int hit_col;
     int hit_region;
     int check_count;
-    /* on_block_hit: return value (0 = bounce, nonzero = no bounce) */
-    int block_hit_return;
+    block_hit_result_t block_hit_return;
     int block_hit_count;
     int block_hit_row;
     int block_hit_col;
@@ -136,7 +135,7 @@ static int cb_check_region(int row, int col, int bx, int by, int bdx, void *ud)
     return BALL_REGION_NONE;
 }
 
-static int cb_on_block_hit(int row, int col, int ball_index, void *ud)
+static block_hit_result_t cb_on_block_hit(int row, int col, int ball_index, void *ud)
 {
     test_block_cb_t *bc = (test_block_cb_t *)ud;
     (void)ball_index;
@@ -1465,6 +1464,247 @@ static void test_split_full_shows_message(void **state)
  * Main
  * ========================================================================= */
 
+/* =========================================================================
+ * Group 13: Guide animation rate (basket 6, xboing-c-xny)
+ *
+ * The launch guide oscillator advances only when
+ * env->frame % (BALL_FRAME_RATE * 8) == 0 — every 40 frames.
+ * Earlier modern code used `* 3` (every 15 frames), 2.67x too fast vs
+ * original/ball.c:456.
+ * ========================================================================= */
+
+static void test_guide_advances_only_at_8x_frame_rate(void **state)
+{
+    (void)state;
+    ball_system_t *ctx = ball_system_create(NULL, NULL, NULL);
+    assert_non_null(ctx);
+
+    /* Add a ball at frame 0 and move to BALL_READY.  change_mode(READY)
+     * doesn't set nextFrame, but ball_system_add sets it to
+     * env.frame + BIRTH_FRAME_RATE = 5.  The BALL_READY auto-activate
+     * guard fires at env->frame >= nextFrame, so we need nextFrame
+     * ahead of our test range.  Transition through the create animation
+     * naturally to reach READY with a proper nextFrame. */
+    ball_system_env_t env = make_env(0);
+    int idx = ball_system_add(ctx, &env, 247, 522, 0, 0, NULL);
+    assert_int_not_equal(idx, -1);
+
+    /* Run create animation to completion (BIRTH_SLIDES=8 * BIRTH_FRAME_RATE=5
+     * = 40 frames), reaching BALL_READY with nextFrame = 40 + 3000 = 3040. */
+    for (int f = 1; f <= 50; f++)
+    {
+        env.frame = f;
+        ball_system_update(ctx, &env);
+    }
+
+    /* Capture initial guide state. */
+    ball_system_guide_info_t g0 = ball_system_get_guide_info(ctx);
+    int base = 80; /* multiple of 40, well below nextFrame ~3040 */
+
+    /* Drive frames base+1..base+39: outer modulus fires at multiples of
+     * BALL_FRAME_RATE.  None of those are multiples of
+     * BALL_FRAME_RATE * 8 = 40 (since base=80 is itself a multiple of
+     * 40), so guide.pos must NOT change. */
+    for (int f = 1; f < 40; f++)
+    {
+        env.frame = base + f;
+        ball_system_update(ctx, &env);
+        ball_system_guide_info_t g = ball_system_get_guide_info(ctx);
+        if (g.pos != g0.pos)
+        {
+            fail_msg("guide.pos changed at frame %d (expected change only at multiples of 40)",
+                     env.frame);
+        }
+    }
+
+    /* Frame base+40 IS a multiple of 40 — guide.pos should change. */
+    env.frame = base + 40;
+    ball_system_update(ctx, &env);
+    ball_system_guide_info_t g40 = ball_system_get_guide_info(ctx);
+    assert_int_not_equal(g40.pos, g0.pos);
+
+    /* Frames base+41..base+79 must hold the new value. */
+    for (int f = 41; f < 80; f++)
+    {
+        env.frame = base + f;
+        ball_system_update(ctx, &env);
+        ball_system_guide_info_t g = ball_system_get_guide_info(ctx);
+        if (g.pos != g40.pos)
+        {
+            fail_msg("guide.pos changed at frame %d (expected hold between multiples of 40)",
+                     env.frame);
+        }
+    }
+
+    ball_system_destroy(ctx);
+}
+
+/* =========================================================================
+ * Savegame v2 accessors — get_velocity, get_wait_mode, restore
+ * ========================================================================= */
+
+static void test_get_velocity_default_zero(void **state)
+{
+    (void)state;
+    ball_system_t *ctx = ball_system_create(NULL, NULL, NULL);
+
+    int dx = 99, dy = 99;
+    ball_system_status_t st = ball_system_get_velocity(ctx, 0, &dx, &dy);
+    assert_int_equal(st, BALL_SYS_OK);
+    /* Default ball slot has zero velocity. */
+    assert_int_equal(dx, 0);
+    assert_int_equal(dy, 0);
+
+    ball_system_destroy(ctx);
+}
+
+static void test_get_velocity_invalid_index(void **state)
+{
+    (void)state;
+    ball_system_t *ctx = ball_system_create(NULL, NULL, NULL);
+
+    int dx = 0, dy = 0;
+    assert_int_equal(ball_system_get_velocity(ctx, -1, &dx, &dy),
+                     BALL_SYS_ERR_INVALID_INDEX);
+    assert_int_equal(ball_system_get_velocity(ctx, MAX_BALLS, &dx, &dy),
+                     BALL_SYS_ERR_INVALID_INDEX);
+
+    ball_system_destroy(ctx);
+}
+
+static void test_get_velocity_null_args(void **state)
+{
+    (void)state;
+    ball_system_t *ctx = ball_system_create(NULL, NULL, NULL);
+    int dx = 0, dy = 0;
+    assert_int_equal(ball_system_get_velocity(NULL, 0, &dx, &dy), BALL_SYS_ERR_NULL_ARG);
+    assert_int_equal(ball_system_get_velocity(ctx, 0, NULL, &dy), BALL_SYS_ERR_NULL_ARG);
+    assert_int_equal(ball_system_get_velocity(ctx, 0, &dx, NULL), BALL_SYS_ERR_NULL_ARG);
+    ball_system_destroy(ctx);
+}
+
+static void test_get_wait_mode_default(void **state)
+{
+    (void)state;
+    ball_system_t *ctx = ball_system_create(NULL, NULL, NULL);
+    assert_int_equal(ball_system_get_wait_mode(ctx, 0), BALL_NONE);
+    /* Invalid index also returns BALL_NONE (sentinel). */
+    assert_int_equal(ball_system_get_wait_mode(ctx, -1), BALL_NONE);
+    assert_int_equal(ball_system_get_wait_mode(NULL, 0), BALL_NONE);
+    ball_system_destroy(ctx);
+}
+
+static void test_restore_active_ball_roundtrip(void **state)
+{
+    (void)state;
+    ball_system_t *ctx = ball_system_create(NULL, NULL, NULL);
+
+    /* Restore a moving ball into slot 0. */
+    ball_system_status_t st = ball_system_restore(
+        ctx, 0, /*current_frame*/ 100, /*active*/ 1, BALL_ACTIVE, /*x*/ 247, /*y*/ 520,
+        /*dx*/ 3, /*dy*/ -4, /*wait_mode*/ BALL_NONE);
+    assert_int_equal(st, BALL_SYS_OK);
+
+    assert_int_equal(ball_system_get_state(ctx, 0), BALL_ACTIVE);
+    int bx, by;
+    ball_system_get_position(ctx, 0, &bx, &by);
+    assert_int_equal(bx, 247);
+    assert_int_equal(by, 520);
+
+    int dx, dy;
+    ball_system_get_velocity(ctx, 0, &dx, &dy);
+    assert_int_equal(dx, 3);
+    assert_int_equal(dy, -4);
+
+    assert_int_equal(ball_system_get_wait_mode(ctx, 0), BALL_NONE);
+
+    ball_system_destroy(ctx);
+}
+
+/* spec: BALL_CREATE in save data restores as BALL_READY (skip spawn animation). */
+static void test_restore_ball_create_becomes_ready(void **state)
+{
+    (void)state;
+    ball_system_t *ctx = ball_system_create(NULL, NULL, NULL);
+
+    ball_system_restore(ctx, 0, 100, 1, BALL_CREATE, 100, 100, 0, 0, BALL_NONE);
+
+    assert_int_equal(ball_system_get_state(ctx, 0), BALL_READY);
+
+    ball_system_destroy(ctx);
+}
+
+static void test_restore_invalid_index(void **state)
+{
+    (void)state;
+    ball_system_t *ctx = ball_system_create(NULL, NULL, NULL);
+    assert_int_equal(
+        ball_system_restore(ctx, -1, 100, 1, BALL_ACTIVE, 0, 0, 0, 0, BALL_NONE),
+        BALL_SYS_ERR_INVALID_INDEX);
+    assert_int_equal(
+        ball_system_restore(ctx, MAX_BALLS, 100, 1, BALL_ACTIVE, 0, 0, 0, 0, BALL_NONE),
+        BALL_SYS_ERR_INVALID_INDEX);
+    assert_int_equal(
+        ball_system_restore(NULL, 0, 100, 1, BALL_ACTIVE, 0, 0, 0, 0, BALL_NONE),
+        BALL_SYS_ERR_NULL_ARG);
+    ball_system_destroy(ctx);
+}
+
+/* Restored BALL_ACTIVE must not auto-tilt on first tick after restore
+ * (would randomize dx/dy and defeat the restored velocity). */
+static void test_restore_active_no_auto_tilt_first_tick(void **state)
+{
+    (void)state;
+    test_cb_log_t log = {0};
+    ball_system_callbacks_t cbs = make_test_callbacks();
+    ball_system_t *ctx = ball_system_create(&cbs, &log, NULL);
+
+    int save_frame = 1000;
+    ball_system_restore(ctx, 0, save_frame, /*active*/ 1, BALL_ACTIVE, /*x*/ 247, /*y*/ 400,
+                        /*dx*/ 3, /*dy*/ -4, /*wait_mode*/ BALL_NONE);
+
+    /* Tick one frame after restore.  No auto-tilt message should fire. */
+    ball_system_env_t env = make_env(save_frame + 1);
+    ball_system_update(ctx, &env);
+
+    /* No message means lastPaddleHitFrame was correctly set far in the
+     * future (current + PADDLE_BALL_FRAME_TILT), not 0. */
+    if (log.message_count > 0)
+    {
+        assert_string_not_equal(log.last_message, "Auto Tilt Activated");
+    }
+
+    /* Velocity preserved (no tilt randomization). */
+    int dx, dy;
+    ball_system_get_velocity(ctx, 0, &dx, &dy);
+    assert_int_equal(dx, 3);
+    assert_int_equal(dy, -4);
+
+    ball_system_destroy(ctx);
+}
+
+/* Restored BALL_READY must not auto-activate on first tick after restore. */
+static void test_restore_ready_no_auto_activate_first_tick(void **state)
+{
+    (void)state;
+    test_cb_log_t log = {0};
+    ball_system_callbacks_t cbs = make_test_callbacks();
+    ball_system_t *ctx = ball_system_create(&cbs, &log, NULL);
+
+    int save_frame = 1000;
+    ball_system_restore(ctx, 0, save_frame, 1, BALL_READY, 247, 528, 0, 0, BALL_NONE);
+
+    /* Tick one frame after restore.  Should still be in BALL_READY (the
+     * auto-activate timer was set to save_frame + BIRTH_FRAME_RATE, so
+     * at save_frame + 1 it has not yet expired). */
+    ball_system_env_t env = make_env(save_frame + 1);
+    ball_system_update(ctx, &env);
+
+    assert_int_equal(ball_system_get_state(ctx, 0), BALL_READY);
+
+    ball_system_destroy(ctx);
+}
+
 int main(void)
 {
     const struct CMUnitTest tests[] = {
@@ -1532,6 +1772,19 @@ int main(void)
         cmocka_unit_test(test_split_teleports_ball),
         cmocka_unit_test(test_split_adds_ball),
         cmocka_unit_test(test_split_full_shows_message),
+        /* Group 13: Guide animation rate (basket 6, xboing-c-xny) */
+        cmocka_unit_test(test_guide_advances_only_at_8x_frame_rate),
+
+        /* Group 14: Savegame v2 accessors */
+        cmocka_unit_test(test_get_velocity_default_zero),
+        cmocka_unit_test(test_get_velocity_invalid_index),
+        cmocka_unit_test(test_get_velocity_null_args),
+        cmocka_unit_test(test_get_wait_mode_default),
+        cmocka_unit_test(test_restore_active_ball_roundtrip),
+        cmocka_unit_test(test_restore_ball_create_becomes_ready),
+        cmocka_unit_test(test_restore_invalid_index),
+        cmocka_unit_test(test_restore_active_no_auto_tilt_first_tick),
+        cmocka_unit_test(test_restore_ready_no_auto_activate_first_tick),
     };
     return cmocka_run_group_tests(tests, NULL, NULL);
 }

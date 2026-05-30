@@ -6,6 +6,7 @@
 
 #include "intro_system.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 
 /* =========================================================================
@@ -31,7 +32,7 @@ static const intro_block_entry_t block_table[INTRO_BLOCK_TOTAL] = {
     {INTRO_BLK_TIMER, 260, 200, 10, 0, "- Extra Time"},
     {INTRO_BLK_BLACK, 260, 240, 0, 0, "- Solid wall"},
     {INTRO_BLK_BOMB, 260, 280, 9, 0, "- Bomb!"},
-    {INTRO_BLK_PADDLE, 260, 320, 20, 0, "- The Paddle"},
+    {INTRO_BLK_PADDLE, 260, 320, 0, 0, "- The Paddle"},
     {INTRO_BLK_BULLET_ITEM, 260, 360, 20, 5, "- Bullet"},
     {INTRO_BLK_DEATH, 260, 400, 8, 0, "- Instant Death!"},
     {INTRO_BLK_EXTRABALL, 260, 440, 10, 0, "- Extra Ball"},
@@ -64,6 +65,7 @@ static const intro_instruct_line_t instruct_lines[INSTRUCT_TEXT_LINES] = {
     {"Sometimes a special block may appear or be added to another block", 0, 1},
     {"that will effect the gameplay if hit. They also disappear randomly.", 0, 0},
     {NULL, 1, 0},
+    {"Please read the manual for more information on how to play.", 0, 1},
 };
 
 /* =========================================================================
@@ -203,7 +205,7 @@ static void do_text(intro_system_t *ctx)
     /* Text drawn once.  Advance to sparkle loop.
      * Sparkle state was initialized in begin(), matching legacy where
      * Reset*() sets up the frame counters before the state machine runs. */
-    ctx->state = INTRO_STATE_SPARKLE;
+    ctx->state = INTRO_STATE_EXPLODE;
 }
 
 static void do_sparkle(intro_system_t *ctx)
@@ -316,6 +318,7 @@ int intro_system_update(intro_system_t *ctx, int frame)
     ctx->sound.volume = 0;
     ctx->blink_active = 0;
 
+    intro_state_t prev = ctx->state;
     switch (ctx->state)
     {
         case INTRO_STATE_TITLE:
@@ -327,7 +330,7 @@ int intro_system_update(intro_system_t *ctx, int frame)
         case INTRO_STATE_TEXT:
             do_text(ctx);
             break;
-        case INTRO_STATE_SPARKLE:
+        case INTRO_STATE_EXPLODE:
             do_sparkle(ctx);
             break;
         case INTRO_STATE_FINISH:
@@ -336,6 +339,15 @@ int intro_system_update(intro_system_t *ctx, int frame)
         case INTRO_STATE_WAIT:
         case INTRO_STATE_NONE:
             break;
+    }
+
+    if (ctx->state != prev && getenv("XBOING_LOG_TRANSITIONS"))
+    {
+        static const char *const names[] = {"NONE",    "TITLE",  "BLOCKS", "TEXT",
+                                            "SPARKLE", "FINISH", "WAIT"};
+        unsigned int pi = ((unsigned int)prev <= 6) ? (unsigned int)prev : 0;
+        unsigned int ci = ((unsigned int)ctx->state <= 6) ? (unsigned int)ctx->state : 0;
+        fprintf(stderr, "XBOING_INTRO: %s -> %s frame=%d\n", names[pi], names[ci], frame);
     }
 
     return ctx->finished ? 0 : 1;
@@ -397,7 +409,7 @@ void intro_system_get_sparkle_info(const intro_system_t *ctx, intro_sparkle_info
     out->x = ctx->sparkle_x;
     out->y = ctx->sparkle_y;
     out->frame_index = ctx->sparkle_frame;
-    out->active = (ctx->state == INTRO_STATE_SPARKLE && !ctx->finished) ? 1 : 0;
+    out->active = (ctx->state == INTRO_STATE_EXPLODE && !ctx->finished) ? 1 : 0;
     out->save_bg = ctx->sparkle_bg_saved;
     out->restore_bg = ctx->sparkle_restore;
 }
@@ -423,7 +435,7 @@ int intro_system_should_blink(const intro_system_t *ctx)
 
 int intro_system_should_draw_specials(const intro_system_t *ctx)
 {
-    if (!ctx || ctx->state != INTRO_STATE_SPARKLE)
+    if (!ctx || ctx->state != INTRO_STATE_EXPLODE)
     {
         return 0;
     }

@@ -41,6 +41,7 @@ struct sdl2_input
     int mouse_x;
     int mouse_y;
     Uint32 mouse_buttons;
+    Uint32 mouse_just_pressed; /* Buttons pressed this frame (edge trigger). */
 
     /* Modifier state. */
     SDL_Keymod modifiers;
@@ -72,7 +73,6 @@ static const struct sdl2_input_binding default_bindings[SDL2I_ACTION_COUNT] = {
     [SDL2I_TOGGLE_SFX] = {{SDL_SCANCODE_S, SDL_SCANCODE_UNKNOWN}},
     [SDL2I_TOGGLE_CONTROL] = {{SDL_SCANCODE_G, SDL_SCANCODE_UNKNOWN}},
     [SDL2I_ICONIFY] = {{SDL_SCANCODE_I, SDL_SCANCODE_UNKNOWN}},
-    [SDL2I_NEXT_LEVEL] = {{SDL_SCANCODE_BACKSLASH, SDL_SCANCODE_UNKNOWN}},
     [SDL2I_SPEED_1] = {{SDL_SCANCODE_1, SDL_SCANCODE_UNKNOWN}},
     [SDL2I_SPEED_2] = {{SDL_SCANCODE_2, SDL_SCANCODE_UNKNOWN}},
     [SDL2I_SPEED_3] = {{SDL_SCANCODE_3, SDL_SCANCODE_UNKNOWN}},
@@ -194,6 +194,7 @@ void sdl2_input_begin_frame(sdl2_input_t *ctx)
     }
 
     memset(ctx->just_pressed, 0, sizeof(ctx->just_pressed));
+    ctx->mouse_just_pressed = 0;
 }
 
 void sdl2_input_process_event(sdl2_input_t *ctx, const SDL_Event *event)
@@ -254,6 +255,7 @@ void sdl2_input_process_event(sdl2_input_t *ctx, const SDL_Event *event)
             if (button >= SDL_BUTTON_LEFT && button <= SDL_BUTTON_X2)
             {
                 ctx->mouse_buttons |= (Uint32)SDL_BUTTON(button);
+                ctx->mouse_just_pressed |= (Uint32)SDL_BUTTON(button);
             }
             ctx->mouse_x = event->button.x;
             ctx->mouse_y = event->button.y;
@@ -335,6 +337,15 @@ bool sdl2_input_mouse_pressed(const sdl2_input_t *ctx, int button)
         return false;
     }
     return (ctx->mouse_buttons & SDL_BUTTON((unsigned)button)) != 0;
+}
+
+bool sdl2_input_mouse_just_pressed(const sdl2_input_t *ctx, int button)
+{
+    if (ctx == NULL || button < 1 || button > 5)
+    {
+        return false;
+    }
+    return (ctx->mouse_just_pressed & SDL_BUTTON((unsigned)button)) != 0;
 }
 
 /* =========================================================================
@@ -459,9 +470,7 @@ const char *sdl2_input_action_name(sdl2_input_action_t action)
         case SDL2I_TOGGLE_CONTROL:
             return "toggle_control";
         case SDL2I_ICONIFY:
-            return "iconify";
-        case SDL2I_NEXT_LEVEL:
-            return "next_level";
+            return "fullscreen";
         case SDL2I_SPEED_1:
             return "speed_1";
         case SDL2I_SPEED_2:

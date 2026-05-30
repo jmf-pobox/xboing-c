@@ -35,6 +35,7 @@
 #include "sdl2_state.h"
 #include "sdl2_texture.h"
 #include "sfx_system.h"
+#include "special_system.h"
 #include "sprite_catalog.h"
 
 /* =========================================================================
@@ -56,8 +57,8 @@
 #define OFFSET_X 35
 #define PLAY_AREA_X OFFSET_X
 #define PLAY_AREA_Y 60
-#define PLAY_AREA_W 495
-#define PLAY_AREA_H 580
+#define PLAY_AREA_W GAME_PLAY_WIDTH
+#define PLAY_AREA_H GAME_PLAY_HEIGHT
 
 /* Border thickness — matches legacy playWindow border_width=2 */
 #define BORDER_THICKNESS 2
@@ -65,6 +66,10 @@
 /* =========================================================================
  * Block rendering
  * ========================================================================= */
+
+/* Forward declaration — definition follows game_render_blocks. */
+static void render_block_composite(const game_ctx_t *ctx, SDL_Renderer *sdl, int block_x,
+                                   int block_y, int block_type, int hit_points);
 
 void game_render_blocks(const game_ctx_t *ctx)
 {
@@ -85,8 +90,27 @@ void game_render_blocks(const game_ctx_t *ctx)
 
             if (info.exploding)
             {
-                /* Explosion animation overrides normal appearance */
-                key = sprite_block_explode_key(info.block_type, info.explode_slide);
+                /* Explosion animation override.
+                 *
+                 * block_system_update_explosions advances explode_slide
+                 * BEFORE the render path runs in the same tick.  So the
+                 * slide values the render path sees are off-by-one from
+                 * the original switch values:
+                 *
+                 *   slide=2: original case 1 — explosion sprite frame 0
+                 *   slide=3: original case 2 — explosion sprite frame 1
+                 *   slide=4: original case 3 — explosion sprite frame 2
+                 *   slide=5: post-finalize (occupied=0 — won't reach here)
+                 *   slide=1: pre-first-update (not reachable in normal flow
+                 *            because update fires on the trigger tick)
+                 *
+                 * sprite_block_explode_key never returns NULL on its
+                 * default case, so the if-key-NULL guard below does NOT
+                 * fire here.  Skip slide outside [2, 4] explicitly and
+                 * pass slide-2 as the 0-based sprite frame index. */
+                if (info.explode_slide < 2 || info.explode_slide > 4)
+                    continue;
+                key = sprite_block_explode_key(info.block_type, info.explode_slide - 2);
             }
             else if (info.block_type == COUNTER_BLK && info.counter_slide > 0)
             {
@@ -95,8 +119,10 @@ void game_render_blocks(const game_ctx_t *ctx)
             }
             else
             {
-                /* Normal static block sprite */
-                key = sprite_block_key(info.block_type);
+                /* Animated block types use bonus_slide to select frame */
+                key = sprite_block_animated_key(info.block_type, info.bonus_slide);
+                if (!key)
+                    key = sprite_block_key(info.block_type);
             }
 
             if (!key)
@@ -114,7 +140,95 @@ void game_render_blocks(const game_ctx_t *ctx)
                 .h = info.height,
             };
             SDL_RenderCopy(sdl, tex.texture, NULL, &dst);
+
+            /* Composite overlays — rendered on top of the base sprite.
+             * Shared with game_render_editor_palette so editor previews
+             * also show DROP/RANDOM/BULLET composites. */
+            if (!info.exploding)
+            {
+                render_block_composite(ctx, sdl, PLAY_AREA_X + info.x, PLAY_AREA_Y + info.y,
+                                       info.block_type, info.hit_points);
+            }
         }
+    }
+}
+
+/*
+ * Render the composite overlay (text or sprite) on top of a base block sprite.
+ * Used by game_render_blocks (playfield) and game_render_editor_palette
+ * (editor sidebar). Hit_points only matters for DROP_BLK.
+ *
+ * Per Copilot review F2: caches "- R -" text metrics across calls (the string
+ * is constant — sizing it every frame for every RANDOM_BLK is wasteful).
+ */
+static void render_block_composite(const game_ctx_t *ctx, SDL_Renderer *sdl, int block_x,
+                                   int block_y, int block_type, int hit_points)
+{
+    SDL_Color black = {0, 0, 0, 255};
+
+    switch (block_type)
+    {
+        case DROP_BLK:
+        {
+            /* DROP_BLK: centered hit-points digit (original/blocks.c:1729-1735) */
+            char hp_buf[8];
+            snprintf(hp_buf, sizeof(hp_buf), "%d", hit_points);
+            sdl2_font_metrics_t m = {0, 0};
+            if (sdl2_font_measure(ctx->font, SDL2F_FONT_DATA, hp_buf, &m) == SDL2F_OK)
+            {
+                int tx, ty;
+                block_overlay_text_pos(block_x, block_y, BLOCK_WIDTH, BLOCK_HEIGHT, m.width,
+                                       m.height, &tx, &ty);
+                sdl2_font_draw(ctx->font, SDL2F_FONT_DATA, hp_buf, tx, ty, black);
+            }
+            break;
+        }
+        case RANDOM_BLK:
+        {
+            /* RANDOM_BLK: centered "- R -" text (original/blocks.c:1702-1708).
+             * String is constant — cache the metrics across calls. */
+            static sdl2_font_metrics_t r_metrics = {0, 0};
+            static int r_metrics_valid = 0;
+            if (!r_metrics_valid)
+            {
+                if (sdl2_font_measure(ctx->font, SDL2F_FONT_DATA, "- R -", &r_metrics) == SDL2F_OK)
+                    r_metrics_valid = 1;
+            }
+            if (r_metrics_valid)
+            {
+                int tx, ty;
+                block_overlay_text_pos(block_x, block_y, BLOCK_WIDTH, BLOCK_HEIGHT, r_metrics.width,
+                                       r_metrics.height, &tx, &ty);
+                sdl2_font_draw(ctx->font, SDL2F_FONT_DATA, "- R -", tx, ty, black);
+            }
+            break;
+        }
+        case BULLET_BLK:
+        {
+            /* BULLET_BLK: 4 bullets at center-point offsets (6,10),(15,10),
+             * (24,10),(33,10) per original/blocks.c:1682-1685.
+             * DrawTheBullet subtracts BULLET_WC=3, BULLET_HC=8. */
+            sdl2_texture_info_t btex;
+            if (sdl2_texture_get(ctx->texture, SPR_BULLET, &btex) == SDL2T_OK)
+            {
+                int bwc = btex.width / 2;
+                int bhc = btex.height / 2;
+                static const int bullet_offsets_x[] = {6, 15, 24, 33};
+                for (int b = 0; b < 4; b++)
+                {
+                    SDL_Rect bdst = {
+                        .x = block_x + bullet_offsets_x[b] - bwc,
+                        .y = block_y + 10 - bhc,
+                        .w = btex.width,
+                        .h = btex.height,
+                    };
+                    SDL_RenderCopy(sdl, btex.texture, NULL, &bdst);
+                }
+            }
+            break;
+        }
+        default:
+            break;
     }
 }
 
@@ -261,9 +375,12 @@ void game_render_playfield(const game_ctx_t *ctx)
 {
     SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
 
-    /* Draw play area border — matches legacy playWindow border_width=2, color=red.
-     * X11 draws the border outside the window content area, so we draw a 2px
-     * border around all 4 sides of the play area. */
+    /* Draw play area border — matches legacy playWindow border_width=2,
+     * color=red.  game_render_border_glow() runs after this and overlays
+     * the cycling glow color (and forces green when SPECIAL_NO_WALLS is
+     * active per original/special.c:138-148 ToggleWallsOn), so the
+     * static red here only shows during the brief window before glow
+     * draws each frame. */
     SDL_SetRenderDrawColor(sdl, 200, 0, 0, 255);
 
     int bx = PLAY_AREA_X - BORDER_THICKNESS;
@@ -424,37 +541,99 @@ void game_render_lives(const game_ctx_t *ctx)
     if (sdl2_texture_get(ctx->texture, SPR_BALL_LIFE, &tex) != SDL2T_OK)
         return;
 
-    /* Draw one life ball for each life remaining */
+    /* Draw lives right-to-left, anchored at LEVEL_AREA_X + 175 (life i=0
+     * is the rightmost icon, original/level.c:223-224).  Sprite dimensions
+     * come from the texture cache so future asset swaps stay correct. */
     int lives = ctx->lives_left;
     if (lives > 5)
         lives = 5; /* Cap display at 5 */
 
     for (int i = 0; i < lives; i++)
     {
-        SDL_Rect dst = {
-            .x = LEVEL_AREA_X + 5 + i * 18,
-            .y = LEVEL_AREA_Y + 30,
-            .w = 16,
-            .h = 16,
-        };
+        SDL_Rect dst = {.w = tex.width, .h = tex.height};
+        level_life_position(LEVEL_AREA_X, LEVEL_AREA_Y, i, tex.width, tex.height, &dst.x, &dst.y);
         SDL_RenderCopy(sdl, tex.texture, NULL, &dst);
     }
 
-    /* Draw level number as digits */
-    int level = ctx->level_number;
-    int d1 = level / 10;
-    int d0 = level % 10;
+    /* Draw level number right-anchored at LEVEL_AREA_X + 260 in absolute
+     * coords (original/level.c:210 DisplayLevelNumber → DrawOutNumber at
+     * window-local x=260, y=5).  Iterate digits least-significant first
+     * so digit_index 0 is the rightmost. */
+    int level = (!ctx->game_active && ctx->attract_level_display > 0) ? ctx->attract_level_display
+                                                                      : ctx->level_number;
+    if (level <= 0)
+        level = 1;
 
-    sdl2_texture_info_t dtex;
-    if (d1 > 0 && sdl2_texture_get(ctx->texture, sprite_digit_key(d1), &dtex) == SDL2T_OK)
+    int digit_index = 0;
+    int remaining = level;
+    do
     {
-        SDL_Rect dst = {LEVEL_AREA_X + 5, LEVEL_AREA_Y + 5, 20, 25};
-        SDL_RenderCopy(sdl, dtex.texture, NULL, &dst);
-    }
-    if (sdl2_texture_get(ctx->texture, sprite_digit_key(d0), &dtex) == SDL2T_OK)
+        int digit = remaining % 10;
+        sdl2_texture_info_t dtex;
+        if (sdl2_texture_get(ctx->texture, sprite_digit_key(digit), &dtex) == SDL2T_OK)
+        {
+            SDL_Rect dst = {.w = SCORE_DIGIT_WIDTH, .h = SCORE_DIGIT_HEIGHT};
+            level_number_digit_position(LEVEL_AREA_X, LEVEL_AREA_Y, digit_index, &dst.x, &dst.y);
+            SDL_RenderCopy(sdl, dtex.texture, NULL, &dst);
+        }
+        remaining /= 10;
+        digit_index++;
+    } while (remaining > 0);
+
+    /* Ammo belt — bullet strip in the level panel */
+    game_render_ammo_belt(ctx);
+}
+
+/* =========================================================================
+ * Ammo belt rendering — horizontal strip of bullet sprites in the level panel
+ * ========================================================================= */
+
+/*
+ * Render the current ammo count as a row of bullet sprites.
+ *
+ * Original/level.c:ReDrawBulletsLeft draws each bullet with
+ * DrawTheBullet(display, levelWindow, x, 43) where (x, 43) is the
+ * CENTER of the bullet in levelWindow coordinates.  DrawTheBullet
+ * (original/gun.c:534-538) renders at (x - BULLET_WC, y - BULLET_HC)
+ * where BULLET_WC=3 and BULLET_HC=8 (half-width/height of 7×16).
+ *
+ * X formula: x = 192 - ((i + 1) * 9)  for i = 0..ammo_count-1
+ * Y center: 43 in levelWindow → absolute y = LEVEL_AREA_Y + 43
+ * Top-left: (center_x - 3, center_y - 8) = (x - 3, LEVEL_AREA_Y + 35)
+ *
+ * Skipped when unlimited ammo is active.
+ */
+void game_render_ammo_belt(const game_ctx_t *ctx)
+{
+    if (gun_system_get_unlimited(ctx->gun))
+        return;
+
+    int ammo_count = gun_system_get_ammo(ctx->gun);
+    if (ammo_count <= 0)
+        return;
+    if (ammo_count > GUN_MAX_AMMO)
+        ammo_count = GUN_MAX_AMMO;
+
+    sdl2_texture_info_t btex;
+    if (sdl2_texture_get(ctx->texture, SPR_BULLET, &btex) != SDL2T_OK)
+        return;
+
+    SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
+    int bullet_wc = btex.width / 2;
+    int bullet_hc = btex.height / 2;
+
+    for (int i = 0; i < ammo_count; i++)
     {
-        SDL_Rect dst = {LEVEL_AREA_X + 27, LEVEL_AREA_Y + 5, 20, 25};
-        SDL_RenderCopy(sdl, dtex.texture, NULL, &dst);
+        /* Center position in levelWindow coords, matching original */
+        int cx = 192 - ((i + 1) * 9);
+        int cy = 43;
+        SDL_Rect dst = {
+            .x = LEVEL_AREA_X + cx - bullet_wc,
+            .y = LEVEL_AREA_Y + cy - bullet_hc,
+            .w = btex.width,
+            .h = btex.height,
+        };
+        SDL_RenderCopy(sdl, btex.texture, NULL, &dst);
     }
 }
 
@@ -568,6 +747,11 @@ void game_render_editor_palette(const game_ctx_t *ctx)
                 SDL_RenderCopy(sdl, tex.texture, NULL, &dst);
             }
         }
+
+        /* Composite overlay (DROP digit, RANDOM "- R -", BULLET 4-bullets)
+         * shared with game_render_blocks per Copilot review F3.
+         * hit_points=1 is a sentinel for editor preview — DROP_BLK shows "1". */
+        render_block_composite(ctx, sdl, PALETTE_X, ey, entry->block_type, 1);
     }
 
     /* Editor status text */
@@ -643,8 +827,14 @@ void game_render_border_glow(const game_ctx_t *ctx)
     /* Map color_index (0-6) to intensity (100-255) */
     int intensity = 100 + (glow.color_index * 155 / (SFX_GLOW_STEPS - 1));
 
+    /* SPECIAL_NO_WALLS forces a green border (matches
+     * original/special.c:138-148 ToggleWallsOn — XSetWindowBorder green
+     * when no-walls active, red when walls on).  The intensity cycle
+     * still applies, giving a pulsing green for the duration. */
+    int use_green = glow.use_green || special_system_is_active(ctx->special, SPECIAL_NO_WALLS);
+
     SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
-    if (glow.use_green)
+    if (use_green)
         SDL_SetRenderDrawColor(sdl, 0, (Uint8)intensity, 0, 255);
     else
         SDL_SetRenderDrawColor(sdl, (Uint8)intensity, 0, 0, 255);
@@ -706,9 +896,9 @@ void game_render_messages(const game_ctx_t *ctx)
     if (!text || text[0] == '\0')
         return;
 
-    SDL_Color yellow = {255, 255, 50, 255};
-    sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_COPY, text, MESSAGE_AREA_X + 5, MESSAGE_AREA_Y + 8,
-                          yellow);
+    SDL_Color green = {0, 190, 0, 255};
+    sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_TEXT, text, MESSAGE_AREA_X + 5, MESSAGE_AREA_Y + 5,
+                          green);
 }
 
 /* =========================================================================
@@ -744,6 +934,44 @@ void game_render_timer(const game_ctx_t *ctx)
 }
 
 /* =========================================================================
+ * Specials panel rendering — 8 power-up labels below the play area
+ * ========================================================================= */
+
+/* specialWindow: x=292, y=655, w=180, h=35 — original/stage.c:263 */
+#define SPECIAL_PANEL_ORIGIN_X 292
+#define SPECIAL_PANEL_ORIGIN_Y 655
+
+void game_render_specials_coords(int lh, const special_label_info_t *labels, int i, int *abs_x,
+                                 int *abs_y)
+{
+    *abs_x = SPECIAL_PANEL_ORIGIN_X + labels[i].col_x;
+    *abs_y = SPECIAL_PANEL_ORIGIN_Y + SPECIAL_ROW0_Y + labels[i].row * (lh + SPECIAL_GAP);
+}
+
+void game_render_specials(const game_ctx_t *ctx)
+{
+    if (ctx->special == NULL || ctx->paddle == NULL)
+        return;
+
+    int reverse_on = paddle_system_get_reverse(ctx->paddle);
+    special_label_info_t labels[SPECIAL_COUNT];
+    special_system_get_labels(ctx->special, reverse_on, labels);
+
+    int lh = sdl2_font_line_height(ctx->font, SDL2F_FONT_COPY);
+    SDL_Color yellow = {255, 255, 50, 255};
+    SDL_Color white = {255, 255, 255, 255};
+
+    for (int i = 0; i < SPECIAL_COUNT; i++)
+    {
+        int abs_x;
+        int abs_y;
+        game_render_specials_coords(lh, labels, i, &abs_x, &abs_y);
+        SDL_Color color = labels[i].active ? yellow : white;
+        sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_COPY, labels[i].label, abs_x, abs_y, color);
+    }
+}
+
+/* =========================================================================
  * Dialogue overlay — modal text input box
  * ========================================================================= */
 
@@ -755,54 +983,98 @@ static void game_render_dialogue(const game_ctx_t *ctx)
     if (state == DIALOGUE_STATE_NONE || state == DIALOGUE_STATE_FINISHED)
         return;
 
-    /* Center a box on screen */
+    /* Position matches original/stage.c:282-285:
+     * x = ((PLAY_WIDTH + MAIN_WIDTH) / 2) - (DIALOGUE_WIDTH / 2) = 92
+     * y = ((PLAY_HEIGHT + MAIN_HEIGHT) / 2) - (DIALOGUE_HEIGHT / 2) = 295 */
     int bw = DIALOGUE_WIDTH;
     int bh = DIALOGUE_HEIGHT;
-    int bx = (SDL2R_LOGICAL_WIDTH - bw) / 2;
-    int by = (SDL2R_LOGICAL_HEIGHT - bh) / 2;
+    int bx = 92;
+    int by = 295;
 
-    /* Dark background */
-    SDL_SetRenderDrawColor(sdl, 20, 20, 40, 255);
-    SDL_Rect bg = {bx, by, bw, bh};
-    SDL_RenderFillRect(sdl, &bg);
+    /* 1. Stone tile background — original/dialogue.c:165 DrawStageBackground */
+    sdl2_texture_info_t bg;
+    if (sdl2_texture_get(ctx->texture, SPR_BGRND_MAIN, &bg) == SDL2T_OK && bg.width > 0 &&
+        bg.height > 0)
+    {
+        for (int ty = by; ty < by + bh; ty += bg.height)
+        {
+            for (int tx = bx; tx < bx + bw; tx += bg.width)
+            {
+                int dw = bg.width;
+                int dh = bg.height;
+                if (tx + dw > bx + bw)
+                    dw = bx + bw - tx;
+                if (ty + dh > by + bh)
+                    dh = by + bh - ty;
+                SDL_Rect src = {0, 0, dw, dh};
+                SDL_Rect dst = {tx, ty, dw, dh};
+                SDL_RenderCopy(sdl, bg.texture, &src, &dst);
+            }
+        }
+    }
 
-    /* Border */
-    SDL_SetRenderDrawColor(sdl, 200, 200, 50, 255);
-    SDL_Rect border = {bx, by, bw, bh};
-    SDL_RenderDrawRect(sdl, &border);
+    /* 2. Red border (4px) — original/stage.c:284 border_width=4, red */
+    SDL_SetRenderDrawColor(sdl, 200, 0, 0, 255);
+    SDL_Rect border_top = {bx, by, bw, 4};
+    SDL_Rect border_bot = {bx, by + bh - 4, bw, 4};
+    SDL_Rect border_lft = {bx, by, 4, bh};
+    SDL_Rect border_rgt = {bx + bw - 4, by, 4, bh};
+    SDL_RenderFillRect(sdl, &border_top);
+    SDL_RenderFillRect(sdl, &border_bot);
+    SDL_RenderFillRect(sdl, &border_lft);
+    SDL_RenderFillRect(sdl, &border_rgt);
 
-    /* Message text */
+    /* 3. Icon — original/dialogue.c:176 RenderShape at (2, 4) */
+    sdl2_texture_info_t icon;
+    if (sdl2_texture_get(ctx->texture, SPR_TEXT, &icon) == SDL2T_OK)
+    {
+        SDL_Rect dst = {bx + 2, by + 4, icon.width, icon.height};
+        SDL_RenderCopy(sdl, icon.texture, NULL, &dst);
+    }
+
+    /* 4. Green shadow message — original/dialogue.c:169 y=10 */
     const char *msg = dialogue_system_get_message(ctx->dialogue);
     if (msg != NULL && msg[0] != '\0')
     {
-        SDL_Color yellow = {255, 255, 50, 255};
-        sdl2_font_draw(ctx->font, SDL2F_FONT_COPY, msg, bx + 15, by + 15, yellow);
+        SDL_Color green = {0, 200, 0, 255};
+        sdl2_font_metrics_t m;
+        int msg_x = bx + 10;
+        if (sdl2_font_measure(ctx->font, SDL2F_FONT_TEXT, msg, &m) == SDL2F_OK)
+            msg_x = bx + (bw - m.width) / 2;
+        sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_TEXT, msg, msg_x, by + 10, green);
     }
 
-    /* Input text with cursor */
-    const char *input = dialogue_system_get_input(ctx->dialogue);
-    if (input != NULL)
-    {
-        SDL_Color white = {255, 255, 255, 255};
-        sdl2_font_draw(ctx->font, SDL2F_FONT_COPY, input, bx + 15, by + 55, white);
+    /* 5. White separator — original/dialogue.c:187 DrawLine y=45, 2px */
+    SDL_SetRenderDrawColor(sdl, 255, 255, 255, 255);
+    SDL_Rect sep = {bx + 10, by + 45, bw - 20, 2};
+    SDL_RenderFillRect(sdl, &sep);
 
-        /* Measure actual text width for cursor placement */
-        int cursor_x = bx + 15;
-        if (input[0] != '\0')
-        {
-            sdl2_font_metrics_t m;
-            if (sdl2_font_measure(ctx->font, SDL2F_FONT_COPY, input, &m) == SDL2F_OK)
-                cursor_x += m.width;
-        }
+    /* 6. Input area — original/dialogue.c:234-242 */
+    const char *input = dialogue_system_get_input(ctx->dialogue);
+    if (input != NULL && input[0] != '\0')
+    {
+        SDL_Color yellow = {255, 255, 0, 255};
+        sdl2_font_metrics_t m = {0, 0};
+        int inp_x = bx + 10;
+        if (sdl2_font_measure(ctx->font, SDL2F_FONT_TEXT, input, &m) == SDL2F_OK)
+            inp_x = bx + (bw - m.width) / 2;
+        sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_TEXT, input, inp_x, by + 70, yellow);
+
+        /* Cursor after text */
         SDL_SetRenderDrawColor(sdl, 255, 255, 255, 255);
-        SDL_Rect cursor = {cursor_x, by + 55, 2, 16};
+        SDL_Rect cursor = {inp_x + m.width, by + 70, 2, 16};
         SDL_RenderFillRect(sdl, &cursor);
     }
-
-    /* Prompt */
-    SDL_Color grey = {160, 160, 160, 255};
-    sdl2_font_draw(ctx->font, SDL2F_FONT_COPY, "Enter to confirm, Esc to cancel", bx + 15,
-                   by + bh - 25, grey);
+    else
+    {
+        /* Question mark icon when input is empty — original uses (DIALOGUE_WIDTH/2)-16 */
+        sdl2_texture_info_t qmark;
+        if (sdl2_texture_get(ctx->texture, SPR_QUESTION, &qmark) == SDL2T_OK)
+        {
+            SDL_Rect dst = {bx + bw / 2 - 16, by + 70, qmark.width, qmark.height};
+            SDL_RenderCopy(sdl, qmark.texture, NULL, &dst);
+        }
+    }
 }
 
 void game_render_frame(const game_ctx_t *ctx)
@@ -820,45 +1092,82 @@ void game_render_frame(const game_ctx_t *ctx)
             game_render_presents(ctx);
             break;
 
+        /* Attract-mode screens: each renderer draws inner content only.
+         * Outer shell (HUD) is rendered once after the switch. */
         case SDL2ST_INTRO:
             game_render_intro(ctx);
             break;
-
         case SDL2ST_INSTRUCT:
             game_render_instruct(ctx);
             break;
-
         case SDL2ST_DEMO:
             game_render_demo(ctx);
             break;
-
         case SDL2ST_PREVIEW:
             game_render_background(ctx);
             game_render_preview(ctx);
             break;
-
         case SDL2ST_KEYS:
             game_render_keys(ctx);
             break;
-
         case SDL2ST_KEYSEDIT:
             game_render_keysedit(ctx);
+            break;
+        case SDL2ST_HIGHSCORE:
+            game_render_highscore(ctx);
             break;
 
         case SDL2ST_BONUS:
             game_render_bonus(ctx);
             break;
 
-        case SDL2ST_HIGHSCORE:
-            game_render_highscore(ctx);
-            break;
-
         case SDL2ST_DIALOGUE:
         {
-            /* Render the underlying mode behind the dialogue overlay */
+            /* Render the underlying mode behind the dialogue overlay.
+             * Q fires from any mode except EDIT, so the saved mode can
+             * be GAME, PAUSE, INTRO, INSTRUCT, DEMO, etc. */
             sdl2_state_mode_t saved = sdl2_state_saved_mode(ctx->state);
-            if (saved == SDL2ST_HIGHSCORE)
-                game_render_highscore(ctx);
+            switch (saved)
+            {
+                case SDL2ST_HIGHSCORE:
+                    game_render_highscore(ctx);
+                    break;
+                case SDL2ST_GAME:
+                case SDL2ST_PAUSE:
+                    game_render_background(ctx);
+                    game_render_playfield(ctx);
+                    game_render_border_glow(ctx);
+                    game_render_eyedude(ctx);
+                    game_render_deveyes(ctx);
+                    break;
+                case SDL2ST_INTRO:
+                    game_render_intro(ctx);
+                    break;
+                case SDL2ST_INSTRUCT:
+                    game_render_instruct(ctx);
+                    break;
+                case SDL2ST_DEMO:
+                    game_render_demo(ctx);
+                    break;
+                case SDL2ST_PREVIEW:
+                    game_render_background(ctx);
+                    game_render_preview(ctx);
+                    break;
+                case SDL2ST_KEYS:
+                    game_render_keys(ctx);
+                    break;
+                case SDL2ST_KEYSEDIT:
+                    game_render_keysedit(ctx);
+                    break;
+                case SDL2ST_BONUS:
+                    game_render_bonus(ctx);
+                    break;
+                case SDL2ST_PRESENTS:
+                    game_render_presents(ctx);
+                    break;
+                default:
+                    break;
+            }
             game_render_dialogue(ctx);
             break;
         }
@@ -882,6 +1191,8 @@ void game_render_frame(const game_ctx_t *ctx)
             /* Message bar and timer */
             game_render_messages(ctx);
             game_render_timer(ctx);
+            /* Specials panel */
+            game_render_specials(ctx);
             break;
 
         case SDL2ST_EDIT:
@@ -893,6 +1204,28 @@ void game_render_frame(const game_ctx_t *ctx)
 
         default:
             break;
+    }
+
+    /* Outer shell: HUD elements shared by all attract modes.
+     * Matches the original's always-mapped X11 sub-windows
+     * (scoreWindow, levelWindow, messWindow, specialWindow).
+     * Also render when in dialogue over an attract mode (highscore entry). */
+    sdl2_state_mode_t effective = mode;
+    if (mode == SDL2ST_DIALOGUE)
+        effective = sdl2_state_saved_mode(ctx->state);
+
+    if (effective == SDL2ST_INTRO || effective == SDL2ST_INSTRUCT || effective == SDL2ST_DEMO ||
+        effective == SDL2ST_PREVIEW || effective == SDL2ST_KEYS || effective == SDL2ST_KEYSEDIT ||
+        effective == SDL2ST_HIGHSCORE)
+    {
+        game_render_score(ctx);
+        game_render_lives(ctx);
+        game_render_messages(ctx);
+        game_render_timer(ctx);
+        game_render_specials(ctx);
+
+        if (effective == SDL2ST_INTRO || effective == SDL2ST_KEYS)
+            game_render_deveyes(ctx);
     }
 
     sdl2_renderer_present(ctx->renderer);

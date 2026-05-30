@@ -15,7 +15,7 @@ I am a principal engineer. Every change I make leaves the codebase in a better s
 ## Toolchain
 
 | Tool | Purpose | Install |
-|------|---------|---------|
+| ---- | ------- | ------- |
 | **gcc / clang** | Compilation with strict warnings | System package manager |
 | **CMake** | Build system | `brew install cmake` / `apt install cmake` |
 | **clang-format** | Code formatting | Ships with LLVM / `brew install clang-format` |
@@ -72,7 +72,7 @@ For legacy files not yet modernized, suppress specific warnings per-file in CMak
 Maintain a separate CMake preset for sanitizer builds:
 
 | Sanitizer | What it catches | Flag |
-|-----------|----------------|------|
+| --------- | --------------- | ---- |
 | AddressSanitizer (ASan) | Buffer overflows, use-after-free, double-free, stack overflow | `-fsanitize=address` |
 | UndefinedBehaviorSanitizer (UBSan) | Integer overflow, null deref, alignment, shift errors | `-fsanitize=undefined` |
 | MemorySanitizer (MSan) | Reads of uninitialized memory (clang only, Linux only) | `-fsanitize=memory` |
@@ -273,7 +273,7 @@ git checkout -b feat/short-description main
 ```
 
 | Prefix | Use |
-|--------|-----|
+| ------ | --- |
 | `feat/` | New features, new systems |
 | `fix/` | Bug fixes |
 | `refactor/` | Modernization, restructuring (no behavior change) |
@@ -287,7 +287,7 @@ One logical change per commit. Quality gates pass before every commit.
 Commit message format: `type(scope): description`
 
 | Prefix | Use |
-|--------|-----|
+| ------ | --- |
 | `feat:` | New feature or capability |
 | `fix:` | Bug fix |
 | `refactor:` | Code modernization, no behavior change |

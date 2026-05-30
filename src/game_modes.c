@@ -55,32 +55,48 @@
  * MODE_GAME — core gameplay
  * ========================================================================= */
 
-/* Play area constants */
-#define GAME_PLAY_WIDTH 495
-#define GAME_PLAY_HEIGHT 580
-#define GAME_COL_WIDTH (GAME_PLAY_WIDTH / 9)
-#define GAME_ROW_HEIGHT (GAME_PLAY_HEIGHT / 18)
-
 /* Play area position in window (from legacy stage.c) */
 #define PLAY_AREA_X 35
 #define PLAY_AREA_Y 60
 
-/* Flag for boing master "words of wisdom" dialogue flow */
+/* Dialogue result pending flags — set before push_dialogue, consumed
+ * in mode exit/enter handlers.  See game_modes.h for API. */
 static int wisdom_pending;
+static int quit_pending;
+static int abort_pending;
+static int level_pending;
+
+void game_modes_set_quit_pending(void)
+{
+    quit_pending = 1;
+}
+void game_modes_set_abort_pending(void)
+{
+    abort_pending = 1;
+}
+void game_modes_set_level_pending(void)
+{
+    level_pending = 1;
+}
 
 static void start_new_game(game_ctx_t *ctx)
 {
     /* Reset game state */
     ctx->level_number = ctx->start_level;
+    ctx->attract_level_display = 0;
     ctx->lives_left = 3;
     ctx->game_active = true;
     ctx->score_submitted = false;
     wisdom_pending = 0;
+    quit_pending = 0;
+    abort_pending = 0;
+    level_pending = 0;
     ctx->game_start = time(NULL);
     ctx->paused_seconds = 0;
     ctx->bonus_block_active = false;
     ctx->next_bonus_frame = 0;
     ctx->user_tilts = 0;
+    ctx->bonus_count = 0;
 
     /* Reset modules */
     score_system_set(ctx->score, 0);
@@ -133,11 +149,32 @@ static void mode_game_enter(sdl2_state_mode_t mode, void *ud)
     (void)mode;
     game_ctx_t *ctx = ud;
 
+    /* Abort dialogue result — checked first because sdl2_state_previous()
+     * returns SDL2ST_DIALOGUE after pop, not the pre-dialogue mode.
+     * The flag carries the intent.  See peer review finding #1. */
+    if (abort_pending)
+    {
+        abort_pending = 0;
+        if (!dialogue_system_was_cancelled(ctx->dialogue))
+        {
+            const char *ans = dialogue_system_get_input(ctx->dialogue);
+            if (ans && (ans[0] == 'y' || ans[0] == 'Y'))
+            {
+                ctx->game_active = false;
+                ctx->highscore_request_type = HIGHSCORE_TYPE_PERSONAL;
+                sdl2_state_transition(ctx->state, SDL2ST_HIGHSCORE);
+                return;
+            }
+        }
+        return;
+    }
+
     sdl2_state_mode_t prev = sdl2_state_previous(ctx->state);
 
     if (prev == SDL2ST_EDIT)
     {
         /* Play-test from editor — use existing blocks, just place ball */
+        ctx->attract_level_display = 0;
         ctx->lives_left = 3;
         ctx->game_active = true;
         ctx->score_submitted = false;
@@ -179,6 +216,19 @@ static void mode_game_update(sdl2_state_mode_t mode, void *ud)
     /* Gun physics */
     gun_system_env_t genv = game_callbacks_gun_env(ctx);
     gun_system_update(ctx->gun, &genv);
+
+    /* Block animation slides (BONUS/DEATH/EXTRABALL/ROAMER cycling) */
+    block_system_advance_animations(ctx->block, (int)sdl2_state_frame(ctx->state));
+
+    /* Block explosion state machine — advances exploding blocks one stage
+     * per tick at BLOCK_EXPLODE_DELAY=10 ticks/stage, fires the finalize
+     * callback when the animation completes (matches original
+     * ExplodeBlocksPending at original/blocks.c:1480-1646). */
+    block_system_update_explosions(ctx->block, (int)sdl2_state_frame(ctx->state),
+                                   game_callbacks_on_block_finalize, ctx);
+
+    /* Ball→eyedude collision — original/ball.c:1339-1347 */
+    game_rules_check_ball_eyedude(ctx);
 
     /* EyeDude character */
     eyedude_system_update(ctx->eyedude, (int)sdl2_state_frame(ctx->state), GAME_PLAY_WIDTH);
@@ -232,11 +282,7 @@ static void mode_pause_enter(sdl2_state_mode_t mode, void *ud)
 static void mode_pause_update(sdl2_state_mode_t mode, void *ud)
 {
     (void)mode;
-    game_ctx_t *ctx = ud;
-
-    /* Only check for unpause */
-    if (sdl2_input_just_pressed(ctx->input, SDL2I_PAUSE))
-        sdl2_state_transition(ctx->state, SDL2ST_GAME);
+    (void)ud;
 }
 
 static void mode_pause_exit(sdl2_state_mode_t mode, void *ud)
@@ -260,7 +306,23 @@ static void mode_pause_exit(sdl2_state_mode_t mode, void *ud)
  * ========================================================================= */
 
 #define ATTRACT_FRAME_MULTIPLIER 6
+#define ATTRACT_FLASH_INTERVAL 500
 static int attract_frame_counter;
+static unsigned long attract_fake_score;
+static int attract_next_flash;
+
+static void attract_random_display(game_ctx_t *ctx, int is_animating)
+{
+    if (!is_animating)
+        return;
+    if (attract_frame_counter < attract_next_flash)
+        return;
+
+    attract_next_flash = attract_frame_counter + ATTRACT_FLASH_INTERVAL;
+    score_system_set_display(ctx->score, attract_fake_score++);
+    ctx->attract_level_display = (rand() % LEVEL_MAX_NUM) + 1;
+    special_system_randomize(ctx->special, rand);
+}
 
 /* =========================================================================
  * MODE_PRESENTS — splash screen sequence
@@ -271,6 +333,7 @@ static void mode_presents_enter(sdl2_state_mode_t mode, void *ud)
     (void)mode;
     game_ctx_t *ctx = ud;
     attract_frame_counter = 0;
+    attract_next_flash = 0;
     presents_system_begin(ctx->presents, 0);
 }
 
@@ -282,6 +345,7 @@ static void mode_presents_update(sdl2_state_mode_t mode, void *ud)
     for (int i = 0; i < ATTRACT_FRAME_MULTIPLIER; i++)
     {
         attract_frame_counter++;
+        sfx_system_update_glow(ctx->sfx, attract_frame_counter);
         presents_system_update(ctx->presents, attract_frame_counter);
 
         presents_sound_t snd = presents_system_get_sound(ctx->presents);
@@ -300,12 +364,28 @@ static void mode_presents_update(sdl2_state_mode_t mode, void *ud)
  * MODE_INTRO — block descriptions + sparkle
  * ========================================================================= */
 
+static int intro_deveye_tick;
+static int intro_deveye_cooldown;
+
 static void mode_intro_enter(sdl2_state_mode_t mode, void *ud)
 {
     (void)mode;
     game_ctx_t *ctx = ud;
     attract_frame_counter = 0;
+    attract_next_flash = 0;
+    intro_deveye_tick = 0;
+    intro_deveye_cooldown = 0;
     intro_system_begin(ctx->intro, INTRO_MODE_INTRO, 0);
+
+    /* "Welcome to XBoing" in the message bar — matches
+     * original/intro.c:203 SetCurrentMessage. */
+    int frame = (int)sdl2_state_frame(ctx->state);
+    message_system_set_default(ctx->message, "Welcome to XBoing");
+    message_system_set(ctx->message, "Welcome to XBoing", 0, frame);
+
+    /* Start devil-eyes animation so they blink during intro
+     * (original/intro.c:359 HandleBlink → BlinkDevilEyes). */
+    sfx_system_start_deveyes(ctx->sfx);
 }
 
 static void mode_intro_update(sdl2_state_mode_t mode, void *ud)
@@ -316,11 +396,40 @@ static void mode_intro_update(sdl2_state_mode_t mode, void *ud)
     for (int i = 0; i < ATTRACT_FRAME_MULTIPLIER; i++)
     {
         attract_frame_counter++;
+        sfx_system_update_glow(ctx->sfx, attract_frame_counter);
         intro_system_update(ctx->intro, attract_frame_counter);
 
         intro_sound_t snd = intro_system_get_sound(ctx->intro);
         if (snd.name && ctx->audio)
             sdl2_audio_play(ctx->audio, snd.name);
+    }
+
+    attract_random_display(ctx, intro_system_get_state(ctx->intro) == INTRO_STATE_EXPLODE);
+
+    /* Devil-eyes: original BLINK_RATE=25 frames (~30ms at ~833fps),
+     * BLINK_GAP=1000 frames (~1.2s).  Attract frames at 6×133tps:
+     * 25 attract frames ≈ 31ms/step, 1000 attract frames ≈ 1.25s gap. */
+    {
+        intro_deveye_tick += ATTRACT_FRAME_MULTIPLIER;
+
+        int still_active = sfx_system_get_deveye_info(ctx->sfx).active;
+        if (still_active)
+        {
+            if (intro_deveye_tick >= 25)
+            {
+                sfx_system_update_deveyes(ctx->sfx, GAME_PLAY_WIDTH, GAME_PLAY_HEIGHT);
+                intro_deveye_tick = 0;
+            }
+        }
+        else
+        {
+            intro_deveye_cooldown += ATTRACT_FRAME_MULTIPLIER;
+            if (intro_deveye_cooldown >= 1000)
+            {
+                sfx_system_start_deveyes(ctx->sfx);
+                intro_deveye_cooldown = 0;
+            }
+        }
     }
 
     if (sdl2_input_just_pressed(ctx->input, SDL2I_START))
@@ -339,7 +448,11 @@ static void mode_instruct_enter(sdl2_state_mode_t mode, void *ud)
     (void)mode;
     game_ctx_t *ctx = ud;
     attract_frame_counter = 0;
+    attract_next_flash = 0;
     intro_system_begin(ctx->intro, INTRO_MODE_INSTRUCT, 0);
+
+    int frame = (int)sdl2_state_frame(ctx->state);
+    message_system_set(ctx->message, "Save the rainforests", 0, frame);
 }
 
 static void mode_instruct_update(sdl2_state_mode_t mode, void *ud)
@@ -350,12 +463,15 @@ static void mode_instruct_update(sdl2_state_mode_t mode, void *ud)
     for (int i = 0; i < ATTRACT_FRAME_MULTIPLIER; i++)
     {
         attract_frame_counter++;
+        sfx_system_update_glow(ctx->sfx, attract_frame_counter);
         intro_system_update(ctx->intro, attract_frame_counter);
 
         intro_sound_t snd = intro_system_get_sound(ctx->intro);
         if (snd.name && ctx->audio)
             sdl2_audio_play(ctx->audio, snd.name);
     }
+
+    attract_random_display(ctx, intro_system_get_state(ctx->intro) == INTRO_STATE_EXPLODE);
 
     if (sdl2_input_just_pressed(ctx->input, SDL2I_START))
     {
@@ -373,7 +489,27 @@ static void mode_demo_enter(sdl2_state_mode_t mode, void *ud)
     (void)mode;
     game_ctx_t *ctx = ud;
     attract_frame_counter = 0;
+    attract_next_flash = 0;
     demo_system_begin(ctx->demo, DEMO_MODE_DEMO, 0);
+
+    int frame = (int)sdl2_state_frame(ctx->state);
+    message_system_set(ctx->message, "Demonstration", 0, frame);
+
+    /* Load demo.data blocks per original/demo.c:137 */
+    {
+        char level_path[PATHS_MAX_PATH];
+        ctx->time_bonus_total = 0;
+        ctx->time_remaining = 0;
+        if (paths_level_file(&ctx->paths, "demo.data", level_path, sizeof(level_path)) == PATHS_OK)
+        {
+            block_system_clear_all(ctx->block);
+            if (level_system_load_file(ctx->level, level_path) == LEVEL_SYS_OK)
+            {
+                ctx->time_bonus_total = level_system_get_time_bonus(ctx->level);
+                ctx->time_remaining = ctx->time_bonus_total;
+            }
+        }
+    }
 }
 
 static void mode_demo_update(sdl2_state_mode_t mode, void *ud)
@@ -383,12 +519,15 @@ static void mode_demo_update(sdl2_state_mode_t mode, void *ud)
     for (int i = 0; i < ATTRACT_FRAME_MULTIPLIER; i++)
     {
         attract_frame_counter++;
+        sfx_system_update_glow(ctx->sfx, attract_frame_counter);
         demo_system_update(ctx->demo, attract_frame_counter);
 
         demo_sound_t snd = demo_system_get_sound(ctx->demo);
         if (snd.name && ctx->audio)
             sdl2_audio_play(ctx->audio, snd.name);
     }
+
+    attract_random_display(ctx, demo_system_get_state(ctx->demo) == DEMO_STATE_SPARKLE);
 
     if (sdl2_input_just_pressed(ctx->input, SDL2I_START))
     {
@@ -401,11 +540,15 @@ static void mode_demo_update(sdl2_state_mode_t mode, void *ud)
  * MODE_PREVIEW — random level preview
  * ========================================================================= */
 
+static int preview_message_set;
+
 static void mode_preview_enter(sdl2_state_mode_t mode, void *ud)
 {
     (void)mode;
     game_ctx_t *ctx = ud;
     attract_frame_counter = 0;
+    attract_next_flash = 0;
+    preview_message_set = 0;
     demo_system_begin(ctx->demo, DEMO_MODE_PREVIEW, 0);
 }
 
@@ -416,11 +559,27 @@ static void mode_preview_update(sdl2_state_mode_t mode, void *ud)
     for (int i = 0; i < ATTRACT_FRAME_MULTIPLIER; i++)
     {
         attract_frame_counter++;
+        sfx_system_update_glow(ctx->sfx, attract_frame_counter);
         demo_system_update(ctx->demo, attract_frame_counter);
 
         demo_sound_t snd = demo_system_get_sound(ctx->demo);
         if (snd.name && ctx->audio)
             sdl2_audio_play(ctx->audio, snd.name);
+    }
+
+    attract_random_display(ctx, demo_system_get_state(ctx->demo) == DEMO_STATE_WAIT);
+
+    if (!preview_message_set)
+    {
+        int level = demo_system_get_preview_level(ctx->demo);
+        if (level > 0)
+        {
+            char msg[64];
+            snprintf(msg, sizeof(msg), "Preview of level %d", level);
+            int frame = (int)sdl2_state_frame(ctx->state);
+            message_system_set(ctx->message, msg, 0, frame);
+            preview_message_set = 1;
+        }
     }
 
     if (sdl2_input_just_pressed(ctx->input, SDL2I_START))
@@ -434,12 +593,23 @@ static void mode_preview_update(sdl2_state_mode_t mode, void *ud)
  * MODE_KEYS — game controls display
  * ========================================================================= */
 
+static int keys_deveye_tick;
+static int keys_deveye_cooldown;
+
 static void mode_keys_enter(sdl2_state_mode_t mode, void *ud)
 {
     (void)mode;
     game_ctx_t *ctx = ud;
     attract_frame_counter = 0;
+    attract_next_flash = 0;
+    keys_deveye_tick = 0;
+    keys_deveye_cooldown = 0;
     keys_system_begin(ctx->keys, KEYS_MODE_GAME, 0);
+
+    int frame = (int)sdl2_state_frame(ctx->state);
+    message_system_set(ctx->message, "Drink driving kills!", 0, frame);
+
+    sfx_system_start_deveyes(ctx->sfx);
 }
 
 static void mode_keys_update(sdl2_state_mode_t mode, void *ud)
@@ -449,7 +619,34 @@ static void mode_keys_update(sdl2_state_mode_t mode, void *ud)
     for (int i = 0; i < ATTRACT_FRAME_MULTIPLIER; i++)
     {
         attract_frame_counter++;
+        sfx_system_update_glow(ctx->sfx, attract_frame_counter);
         keys_system_update(ctx->keys, attract_frame_counter);
+    }
+
+    attract_random_display(ctx, keys_system_get_state(ctx->keys) == KEYS_STATE_SPARKLE);
+
+    /* Devil eyes during keys screen per original/keys.c:332 */
+    {
+        keys_deveye_tick += ATTRACT_FRAME_MULTIPLIER;
+
+        int still_active = sfx_system_get_deveye_info(ctx->sfx).active;
+        if (still_active)
+        {
+            if (keys_deveye_tick >= 25)
+            {
+                sfx_system_update_deveyes(ctx->sfx, GAME_PLAY_WIDTH, GAME_PLAY_HEIGHT);
+                keys_deveye_tick = 0;
+            }
+        }
+        else
+        {
+            keys_deveye_cooldown += ATTRACT_FRAME_MULTIPLIER;
+            if (keys_deveye_cooldown >= 1000)
+            {
+                sfx_system_start_deveyes(ctx->sfx);
+                keys_deveye_cooldown = 0;
+            }
+        }
     }
 
     if (sdl2_input_just_pressed(ctx->input, SDL2I_START))
@@ -468,7 +665,11 @@ static void mode_keysedit_enter(sdl2_state_mode_t mode, void *ud)
     (void)mode;
     game_ctx_t *ctx = ud;
     attract_frame_counter = 0;
+    attract_next_flash = 0;
     keys_system_begin(ctx->keys, KEYS_MODE_EDITOR, 0);
+
+    int frame = (int)sdl2_state_frame(ctx->state);
+    message_system_set(ctx->message, "Be happy!", 0, frame);
 }
 
 static void mode_keysedit_update(sdl2_state_mode_t mode, void *ud)
@@ -478,8 +679,11 @@ static void mode_keysedit_update(sdl2_state_mode_t mode, void *ud)
     for (int i = 0; i < ATTRACT_FRAME_MULTIPLIER; i++)
     {
         attract_frame_counter++;
+        sfx_system_update_glow(ctx->sfx, attract_frame_counter);
         keys_system_update(ctx->keys, attract_frame_counter);
     }
+
+    attract_random_display(ctx, keys_system_get_state(ctx->keys) == KEYS_STATE_SPARKLE);
 
     if (sdl2_input_just_pressed(ctx->input, SDL2I_START))
     {
@@ -501,6 +705,7 @@ static void mode_bonus_enter(sdl2_state_mode_t mode, void *ud)
     (void)mode;
     game_ctx_t *ctx = ud;
     attract_frame_counter = 0;
+    attract_next_flash = 0;
 
     /* Restore cursor during bonus tally */
     if (ctx->cursor)
@@ -528,6 +733,7 @@ static void mode_bonus_update(sdl2_state_mode_t mode, void *ud)
     for (int i = 0; i < ATTRACT_FRAME_MULTIPLIER; i++)
     {
         attract_frame_counter++;
+        sfx_system_update_glow(ctx->sfx, attract_frame_counter);
         bonus_system_update(ctx->bonus, attract_frame_counter);
     }
 
@@ -592,6 +798,7 @@ static void mode_highscore_enter(sdl2_state_mode_t mode, void *ud)
     (void)mode;
     game_ctx_t *ctx = ud;
     attract_frame_counter = 0;
+    attract_next_flash = 0;
 
     /* Restore cursor when leaving gameplay */
     if (ctx->cursor)
@@ -619,7 +826,7 @@ static void mode_highscore_enter(sdl2_state_mode_t mode, void *ud)
         }
         /* Fall through to display */
     }
-    else if (!ctx->score_submitted)
+    else if (!ctx->score_submitted && ctx->game_active)
     {
         /* Insert the player's score into the personal table and save to disk */
         unsigned long final_score = score_system_get(ctx->score);
@@ -663,9 +870,17 @@ static void mode_highscore_enter(sdl2_state_mode_t mode, void *ud)
         }
     }
 
-    highscore_system_set_table(ctx->highscore_display, &ctx->hs_personal);
+    highscore_type_t type = ctx->highscore_request_type;
+    const highscore_table_t *table =
+        (type == HIGHSCORE_TYPE_GLOBAL) ? &ctx->hs_global : &ctx->hs_personal;
+    highscore_system_set_table(ctx->highscore_display, table);
     highscore_system_set_current_score(ctx->highscore_display, score_system_get(ctx->score));
-    highscore_system_begin(ctx->highscore_display, HIGHSCORE_TYPE_PERSONAL, 0);
+    highscore_system_begin(ctx->highscore_display, type, 0);
+
+    int frame = (int)sdl2_state_frame(ctx->state);
+    const char *label =
+        (type == HIGHSCORE_TYPE_GLOBAL) ? "<h> - Hall of Fame" : "<H> - Personal Best";
+    message_system_set(ctx->message, label, 0, frame);
 }
 
 static void mode_highscore_update(sdl2_state_mode_t mode, void *ud)
@@ -676,8 +891,12 @@ static void mode_highscore_update(sdl2_state_mode_t mode, void *ud)
     for (int i = 0; i < ATTRACT_FRAME_MULTIPLIER; i++)
     {
         attract_frame_counter++;
+        sfx_system_update_glow(ctx->sfx, attract_frame_counter);
         highscore_system_update(ctx->highscore_display, attract_frame_counter);
     }
+
+    attract_random_display(ctx, highscore_system_get_state(ctx->highscore_display) ==
+                                    HIGHSCORE_STATE_SPARKLE);
 
     if (sdl2_input_just_pressed(ctx->input, SDL2I_START))
     {
@@ -713,6 +932,13 @@ static void mode_dialogue_update(sdl2_state_mode_t mode, void *ud)
     (void)mode;
     game_ctx_t *ctx = ud;
 
+    /* Read sound before update — update() clears the sound field
+     * (dialogue_system.c:113-114), but key_input() sets it during
+     * event processing before this tick runs. */
+    dialogue_sound_t snd = dialogue_system_get_sound(ctx->dialogue);
+    if (snd.name && ctx->audio)
+        sdl2_audio_play(ctx->audio, snd.name);
+
     dialogue_system_update(ctx->dialogue);
 
     if (dialogue_system_is_finished(ctx->dialogue))
@@ -724,8 +950,51 @@ static void mode_dialogue_update(sdl2_state_mode_t mode, void *ud)
 static void mode_dialogue_exit(sdl2_state_mode_t mode, void *ud)
 {
     (void)mode;
-    (void)ud;
+    game_ctx_t *ctx = ud;
     SDL_StopTextInput();
+
+    if (quit_pending)
+    {
+        quit_pending = 0;
+        if (!dialogue_system_was_cancelled(ctx->dialogue))
+        {
+            const char *ans = dialogue_system_get_input(ctx->dialogue);
+            if (ans && (ans[0] == 'y' || ans[0] == 'Y'))
+            {
+                SDL_Event quit_event = {0};
+                quit_event.type = SDL_QUIT;
+                SDL_PushEvent(&quit_event);
+            }
+        }
+    }
+
+    /* W key: set starting level — original/level.c:245-282 */
+    if (level_pending)
+    {
+        level_pending = 0;
+        if (!dialogue_system_was_cancelled(ctx->dialogue))
+        {
+            const char *ans = dialogue_system_get_input(ctx->dialogue);
+            if (ans && ans[0] != '\0')
+            {
+                int num = atoi(ans);
+                int frame = (int)sdl2_state_frame(ctx->state);
+                if (num > 0 && num <= LEVEL_MAX_NUM)
+                {
+                    ctx->start_level = num;
+                    char msg[64];
+                    snprintf(msg, sizeof(msg), "Starting level set to %d", num);
+                    message_system_set(ctx->message, msg, 1, frame);
+                }
+                else
+                {
+                    char msg[64];
+                    snprintf(msg, sizeof(msg), "Invalid - level range [1-%d]", LEVEL_MAX_NUM);
+                    message_system_set(ctx->message, msg, 1, frame);
+                }
+            }
+        }
+    }
 }
 
 /* =========================================================================

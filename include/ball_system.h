@@ -13,6 +13,7 @@
  */
 
 #include "ball_types.h"
+#include "block_types.h"
 
 /* =========================================================================
  * Status codes
@@ -46,11 +47,11 @@ typedef enum
  * Matches legacy XRectInRegion() usage in ball.c CheckRegions()
  * ========================================================================= */
 
-#define BALL_REGION_NONE 0
-#define BALL_REGION_TOP 1
-#define BALL_REGION_BOTTOM 2
-#define BALL_REGION_LEFT 3
-#define BALL_REGION_RIGHT 4
+#define BALL_REGION_NONE COLLISION_REGION_NONE
+#define BALL_REGION_TOP COLLISION_REGION_TOP
+#define BALL_REGION_BOTTOM COLLISION_REGION_BOTTOM
+#define BALL_REGION_LEFT COLLISION_REGION_LEFT
+#define BALL_REGION_RIGHT COLLISION_REGION_RIGHT
 
 /* =========================================================================
  * Environment struct — replaces extern globals, passed per-frame
@@ -73,6 +74,17 @@ typedef struct
 } ball_system_env_t;
 
 /* =========================================================================
+ * Block-hit result codes — returned by the on_block_hit callback
+ * ========================================================================= */
+
+typedef enum
+{
+    BLOCK_HIT_BOUNCE = 0,
+    BLOCK_HIT_ABSORB = 1,
+    BLOCK_HIT_TELEPORT = 2,
+} block_hit_result_t;
+
+/* =========================================================================
  * Callback table — side effects injected by the integration layer
  * ========================================================================= */
 
@@ -86,9 +98,9 @@ typedef struct
 
     /*
      * Block hit: called when a ball strikes a block.
-     * Returns nonzero if ball should NOT bounce (killer block, teleport, etc.).
+     * Returns BLOCK_HIT_BOUNCE, BLOCK_HIT_ABSORB, or BLOCK_HIT_TELEPORT.
      */
-    int (*on_block_hit)(int row, int col, int ball_index, void *ud);
+    block_hit_result_t (*on_block_hit)(int row, int col, int ball_index, void *ud);
 
     /*
      * Cell availability query for teleport.
@@ -263,6 +275,31 @@ ball_system_status_t ball_system_get_render_info(const ball_system_t *ctx, int i
 
 /* Get guide direction indicator state. */
 ball_system_guide_info_t ball_system_get_guide_info(const ball_system_t *ctx);
+
+/* Get ball velocity components.  Returns BALL_SYS_ERR_INVALID_INDEX on bad index. */
+ball_system_status_t ball_system_get_velocity(const ball_system_t *ctx, int index, int *out_dx,
+                                              int *out_dy);
+
+/* Get ball waitMode field.  Returns BALL_NONE on invalid index. */
+enum BallStates ball_system_get_wait_mode(const ball_system_t *ctx, int index);
+
+/*
+ * Restore a ball slot directly from saved state.  Sets all physics fields
+ * (active, state, position, velocity, wait_mode).  Used by save/load.
+ *
+ * Frame-based deadlines are computed from `current_frame`:
+ *   - nextFrame      = current_frame + BIRTH_FRAME_RATE   (READY → ACTIVE timer)
+ *   - lastPaddleHitFrame = current_frame + PADDLE_BALL_FRAME_TILT  (auto-tilt guard)
+ *   - waitingFrame   = 0  (WAIT state restored via wait_mode parameter)
+ * These defaults match a freshly-added ball, preventing immediate
+ * auto-activation or auto-tilt on the first post-restore tick.
+ *
+ * BALL_CREATE in the save data is restored as BALL_READY (skip the spawn
+ * animation).
+ */
+ball_system_status_t ball_system_restore(ball_system_t *ctx, int index, int current_frame,
+                                         int active, enum BallStates state, int x, int y, int dx,
+                                         int dy, enum BallStates wait_mode);
 
 /* =========================================================================
  * Utility

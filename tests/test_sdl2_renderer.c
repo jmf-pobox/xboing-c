@@ -32,7 +32,7 @@ static void test_config_defaults(void **state)
     assert_false(cfg.fullscreen);
     assert_true(cfg.vsync);
     assert_non_null(cfg.title);
-    assert_string_equal(cfg.title, "XBoing");
+    assert_string_equal(cfg.title, "- XBoing II -");
 }
 
 /* =========================================================================
@@ -85,7 +85,10 @@ static void test_logical_size(void **state)
     sdl2_renderer_destroy(ctx);
 }
 
-/* TC-05: Default 2x scale gives 1150x1440 physical window. */
+/* TC-05: Default scale=2 is clamped to fit the display's usable
+ * bounds.  On a display tall enough for 1440px: 1150×1440 (2x).
+ * On a smaller display: the window is shrunk to fit while preserving
+ * the 575:720 aspect ratio.  May not be an exact integer multiple. */
 static void test_window_size_default_scale(void **state)
 {
     (void)state;
@@ -96,8 +99,14 @@ static void test_window_size_default_scale(void **state)
 
     int w = 0, h = 0;
     sdl2_renderer_get_window_size(ctx, &w, &h);
-    assert_int_equal(w, 1150);
-    assert_int_equal(h, 1440);
+
+    /* At least 1x logical size. */
+    assert_true(w >= SDL2R_LOGICAL_WIDTH);
+    assert_true(h >= SDL2R_LOGICAL_HEIGHT);
+
+    /* Aspect ratio preserved within ±1 pixel of rounding. */
+    int expected_w = h * SDL2R_LOGICAL_WIDTH / SDL2R_LOGICAL_HEIGHT;
+    assert_true(w >= expected_w - 1 && w <= expected_w + 1);
 
     sdl2_renderer_destroy(ctx);
 }

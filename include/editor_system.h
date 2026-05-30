@@ -142,16 +142,22 @@ typedef struct editor_system editor_system_t;
 /*
  * Create an editor system context.
  *
- * callbacks: callback table (copied, caller retains ownership).
- *            NULL callbacks are safe — operations that need them are skipped.
- * user_data: opaque pointer passed to all callbacks.
- * levels_dir: path to levels directory (e.g. "levels/").
- * no_sound: nonzero to suppress sound callbacks.
+ * callbacks:            callback table (copied, caller retains ownership).
+ *                       NULL callbacks are safe — operations that need them
+ *                       are skipped.
+ * user_data:            opaque pointer passed to all callbacks.
+ * levels_dir_readable:  path used for load operations (e.g. "levels" or
+ *                       "/usr/share/xboing/levels").
+ * levels_dir_writable:  path used for save operations (e.g.
+ *                       "$XDG_DATA_HOME/xboing/levels").  The directory is
+ *                       not required to exist; it is created on first save.
+ * no_sound:             nonzero to suppress sound callbacks.
  *
  * Returns NULL on allocation failure.
  */
 editor_system_t *editor_system_create(const editor_system_callbacks_t *callbacks, void *user_data,
-                                      const char *levels_dir, int no_sound);
+                                      const char *levels_dir_readable,
+                                      const char *levels_dir_writable, int no_sound);
 
 /* Destroy the editor system.  Safe to call with NULL. */
 void editor_system_destroy(editor_system_t *ctx);

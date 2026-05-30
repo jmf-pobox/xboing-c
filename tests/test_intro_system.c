@@ -116,7 +116,7 @@ static void test_intro_blocks_to_text_to_sparkle(void **state)
     intro_system_update(ctx, 1); /* BLOCKS -> TEXT */
     assert_int_equal(intro_system_get_state(ctx), INTRO_STATE_TEXT);
     intro_system_update(ctx, 2); /* TEXT -> SPARKLE */
-    assert_int_equal(intro_system_get_state(ctx), INTRO_STATE_SPARKLE);
+    assert_int_equal(intro_system_get_state(ctx), INTRO_STATE_EXPLODE);
     intro_system_destroy(ctx);
 }
 
@@ -131,7 +131,7 @@ static void test_intro_finishes_at_end_frame(void **state)
     {
         intro_system_update(ctx, i);
     }
-    assert_int_equal(intro_system_get_state(ctx), INTRO_STATE_SPARKLE);
+    assert_int_equal(intro_system_get_state(ctx), INTRO_STATE_EXPLODE);
 
     /* Jump to end frame. */
     intro_system_update(ctx, INTRO_END_FRAME_OFFSET);
@@ -164,7 +164,7 @@ static void test_instruct_text_to_sparkle(void **state)
     intro_system_begin(ctx, INTRO_MODE_INSTRUCT, 0);
     intro_system_update(ctx, 0); /* TITLE -> TEXT */
     intro_system_update(ctx, 1); /* TEXT -> SPARKLE */
-    assert_int_equal(intro_system_get_state(ctx), INTRO_STATE_SPARKLE);
+    assert_int_equal(intro_system_get_state(ctx), INTRO_STATE_EXPLODE);
     intro_system_destroy(ctx);
 }
 
@@ -274,7 +274,7 @@ static void test_sparkle_active_during_sparkle_state(void **state)
     {
         intro_system_update(ctx, i);
     }
-    assert_int_equal(intro_system_get_state(ctx), INTRO_STATE_SPARKLE);
+    assert_int_equal(intro_system_get_state(ctx), INTRO_STATE_EXPLODE);
 
     intro_sparkle_info_t info;
     intro_system_get_sparkle_info(ctx, &info);

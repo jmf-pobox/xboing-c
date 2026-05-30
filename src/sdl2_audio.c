@@ -29,6 +29,7 @@ struct sdl2_audio
     struct sdl2_audio_entry entries[SDL2A_MAX_SOUNDS];
     int count;
     int volume;
+    bool muted;
     bool audio_subsystem_owned;
     bool audio_opened;
     bool mixer_initialized;
@@ -380,6 +381,10 @@ sdl2_audio_status_t sdl2_audio_play(sdl2_audio_t *ctx, const char *name)
     {
         return SDL2A_ERR_NULL_ARG;
     }
+    if (ctx->muted)
+    {
+        return SDL2A_OK;
+    }
 
     const struct sdl2_audio_entry *e = find_entry(ctx->entries, name);
     if (e == NULL)
@@ -544,6 +549,28 @@ int sdl2_audio_count(const sdl2_audio_t *ctx)
         return 0;
     }
     return ctx->count;
+}
+
+void sdl2_audio_set_muted(sdl2_audio_t *ctx, bool muted)
+{
+    if (ctx == NULL)
+    {
+        return;
+    }
+    ctx->muted = muted;
+    if (muted)
+    {
+        Mix_HaltChannel(-1);
+    }
+}
+
+bool sdl2_audio_is_muted(const sdl2_audio_t *ctx)
+{
+    if (ctx == NULL)
+    {
+        return true;
+    }
+    return ctx->muted;
 }
 
 const char *sdl2_audio_status_string(sdl2_audio_status_t status)

@@ -24,7 +24,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y cmake pkg-config \
-            libx11-dev libxpm-dev libcmocka-dev \
+            libcmocka-dev \
             libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev
 
       - name: Configure (${{ matrix.preset }})

@@ -249,7 +249,7 @@ static int setup(void **vstate)
             f->state.grid[r][c].block_type = NONE_BLK;
 
     editor_system_callbacks_t cb = make_callbacks();
-    f->editor = editor_system_create(&cb, &f->state, "levels", 0);
+    f->editor = editor_system_create(&cb, &f->state, "levels", "levels", 0);
     assert_non_null(f->editor);
 
     /* Initialize palette */
@@ -282,7 +282,7 @@ static void test_create_destroy(void **vstate)
     memset(&s, 0, sizeof(s));
     s.load_result = 1;
 
-    editor_system_t *ctx = editor_system_create(&cb, &s, "levels", 0);
+    editor_system_t *ctx = editor_system_create(&cb, &s, "levels", "levels", 0);
     assert_non_null(ctx);
     assert_int_equal(editor_system_get_state(ctx), EDITOR_STATE_LEVEL);
     editor_system_destroy(ctx);
@@ -291,7 +291,7 @@ static void test_create_destroy(void **vstate)
 static void test_create_null_callbacks(void **vstate)
 {
     (void)vstate;
-    editor_system_t *ctx = editor_system_create(NULL, NULL, "levels", 0);
+    editor_system_t *ctx = editor_system_create(NULL, NULL, "levels", "levels", 0);
     assert_non_null(ctx);
     assert_int_equal(editor_system_get_state(ctx), EDITOR_STATE_LEVEL);
     /* Update with no callbacks should not crash */
@@ -313,7 +313,7 @@ static void test_initial_state_is_level(void **vstate)
     memset(&s, 0, sizeof(s));
     s.load_result = 1;
 
-    editor_system_t *ctx = editor_system_create(&cb, &s, "levels", 0);
+    editor_system_t *ctx = editor_system_create(&cb, &s, "levels", "levels", 0);
     assert_int_equal(editor_system_get_state(ctx), EDITOR_STATE_LEVEL);
     editor_system_destroy(ctx);
 }
@@ -351,7 +351,7 @@ static void test_wait_state(void **vstate)
     memset(&s, 0, sizeof(s));
     s.load_result = 1;
 
-    editor_system_t *ctx = editor_system_create(&cb, &s, "levels", 0);
+    editor_system_t *ctx = editor_system_create(&cb, &s, "levels", "levels", 0);
 
     /* Transition through LEVEL -> NONE */
     editor_system_update(ctx, 0);
@@ -862,7 +862,7 @@ static void test_no_sound_suppresses_callbacks(void **vstate)
     s.load_result = 1;
 
     /* Create with no_sound=1 */
-    editor_system_t *ctx = editor_system_create(&cb, &s, "levels", 1);
+    editor_system_t *ctx = editor_system_create(&cb, &s, "levels", "levels", 1);
     editor_system_init_palette(ctx, MAX_STATIC_BLOCKS);
     editor_system_update(ctx, 0);
 

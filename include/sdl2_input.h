@@ -61,7 +61,6 @@ typedef enum
     SDL2I_TOGGLE_SFX,
     SDL2I_TOGGLE_CONTROL,
     SDL2I_ICONIFY,
-    SDL2I_NEXT_LEVEL, /* Debug — skip to next level */
 
     /* Speed levels (1-9) */
     SDL2I_SPEED_1,
@@ -109,12 +108,8 @@ typedef struct sdl2_input sdl2_input_t;
  *   Space = start,  C = cycle,  H = scores,  E = editor,  W = set level,
  *   Q = quit,  =/KP+ = volume up,  -/KP- = volume down,
  *   A = audio,  S = sfx,  G = control toggle,
- *   I = iconify,  \ = next level (debug),  1-9 = speed levels.
- *
- * Note: Legacy used XK_plus (Shift+=) for volume up and XK_equal for the
- * debug next-level command.  Scancode-only mapping cannot distinguish these
- * since they share SDL_SCANCODE_EQUALS.  Volume up keeps the = key;
- * next-level was moved to backslash.
+ *   I = fullscreen toggle (modernized from original iconify),
+ *   1-9 = speed levels (attract modes only).
  *
  * Returns NULL on allocation failure.
  */
@@ -158,8 +153,17 @@ bool sdl2_input_just_pressed(const sdl2_input_t *ctx, sdl2_input_action_t action
 /* Get current mouse position within the window. */
 void sdl2_input_get_mouse(const sdl2_input_t *ctx, int *x, int *y);
 
-/* True if the given mouse button is currently pressed (1=left, 2=mid, 3=right). */
+/* True if the given mouse button is currently pressed.
+ * button: SDL_BUTTON_LEFT (1) through SDL_BUTTON_X2 (5). */
 bool sdl2_input_mouse_pressed(const sdl2_input_t *ctx, int button);
+
+/*
+ * True if the given mouse button was pressed this frame (edge trigger).
+ * Matches the semantics of sdl2_input_just_pressed for keyboard actions.
+ * Cleared by sdl2_input_begin_frame each frame.
+ * button: SDL_BUTTON_LEFT (1) through SDL_BUTTON_X2 (5).
+ */
+bool sdl2_input_mouse_just_pressed(const sdl2_input_t *ctx, int button);
 
 /* =========================================================================
  * Modifier queries

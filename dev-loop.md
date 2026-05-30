@@ -134,9 +134,9 @@ Go to step 0.
 
 ## Expert Agents
 
-| When | Agent |
-| ---- | ----- |
-| Gameplay mechanics, physics, constants | `xboing-author` |
-| C code quality, sanitizer findings | `c-modernization-expert` |
-| SDL2 rendering/audio, X11 porting | `av-platform-expert` |
-| Test strategy, testability seams | `test-expert` |
+| When | Agent | Persona |
+| ---- | ----- | ------- |
+| Gameplay mechanics, physics, constants | `jck` | Justin C. Kibell |
+| C code quality, sanitizer findings | `jdc` | John D. Carmack |
+| SDL2 rendering/audio, X11 porting | `sjl` | Sam J. Lantinga |
+| Test strategy, testability seams | `gjm` | Glenford J. Myers |

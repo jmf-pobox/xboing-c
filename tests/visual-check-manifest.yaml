@@ -1,0 +1,66 @@
+# Visual-fidelity comparison manifest.
+#
+# Each pair compares an original golden (from tests/golden/original/)
+# against a modern capture (produced by scripts/visual_capture.sh).
+#
+# `expected: equivalent` — sanity check (self-comparison or matched pair).
+# `expected: diff` — known divergences exist (font rendering, timing).
+#
+# Key-frame pairs: one representative image per content sub-state.
+# Full filmstrip goldens in tests/golden/original/<mode>/ are for
+# manual inspection; the LLM comparison uses these key frames only.
+
+pairs:
+  # ----- Self-comparison sanity checks --------------------------------
+  - name: self-presents-text1
+    a: tests/golden/original/presents/text1-000.png
+    b: tests/golden/original/presents/text1-000.png
+    expected: equivalent
+
+  - name: self-intro-blocks
+    a: tests/golden/original/intro/blocks-000.png
+    b: tests/golden/original/intro/blocks-000.png
+    expected: equivalent
+
+  # ----- Presents screen key frames -----------------------------------
+  - name: presents/text2
+    a: tests/golden/original/presents/text2-000.png
+    b: .tmp/visual-check/modern/presents/text2-000.png
+    expected: diff
+
+  - name: presents/letters
+    a: tests/golden/original/presents/letters-000.png
+    b: .tmp/visual-check/modern/presents/letters-000.png
+    expected: diff
+
+  - name: presents/shine
+    a: tests/golden/original/presents/shine-000.png
+    b: .tmp/visual-check/modern/presents/shine-000.png
+    expected: diff
+
+  - name: presents/typewriter1
+    a: tests/golden/original/presents/typewriter1-003.png
+    b: .tmp/visual-check/modern/presents/typewriter1-000.png
+    expected: diff
+
+  - name: presents/wipe
+    a: tests/golden/original/presents/wipe-001.png
+    b: .tmp/visual-check/modern/presents/wipe-000.png
+    expected: diff
+
+  # ----- Intro screen key frames -------------------------------------
+  - name: intro/explode
+    a: tests/golden/original/intro/explode-007.png
+    b: .tmp/visual-check/modern/intro/explode-001.png
+    expected: diff
+
+  # ----- Instruct screen key frames ----------------------------------
+  - name: instruct/text
+    a: tests/golden/original/instruct/text-000.png
+    b: .tmp/visual-check/modern/instruct/text-000.png
+    expected: diff
+
+  - name: instruct/sparkle
+    a: tests/golden/original/instruct/sparkle-010.png
+    b: .tmp/visual-check/modern/instruct/sparkle-000.png
+    expected: diff

@@ -43,8 +43,10 @@ typedef enum
 #define PADDLE_WIDTH_MEDIUM 50
 #define PADDLE_WIDTH_HUGE 70
 
-/* Movement velocity for keyboard control (pixels per update) */
-#define PADDLE_VELOCITY 10
+/* Movement velocity for keyboard control (pixels per update).
+ * Original: 10px every 5 frames (PADDLE_ANIMATE_DELAY) = 2px/frame.
+ * We update every frame for smooth interpolation; 4px/frame = 2x original. */
+#define PADDLE_VELOCITY 4
 
 /* Paddle geometry */
 #define PADDLE_RENDER_HEIGHT 15   /* Pixmap render height */
@@ -155,6 +157,10 @@ void paddle_system_set_sticky(paddle_system_t *ctx, int on);
 
 /* Return paddle center X position. */
 int paddle_system_get_pos(const paddle_system_t *ctx);
+
+/* Set paddle center X position (clamped to play-area bounds).  Used by
+ * savegame restore.  Resets prev_pos and dx to avoid spurious motion. */
+void paddle_system_set_pos(paddle_system_t *ctx, int pos);
 
 /*
  * Return paddle movement delta since last update.

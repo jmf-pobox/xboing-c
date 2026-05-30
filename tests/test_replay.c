@@ -11,6 +11,7 @@
 
 #include <SDL2/SDL.h>
 
+#include "game_input.h"
 #include "sdl2_input.h"
 #include "sdl2_state.h"
 
@@ -46,7 +47,6 @@ static const SDL_Scancode action_scancodes[SDL2I_ACTION_COUNT] = {
     [SDL2I_TOGGLE_SFX] = SDL_SCANCODE_S,
     [SDL2I_TOGGLE_CONTROL] = SDL_SCANCODE_G,
     [SDL2I_ICONIFY] = SDL_SCANCODE_I,
-    [SDL2I_NEXT_LEVEL] = SDL_SCANCODE_BACKSLASH,
     [SDL2I_SPEED_1] = SDL_SCANCODE_1,
     [SDL2I_SPEED_2] = SDL_SCANCODE_2,
     [SDL2I_SPEED_3] = SDL_SCANCODE_3,
@@ -126,6 +126,10 @@ int replay_tick(replay_ctx_t *rctx)
             inject_key_event(rctx->ctx->input, sc, ev->pressed);
         rctx->script_idx++;
     }
+
+    /* Global keys (pause, SFX, speed, etc.) — once per frame.
+     * Must run before sdl2_state_update to match game_main.c order. */
+    game_input_global(rctx->ctx);
 
     /* Tick the state machine */
     sdl2_state_update(rctx->ctx->state);

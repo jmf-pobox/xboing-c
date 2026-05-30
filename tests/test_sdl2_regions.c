@@ -179,8 +179,8 @@ static void test_dialogue_centered(void **state)
     /* Check center is within 1 pixel of main center (integer rounding). */
     int cx = r.x + r.w / 2;
     int cy = r.y + r.h / 2;
-    assert_in_range(cx, main_w / 2 - 1, main_w / 2 + 1);
-    assert_in_range(cy, main_h / 2 - 1, main_h / 2 + 1);
+    assert_true(cx >= main_w / 2 - 1 && cx <= main_w / 2 + 1);
+    assert_true(cy >= main_h / 2 - 1 && cy <= main_h / 2 + 1);
 }
 
 /* TC-14: Dialogue overlaps the play area (it's a modal overlay). */

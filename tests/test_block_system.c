@@ -547,7 +547,63 @@ static void test_render_info_empty(void **state)
 }
 
 /* =========================================================================
- * Group 7: Status string utility (1 test)
+ * Group 7: Adjacency-filter gap reproducer (xboing-c-895)
+ *
+ * Two adjacent rows at (5,4) and (6,4).  Ball in the inter-block gap
+ * at x=247, y=192, dx=1, dy=-5 (moving upward).
+ *
+ * Block geometry:
+ *   Row 5, col 4: x=227, y=166, w=40, h=20 (center: 247, 176)
+ *   Row 6, col 4: x=227, y=198, w=40, h=20 (center: 247, 208)
+ *   Gap between them: y=187..197.  Ball center at y=192 is in the gap.
+ *
+ * Before the fix: both block hits suppressed (ball tunnels).
+ * After the fix: row 6 hit is NOT suppressed (by=192 < bp->y=198).
+ *
+ * The test asserts that block_system_check_region returns non-NONE for
+ * at least one of the two blocks — meaning a hit registers.
+ *
+ * Citation: src/block_system.c:618-646 (adjacency filter).
+ * ========================================================================= */
+
+/* TC-28b: Gap-zone ball is not suppressed on both faces after fix */
+static void test_adjacency_filter_gap_not_suppressed(void **state)
+{
+    (void)state;
+    block_system_t *ctx = make_ctx();
+
+    /* Place RED_BLK at row 5 and row 6, column 4 */
+    block_system_add(ctx, 5, 4, RED_BLK, 0, 0);
+    block_system_add(ctx, 6, 4, RED_BLK, 0, 0);
+
+    /*
+     * Ball center at x=247, y=192, dx=1, dy=-5.
+     * Row 5 block: x=227, y=166, w=40, h=20.
+     * Row 6 block: x=227, y=198, w=40, h=20.
+     * y=192 is in the gap (row 5 block bottom = 186, row 6 block top = 198).
+     * Ball AABB: left=237, top=183, right=257, bottom=201.
+     * Overlaps row 5 AABB [166,186]: ball_bottom=201 > 166, ball_top=183 < 186 YES.
+     * Overlaps row 6 AABB [198,218]: ball_bottom=201 > 198, ball_top=183 < 218 YES.
+     */
+    int ball_x = 247;
+    int ball_y = 192;
+    int ball_dx = 1;
+
+    int r5 = block_system_check_region(5, 4, ball_x, ball_y, ball_dx, ctx);
+    int r6 = block_system_check_region(6, 4, ball_x, ball_y, ball_dx, ctx);
+
+    /*
+     * With the fix: row 6 hit is real (by=192 < bp->y=198 — ball above
+     * block top edge, in the gap) so r6 != BLOCK_REGION_NONE.
+     * At least one block must register a hit.
+     */
+    assert_true(r5 != BLOCK_REGION_NONE || r6 != BLOCK_REGION_NONE);
+
+    block_system_destroy(ctx);
+}
+
+/* =========================================================================
+ * Group 8: Status string utility (1 test)
  * ========================================================================= */
 
 /* TC-28: Status strings are non-NULL */
@@ -559,6 +615,203 @@ static void test_status_strings(void **state)
     assert_non_null(block_system_status_string(BLOCK_SYS_ERR_NULL_ARG));
     assert_non_null(block_system_status_string(BLOCK_SYS_ERR_ALLOC_FAILED));
     assert_non_null(block_system_status_string(BLOCK_SYS_ERR_OUT_OF_BOUNDS));
+}
+
+/* =========================================================================
+ * Group 9: block_system_decrement_gun_hit (gun-feature gaps 3, 4, 5)
+ *
+ * original/gun.c:318-350 — multi-hit logic for bullet-block collisions.
+ * ========================================================================= */
+
+/* TC-29: Regular block returns 0 on first bullet hit (destroyed by this hit).
+ * Basket 3: the function no longer clears — the caller arms explosion via
+ * block_system_explode, so the cell remains occupied until the explosion
+ * lifecycle finalizes. */
+static void test_gun_hit_regular_block_cleared(void **state)
+{
+    (void)state;
+    block_system_t *ctx = make_ctx();
+
+    block_system_add(ctx, 2, 3, RED_BLK, 0, 0);
+    assert_int_equal(block_system_is_occupied(ctx, 2, 3), 1);
+
+    int absorbed = block_system_decrement_gun_hit(ctx, 2, 3);
+    assert_int_equal(absorbed, 0);
+    /* Block still occupied — caller must arm explosion. */
+    assert_int_equal(block_system_is_occupied(ctx, 2, 3), 1);
+
+    block_system_destroy(ctx);
+}
+
+/* TC-30: HYPERSPACE_BLK absorbs bullet — block still occupied (Gap 3)
+ * original/gun.c:341-345 — just redraws, never killed. */
+static void test_gun_hit_hyperspace_absorbed(void **state)
+{
+    (void)state;
+    block_system_t *ctx = make_ctx();
+
+    block_system_add(ctx, 1, 0, HYPERSPACE_BLK, 0, 0);
+    assert_int_equal(block_system_is_occupied(ctx, 1, 0), 1);
+
+    int absorbed = block_system_decrement_gun_hit(ctx, 1, 0);
+    assert_int_equal(absorbed, 1);
+    assert_int_equal(block_system_is_occupied(ctx, 1, 0), 1);
+
+    block_system_destroy(ctx);
+}
+
+/* TC-31: BLACK_BLK absorbs bullet — block still occupied (Gap 4)
+ * original/gun.c:346-350 — just redraws, never killed. */
+static void test_gun_hit_black_absorbed(void **state)
+{
+    (void)state;
+    block_system_t *ctx = make_ctx();
+
+    block_system_add(ctx, 0, 5, BLACK_BLK, 0, 0);
+    assert_int_equal(block_system_is_occupied(ctx, 0, 5), 1);
+
+    int absorbed = block_system_decrement_gun_hit(ctx, 0, 5);
+    assert_int_equal(absorbed, 1);
+    assert_int_equal(block_system_is_occupied(ctx, 0, 5), 1);
+
+    block_system_destroy(ctx);
+}
+
+/* TC-32: Multi-hit special block requires 3 hits — MGUN_BLK (Gap 5)
+ * original/gun.c:325-340: counterSlide initialized to SHOTS_TO_KILL_SPECIAL=3.
+ * Hits 1 and 2 absorb; hit 3 clears. */
+static void test_gun_hit_mgun_requires_three_hits(void **state)
+{
+    (void)state;
+    block_system_t *ctx = make_ctx();
+
+    block_system_add(ctx, 3, 4, MGUN_BLK, BLOCK_SHOTS_TO_KILL_SPECIAL, 0);
+    assert_int_equal(block_system_is_occupied(ctx, 3, 4), 1);
+
+    /* Hit 1: absorbed, still occupied */
+    int r1 = block_system_decrement_gun_hit(ctx, 3, 4);
+    assert_int_equal(r1, 1);
+    assert_int_equal(block_system_is_occupied(ctx, 3, 4), 1);
+
+    /* Hit 2: absorbed, still occupied */
+    int r2 = block_system_decrement_gun_hit(ctx, 3, 4);
+    assert_int_equal(r2, 1);
+    assert_int_equal(block_system_is_occupied(ctx, 3, 4), 1);
+
+    /* Hit 3: returns 0 (destroyed by this hit; caller arms explosion).
+     * Basket 3: cell still occupied — block_system_decrement_gun_hit no
+     * longer clears, the caller is responsible for arming the explosion
+     * lifecycle. */
+    int r3 = block_system_decrement_gun_hit(ctx, 3, 4);
+    assert_int_equal(r3, 0);
+    assert_int_equal(block_system_is_occupied(ctx, 3, 4), 1);
+
+    block_system_destroy(ctx);
+}
+
+/* TC-33: COUNTER_BLK also requires 3 hits via counterSlide */
+static void test_gun_hit_counter_blk_requires_three_hits(void **state)
+{
+    (void)state;
+    block_system_t *ctx = make_ctx();
+
+    block_system_add(ctx, 2, 2, COUNTER_BLK, BLOCK_SHOTS_TO_KILL_SPECIAL, 0);
+    assert_int_equal(block_system_is_occupied(ctx, 2, 2), 1);
+
+    /* Hits 1 and 2 absorbed */
+    assert_int_equal(block_system_decrement_gun_hit(ctx, 2, 2), 1);
+    assert_int_equal(block_system_is_occupied(ctx, 2, 2), 1);
+    assert_int_equal(block_system_decrement_gun_hit(ctx, 2, 2), 1);
+    assert_int_equal(block_system_is_occupied(ctx, 2, 2), 1);
+
+    /* Hit 3 returns 0 (destroyed by this hit; caller arms explosion).
+     * Basket 3: cell still occupied — caller arms the explosion lifecycle. */
+    assert_int_equal(block_system_decrement_gun_hit(ctx, 2, 2), 0);
+    assert_int_equal(block_system_is_occupied(ctx, 2, 2), 1);
+
+    block_system_destroy(ctx);
+}
+
+/* TC-34: NULL ctx returns 0 safely */
+static void test_gun_hit_null_ctx(void **state)
+{
+    (void)state;
+    assert_int_equal(block_system_decrement_gun_hit(NULL, 0, 0), 0);
+}
+
+/* =========================================================================
+ * Group 10: Savegame v2 accessors
+ * ========================================================================= */
+
+static void test_get_black_next_frame_roundtrip(void **state)
+{
+    (void)state;
+    block_system_t *ctx = make_ctx();
+
+    block_system_add(ctx, 4, 2, BLACK_BLK, 0, 0);
+    /* Initial value should be 0 (no cooldown active). */
+    assert_int_equal(block_system_get_black_next_frame(ctx, 4, 2), 0);
+
+    block_system_set_black_next_frame(ctx, 4, 2, 1540);
+    assert_int_equal(block_system_get_black_next_frame(ctx, 4, 2), 1540);
+
+    block_system_destroy(ctx);
+}
+
+static void test_get_black_next_frame_wrong_type(void **state)
+{
+    (void)state;
+    block_system_t *ctx = make_ctx();
+
+    block_system_add(ctx, 0, 0, RED_BLK, 0, 0);
+    /* Wrong block type → returns 0. */
+    assert_int_equal(block_system_get_black_next_frame(ctx, 0, 0), 0);
+
+    /* Set is a no-op on wrong type. */
+    block_system_set_black_next_frame(ctx, 0, 0, 999);
+    assert_int_equal(block_system_get_black_next_frame(ctx, 0, 0), 0);
+
+    block_system_destroy(ctx);
+}
+
+static void test_get_random_roundtrip(void **state)
+{
+    (void)state;
+    block_system_t *ctx = make_ctx();
+
+    block_system_add(ctx, 3, 3, RED_BLK, 0, 0);
+    assert_int_equal(block_system_get_random(ctx, 3, 3), 0);
+
+    block_system_set_random(ctx, 3, 3, 1);
+    assert_int_equal(block_system_get_random(ctx, 3, 3), 1);
+
+    /* Set normalizes truthy values to 1. */
+    block_system_set_random(ctx, 3, 3, 42);
+    assert_int_equal(block_system_get_random(ctx, 3, 3), 1);
+
+    block_system_set_random(ctx, 3, 3, 0);
+    assert_int_equal(block_system_get_random(ctx, 3, 3), 0);
+
+    block_system_destroy(ctx);
+}
+
+static void test_savegame_accessors_unoccupied(void **state)
+{
+    (void)state;
+    block_system_t *ctx = make_ctx();
+
+    /* Unoccupied cell — getters return 0, setters are no-ops. */
+    assert_int_equal(block_system_get_black_next_frame(ctx, 5, 5), 0);
+    assert_int_equal(block_system_get_random(ctx, 5, 5), 0);
+
+    block_system_set_black_next_frame(ctx, 5, 5, 100);
+    block_system_set_random(ctx, 5, 5, 1);
+
+    /* Still zero — set didn't write. */
+    assert_int_equal(block_system_get_black_next_frame(ctx, 5, 5), 0);
+    assert_int_equal(block_system_get_random(ctx, 5, 5), 0);
+
+    block_system_destroy(ctx);
 }
 
 /* =========================================================================
@@ -591,6 +844,7 @@ int main(void)
         cmocka_unit_test(test_check_region_empty),
         cmocka_unit_test(test_check_region_out_of_bounds),
         cmocka_unit_test(test_check_region_adjacency_filter),
+        cmocka_unit_test(test_adjacency_filter_gap_not_suppressed),
 
         /* Group 4: Non-standard block sizes */
         cmocka_unit_test(test_check_region_bomb_block),
@@ -607,8 +861,25 @@ int main(void)
         cmocka_unit_test(test_render_info_occupied),
         cmocka_unit_test(test_render_info_empty),
 
-        /* Group 7: Status strings */
+        /* Group 7: Adjacency-filter gap reproducer */
+        /* (registered above, inline with Group 3) */
+
+        /* Group 8: Status strings */
         cmocka_unit_test(test_status_strings),
+
+        /* Group 9: block_system_decrement_gun_hit */
+        cmocka_unit_test(test_gun_hit_regular_block_cleared),
+        cmocka_unit_test(test_gun_hit_hyperspace_absorbed),
+        cmocka_unit_test(test_gun_hit_black_absorbed),
+        cmocka_unit_test(test_gun_hit_mgun_requires_three_hits),
+        cmocka_unit_test(test_gun_hit_counter_blk_requires_three_hits),
+        cmocka_unit_test(test_gun_hit_null_ctx),
+
+        /* Group 10: Savegame v2 accessors */
+        cmocka_unit_test(test_get_black_next_frame_roundtrip),
+        cmocka_unit_test(test_get_black_next_frame_wrong_type),
+        cmocka_unit_test(test_get_random_roundtrip),
+        cmocka_unit_test(test_savegame_accessors_unoccupied),
     };
 
     return cmocka_run_group_tests(tests, NULL, NULL);

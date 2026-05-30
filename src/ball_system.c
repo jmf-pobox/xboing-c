@@ -400,7 +400,7 @@ void ball_system_update(ball_system_t *ctx, const ball_system_env_t *env)
                 }
 
                 /* Auto-activate after delay */
-                if (env->frame == ctx->balls[i].nextFrame)
+                if (env->frame >= ctx->balls[i].nextFrame)
                 {
                     /* Snap interpolation origin before switching to BALL_ACTIVE rate */
                     ctx->balls[i].render_from_x = ctx->balls[i].ballx;
@@ -657,9 +657,16 @@ static void update_a_ball(ball_system_t *ctx, const ball_system_env_t *env, int 
                 /* Delegate block handling to callback */
                 if (ctx->callbacks.on_block_hit != NULL)
                 {
-                    if (ctx->callbacks.on_block_hit(row, col, i, ctx->user_data) != 0)
+                    block_hit_result_t hit_result =
+                        ctx->callbacks.on_block_hit(row, col, i, ctx->user_data);
+                    if (hit_result == BLOCK_HIT_TELEPORT)
                     {
-                        /* Callback says ball should NOT bounce (killer, teleport, etc.) */
+                        teleport_ball(ctx, env, i);
+                        randomise_velocity(ctx, env, i);
+                        return;
+                    }
+                    if (hit_result != BLOCK_HIT_BOUNCE)
+                    {
                         return;
                     }
                 }
@@ -793,10 +800,10 @@ static void animate_ball_pop(ball_system_t *ctx, const ball_system_env_t *env, i
 
     BALL *b = &ctx->balls[i];
 
-    if (env->frame == b->nextFrame)
+    if (env->frame >= b->nextFrame)
     {
         b->slide--;
-        b->nextFrame += BIRTH_FRAME_RATE;
+        b->nextFrame = env->frame + BIRTH_FRAME_RATE;
 
         /* First frame clears the ball visual (slide == BIRTH_SLIDES) */
         if (b->slide == BIRTH_SLIDES)
@@ -838,10 +845,10 @@ static void animate_ball_create(ball_system_t *ctx, const ball_system_env_t *env
         b->last_move_frame = env->frame;
     }
 
-    if (env->frame == b->nextFrame)
+    if (env->frame >= b->nextFrame)
     {
         b->slide++;
-        b->nextFrame += BIRTH_FRAME_RATE;
+        b->nextFrame = env->frame + BIRTH_FRAME_RATE;
 
         if (b->slide == BIRTH_SLIDES)
         {
@@ -872,7 +879,7 @@ static void do_ball_wait(ball_system_t *ctx, const ball_system_env_t *env, int i
 
     BALL *b = &ctx->balls[i];
 
-    if (env->frame == b->waitingFrame)
+    if (env->frame >= b->waitingFrame)
     {
         b->nextFrame = env->frame + 10;
         b->ballState = b->waitMode;
@@ -912,10 +919,13 @@ static void update_guide(ball_system_t *ctx, const ball_system_env_t *env)
 {
     /*
      * Animate guide direction indicator.
-     * Matches MoveGuides() in ball.c:425-467 (animation timing only).
+     * Matches MoveGuides() in original/ball.c:456 — guide steps every
+     * BALL_FRAME_RATE * 8 frames (40 frames at BALL_FRAME_RATE=5).
+     * Earlier modern code used `* 3` which sweeps 2.67x too fast and
+     * makes ball-launch aiming feel frantic.
      */
 
-    if ((env->frame % (BALL_FRAME_RATE * 3)) == 0)
+    if ((env->frame % (BALL_FRAME_RATE * 8)) == 0)
     {
         ctx->guide_pos += ctx->guide_inc;
     }
@@ -1206,6 +1216,77 @@ ball_system_guide_info_t ball_system_get_guide_info(const ball_system_t *ctx)
     info.pos = ctx->guide_pos;
     info.inc = ctx->guide_inc;
     return info;
+}
+
+ball_system_status_t ball_system_get_velocity(const ball_system_t *ctx, int index, int *out_dx,
+                                              int *out_dy)
+{
+    if (ctx == NULL || out_dx == NULL || out_dy == NULL)
+    {
+        return BALL_SYS_ERR_NULL_ARG;
+    }
+    if (index < 0 || index >= MAX_BALLS)
+    {
+        return BALL_SYS_ERR_INVALID_INDEX;
+    }
+
+    *out_dx = ctx->balls[index].dx;
+    *out_dy = ctx->balls[index].dy;
+    return BALL_SYS_OK;
+}
+
+enum BallStates ball_system_get_wait_mode(const ball_system_t *ctx, int index)
+{
+    if (ctx == NULL || index < 0 || index >= MAX_BALLS)
+    {
+        return BALL_NONE;
+    }
+    return ctx->balls[index].waitMode;
+}
+
+ball_system_status_t ball_system_restore(ball_system_t *ctx, int index, int current_frame,
+                                         int active, enum BallStates state, int x, int y, int dx,
+                                         int dy, enum BallStates wait_mode)
+{
+    if (ctx == NULL)
+    {
+        return BALL_SYS_ERR_NULL_ARG;
+    }
+    if (index < 0 || index >= MAX_BALLS)
+    {
+        return BALL_SYS_ERR_INVALID_INDEX;
+    }
+
+    BALL *b = &ctx->balls[index];
+
+    /* Skip the spawn animation: BALL_CREATE in save data restores as
+     * BALL_READY.  Matches spec design — see docs/specs/2026-05-28-savegame-v2.md. */
+    enum BallStates restored_state = (state == BALL_CREATE) ? BALL_READY : state;
+
+    b->active = active;
+    b->ballState = restored_state;
+    b->waitMode = wait_mode;
+    b->ballx = x;
+    b->bally = y;
+    b->oldx = x;
+    b->oldy = y;
+    b->render_from_x = x;
+    b->render_from_y = y;
+    b->dx = dx;
+    b->dy = dy;
+    b->slide = 0;
+    b->radius = (float)BALL_WIDTH / 2.0f;
+    b->mass = MIN_BALL_MASS;
+    /* Frame-relative deadlines computed from current_frame to prevent
+     * immediate auto-activate (READY) or auto-tilt (ACTIVE) on the next
+     * update tick.  Values match freshly-added ball semantics. */
+    b->nextFrame = current_frame + BIRTH_FRAME_RATE;
+    b->waitingFrame = 0;
+    b->lastPaddleHitFrame = current_frame + PADDLE_BALL_FRAME_TILT;
+    b->last_move_frame = current_frame;
+    b->newMode = BALL_NONE;
+
+    return BALL_SYS_OK;
 }
 
 /* =========================================================================

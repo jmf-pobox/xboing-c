@@ -308,7 +308,7 @@ static inline const char *sprite_block_key(int block_type)
         case PURPLE_BLK:
             return SPR_BLOCK_PURPLE;
         case BULLET_BLK:
-            return SPR_BLOCK_LOTSAMMO;
+            return SPR_BLOCK_YELLOW; /* Bullet block base is yellow; 4 bullet sprites composited on top (original/blocks.c:1681-1685) */
         case BLACK_BLK:
             return SPR_BLOCK_BLACK;
         case COUNTER_BLK:
@@ -336,7 +336,7 @@ static inline const char *sprite_block_key(int block_type)
         case PAD_EXPAND_BLK:
             return SPR_BLOCK_PAD_EXPAND;
         case DROP_BLK:
-            return SPR_BLOCK_RED; /* Drop uses row-dependent coloring */
+            return SPR_BLOCK_GREEN; /* Drop block renders as green (original/blocks.c:1728) */
         case MAXAMMO_BLK:
             return SPR_BLOCK_LOTSAMMO;
         case ROAMER_BLK:
@@ -344,7 +344,7 @@ static inline const char *sprite_block_key(int block_type)
         case TIMER_BLK:
             return SPR_BLOCK_CLOCK;
         case RANDOM_BLK:
-            return SPR_BLOCK_BONUS_1; /* Random uses animated bonus frames */
+            return SPR_BLOCK_RED; /* Random block renders as red with "- R -" text overlay (original/blocks.c:1700-1708) */
         case DYNAMITE_BLK:
             return SPR_BLOCK_DYNAMITE;
         case BONUSX2_BLK:
@@ -534,6 +534,67 @@ static inline const char *sprite_block_explode_key(int block_type, int frame)
                                                 SPR_EXPLODE_RED_3};
                 return k[frame % 3];
             }
+    }
+}
+
+/*
+ * Return the texture key for a block animation frame, or NULL when the block
+ * type has no multi-frame animation.  Call this before sprite_block_key() and
+ * fall back to sprite_block_key() when this returns NULL.
+ *
+ * slide semantics per block type:
+ *   BONUSX2/X4/BONUS_BLK  — 4-frame cycle: slide % 4  → frame index 0..3
+ *   DEATH_BLK              — 5-frame cycle: slide % 5  → frame index 0..4
+ *   EXTRABALL_BLK          — 2-frame cycle: slide % 2  → frame index 0..1
+ *   ROAMER_BLK             — directional:   slide 0=neutral,1=L,2=R,3=U,4=D
+ *                            out-of-range slide clamps to index 0 (neutral)
+ *   all other types        — NULL (no animation)
+ */
+static inline const char *sprite_block_animated_key(int block_type, int slide)
+{
+    switch (block_type)
+    {
+        case BONUSX2_BLK:
+        {
+            static const char *const k[] = {SPR_BLOCK_X2_1, SPR_BLOCK_X2_2, SPR_BLOCK_X2_3,
+                                            SPR_BLOCK_X2_4};
+            return k[((slide % 4) + 4) % 4];
+        }
+        case BONUSX4_BLK:
+        {
+            static const char *const k[] = {SPR_BLOCK_X4_1, SPR_BLOCK_X4_2, SPR_BLOCK_X4_3,
+                                            SPR_BLOCK_X4_4};
+            return k[((slide % 4) + 4) % 4];
+        }
+        case BONUS_BLK:
+        {
+            static const char *const k[] = {SPR_BLOCK_BONUS_1, SPR_BLOCK_BONUS_2,
+                                            SPR_BLOCK_BONUS_3, SPR_BLOCK_BONUS_4};
+            return k[((slide % 4) + 4) % 4];
+        }
+        case DEATH_BLK:
+        {
+            static const char *const k[] = {SPR_BLOCK_DEATH_1, SPR_BLOCK_DEATH_2,
+                                            SPR_BLOCK_DEATH_3, SPR_BLOCK_DEATH_4,
+                                            SPR_BLOCK_DEATH_5};
+            return k[((slide % 5) + 5) % 5];
+        }
+        case EXTRABALL_BLK:
+        {
+            static const char *const k[] = {SPR_BLOCK_EXTRABALL, SPR_BLOCK_EXTRABALL_2};
+            return k[((slide % 2) + 2) % 2];
+        }
+        case ROAMER_BLK:
+        {
+            static const char *const k[] = {SPR_BLOCK_ROAMER, SPR_BLOCK_ROAMER_L,
+                                            SPR_BLOCK_ROAMER_R, SPR_BLOCK_ROAMER_U,
+                                            SPR_BLOCK_ROAMER_D};
+            if (slide < 0 || slide > 4)
+                return k[0]; /* out-of-range clamps to neutral */
+            return k[slide];
+        }
+        default:
+            return NULL;
     }
 }
 

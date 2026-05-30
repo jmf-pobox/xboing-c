@@ -14,8 +14,8 @@
 
 #define BALL_WIDTH 20
 #define BALL_HEIGHT 19
-#define MAX_BALL_MASS 3.0
-#define MIN_BALL_MASS 1.0
+#define MAX_BALL_MASS 3.0f
+#define MIN_BALL_MASS 1.0f
 
 #define BALL_WC (BALL_WIDTH / 2)
 #define BALL_HC (BALL_HEIGHT / 2)

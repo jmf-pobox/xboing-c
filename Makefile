@@ -1,44 +1,245 @@
-# Makefile for XBoing - Modern Linux version
-# Original: Justin C. Kibell, 1993-1997
-# Modernized for current Linux systems
+# Convenience Makefile that wraps cmake + ctest + packaging.
+#
+# This is NOT the legacy 1996 Xlib build (preserved verbatim in original/).
+# It is a thin driver around the active CMake build defined in CMakeLists.txt
+# and CMakePresets.json so that 'make build' / 'make test' / 'make run' work
+# without having to remember the cmake invocations.
+#
+# Run 'make help' for the full target list.
 
-CC = gcc
-CFLAGS = -O2 -Wall -Wno-unused-result -Wno-format-overflow -Wno-format-truncation \
-         -I./include -I/usr/include/X11 \
-         -DHIGH_SCORE_FILE=\"./.xboing.scr\" \
-         -DLEVEL_INSTALL_DIR=\"./levels\" \
-         -DSOUNDS_DIR=\"./sounds\" \
-         -DREADMEP_FILE=\"./docs/problems.doc\" \
-         -DAUDIO_AVAILABLE=\"True\" \
-         -DAUDIO_FILE=\"audio/LINUXaudio.c\"
+# --- Configuration ---------------------------------------------------------
 
-LDFLAGS =
-LIBS = -lXpm -lX11 -lm
+BUILD_DIR      ?= build
+ASAN_BUILD_DIR ?= build-asan
+JOBS           ?= $(shell nproc 2>/dev/null || echo 4)
+PREFIX         ?= /usr/local
 
-SRCS = version.c main.c score.c error.c ball.c blocks.c init.c \
-       stage.c level.c paddle.c mess.c intro.c bonus.c sfx.c \
-       highscore.c misc.c inst.c gun.c keys.c audio.c special.c \
-       presents.c demo.c file.c preview.c dialogue.c eyedude.c \
-       editor.c keysedit.c
+# Run quietly under cmake's own progress reporting.
+.SILENT:
 
-OBJS = $(SRCS:.c=.o)
+# Phony targets (no on-disk file maps to these names).
+.PHONY: help all build configure rebuild test run \
+        asan asan-build asan-test \
+        clean distclean \
+        install uninstall deb deb-lint dogfood \
+        lint format format-check \
+        cppcheck cppcheck-src cppcheck-tests \
+        tidy check ci \
+        original-build capture-original visual-check visual-check-setup
 
-all: audio.c version.c xboing
+# --- Default ---------------------------------------------------------------
 
-xboing: $(OBJS)
-	$(CC) $(LDFLAGS) -o $@ $(OBJS) $(LIBS)
+# 'make' with no args = 'make help' (safer than building accidentally).
+help: ## Show this help.
+	echo "XBoing convenience Makefile (wraps cmake + ctest)."
+	echo
+	echo "Targets:"
+	awk 'BEGIN {FS = ":[^#]*## "} \
+	     /^[a-zA-Z_-]+:[^#]*## / { printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2 }' \
+	     $(MAKEFILE_LIST)
+	echo
+	echo "Variables (override on command line, e.g. 'make build JOBS=2'):"
+	echo "  BUILD_DIR      = $(BUILD_DIR)"
+	echo "  ASAN_BUILD_DIR = $(ASAN_BUILD_DIR)"
+	echo "  JOBS           = $(JOBS)"
+	echo "  PREFIX         = $(PREFIX) (used by 'make install')"
 
-version.c:
-	sh ./version.sh xboing
+# --- Debug build (default flow) --------------------------------------------
 
-audio.c: audio/LINUXaudio.c
-	rm -f $@
-	ln -s $< $@
+all: build ## Alias for 'build'.
 
-%.o: %.c
-	$(CC) $(CFLAGS) -c $< -o $@
+configure: $(BUILD_DIR)/CMakeCache.txt ## Configure (debug preset) if not done.
 
-clean:
-	rm -f $(OBJS) xboing version.c audio.c
+$(BUILD_DIR)/CMakeCache.txt:
+	# -B overrides the preset's hardcoded binaryDir so BUILD_DIR is honored.
+	cmake --preset debug -B $(BUILD_DIR)
 
-.PHONY: all clean
+build: configure ## Build the game and all tests (debug).
+	cmake --build $(BUILD_DIR) -j$(JOBS)
+
+rebuild: ## Wipe build/ and build from scratch.
+	rm -rf $(BUILD_DIR)
+	$(MAKE) build
+
+test: build ## Run the full ctest suite (debug build).
+	ctest --test-dir $(BUILD_DIR) --output-on-failure
+
+run: build ## Build and run the game.
+	./$(BUILD_DIR)/xboing
+
+# --- Sanitizer build (ASan + UBSan) ----------------------------------------
+
+asan: asan-build ## Configure + build the sanitizer preset.
+
+$(ASAN_BUILD_DIR)/CMakeCache.txt:
+	# -B overrides the preset's hardcoded binaryDir so ASAN_BUILD_DIR is honored.
+	cmake --preset asan -B $(ASAN_BUILD_DIR)
+
+asan-build: $(ASAN_BUILD_DIR)/CMakeCache.txt
+	cmake --build $(ASAN_BUILD_DIR) -j$(JOBS)
+
+asan-test: asan-build ## Run ctest under ASan + UBSan.
+	ctest --test-dir $(ASAN_BUILD_DIR) --output-on-failure
+
+# --- Install / packaging ---------------------------------------------------
+
+install: build ## Install to PREFIX (default /usr/local; override with PREFIX=).
+	cmake --install $(BUILD_DIR) --prefix $(PREFIX)
+
+uninstall: ## Best-effort uninstall using install_manifest.txt.
+	if [ -f $(BUILD_DIR)/install_manifest.txt ]; then \
+	  xargs rm -fv < $(BUILD_DIR)/install_manifest.txt ; \
+	else \
+	  echo "no install_manifest.txt; nothing to uninstall" ; \
+	fi
+
+deb: ## Build a Debian package via dpkg-buildpackage (.deb lands in ../).
+	dpkg-buildpackage -us -uc -b
+	echo
+	echo "Built: $$(ls -1 ../xboing_*.deb 2>/dev/null | tail -1)"
+
+deb-lint: deb ## Build .deb + run lintian on it (Debian Policy compliance).
+	lintian ../xboing_*.deb
+	echo "lintian: clean"
+
+original-build: ## Build the legacy 1996 Xlib binary in original/ (used for visual-fidelity reference capture).
+	$(MAKE) -C original
+
+capture-original: original-build ## Capture visual-fidelity reference PNGs from original/xboing under Xvfb (one-time; commits to tests/golden/original/).
+	scripts/capture_original.sh tests/golden/original/
+
+visual-check-setup: ## Set up the managed venv and Python deps for `make visual-check`.
+	@if [ ! -x ~/.local/bin/uv ]; then \
+		echo "ERROR: uv not installed. Run: curl -LsSf https://astral.sh/uv/install.sh | sh"; \
+		exit 1; \
+	fi
+	~/.local/bin/uv venv .tmp/venv
+	~/.local/bin/uv pip install --python .tmp/venv/bin/python anthropic pyyaml
+
+visual-check: build ## LLM-based visual-fidelity comparison (modern vs. tests/golden/original/). Reads ANTHROPIC_API_KEY from env or `secret-tool lookup service anthropic`. Run `make visual-check-setup` once to install deps.
+	@if [ -n "$$DISPLAY" ]; then \
+		for screen in presents intro instruct demo keys keysedit preview highscore; do \
+			if ! [ -d .tmp/visual-check/modern/$$screen ]; then \
+				echo "Capturing modern $$screen screenshots..."; \
+				BUILD_DIR=$(BUILD_DIR) scripts/visual_capture.sh modern "$$screen:200" .tmp/visual-check/modern/; \
+			fi; \
+		done; \
+	fi
+	@echo "Running LLM comparison..."
+	.tmp/venv/bin/python scripts/visual_check.py
+
+# --- Visual-capture targets (state-driven screenshot capture) ----------------
+
+golden-screen: original-build ## Capture original goldens for one screen. Usage: make golden-screen SCREEN=intro INTERVAL=200
+	scripts/visual_capture.sh original "$(SCREEN):$(or $(INTERVAL),200)" tests/golden/original/
+
+golden-all: original-build ## Capture original goldens for all attract screens (one-time).
+	scripts/visual_capture.sh original "all:$(or $(INTERVAL),200)" tests/golden/original/
+
+modern-screen: build ## Capture modern screenshots for one screen. Usage: make modern-screen SCREEN=intro INTERVAL=200
+	scripts/visual_capture.sh modern "$(SCREEN):$(or $(INTERVAL),200)" .tmp/visual-check/modern/
+
+dogfood: deb ## Install .deb, launch xboing from .tmp/, verify window opens (requires sudo; skips window check if headless or xwininfo missing).
+	mkdir -p .tmp
+	rm -f .tmp/xboing_*.deb .tmp/dogfood.deb
+	ver="$$(dpkg-parsechangelog -S Version)"; \
+	arch="$$(dpkg --print-architecture)"; \
+	expected="../xboing_$${ver}_$${arch}.deb"; \
+	if [ ! -f "$$expected" ]; then \
+	    echo "FAIL: expected package $$expected not found (did make deb succeed?)"; \
+	    exit 1; \
+	fi; \
+	cp "$$expected" .tmp/dogfood.deb; \
+	sudo dpkg -i .tmp/dogfood.deb
+	( cd .tmp && exec /usr/games/xboing ) & echo $$! > .tmp/dogfood.pid
+	sleep 3
+	if [ -n "$$DISPLAY" ] || [ -n "$$WAYLAND_DISPLAY" ]; then \
+	    if command -v xwininfo >/dev/null 2>&1; then \
+	        xwininfo -name "- XBoing II -" > .tmp/dogfood-window.txt 2>&1 || { \
+	            echo "FAIL: xboing window not detected"; \
+	            kill "$$(cat .tmp/dogfood.pid)" 2>/dev/null || true; \
+	            rm -f .tmp/dogfood.pid; \
+	            exit 1; \
+	        }; \
+	        echo "PASS: xboing launched from .tmp/, window detected"; \
+	    else \
+	        if kill -0 "$$(cat .tmp/dogfood.pid)" 2>/dev/null; then \
+	            echo "INFO: display detected but xwininfo unavailable; window check skipped"; \
+	            echo "PASS: xboing started from .tmp/ without immediate crash"; \
+	        else \
+	            echo "FAIL: xboing exited before window-detection grace period"; \
+	            rm -f .tmp/dogfood.pid; \
+	            exit 1; \
+	        fi; \
+	    fi; \
+	else \
+	    if kill -0 "$$(cat .tmp/dogfood.pid)" 2>/dev/null; then \
+	        echo "INFO: no display detected ($$DISPLAY/$$WAYLAND_DISPLAY unset); window check skipped"; \
+	        echo "PASS: xboing started from .tmp/ without immediate crash"; \
+	    else \
+	        echo "FAIL: xboing exited before window-detection grace period"; \
+	        rm -f .tmp/dogfood.pid; \
+	        exit 1; \
+	    fi; \
+	fi
+	kill "$$(cat .tmp/dogfood.pid)" 2>/dev/null || true
+	rm -f .tmp/dogfood.pid
+
+# --- Cleanup ---------------------------------------------------------------
+
+clean: ## Remove the debug build dir.
+	rm -rf $(BUILD_DIR)
+
+distclean: ## Remove all build artifacts (debug, asan, debian, in-source pollution).
+	rm -rf $(BUILD_DIR) $(ASAN_BUILD_DIR) build-install build-coverage
+	rm -rf obj-*/ debian/.debhelper debian/files debian/*.substvars \
+	       debian/*.log debian/debhelper-build-stamp \
+	       debian/xboing debian/xboing-dbgsym
+	rm -rf CMakeCache.txt CMakeFiles cmake_install.cmake
+
+# --- Quality gates (mirror CI exactly) -------------------------------------
+
+lint: ## Lint markdown files (markdownlint-cli2; mirrors docs.yml).
+	markdownlint-cli2
+
+format: ## Apply clang-format in-place to src/*.c and include/*.h.
+	clang-format -i src/*.c include/*.h
+
+format-check: ## Check formatting without modifying files (mirrors lint.yml clang-format job).
+	clang-format --dry-run --Werror src/*.c include/*.h
+
+cppcheck-src: ## Static analysis on src/ (mirrors lint.yml cppcheck (src) step).
+	cppcheck \
+	  --enable=warning,style,performance,portability \
+	  --inline-suppr \
+	  --error-exitcode=1 \
+	  -I include/ \
+	  src/
+
+cppcheck-tests: ## Static analysis on tests/ (mirrors lint.yml cppcheck (tests) step).
+	cppcheck \
+	  --enable=warning,style,performance,portability \
+	  --inline-suppr \
+	  --suppress=missingIncludeSystem \
+	  --error-exitcode=1 \
+	  -I include/ \
+	  tests/
+
+cppcheck: cppcheck-src cppcheck-tests ## Run both cppcheck passes.
+
+tidy: build ## Run clang-tidy across src/ (uses build/compile_commands.json).
+	find src -name '*.c' -exec clang-tidy -p $(BUILD_DIR) {} +
+
+# --- One-shot ---------------------------------------------------------------
+
+check: ## Run every CI gate locally (format + cppcheck + lint + debug build/test + asan build/test + .deb lintian).  Use before pushing.
+	$(MAKE) format-check
+	$(MAKE) cppcheck
+	$(MAKE) lint
+	$(MAKE) test
+	$(MAKE) asan-test
+	$(MAKE) deb-lint
+	echo
+	echo "All checks passed."
+
+ci: check ## Alias for 'check'.

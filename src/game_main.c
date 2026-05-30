@@ -18,9 +18,9 @@
 
 #include "dialogue_system.h"
 #include "game_context.h"
+#include "game_input.h"
 #include "sdl2_input.h"
 #include "sdl2_loop.h"
-#include "sdl2_renderer.h"
 #include "sdl2_state.h"
 
 int main(int argc, char *argv[])
@@ -98,14 +98,10 @@ int main(int argc, char *argv[])
             sdl2_input_process_event(ctx->input, &event);
         }
 
-        /* Check for quit action — but not in editor mode (Q is used for editor exit) */
-        if (sdl2_input_just_pressed(ctx->input, SDL2I_QUIT) &&
-            sdl2_state_current(ctx->state) != SDL2ST_EDIT)
-            running = false;
-
-        /* Toggle fullscreen on F11 */
-        if (sdl2_input_just_pressed(ctx->input, SDL2I_ICONIFY))
-            sdl2_renderer_toggle_fullscreen(ctx->renderer);
+        /* Mode-independent keys (SFX, speed, volume, fullscreen, control, quit).
+         * Called once per visual frame, after events are processed and before
+         * the fixed-timestep loop runs.  See game_input.h for rationale. */
+        game_input_global(ctx);
 
         /* Calculate elapsed time and drive the game loop */
         Uint64 now = SDL_GetTicks64();

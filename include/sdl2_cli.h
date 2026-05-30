@@ -70,6 +70,10 @@ typedef struct
 
     /* Display options */
     bool grab; /* false = no pointer grab (default), true = grab */
+
+    /* Visual-capture: -1 = off, 0+ = SDL2ST_* mode, 99 = all */
+    int visual_capture_mode;
+    int visual_capture_interval;
 } sdl2_cli_config_t;
 
 /* =========================================================================

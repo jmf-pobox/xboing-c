@@ -8,6 +8,8 @@
 #ifndef GAME_CALLBACKS_H
 #define GAME_CALLBACKS_H
 
+#include "sdl2_state.h"
+
 #include "ball_system.h"
 #include "bonus_system.h"
 #include "demo_system.h"
@@ -69,5 +71,26 @@ sfx_system_callbacks_t game_callbacks_sfx(void);
 
 /* EyeDude system callback table. */
 eyedude_system_callbacks_t game_callbacks_eyedude(void);
+
+/*
+ * Return the next attract-mode screen in the cycle.
+ * Single source of truth for: INTRO → INSTRUCT → DEMO → KEYS →
+ * KEYSEDIT → PREVIEW → HIGHSCORE → INTRO.
+ * Returns SDL2ST_NONE if current is not an attract screen.
+ */
+sdl2_state_mode_t game_callbacks_attract_next(sdl2_state_mode_t current);
+
+/*
+ * Block explosion finalize callback — registered with
+ * block_system_update_explosions().  Fires once per block reaching the
+ * end of its KILL_BLK animation (~40 ticks after trigger).  Applies
+ * score and per-type finalize-only side effects (BOMB chain, BULLET
+ * +4 ammo, BONUS counter, X2/X4 toggles, etc.) — matches the per-type
+ * switch at original/blocks.c:1550-1637.
+ *
+ * `ud` is a game_ctx_t*.  Cell at (row, col) is already unoccupied
+ * when this fires (block_system invariant).
+ */
+void game_callbacks_on_block_finalize(int row, int col, int block_type, int hit_points, void *ud);
 
 #endif /* GAME_CALLBACKS_H */

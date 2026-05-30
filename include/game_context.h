@@ -56,6 +56,15 @@ typedef struct dialogue_system dialogue_system_t;
 /* highscore_system_t already typedef'd via highscore_system.h above */
 
 /* =========================================================================
+ * Play area geometry — original/include/stage.h PLAY_WIDTH/PLAY_HEIGHT
+ * ========================================================================= */
+
+#define GAME_PLAY_WIDTH 495
+#define GAME_PLAY_HEIGHT 580
+#define GAME_COL_WIDTH (GAME_PLAY_WIDTH / 9)
+#define GAME_ROW_HEIGHT (GAME_PLAY_HEIGHT / 18)
+
+/* =========================================================================
  * Master context
  * ========================================================================= */
 
@@ -99,6 +108,8 @@ typedef struct game_ctx
     highscore_table_t hs_global;
     highscore_table_t hs_personal;
 
+    highscore_type_t highscore_request_type;
+
     /* --- Game state (replaces legacy globals from main.c) ---------------- */
     int level_number;     /* Current level (1-based) */
     int lives_left;       /* Remaining lives */
@@ -117,14 +128,26 @@ typedef struct game_ctx
     int time_remaining;   /* Seconds remaining on level timer */
     int timer_frame_acc;  /* Frame accumulator for 1-second countdown */
 
-    /* Tilt state */
-    int user_tilts; /* Remaining tilts this level */
+    /* Tilt state — original/include/main.h:85 */
+#define GAME_MAX_TILTS 3
+    int user_tilts;
+
+    /* Bonus block counter — incremented on BONUS_BLK explosion finalize.
+     * At count == 10, killer mode activates (matches original/blocks.c:1607). */
+    int bonus_count;
 
     /* Render interpolation */
     double render_alpha; /* 0.0–1.0, fraction of tick elapsed since last physics step */
 
     /* Debug / control flags */
     bool debug_mode;
+
+    /* Visual-capture: -1 = off, SDL2ST_* = single mode, 99 = all */
+    int vc_mode;
+    int vc_interval;
+
+    /* Attract-mode display overrides (don't affect game state) */
+    int attract_level_display; /* 0 = use real level_number */
 
 } game_ctx_t;
 

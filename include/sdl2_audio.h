@@ -15,6 +15,8 @@
  * See ADR-010 in docs/DESIGN.md for design rationale.
  */
 
+#include <stdbool.h>
+
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_mixer.h>
 
@@ -140,6 +142,12 @@ int sdl2_audio_volume_down(sdl2_audio_t *ctx);
 
 /* Halt all currently playing channels immediately. */
 void sdl2_audio_halt(sdl2_audio_t *ctx);
+
+/* Mute/unmute all audio.  When muted, play() returns OK but is silent. */
+void sdl2_audio_set_muted(sdl2_audio_t *ctx, bool muted);
+
+/* Return true if audio is muted. */
+bool sdl2_audio_is_muted(const sdl2_audio_t *ctx);
 
 /* Return the number of sounds currently cached. */
 int sdl2_audio_count(const sdl2_audio_t *ctx);

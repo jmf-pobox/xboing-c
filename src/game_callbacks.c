@@ -22,6 +22,7 @@
 #include "editor_system.h"
 #include "game_context.h"
 #include "game_rules.h"
+#include "gun_system.h"
 #include "intro_system.h"
 #include "keys_system.h"
 #include "level_system.h"
@@ -34,13 +35,35 @@
 #include "sdl2_audio.h"
 #include "sdl2_loop.h"
 #include "sdl2_state.h"
+#include "sfx_system.h"
 #include "special_system.h"
 
-/* Play area constants */
-#define GAME_PLAY_WIDTH 495
-#define GAME_PLAY_HEIGHT 580
-#define GAME_COL_WIDTH (GAME_PLAY_WIDTH / 9)
-#define GAME_ROW_HEIGHT (GAME_PLAY_HEIGHT / 18)
+/* =========================================================================
+ * Attract cycle — single source of truth for screen order
+ *
+ * Order matches the natural callback chain (keys_cb_on_finished →
+ * PREVIEW, demo_cb_on_finished(PREVIEW) → HIGHSCORE).  The original's
+ * C-key handler (original/main.c:554-605) had HIGHSCORE before PREVIEW,
+ * disagreeing with the natural cycle — a bug in the original that caused
+ * C-key and timer-based transitions to visit screens in different order.
+ * We align both paths to the natural order.
+ * ========================================================================= */
+
+static const sdl2_state_mode_t attract_cycle[] = {
+    SDL2ST_INTRO,    SDL2ST_INSTRUCT, SDL2ST_DEMO,      SDL2ST_KEYS,
+    SDL2ST_KEYSEDIT, SDL2ST_PREVIEW,  SDL2ST_HIGHSCORE,
+};
+static const int attract_cycle_len = (int)(sizeof(attract_cycle) / sizeof(attract_cycle[0]));
+
+sdl2_state_mode_t game_callbacks_attract_next(sdl2_state_mode_t current)
+{
+    for (int i = 0; i < attract_cycle_len; i++)
+    {
+        if (attract_cycle[i] == current)
+            return attract_cycle[(i + 1) % attract_cycle_len];
+    }
+    return SDL2ST_NONE;
+}
 
 /* =========================================================================
  * Ball system callbacks
@@ -63,106 +86,194 @@ static int ball_cb_check_region(int row, int col, int bx, int by, int bdx, void 
  * Returns nonzero if ball should NOT bounce (e.g., DEATH_BLK kills ball,
  * HYPERSPACE_BLK teleports — these absorb the hit).
  */
-static int ball_cb_on_block_hit(int row, int col, int ball_index, void *ud)
+static block_hit_result_t ball_cb_on_block_hit(int row, int col, int ball_index, void *ud)
 {
-    (void)ball_index;
     game_ctx_t *ctx = ud;
 
     int block_type = block_system_get_type(ctx->block, row, col);
     if (block_type == NONE_BLK)
-        return 0;
+        return BLOCK_HIT_BOUNCE;
 
-    /* Award points based on block type */
-    int points = score_block_hit_points(block_type, row);
-    if (points > 0)
+    int frame = (int)sdl2_state_frame(ctx->state);
+    int killer = special_system_is_active(ctx->special, SPECIAL_KILLER);
+
+    switch (block_type)
+    {
+        case DEATH_BLK:
+            (void)block_system_explode(ctx->block, row, col, frame);
+            {
+                ball_system_env_t benv = game_callbacks_ball_env(ctx);
+                ball_system_change_mode(ctx->ball, &benv, ball_index, BALL_POP);
+            }
+            return BLOCK_HIT_ABSORB;
+
+        case BOMB_BLK:
+            (void)block_system_explode(ctx->block, row, col, frame);
+            if (ctx->audio)
+                sdl2_audio_play(ctx->audio, "bomb");
+            return killer ? BLOCK_HIT_ABSORB : BLOCK_HIT_BOUNCE;
+
+        case REVERSE_BLK:
+            (void)block_system_explode(ctx->block, row, col, frame);
+            paddle_system_toggle_reverse(ctx->paddle);
+            return killer ? BLOCK_HIT_ABSORB : BLOCK_HIT_BOUNCE;
+
+        case MULTIBALL_BLK:
+        {
+            (void)block_system_explode(ctx->block, row, col, frame);
+            ball_system_env_t env = game_callbacks_ball_env(ctx);
+            ball_system_split(ctx->ball, &env);
+            return killer ? BLOCK_HIT_ABSORB : BLOCK_HIT_BOUNCE;
+        }
+
+        case STICKY_BLK:
+            (void)block_system_explode(ctx->block, row, col, frame);
+            special_system_set(ctx->special, SPECIAL_STICKY, 1);
+            paddle_system_set_sticky(ctx->paddle, 1);
+            return killer ? BLOCK_HIT_ABSORB : BLOCK_HIT_BOUNCE;
+
+        case PAD_SHRINK_BLK:
+            (void)block_system_explode(ctx->block, row, col, frame);
+            paddle_system_change_size(ctx->paddle, 1);
+            return killer ? BLOCK_HIT_ABSORB : BLOCK_HIT_BOUNCE;
+
+        case PAD_EXPAND_BLK:
+            (void)block_system_explode(ctx->block, row, col, frame);
+            paddle_system_change_size(ctx->paddle, 0);
+            return killer ? BLOCK_HIT_ABSORB : BLOCK_HIT_BOUNCE;
+
+        case MGUN_BLK:
+            (void)block_system_explode(ctx->block, row, col, frame);
+            special_system_set(ctx->special, SPECIAL_FAST_GUN, 1);
+            return killer ? BLOCK_HIT_ABSORB : BLOCK_HIT_BOUNCE;
+
+        case WALLOFF_BLK:
+            (void)block_system_explode(ctx->block, row, col, frame);
+            special_system_set(ctx->special, SPECIAL_NO_WALLS, 1);
+            return killer ? BLOCK_HIT_ABSORB : BLOCK_HIT_BOUNCE;
+
+        case EXTRABALL_BLK:
+            (void)block_system_explode(ctx->block, row, col, frame);
+            ctx->lives_left++;
+            return killer ? BLOCK_HIT_ABSORB : BLOCK_HIT_BOUNCE;
+
+        case COUNTER_BLK:
+            if (killer || block_system_ball_hit_counter(ctx->block, row, col) <= 0)
+            {
+                (void)block_system_explode(ctx->block, row, col, frame);
+                return killer ? BLOCK_HIT_ABSORB : BLOCK_HIT_BOUNCE;
+            }
+            return BLOCK_HIT_BOUNCE;
+
+        case BLACK_BLK:
+        {
+            int survives = block_system_check_black_hit(ctx->block, row, col, frame);
+            if (survives > 0)
+                return BLOCK_HIT_BOUNCE;
+            (void)block_system_explode(ctx->block, row, col, frame);
+            return killer ? BLOCK_HIT_ABSORB : BLOCK_HIT_BOUNCE;
+        }
+
+        case HYPERSPACE_BLK:
+            if (ctx->audio)
+                sdl2_audio_play(ctx->audio, "hyperspace");
+            return BLOCK_HIT_TELEPORT;
+
+        default:
+            (void)block_system_explode(ctx->block, row, col, frame);
+            return killer ? BLOCK_HIT_ABSORB : BLOCK_HIT_BOUNCE;
+    }
+}
+
+/*
+ * Block explosion finalize handler — fires once per block reaching the
+ * end of its KILL_BLK animation (~40 ticks after trigger).  Applies score
+ * and per-type finalize-only side effects, matching the per-type switch
+ * at original/blocks.c:1550-1637.
+ *
+ * The cell is already unoccupied when this callback fires.
+ */
+void game_callbacks_on_block_finalize(int row, int col, int block_type, int hit_points, void *ud)
+{
+    game_ctx_t *ctx = ud;
+    int frame = (int)sdl2_state_frame(ctx->state);
+
+    /* Score deferred from hit time (original/blocks.c:1547). */
+    if (hit_points > 0)
     {
         score_system_env_t senv = {
             .x2_active = special_system_is_active(ctx->special, SPECIAL_X2_BONUS),
             .x4_active = special_system_is_active(ctx->special, SPECIAL_X4_BONUS),
         };
-        score_system_add(ctx->score, (unsigned long)points, &senv);
+        score_system_add(ctx->score, (unsigned long)hit_points, &senv);
     }
 
-    /* Handle block-type-specific behavior */
     switch (block_type)
     {
-        case DEATH_BLK:
-            block_system_clear(ctx->block, row, col);
-            return 1; /* Kill the ball */
-
         case BOMB_BLK:
-            block_system_clear(ctx->block, row, col);
+            /* 8-neighbor chain reaction (original/blocks.c:1559-1566).
+             * Return value intentionally discarded — overlapping chains
+             * may try to re-arm an already-exploding neighbor and the
+             * silent skip matches original/blocks.c:1825. */
             for (int dr = -1; dr <= 1; dr++)
+            {
                 for (int dc = -1; dc <= 1; dc++)
-                    if (!(dr == 0 && dc == 0) &&
-                        block_system_is_occupied(ctx->block, row + dr, col + dc))
-                        block_system_clear(ctx->block, row + dr, col + dc);
-            if (ctx->audio)
-                sdl2_audio_play(ctx->audio, "bomb");
-            return 0;
-
-        case REVERSE_BLK:
-            block_system_clear(ctx->block, row, col);
-            paddle_system_toggle_reverse(ctx->paddle);
-            return 0;
-
-        case MULTIBALL_BLK:
-        {
-            block_system_clear(ctx->block, row, col);
-            ball_system_env_t env = game_callbacks_ball_env(ctx);
-            ball_system_split(ctx->ball, &env);
-            return 0;
-        }
-
-        case STICKY_BLK:
-            block_system_clear(ctx->block, row, col);
-            special_system_set(ctx->special, SPECIAL_STICKY, 1);
-            paddle_system_set_sticky(ctx->paddle, 1);
-            return 0;
-
-        case PAD_SHRINK_BLK:
-            block_system_clear(ctx->block, row, col);
-            paddle_system_change_size(ctx->paddle, 1); /* shrink */
-            return 0;
-
-        case PAD_EXPAND_BLK:
-            block_system_clear(ctx->block, row, col);
-            paddle_system_change_size(ctx->paddle, 0); /* expand */
-            return 0;
-
-        case MGUN_BLK:
-            block_system_clear(ctx->block, row, col);
-            special_system_set(ctx->special, SPECIAL_FAST_GUN, 1);
-            gun_system_set_unlimited(ctx->gun, 1);
-            return 0;
-
-        case WALLOFF_BLK:
-            block_system_clear(ctx->block, row, col);
-            special_system_set(ctx->special, SPECIAL_NO_WALLS, 1);
-            return 0;
-
-        case EXTRABALL_BLK:
-            block_system_clear(ctx->block, row, col);
-            ctx->lives_left++;
-            return 0;
+                {
+                    if (dr == 0 && dc == 0)
+                        continue;
+                    (void)block_system_explode(ctx->block, row + dr, col + dc,
+                                               frame + BLOCK_EXPLODE_DELAY);
+                }
+            }
+            /* Screen shake — matches original/blocks.c:1571-1572 SFX_SHAKE. */
+            if (ctx->sfx)
+                sfx_system_set_mode(ctx->sfx, SFX_MODE_SHAKE);
+            break;
 
         case BONUSX2_BLK:
-            block_system_clear(ctx->block, row, col);
+            /* x2 explicitly disables x4 (original/blocks.c:1619). */
             special_system_set(ctx->special, SPECIAL_X2_BONUS, 1);
-            return 0;
+            special_system_set(ctx->special, SPECIAL_X4_BONUS, 0);
+            break;
 
         case BONUSX4_BLK:
-            block_system_clear(ctx->block, row, col);
+            /* x4 explicitly disables x2 (original/blocks.c:1628). */
             special_system_set(ctx->special, SPECIAL_X4_BONUS, 1);
-            return 0;
+            special_system_set(ctx->special, SPECIAL_X2_BONUS, 0);
+            break;
 
-        case HYPERSPACE_BLK:
-            block_system_clear(ctx->block, row, col);
-            return 1; /* Absorb ball (teleport in full impl) */
+        case TIMER_BLK:
+            /* +20 seconds (original/blocks.c:1576, BLOCK_EXTRA_TIME=20). */
+            if (ctx->time_remaining < 1000000)
+                ctx->time_remaining += BLOCK_EXTRA_TIME;
+            break;
+
+        case BULLET_BLK:
+            /* +4 ammo (original/blocks.c:1584-1585).  Matches the gun-hit
+             * pattern at gun_cb_on_block_hit line 317-319. */
+            if (!gun_system_get_unlimited(ctx->gun))
+            {
+                for (int i = 0; i < BLOCK_NUMBER_OF_BULLETS_NEW_LEVEL; i++)
+                    gun_system_add_ammo(ctx->gun);
+            }
+            break;
+
+        case MAXAMMO_BLK:
+            /* Unlimited bullets (original/blocks.c:1590-1591). */
+            gun_system_set_unlimited(ctx->gun, 1);
+            gun_system_set_ammo(ctx->gun, GUN_MAX_AMMO + 1);
+            break;
+
+        case BONUS_BLK:
+            /* Bonus counter — killer mode at exactly 10
+             * (original/blocks.c:1607). */
+            ctx->bonus_count++;
+            if (ctx->bonus_count == 10)
+                special_system_set(ctx->special, SPECIAL_KILLER, 1);
+            break;
 
         default:
-            block_system_clear(ctx->block, row, col);
-            return 0;
+            break;
     }
 }
 
@@ -238,17 +349,21 @@ static void ball_cb_on_event(ball_system_event_t event, int ball_index, void *ud
  * Gun system callbacks
  * ========================================================================= */
 
-/*
- * Check if bullet at (bx, by) hits any block in the grid.
- * Iterates all occupied blocks and checks AABB overlap.
- */
+/* Check if bullet at (bx, by) hits a block. Narrows to 3x3 neighborhood. */
 static int gun_cb_check_block_hit(int bx, int by, int *out_row, int *out_col, void *ud)
 {
-    game_ctx_t *ctx = ud;
+    const game_ctx_t *ctx = ud;
 
-    for (int row = 0; row < MAX_ROW; row++)
+    int center_col = bx / GAME_COL_WIDTH;
+    int center_row = by / GAME_ROW_HEIGHT;
+    int r0 = (center_row > 0) ? center_row - 1 : 0;
+    int r1 = (center_row < MAX_ROW - 1) ? center_row + 1 : MAX_ROW - 1;
+    int c0 = (center_col > 0) ? center_col - 1 : 0;
+    int c1 = (center_col < MAX_COL - 1) ? center_col + 1 : MAX_COL - 1;
+
+    for (int row = r0; row <= r1; row++)
     {
-        for (int col = 0; col < MAX_COL; col++)
+        for (int col = c0; col <= c1; col++)
         {
             if (!block_system_is_occupied(ctx->block, row, col))
                 continue;
@@ -257,7 +372,6 @@ static int gun_cb_check_block_hit(int bx, int by, int *out_row, int *out_col, vo
             if (block_system_get_render_info(ctx->block, row, col, &info) != BLOCK_SYS_OK)
                 continue;
 
-            /* AABB overlap: bullet center vs block rectangle */
             if (bx >= info.x && bx < info.x + info.width && by >= info.y &&
                 by < info.y + info.height)
             {
@@ -270,7 +384,7 @@ static int gun_cb_check_block_hit(int bx, int by, int *out_row, int *out_col, vo
     return 0;
 }
 
-/* Handle bullet-block hit: clear block and award points */
+/* Handle bullet-block hit: decrement/absorb per block type, award points. */
 static void gun_cb_on_block_hit(int row, int col, void *ud)
 {
     game_ctx_t *ctx = ud;
@@ -278,22 +392,47 @@ static void gun_cb_on_block_hit(int row, int col, void *ud)
     if (block_type == NONE_BLK)
         return;
 
-    int points = score_block_hit_points(block_type, row);
-    if (points > 0)
+    /* Delegate decrement / absorb logic to block_system —
+     * original/gun.c:318-350.  Returns 1 if bullet absorbed (block still
+     * occupied), 0 if the block would be destroyed by this hit. */
+    int absorbed = block_system_decrement_gun_hit(ctx->block, row, col);
+    if (absorbed)
+        return;
+
+    /* Block destroyed by this bullet — arm the explosion lifecycle so
+     * finalize-time effects (BULLET +4 ammo, MAXAMMO unlimited, score,
+     * BOMB chain, etc.) fire via game_callbacks_on_block_finalize at
+     * the end of the explosion animation.  This matches original
+     * blocks.c:1547-1637 where every block dies through
+     * ExplodeBlocksPending regardless of whether the killing hit was
+     * a bullet or a ball.  Pickup-feedback messages still fire at hit
+     * time below for immediate player feedback. */
+    int frame = (int)sdl2_state_frame(ctx->state);
+    (void)block_system_explode(ctx->block, row, col, frame);
+
+    switch (block_type)
     {
-        score_system_env_t senv = {
-            .x2_active = special_system_is_active(ctx->special, SPECIAL_X2_BONUS),
-            .x4_active = special_system_is_active(ctx->special, SPECIAL_X4_BONUS),
-        };
-        score_system_add(ctx->score, (unsigned long)points, &senv);
+        case BULLET_BLK:
+            if (ctx->audio)
+                sdl2_audio_play(ctx->audio, "ammo");
+            message_system_set(ctx->message, "More ammunition, cool!", 1, frame);
+            break;
+
+        case MAXAMMO_BLK:
+            if (ctx->audio)
+                sdl2_audio_play(ctx->audio, "ammo");
+            message_system_set(ctx->message, "Unlimited bullets!", 1, frame);
+            break;
+
+        default:
+            break;
     }
-    block_system_clear(ctx->block, row, col);
 }
 
 /* Check if bullet hits any active ball (AABB overlap) */
 static int gun_cb_check_ball_hit(int bx, int by, void *ud)
 {
-    game_ctx_t *ctx = ud;
+    const game_ctx_t *ctx = ud;
     for (int i = 0; i < MAX_BALLS; i++)
     {
         ball_system_render_info_t info;
@@ -310,26 +449,41 @@ static int gun_cb_check_ball_hit(int bx, int by, void *ud)
     return -1;
 }
 
-/* Bullet hit ball: activate it (wake up from stun) */
+/* Bullet hit ball: kill the ball — original/gun.c:284 ClearBallNow. */
 static void gun_cb_on_ball_hit(int ball_index, void *ud)
 {
-    (void)ball_index;
-    (void)ud;
-    /* Ball activation on bullet hit — simplified for now */
+    game_ctx_t *ctx = ud;
+    /* Use the existing factory — it captures no_walls, killer, and all
+     * other fields that an inline construction might miss. */
+    ball_system_env_t env = game_callbacks_ball_env(ctx);
+    ball_system_change_mode(ctx->ball, &env, ball_index, BALL_POP);
 }
 
-/* Check if bullet hits eyedude — stub until bead 4.2 */
+/* Bullet half-dimensions for the eyedude collision check.  The bullet
+ * sprite is 7x10 (original) / 7x16 (modern PNG with alpha padding); we
+ * use 4x5 half-extents for a slightly forgiving AABB. */
+#define EYEDUDE_BULLET_HW 4
+#define EYEDUDE_BULLET_HH 5
+
+/* Check if a bullet at (bx, by) hits the eyedude — AABB overlap when
+ * the eyedude is in WALK state.  Reuses eyedude_system_check_collision
+ * which already enforces the state guard. */
 static int gun_cb_check_eyedude_hit(int bx, int by, void *ud)
 {
-    (void)bx;
-    (void)by;
-    (void)ud;
-    return 0;
+    const game_ctx_t *ctx = ud;
+    return eyedude_system_check_collision(ctx->eyedude, bx, by, EYEDUDE_BULLET_HW,
+                                          EYEDUDE_BULLET_HH);
 }
 
+/* Bullet hit on eyedude: switch to DIE state.  The next
+ * eyedude_system_update tick processes do_die() which fires the
+ * on_score / on_message / on_sound callbacks (eyedude_cb_on_score
+ * adds EYEDUDE_HIT_BONUS=10000 with x2/x4 multiplier env applied),
+ * so we do NOT award points here — that would double-count. */
 static void gun_cb_on_eyedude_hit(void *ud)
 {
-    (void)ud;
+    game_ctx_t *ctx = ud;
+    eyedude_system_set_state(ctx->eyedude, EYEDUDE_STATE_DIE);
 }
 
 static void gun_cb_on_sound(const char *name, void *ud)
@@ -341,7 +495,7 @@ static void gun_cb_on_sound(const char *name, void *ud)
 
 static int gun_cb_is_ball_waiting(void *ud)
 {
-    game_ctx_t *ctx = ud;
+    const game_ctx_t *ctx = ud;
     return ball_system_is_ball_waiting(ctx->ball);
 }
 
@@ -447,10 +601,8 @@ presents_system_callbacks_t game_callbacks_presents(void)
 static void intro_cb_on_finished(intro_screen_mode_t mode, void *ud)
 {
     game_ctx_t *ctx = ud;
-    if (mode == INTRO_MODE_INTRO)
-        sdl2_state_transition(ctx->state, SDL2ST_INSTRUCT);
-    else
-        sdl2_state_transition(ctx->state, SDL2ST_DEMO);
+    sdl2_state_mode_t current = (mode == INTRO_MODE_INTRO) ? SDL2ST_INTRO : SDL2ST_INSTRUCT;
+    sdl2_state_transition(ctx->state, game_callbacks_attract_next(current));
 }
 
 intro_system_callbacks_t game_callbacks_intro(void)
@@ -518,11 +670,8 @@ bonus_system_callbacks_t game_callbacks_bonus(void)
 static void demo_cb_on_finished(demo_screen_mode_t mode, void *ud)
 {
     game_ctx_t *ctx = ud;
-    /* Attract cycle: demo → keys → keysedit → preview → highscore → intro */
-    if (mode == DEMO_MODE_DEMO)
-        sdl2_state_transition(ctx->state, SDL2ST_KEYS);
-    else /* DEMO_MODE_PREVIEW */
-        sdl2_state_transition(ctx->state, SDL2ST_HIGHSCORE);
+    sdl2_state_mode_t current = (mode == DEMO_MODE_DEMO) ? SDL2ST_DEMO : SDL2ST_PREVIEW;
+    sdl2_state_transition(ctx->state, game_callbacks_attract_next(current));
 }
 
 static void demo_cb_on_load_level(int level_num, void *ud)
@@ -556,11 +705,8 @@ demo_system_callbacks_t game_callbacks_demo(void)
 static void keys_cb_on_finished(keys_screen_mode_t mode, void *ud)
 {
     game_ctx_t *ctx = ud;
-    /* Attract cycle: keys → keysedit → preview → highscore → intro */
-    if (mode == KEYS_MODE_GAME)
-        sdl2_state_transition(ctx->state, SDL2ST_KEYSEDIT);
-    else /* KEYS_MODE_EDITOR */
-        sdl2_state_transition(ctx->state, SDL2ST_PREVIEW);
+    sdl2_state_mode_t current = (mode == KEYS_MODE_GAME) ? SDL2ST_KEYS : SDL2ST_KEYSEDIT;
+    sdl2_state_transition(ctx->state, game_callbacks_attract_next(current));
 }
 
 keys_system_callbacks_t game_callbacks_keys(void)
@@ -579,8 +725,7 @@ static void highscore_cb_on_finished(highscore_type_t type, void *ud)
 {
     (void)type;
     game_ctx_t *ctx = ud;
-    /* After highscore display, cycle back to intro */
-    sdl2_state_transition(ctx->state, SDL2ST_INTRO);
+    sdl2_state_transition(ctx->state, game_callbacks_attract_next(SDL2ST_HIGHSCORE));
 }
 
 highscore_system_callbacks_t game_callbacks_highscore(void)
@@ -625,7 +770,7 @@ sfx_system_callbacks_t game_callbacks_sfx(void)
 
 static int eyedude_cb_is_path_clear(void *ud)
 {
-    game_ctx_t *ctx = ud;
+    const game_ctx_t *ctx = ud;
     /* Check if top row has blocks */
     for (int col = 0; col < MAX_COL; col++)
     {
@@ -696,7 +841,7 @@ static void editor_cb_clear_grid(void *ud)
 
 static int editor_cb_query_cell(int row, int col, editor_cell_t *cell, void *ud)
 {
-    game_ctx_t *ctx = ud;
+    const game_ctx_t *ctx = ud;
     if (!block_system_is_occupied(ctx->block, row, col))
         return 0;
     cell->occupied = 1;
@@ -800,7 +945,7 @@ static char block_type_to_char(int block_type)
 
 static int editor_cb_save_level(const char *path, void *ud)
 {
-    game_ctx_t *ctx = ud;
+    const game_ctx_t *ctx = ud;
     FILE *fp = fopen(path, "w");
     if (!fp)
         return 0;
@@ -836,7 +981,7 @@ static const char *editor_cb_input_dialogue(const char *message, int numeric_onl
 {
     (void)message;
     (void)numeric_only;
-    game_ctx_t *ctx = ud;
+    const game_ctx_t *ctx = ud;
     static char buf[16];
     int num = editor_system_get_level_number(ctx->editor);
     if (num <= 0 || num > 80)

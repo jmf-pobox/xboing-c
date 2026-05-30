@@ -40,7 +40,7 @@
 .\" =========================================================================
 .\"
 .TH XBOING 6 "November 1996" "X Version 11"
-.AU Justin C. Kibell <jck@catt.rmit.edu.au>
+.\" Author: Justin C. Kibell <jck@catt.rmit.edu.au>
 .SH NAME
 xboing \- An X Window System based blockout clone. V2.4
 .SH SYNOPSIS
@@ -380,7 +380,7 @@ Make sure you have a level title and a time bonus in seconds.
 
 level format: (case sensitive)
 .IP
-. = blank
+\&. = blank
 .br
 w = wall block
 .br

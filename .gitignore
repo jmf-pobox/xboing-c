@@ -1,14 +1,59 @@
+# Stale root build artifacts (from pre-archive builds)
 *.o
-xboing
-.xboing.scr
+/xboing
 version.c
 audio.c
+
+# Legacy build artifacts (in original/)
+original/*.o
+original/xboing
+original/version.c
+original/audio.c
+
+# Score files
+.xboing.scr
+original/.xboing.scr
+
+# Sound conversion artifacts
 sounds/originals/
 sounds/*.raw
+
+# CMake build directories
 build/
 build-asan/
 build-install/
+build-coverage/
+# CLion default build dirs
+cmake-build-*/
+
+# Debian packaging build artifacts (dpkg-buildpackage)
+obj-*/
+debian/.debhelper/
+debian/files
+debian/*.substvars
+debian/*.log
+debian/debhelper-build-stamp
+debian/xboing/
+debian/xboing-dbgsym/
+
+# Scratch directory (per CLAUDE.md tool-usage policy)
+.tmp/
+
+# JetBrains IDE — share project-level config; per-user state is excluded
+# by .idea/.gitignore (workspace.xml, shelf/, etc.)
+
+# Claude Code
 .claude/settings.local.json
+.claude/scheduled_tasks.lock
+
+# direnv
 .envrc
 .direnv
+
+# Biff
 .biff.local
+
+# Beads / Dolt files (added by bd init)
+.dolt/
+*.db
+.beads-credential-key

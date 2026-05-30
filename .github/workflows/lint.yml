@@ -14,17 +14,11 @@ jobs:
       - name: Install clang-format
         run: sudo apt-get update && sudo apt-get install -y clang-format
 
-      - name: Check formatting (modernized files only)
+      - name: Check formatting
         run: |
           clang-format --dry-run --Werror \
             src/*.c \
-            ball_math.c \
-            include/block_types.h \
-            include/ball_types.h \
-            include/ball_math.h \
-            include/paths.h \
-            include/score_logic.h \
-            include/sdl2_*.h
+            include/*.h
 
   cppcheck:
     runs-on: ubuntu-latest
@@ -34,27 +28,16 @@ jobs:
       - name: Install cppcheck
         run: sudo apt-get update && sudo apt-get install -y cppcheck
 
-      - name: cppcheck (modernized files - strict)
+      - name: cppcheck (src)
         run: |
           cppcheck \
             --enable=warning,style,performance,portability \
             --inline-suppr \
-            --suppress=variableScope:ball_math.c \
-            --error-exitcode=1 \
-            src/ ball_math.c
-
-      - name: cppcheck (legacy files - strict)
-        run: |
-          cppcheck \
-            --enable=warning,style,performance,portability \
-            --inline-suppr \
-            --suppress=missingIncludeSystem \
-            --suppress=variableScope \
             --error-exitcode=1 \
             -I include/ \
-            $(ls *.c | grep -v '^ball_math\.c$')
+            src/
 
-      - name: cppcheck (test files - strict)
+      - name: cppcheck (tests)
         run: |
           cppcheck \
             --enable=warning,style,performance,portability \
