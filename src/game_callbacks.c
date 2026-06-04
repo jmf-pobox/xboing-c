@@ -66,6 +66,92 @@ sdl2_state_mode_t game_callbacks_attract_next(sdl2_state_mode_t current)
 }
 
 /* =========================================================================
+ * Per-block hit sound — matches original/blocks.c:762 PlaySoundForBlock
+ *
+ * Plays the sound effect for a block being hit hard enough to destroy
+ * (or, for HYPERSPACE_BLK, to absorb).  Intermediate hits that leave
+ * the block alive (COUNTER countdown, BLACK_BLK cooldown flash) are
+ * silent — they match the original where DrawBlock(KILL_BLK) is the
+ * trigger, not the intermediate DrawBlock(COUNTER_BLK) etc.
+ * ========================================================================= */
+
+static void play_block_hit_sound(sdl2_audio_t *audio, int block_type)
+{
+    if (!audio)
+        return;
+
+    const char *name = NULL;
+    switch (block_type)
+    {
+        case BOMB_BLK:
+            name = "bomb";
+            break;
+        case BULLET_BLK:
+        case MAXAMMO_BLK:
+            name = "ammo";
+            break;
+        case RED_BLK:
+        case GREEN_BLK:
+        case BLUE_BLK:
+        case TAN_BLK:
+        case PURPLE_BLK:
+        case YELLOW_BLK:
+        case COUNTER_BLK:
+        case RANDOM_BLK:
+        case DROP_BLK:
+            name = "touch";
+            break;
+        case ROAMER_BLK:
+            name = "ouch";
+            break;
+        case EXTRABALL_BLK:
+            name = "ddloo";
+            break;
+        case MGUN_BLK:
+            name = "mgun";
+            break;
+        case WALLOFF_BLK:
+            name = "wallsoff";
+            break;
+        case BONUSX2_BLK:
+        case BONUSX4_BLK:
+        case BONUS_BLK:
+            name = "gate";
+            break;
+        case REVERSE_BLK:
+            name = "warp";
+            break;
+        case PAD_SHRINK_BLK:
+            name = "wzzz2";
+            break;
+        case PAD_EXPAND_BLK:
+            name = "wzzz";
+            break;
+        case MULTIBALL_BLK:
+            name = "spring";
+            break;
+        case TIMER_BLK:
+            name = "bonus";
+            break;
+        case STICKY_BLK:
+            name = "sticky";
+            break;
+        case DEATH_BLK:
+            name = "evillaugh";
+            break;
+        case BLACK_BLK:
+            name = "metal";
+            break;
+        case HYPERSPACE_BLK:
+            name = "hypspc";
+            break;
+        default:
+            return;
+    }
+    sdl2_audio_play(audio, name);
+}
+
+/* =========================================================================
  * Ball system callbacks
  * ========================================================================= */
 
@@ -100,27 +186,33 @@ static block_hit_result_t ball_cb_on_block_hit(int row, int col, int ball_index,
     switch (block_type)
     {
         case DEATH_BLK:
-            (void)block_system_explode(ctx->block, row, col, frame);
+            /* Match original/ball.c:847-861 ordering: kill ball first,
+             * then arm explosion and play sound (the original plays the
+             * sound inside DrawBlock(KILL_BLK) which is called AFTER
+             * ClearBallNow). */
             {
                 ball_system_env_t benv = game_callbacks_ball_env(ctx);
                 ball_system_change_mode(ctx->ball, &benv, ball_index, BALL_POP);
             }
+            (void)block_system_explode(ctx->block, row, col, frame);
+            play_block_hit_sound(ctx->audio, DEATH_BLK);
             return BLOCK_HIT_ABSORB;
 
         case BOMB_BLK:
             (void)block_system_explode(ctx->block, row, col, frame);
-            if (ctx->audio)
-                sdl2_audio_play(ctx->audio, "bomb");
+            play_block_hit_sound(ctx->audio, BOMB_BLK);
             return killer ? BLOCK_HIT_ABSORB : BLOCK_HIT_BOUNCE;
 
         case REVERSE_BLK:
             (void)block_system_explode(ctx->block, row, col, frame);
+            play_block_hit_sound(ctx->audio, REVERSE_BLK);
             paddle_system_toggle_reverse(ctx->paddle);
             return killer ? BLOCK_HIT_ABSORB : BLOCK_HIT_BOUNCE;
 
         case MULTIBALL_BLK:
         {
             (void)block_system_explode(ctx->block, row, col, frame);
+            play_block_hit_sound(ctx->audio, MULTIBALL_BLK);
             ball_system_env_t env = game_callbacks_ball_env(ctx);
             ball_system_split(ctx->ball, &env);
             return killer ? BLOCK_HIT_ABSORB : BLOCK_HIT_BOUNCE;
@@ -128,32 +220,38 @@ static block_hit_result_t ball_cb_on_block_hit(int row, int col, int ball_index,
 
         case STICKY_BLK:
             (void)block_system_explode(ctx->block, row, col, frame);
+            play_block_hit_sound(ctx->audio, STICKY_BLK);
             special_system_set(ctx->special, SPECIAL_STICKY, 1);
             paddle_system_set_sticky(ctx->paddle, 1);
             return killer ? BLOCK_HIT_ABSORB : BLOCK_HIT_BOUNCE;
 
         case PAD_SHRINK_BLK:
             (void)block_system_explode(ctx->block, row, col, frame);
+            play_block_hit_sound(ctx->audio, PAD_SHRINK_BLK);
             paddle_system_change_size(ctx->paddle, 1);
             return killer ? BLOCK_HIT_ABSORB : BLOCK_HIT_BOUNCE;
 
         case PAD_EXPAND_BLK:
             (void)block_system_explode(ctx->block, row, col, frame);
+            play_block_hit_sound(ctx->audio, PAD_EXPAND_BLK);
             paddle_system_change_size(ctx->paddle, 0);
             return killer ? BLOCK_HIT_ABSORB : BLOCK_HIT_BOUNCE;
 
         case MGUN_BLK:
             (void)block_system_explode(ctx->block, row, col, frame);
+            play_block_hit_sound(ctx->audio, MGUN_BLK);
             special_system_set(ctx->special, SPECIAL_FAST_GUN, 1);
             return killer ? BLOCK_HIT_ABSORB : BLOCK_HIT_BOUNCE;
 
         case WALLOFF_BLK:
             (void)block_system_explode(ctx->block, row, col, frame);
+            play_block_hit_sound(ctx->audio, WALLOFF_BLK);
             special_system_set(ctx->special, SPECIAL_NO_WALLS, 1);
             return killer ? BLOCK_HIT_ABSORB : BLOCK_HIT_BOUNCE;
 
         case EXTRABALL_BLK:
             (void)block_system_explode(ctx->block, row, col, frame);
+            play_block_hit_sound(ctx->audio, EXTRABALL_BLK);
             ctx->lives_left++;
             return killer ? BLOCK_HIT_ABSORB : BLOCK_HIT_BOUNCE;
 
@@ -161,6 +259,7 @@ static block_hit_result_t ball_cb_on_block_hit(int row, int col, int ball_index,
             if (killer || block_system_ball_hit_counter(ctx->block, row, col) <= 0)
             {
                 (void)block_system_explode(ctx->block, row, col, frame);
+                play_block_hit_sound(ctx->audio, COUNTER_BLK);
                 return killer ? BLOCK_HIT_ABSORB : BLOCK_HIT_BOUNCE;
             }
             return BLOCK_HIT_BOUNCE;
@@ -171,16 +270,17 @@ static block_hit_result_t ball_cb_on_block_hit(int row, int col, int ball_index,
             if (survives > 0)
                 return BLOCK_HIT_BOUNCE;
             (void)block_system_explode(ctx->block, row, col, frame);
+            play_block_hit_sound(ctx->audio, BLACK_BLK);
             return killer ? BLOCK_HIT_ABSORB : BLOCK_HIT_BOUNCE;
         }
 
         case HYPERSPACE_BLK:
-            if (ctx->audio)
-                sdl2_audio_play(ctx->audio, "hyperspace");
+            play_block_hit_sound(ctx->audio, HYPERSPACE_BLK);
             return BLOCK_HIT_TELEPORT;
 
         default:
             (void)block_system_explode(ctx->block, row, col, frame);
+            play_block_hit_sound(ctx->audio, block_type);
             return killer ? BLOCK_HIT_ABSORB : BLOCK_HIT_BOUNCE;
     }
 }
@@ -409,18 +509,15 @@ static void gun_cb_on_block_hit(int row, int col, void *ud)
      * time below for immediate player feedback. */
     int frame = (int)sdl2_state_frame(ctx->state);
     (void)block_system_explode(ctx->block, row, col, frame);
+    play_block_hit_sound(ctx->audio, block_type);
 
     switch (block_type)
     {
         case BULLET_BLK:
-            if (ctx->audio)
-                sdl2_audio_play(ctx->audio, "ammo");
             message_system_set(ctx->message, "More ammunition, cool!", 1, frame);
             break;
 
         case MAXAMMO_BLK:
-            if (ctx->audio)
-                sdl2_audio_play(ctx->audio, "ammo");
             message_system_set(ctx->message, "Unlimited bullets!", 1, frame);
             break;
 
