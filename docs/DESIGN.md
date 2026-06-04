@@ -2183,3 +2183,108 @@ Three industry patterns considered:
 - For unusual prefixes (`/opt/xboing`), users add to $XDG_DATA_DIRS
   themselves.  This matches the standard Linux contract — no app
   handles arbitrary prefixes without env var configuration.
+
+## ADR-038: Save/load v2 — mid-flight resume deviation from original
+
+**Status:** Accepted
+**Date:** 2026-06-03
+**Bead:** xboing-c-1d0 (savegame v2 implementation), xboing-c-hsg (this ADR)
+
+**Context:**
+
+The original 1996 XBoing (`original/file.c:217-230`) does not resume
+a saved game mid-flight.  On `LoadSavedGame` the code calls:
+
+- `ClearAllBalls()` — discard in-flight balls
+- `ResetPaddleStart()` — re-center paddle
+- `ResetBallStart()` — spawn one new ball on the paddle in
+  BALL_CREATE state, running an ~0.7 s birth animation, then
+  transitioning to BALL_READY where the ball sits on the paddle
+  waiting for the player to press space
+- `TurnSpecialsOff()` — clear sticky / fast-gun / walls-off /
+  killer / x2 / x4 (per `original/special.c:88-94`)
+- `ChangeEyeDudeMode(EYEDUDE_NONE)` — clear the EyeDude state
+- `SetReverseOff()` — clear paddle reverse
+- `ResetNumberBonus()` — bonus counter cleared
+- `ReadNextLevel($HOME/.xboing-savelevel)` — block grid loaded
+  from the saved snapshot (`original/file.c:232-237`)
+
+The effect is "restart this level at the saved score/lives, with the
+block grid as you left it, but everything else fresh."  Save is also
+gated by an in-game `SPECIAL_SAVING` token granted every 5 levels
+(`original/bonus.c:243-246`), and a successful save consumes the
+token (`original/file.c:305` — *"Only one chance to save buddy"*).
+
+The v2 modern implementation (`docs/specs/2026-05-28-savegame-v2.md`,
+`src/savegame_system.c`) restores **full mid-flight state**: the ball
+keeps its saved position, velocity, and `BALL_ACTIVE` state; specials,
+EyeDude, paddle reverse / sticky, bonus_count are all restored; save
+is available anytime via the Z key with no gating token.
+
+When loaded, the modern game resumes with the ball moving immediately.
+The original gave the player a small breath (the birth animation and
+ready-state wait) before play resumed.
+
+**Decision:**
+
+Keep the v2 "full mid-flight resume" behavior.  Do not add a 500 ms
+resume freeze to mimic the original's birth-animation breath.  Do
+not gate save behind the SPECIAL_SAVING token.
+
+**Rationale:**
+
+This is the one place in the modernization where we deliberately
+deviate from the original 1996 behavior, in exchange for **testing
+infrastructure**.  Full mid-flight resume converts the save file
+into a general-purpose game-state fixture:
+
+1. **Arbitrary level seed.**  A test can write a `save-info.dat` +
+   `save-level.dat` pair representing any specific game state
+   (level N, paddle at pixel column P, ball at (x, y) with velocity
+   (dx, dy), KILLER mode active, BLACK_BLK at row R col C with
+   cooldown offset F) and load that state directly into a real
+   `game_ctx_t`.  Without mid-flight resume the test could only
+   reach a level via scripted gameplay — minutes of synthetic
+   input per test, with brittle dependencies on physics and
+   collision evolution across releases.
+
+2. **Automated screenshot generation of deep levels.**  The visual
+   fidelity layer (`docs/TESTING.md` Layer 4) captures screenshots
+   for LLM-based comparison against `tests/golden/original/`.
+   Without the fixture mechanism, capturing a screenshot of "level
+   25 with active KILLER + 3 explosions in progress" would require
+   either scripting 25 levels of replay (slow, fragile) or hand-
+   editing the binary save format every time the schema evolves.
+   With v2 the test writes a JSON file with the desired state and
+   loads it; the screenshot capture path is unchanged.
+
+3. **Regression isolation.**  When a bug surfaces "ball passes
+   through BLACK_BLK after a specific sequence on level 12," the
+   reproduction is a save file checked into the repo, not a 12-
+   level scripted replay that breaks the moment unrelated physics
+   changes.
+
+The cost of the deviation is the ball-moves-immediately feel that
+the original didn't have.  The benefit is several orders of
+magnitude of test-fixture leverage, and no other modernization
+deviation comes close to this ratio.
+
+**Consequences:**
+
+- `savegame_system_capture` / `_restore` are documented in
+  `include/savegame_system.h` as pure transforms suitable for
+  test fixtures — that wording is load-bearing, not aspirational.
+- The save token gating is dropped; Z works whenever the game is
+  active.  This is a UX simplification (one less "Not available
+  yet!" message) consistent with modern save expectations.
+- 14 tests in `tests/test_savegame_system.c` cover the API,
+  including 6 corrupted-save rejection tests.  The same fixture
+  pattern is available to any future test that needs to start
+  from a specific game state.
+- The "small breath" behavior is documented as a possible future
+  enhancement.  ~10-15 production lines + 1 test would add a
+  wall-clock-gated 500 ms freeze after restore without
+  compromising the fixture pattern (the test simply pokes
+  `ctx->resume_at_ms = 0` to skip the freeze).  Not implemented
+  because the testability benefit is the primary motivator and
+  the current behavior doesn't impede it.
