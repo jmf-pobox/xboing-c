@@ -510,6 +510,7 @@ target_link_libraries(savegame_system PUBLIC
     eyedude_system
     message_system
     paths
+    sdl2_state
 )
 
 # --- Level editor system library -------------------------------------------

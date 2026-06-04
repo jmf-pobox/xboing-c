@@ -38,11 +38,15 @@
  * any legitimately produced save sits well within them.
  * ========================================================================= */
 
-#define SAVEGAME_MAX_LEVEL 999
+#define SAVEGAME_MAX_LEVEL 999UL
 #define SAVEGAME_MAX_LIVES 99
 #define SAVEGAME_MAX_BULLETS 9999
 #define SAVEGAME_MAX_TILTS 99
 #define SAVEGAME_MAX_BONUS_COUNT 99
+/* Bound game_time before casting to time_t.  30 days of pure
+ * playtime is several orders of magnitude beyond any real game and
+ * keeps the cast safe on 32-bit time_t platforms. */
+#define SAVEGAME_MAX_GAME_TIME (30UL * 24UL * 60UL * 60UL)
 /* Original BLACK cooldown is 30 frames; cap at ~10s at 60fps to
  * absorb any reasonable per-tick rate without enabling overflow. */
 #define SAVEGAME_MAX_FRAME_OFFSET 600
@@ -51,13 +55,13 @@
  * (~0-127) pass while preventing negative-modulo OOB. */
 #define SAVEGAME_MAX_ANIM_INDEX 4095
 
-/* Ball coordinates: play area is GAME_PLAY_WIDTH×GAME_PLAY_HEIGHT.
- * Allow a generous margin (±200) so just-launched balls or mid-bounce
- * positions slightly out of bounds still load, while INT_MAX-ish
- * coordinates are rejected. */
-#define SAVEGAME_MIN_BALL_COORD (-200)
-#define SAVEGAME_MAX_BALL_X (GAME_PLAY_WIDTH + 200)
-#define SAVEGAME_MAX_BALL_Y (GAME_PLAY_HEIGHT + 200)
+/* Ball / eyedude coordinates: play area is GAME_PLAY_WIDTH×
+ * GAME_PLAY_HEIGHT.  Allow a generous margin (±200) so just-launched
+ * balls or mid-bounce positions slightly out of bounds still load,
+ * while INT_MAX-ish coordinates are rejected. */
+#define SAVEGAME_MIN_COORD (-200)
+#define SAVEGAME_MAX_COORD_X (GAME_PLAY_WIDTH + 200)
+#define SAVEGAME_MAX_COORD_Y (GAME_PLAY_HEIGHT + 200)
 
 /* Ball velocity: legitimate game speeds are ±5-10 px/tick.  Cap at
  * ±50 so attackers can't supply INT_MIN (abs() UB) or large dx/dy
@@ -72,8 +76,15 @@ static int in_range(int v, int lo, int hi)
 
 static int validate_info(const savegame_data_t *info)
 {
-    if (!in_range((int)info->level, 1, SAVEGAME_MAX_LEVEL) ||
-        !in_range(info->lives_left, 0, SAVEGAME_MAX_LIVES) ||
+    /* Bound the unsigned long fields *before* any narrowing cast, so
+     * values > INT_MAX can't wrap into an in-range int and bypass
+     * the check. */
+    if (info->level < 1UL || info->level > SAVEGAME_MAX_LEVEL ||
+        info->game_time > SAVEGAME_MAX_GAME_TIME)
+    {
+        return 0;
+    }
+    if (!in_range(info->lives_left, 0, SAVEGAME_MAX_LIVES) ||
         !in_range(info->num_bullets, 0, SAVEGAME_MAX_BULLETS) ||
         !in_range(info->user_tilts, 0, SAVEGAME_MAX_TILTS) ||
         !in_range(info->bonus_count, 0, SAVEGAME_MAX_BONUS_COUNT))
@@ -85,10 +96,15 @@ static int validate_info(const savegame_data_t *info)
         return 0;
     }
     /* Eyedude: state/dir are small enums; slide drives a modulo
-     * sprite-table index and MUST be non-negative. */
+     * sprite-table index and MUST be non-negative.  x/y are
+     * unbounded integers in the schema — clamp to a generous
+     * play-area window so INT_MIN/INT_MAX can't reach the
+     * collision/render code. */
     if (!in_range(info->eyedude.state, EYEDUDE_STATE_NONE, EYEDUDE_STATE_DIE) ||
         !in_range(info->eyedude.dir, 0, EYEDUDE_DIR_DEAD) ||
-        !in_range(info->eyedude.slide, 0, SAVEGAME_MAX_ANIM_INDEX))
+        !in_range(info->eyedude.slide, 0, SAVEGAME_MAX_ANIM_INDEX) ||
+        !in_range(info->eyedude.x, SAVEGAME_MIN_COORD, SAVEGAME_MAX_COORD_X) ||
+        !in_range(info->eyedude.y, SAVEGAME_MIN_COORD, SAVEGAME_MAX_COORD_Y))
     {
         return 0;
     }
@@ -109,8 +125,8 @@ static int validate_info(const savegame_data_t *info)
         {
             continue;
         }
-        if (!in_range(b->x, SAVEGAME_MIN_BALL_COORD, SAVEGAME_MAX_BALL_X) ||
-            !in_range(b->y, SAVEGAME_MIN_BALL_COORD, SAVEGAME_MAX_BALL_Y) ||
+        if (!in_range(b->x, SAVEGAME_MIN_COORD, SAVEGAME_MAX_COORD_X) ||
+            !in_range(b->y, SAVEGAME_MIN_COORD, SAVEGAME_MAX_COORD_Y) ||
             !in_range(b->dx, -SAVEGAME_MAX_BALL_VELOCITY, SAVEGAME_MAX_BALL_VELOCITY) ||
             !in_range(b->dy, -SAVEGAME_MAX_BALL_VELOCITY, SAVEGAME_MAX_BALL_VELOCITY))
         {

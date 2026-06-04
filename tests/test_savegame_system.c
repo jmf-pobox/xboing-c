@@ -41,6 +41,7 @@ typedef struct
 {
     game_ctx_t *ctx;
     char tmp_xdg[256]; /* per-test XDG_DATA_HOME for disk I/O tests */
+    char *prev_xdg;    /* heap-owned strdup of caller's prior XDG (or NULL) */
 } fixture_t;
 
 static int setup(void **vstate)
@@ -48,9 +49,16 @@ static int setup(void **vstate)
     fixture_t *f = calloc(1, sizeof(*f));
     assert_non_null(f);
 
+    /* Preserve the caller's XDG_DATA_HOME so we can restore it on
+     * teardown.  Important when this binary is run inside a harness
+     * (or interactively) that already sets XDG vars — we must not
+     * leak environment changes across tests in the same process. */
+    const char *existing = getenv("XDG_DATA_HOME");
+    f->prev_xdg = existing ? strdup(existing) : NULL;
+
     /* Redirect XDG_DATA_HOME into the project's .tmp/ so save/load
-     * tests don't write to the real user dir.  CMake sets WORKING_DIRECTORY
-     * to the project root for integration tests. */
+     * tests don't write to the real user dir.  CMake sets
+     * WORKING_DIRECTORY to the project root for integration tests. */
     snprintf(f->tmp_xdg, sizeof(f->tmp_xdg), ".tmp/test_savegame_system_xdg_%d", (int)getpid());
     (void)mkdir(".tmp", 0700);
     (void)mkdir(f->tmp_xdg, 0700);
@@ -86,7 +94,18 @@ static int teardown(void **vstate)
     snprintf(xboing_dir, sizeof(xboing_dir), "%s/xboing", f->tmp_xdg);
     (void)rmdir(xboing_dir);
     (void)rmdir(f->tmp_xdg);
-    unsetenv("XDG_DATA_HOME");
+    /* Restore the caller's prior XDG_DATA_HOME, or remove it
+     * entirely if none was set.  Never unconditionally unset — that
+     * would clobber a setting the test harness gave us. */
+    if (f->prev_xdg)
+    {
+        setenv("XDG_DATA_HOME", f->prev_xdg, 1);
+        free(f->prev_xdg);
+    }
+    else
+    {
+        unsetenv("XDG_DATA_HOME");
+    }
     free(f);
     return 0;
 }
@@ -558,6 +577,38 @@ static void test_load_rejects_oversized_ball_position(void **vstate)
     assert_int_equal(savegame_system_load(ctx), 0);
 }
 
+static void test_load_rejects_intmax_eyedude_coords(void **vstate)
+{
+    fixture_t *f = *vstate;
+    game_ctx_t *ctx = f->ctx;
+    seed_state(ctx);
+
+    savegame_data_t info;
+    savegame_system_capture(ctx, &info, NULL);
+    info.eyedude.x = INT_MAX;
+    write_info_directly(ctx, &info);
+
+    clear_state(ctx);
+    assert_int_equal(savegame_system_load(ctx), 0);
+}
+
+static void test_load_rejects_oversized_level_number(void **vstate)
+{
+    fixture_t *f = *vstate;
+    game_ctx_t *ctx = f->ctx;
+    seed_state(ctx);
+
+    savegame_data_t info;
+    savegame_system_capture(ctx, &info, NULL);
+    /* Tampered level >> SAVEGAME_MAX_LEVEL — must NOT bypass the
+     * range check via narrowing-to-int wraparound. */
+    info.level = (unsigned long)INT_MAX + 1UL;
+    write_info_directly(ctx, &info);
+
+    clear_state(ctx);
+    assert_int_equal(savegame_system_load(ctx), 0);
+}
+
 int main(void)
 {
     const struct CMUnitTest tests[] = {
@@ -584,6 +635,8 @@ int main(void)
                                         teardown),
         cmocka_unit_test_setup_teardown(test_load_rejects_intmin_ball_velocity, setup, teardown),
         cmocka_unit_test_setup_teardown(test_load_rejects_oversized_ball_position, setup, teardown),
+        cmocka_unit_test_setup_teardown(test_load_rejects_intmax_eyedude_coords, setup, teardown),
+        cmocka_unit_test_setup_teardown(test_load_rejects_oversized_level_number, setup, teardown),
     };
     return cmocka_run_group_tests(tests, NULL, NULL);
 }
