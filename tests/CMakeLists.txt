@@ -60,6 +60,13 @@ target_include_directories(test_paths PRIVATE
 target_compile_options(test_paths PRIVATE ${XBOING_STRICT_WARNINGS} -Werror ${CMOCKA_WARNING_FIXUPS})
 target_link_libraries(test_paths PRIVATE ${CMOCKA_LIBRARIES})
 
+# Block-type → sound-name mapping tests (bead xboing-c-cfy, Component 3a).
+# Pure C, no SDL2.  Exhaustive per peer review B2.
+add_executable(test_block_sound test_block_sound.c)
+target_compile_options(test_block_sound PRIVATE ${XBOING_STRICT_WARNINGS} -Werror ${CMOCKA_WARNING_FIXUPS})
+target_link_libraries(test_block_sound PRIVATE block_sound ${CMOCKA_LIBRARIES})
+add_test(NAME test_block_sound COMMAND test_block_sound)
+
 # Sprite catalog header-only tests (basket 1: block animation frame selection — beads ejn, qe2, ax9, agi)
 # sprite_catalog.h is header-only static inline; depends on block_types.h.
 add_executable(test_sprite_catalog test_sprite_catalog.c)
@@ -164,6 +171,17 @@ if(SDL2_FOUND AND SDL2_MIXER_FOUND)
     target_link_libraries(test_sdl2_audio PRIVATE sdl2_audio ${CMOCKA_LIBRARIES})
     add_test(NAME test_sdl2_audio COMMAND test_sdl2_audio)
     set_tests_properties(test_sdl2_audio PROPERTIES
+        ENVIRONMENT "SDL_AUDIODRIVER=dummy"
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+    # Audio name validation (bead xboing-c-cfy, Component 3b).
+    # Catches misnamed string literals like the "hyperspace" → "hypspc"
+    # bug from PR #138, plus exercises Component 1's call log.
+    add_executable(test_audio_name_validation test_audio_name_validation.c)
+    target_compile_options(test_audio_name_validation PRIVATE ${XBOING_STRICT_WARNINGS} -Werror ${CMOCKA_WARNING_FIXUPS})
+    target_link_libraries(test_audio_name_validation PRIVATE sdl2_audio block_sound ${CMOCKA_LIBRARIES})
+    add_test(NAME test_audio_name_validation COMMAND test_audio_name_validation)
+    set_tests_properties(test_audio_name_validation PROPERTIES
         ENVIRONMENT "SDL_AUDIODRIVER=dummy"
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 endif()
@@ -450,7 +468,7 @@ if(SDL2_FOUND AND SDL2_IMAGE_FOUND AND SDL2_MIXER_FOUND AND SDL2_TTF_FOUND)
         sdl2_renderer sdl2_texture sdl2_font sdl2_audio sdl2_input
         sdl2_cursor sdl2_state sdl2_loop sdl2_cli
         # Game systems
-        ball_system block_system paddle_system gun_system score_system
+        ball_system block_system block_sound paddle_system gun_system score_system
         level_system special_system bonus_system sfx_system eyedude_system
         message_system editor_system
         # Persistence
@@ -490,7 +508,7 @@ if(SDL2_FOUND AND SDL2_IMAGE_FOUND AND SDL2_MIXER_FOUND AND SDL2_TTF_FOUND)
     target_link_libraries(test_integration_autocycle PRIVATE
         sdl2_renderer sdl2_texture sdl2_font sdl2_audio sdl2_input
         sdl2_cursor sdl2_state sdl2_loop sdl2_cli
-        ball_system block_system paddle_system gun_system score_system
+        ball_system block_system block_sound paddle_system gun_system score_system
         level_system special_system bonus_system sfx_system eyedude_system
         message_system editor_system
         highscore_io savegame_io config_io paths
@@ -527,7 +545,7 @@ if(SDL2_FOUND AND SDL2_IMAGE_FOUND AND SDL2_MIXER_FOUND AND SDL2_TTF_FOUND)
     target_link_libraries(test_integration_modes PRIVATE
         sdl2_renderer sdl2_texture sdl2_font sdl2_audio sdl2_input
         sdl2_cursor sdl2_state sdl2_loop sdl2_cli
-        ball_system block_system paddle_system gun_system score_system
+        ball_system block_system block_sound paddle_system gun_system score_system
         level_system special_system bonus_system sfx_system eyedude_system
         message_system editor_system
         highscore_io savegame_io config_io paths
@@ -565,7 +583,7 @@ if(SDL2_FOUND AND SDL2_IMAGE_FOUND AND SDL2_MIXER_FOUND AND SDL2_TTF_FOUND)
         target_link_libraries(${NAME} PRIVATE
             sdl2_renderer sdl2_texture sdl2_font sdl2_audio sdl2_input
             sdl2_cursor sdl2_state sdl2_loop sdl2_cli
-            ball_system block_system paddle_system gun_system score_system
+            ball_system block_system block_sound paddle_system gun_system score_system
             level_system special_system bonus_system sfx_system eyedude_system
             message_system editor_system
             highscore_io savegame_io config_io paths

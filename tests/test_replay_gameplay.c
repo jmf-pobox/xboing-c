@@ -28,6 +28,7 @@
 #include "game_init.h"
 #include "paddle_system.h"
 #include "score_system.h"
+#include "sdl2_audio.h"
 #include "sdl2_state.h"
 #include "test_replay.h"
 
@@ -238,6 +239,17 @@ static void test_extended_scripted_session(void **vstate)
 
     /* Game should have been active at some point */
     assert_true(s.ctx->game_active);
+
+    /* Component 3c: no sdl2_audio_play call during the replay session
+     * resolved to a missing asset.  This catches misnamed sound strings
+     * in the dynamic-name paths (presents_system_get_sound().name,
+     * intro_system_get_sound().name, etc. in game_modes.c) that the
+     * exhaustive Components 3a/3b can't see because the names are
+     * computed at runtime, not string literals at fixed call sites. */
+    if (s.ctx->audio)
+    {
+        assert_int_equal(sdl2_audio_log_error_count(s.ctx->audio), 0);
+    }
 
     end_game_session(&s);
 }

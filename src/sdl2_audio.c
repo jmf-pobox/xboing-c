@@ -33,6 +33,14 @@ struct sdl2_audio
     bool audio_subsystem_owned;
     bool audio_opened;
     bool mixer_initialized;
+    /* Always-on call log ring buffer.  log_head points at the next
+     * slot to write.  log_count saturates at SDL2A_LOG_CAPACITY once
+     * the buffer wraps; oldest entry is at (log_head - log_count).
+     * No cached error count — sdl2_audio_log_error_count() iterates
+     * the live window so it stays correct across wraps. */
+    sdl2_audio_call_t log[SDL2A_LOG_CAPACITY];
+    int log_head;
+    int log_count;
 };
 
 /* =========================================================================
@@ -374,6 +382,25 @@ void sdl2_audio_destroy(sdl2_audio_t *ctx)
     free(ctx);
 }
 
+static void log_append(sdl2_audio_t *ctx, const char *name, sdl2_audio_status_t status)
+{
+    sdl2_audio_call_t *slot = &ctx->log[ctx->log_head];
+    size_t name_len = strlen(name);
+    if (name_len > SDL2A_MAX_KEY_LEN)
+    {
+        name_len = SDL2A_MAX_KEY_LEN;
+    }
+    memcpy(slot->name, name, name_len);
+    slot->name[name_len] = '\0';
+    slot->status = status;
+
+    ctx->log_head = (ctx->log_head + 1) % SDL2A_LOG_CAPACITY;
+    if (ctx->log_count < SDL2A_LOG_CAPACITY)
+    {
+        ctx->log_count++;
+    }
+}
+
 // cppcheck-suppress constParameterPointer
 sdl2_audio_status_t sdl2_audio_play(sdl2_audio_t *ctx, const char *name)
 {
@@ -383,12 +410,14 @@ sdl2_audio_status_t sdl2_audio_play(sdl2_audio_t *ctx, const char *name)
     }
     if (ctx->muted)
     {
+        log_append(ctx, name, SDL2A_OK);
         return SDL2A_OK;
     }
 
     const struct sdl2_audio_entry *e = find_entry(ctx->entries, name);
     if (e == NULL)
     {
+        log_append(ctx, name, SDL2A_ERR_NOT_FOUND);
         return SDL2A_ERR_NOT_FOUND;
     }
 
@@ -399,7 +428,63 @@ sdl2_audio_status_t sdl2_audio_play(sdl2_audio_t *ctx, const char *name)
                     Mix_GetError());
     }
 
+    log_append(ctx, name, SDL2A_OK);
     return SDL2A_OK;
+}
+
+int sdl2_audio_log_snapshot(const sdl2_audio_t *ctx, sdl2_audio_call_t *out, int out_capacity)
+{
+    if (ctx == NULL || out == NULL || out_capacity <= 0)
+    {
+        return 0;
+    }
+    int n = ctx->log_count;
+    if (n > out_capacity)
+    {
+        n = out_capacity;
+    }
+    /* Oldest entry sits `log_count` slots behind log_head (mod cap).
+     * When n == out_capacity < log_count we still start from the
+     * oldest copyable slot so the caller sees a contiguous tail. */
+    int start = (ctx->log_head - n + SDL2A_LOG_CAPACITY) % SDL2A_LOG_CAPACITY;
+    for (int i = 0; i < n; i++)
+    {
+        out[i] = ctx->log[(start + i) % SDL2A_LOG_CAPACITY];
+    }
+    return n;
+}
+
+void sdl2_audio_log_clear(sdl2_audio_t *ctx)
+{
+    if (ctx == NULL)
+    {
+        return;
+    }
+    ctx->log_head = 0;
+    ctx->log_count = 0;
+}
+
+int sdl2_audio_log_error_count(const sdl2_audio_t *ctx)
+{
+    if (ctx == NULL)
+    {
+        return 0;
+    }
+    /* Iterate only the live window so the count stays accurate after
+     * the ring buffer wraps and overwrites older entries.  A cached
+     * counter would have to decrement on overwrite, which is a third
+     * source of truth and easy to get wrong; iteration over at most
+     * SDL2A_LOG_CAPACITY slots is trivial. */
+    int errors = 0;
+    int start = (ctx->log_head - ctx->log_count + SDL2A_LOG_CAPACITY) % SDL2A_LOG_CAPACITY;
+    for (int i = 0; i < ctx->log_count; i++)
+    {
+        if (ctx->log[(start + i) % SDL2A_LOG_CAPACITY].status != SDL2A_OK)
+        {
+            errors++;
+        }
+    }
+    return errors;
 }
 
 void sdl2_audio_set_volume(sdl2_audio_t *ctx, int volume)

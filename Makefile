@@ -25,6 +25,7 @@ PREFIX         ?= /usr/local
         lint format format-check \
         cppcheck cppcheck-src cppcheck-tests \
         tidy check ci \
+        audio-literals audio-literals-check \
         original-build capture-original visual-check visual-check-setup
 
 # --- Default ---------------------------------------------------------------
@@ -232,10 +233,17 @@ tidy: build ## Run clang-tidy across src/ (uses build/compile_commands.json).
 
 # --- One-shot ---------------------------------------------------------------
 
+audio-literals: ## Print sorted unique sound names passed to sdl2_audio_play() in src/.
+	scripts/audio-literals.sh
+
+audio-literals-check: ## Verify k_known_literals[] in tests matches source call sites.
+	scripts/audio-literals-check.sh
+
 check: ## Run every CI gate locally (format + cppcheck + lint + debug build/test + asan build/test + .deb lintian).  Use before pushing.
 	$(MAKE) format-check
 	$(MAKE) cppcheck
 	$(MAKE) lint
+	$(MAKE) audio-literals-check
 	$(MAKE) test
 	$(MAKE) asan-test
 	$(MAKE) deb-lint
