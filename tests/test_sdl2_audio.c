@@ -393,6 +393,135 @@ static void test_status_string_unknown(void **state)
 }
 
 /* =========================================================================
+ * Group 8: Call log ring buffer (Component 1 — bead xboing-c-cfy)
+ *
+ * Covers the four cases the spec called out: snapshot order, clear
+ * resets count, error counter is accurate across wraps, and the
+ * buffer wraps cleanly at SDL2A_LOG_CAPACITY.
+ * ========================================================================= */
+
+static void test_log_starts_empty(void **state)
+{
+    const sdl2_audio_t *ctx = (const sdl2_audio_t *)*state;
+    sdl2_audio_call_t entries[8];
+    assert_int_equal(sdl2_audio_log_snapshot(ctx, entries, 8), 0);
+    assert_int_equal(sdl2_audio_log_error_count(ctx), 0);
+}
+
+static void test_log_records_each_play(void **state)
+{
+    sdl2_audio_t *ctx = (sdl2_audio_t *)*state;
+    sdl2_audio_log_clear(ctx);
+    (void)sdl2_audio_play(ctx, "boing");
+    (void)sdl2_audio_play(ctx, "paddle");
+    (void)sdl2_audio_play(ctx, "bomb");
+
+    sdl2_audio_call_t entries[8];
+    int n = sdl2_audio_log_snapshot(ctx, entries, 8);
+    assert_int_equal(n, 3);
+    /* Snapshot returns oldest-first. */
+    assert_string_equal(entries[0].name, "boing");
+    assert_string_equal(entries[1].name, "paddle");
+    assert_string_equal(entries[2].name, "bomb");
+    assert_int_equal(entries[0].status, SDL2A_OK);
+    assert_int_equal(entries[1].status, SDL2A_OK);
+    assert_int_equal(entries[2].status, SDL2A_OK);
+}
+
+static void test_log_clear_resets(void **state)
+{
+    sdl2_audio_t *ctx = (sdl2_audio_t *)*state;
+    (void)sdl2_audio_play(ctx, "boing");
+    (void)sdl2_audio_play(ctx, "nonexistent_xyz");
+    assert_int_equal(sdl2_audio_log_error_count(ctx), 1);
+    sdl2_audio_log_clear(ctx);
+    assert_int_equal(sdl2_audio_log_error_count(ctx), 0);
+
+    sdl2_audio_call_t entries[4];
+    assert_int_equal(sdl2_audio_log_snapshot(ctx, entries, 4), 0);
+}
+
+static void test_log_wraps_at_capacity(void **state)
+{
+    sdl2_audio_t *ctx = (sdl2_audio_t *)*state;
+    sdl2_audio_log_clear(ctx);
+
+    /* Fill exactly to capacity with successful plays. */
+    for (int i = 0; i < SDL2A_LOG_CAPACITY; i++)
+    {
+        (void)sdl2_audio_play(ctx, "boing");
+    }
+    assert_int_equal(sdl2_audio_log_error_count(ctx), 0);
+
+    sdl2_audio_call_t entries[SDL2A_LOG_CAPACITY];
+    int n = sdl2_audio_log_snapshot(ctx, entries, SDL2A_LOG_CAPACITY);
+    assert_int_equal(n, SDL2A_LOG_CAPACITY);
+
+    /* Overflow by 5 — older entries are discarded. */
+    for (int i = 0; i < 5; i++)
+    {
+        (void)sdl2_audio_play(ctx, "paddle");
+    }
+    n = sdl2_audio_log_snapshot(ctx, entries, SDL2A_LOG_CAPACITY);
+    assert_int_equal(n, SDL2A_LOG_CAPACITY);
+    /* Newest entry (at the end) should be the most recent push. */
+    assert_string_equal(entries[SDL2A_LOG_CAPACITY - 1].name, "paddle");
+    /* The 5 oldest "boing" entries got overwritten — the first
+     * surviving entry should still be a "boing" (entries 5..254 of
+     * the original burst). */
+    assert_string_equal(entries[0].name, "boing");
+}
+
+static void test_log_error_count_accurate_after_wrap(void **state)
+{
+    sdl2_audio_t *ctx = (sdl2_audio_t *)*state;
+    sdl2_audio_log_clear(ctx);
+
+    /* Fill with errors first, then wrap with successes.  After the
+     * wrap, the live window contains zero errors — but a naive
+     * cached counter would still report N errors from the discarded
+     * entries.  This is the exact failure mode from the local review. */
+    for (int i = 0; i < SDL2A_LOG_CAPACITY; i++)
+    {
+        (void)sdl2_audio_play(ctx, "nonexistent_xyz");
+    }
+    assert_int_equal(sdl2_audio_log_error_count(ctx), SDL2A_LOG_CAPACITY);
+
+    /* Overwrite every error slot with a successful play. */
+    for (int i = 0; i < SDL2A_LOG_CAPACITY; i++)
+    {
+        (void)sdl2_audio_play(ctx, "boing");
+    }
+    /* Live window is now all successes; error count must be 0. */
+    assert_int_equal(sdl2_audio_log_error_count(ctx), 0);
+}
+
+static void test_log_snapshot_cap_smaller_than_count(void **state)
+{
+    sdl2_audio_t *ctx = (sdl2_audio_t *)*state;
+    sdl2_audio_log_clear(ctx);
+    (void)sdl2_audio_play(ctx, "boing");
+    (void)sdl2_audio_play(ctx, "paddle");
+    (void)sdl2_audio_play(ctx, "bomb");
+
+    /* Request only 2 — caller sees the most recent 2 (oldest first). */
+    sdl2_audio_call_t entries[2];
+    int n = sdl2_audio_log_snapshot(ctx, entries, 2);
+    assert_int_equal(n, 2);
+    assert_string_equal(entries[0].name, "paddle");
+    assert_string_equal(entries[1].name, "bomb");
+}
+
+static void test_log_null_safety(void **state)
+{
+    (void)state;
+    sdl2_audio_call_t entries[4];
+    assert_int_equal(sdl2_audio_log_snapshot(NULL, entries, 4), 0);
+    assert_int_equal(sdl2_audio_log_error_count(NULL), 0);
+    sdl2_audio_log_clear(NULL); /* must not crash */
+}
+
+/* =========================================================================
  * Test runner
  * ========================================================================= */
 
@@ -468,6 +597,20 @@ int main(void)
         cmocka_unit_test(test_status_string_unknown),
     };
 
+    const struct CMUnitTest log_tests[] = {
+        cmocka_unit_test_setup_teardown(test_log_starts_empty, setup_audio_ctx, teardown_audio_ctx),
+        cmocka_unit_test_setup_teardown(test_log_records_each_play, setup_audio_ctx,
+                                        teardown_audio_ctx),
+        cmocka_unit_test_setup_teardown(test_log_clear_resets, setup_audio_ctx, teardown_audio_ctx),
+        cmocka_unit_test_setup_teardown(test_log_wraps_at_capacity, setup_audio_ctx,
+                                        teardown_audio_ctx),
+        cmocka_unit_test_setup_teardown(test_log_error_count_accurate_after_wrap, setup_audio_ctx,
+                                        teardown_audio_ctx),
+        cmocka_unit_test_setup_teardown(test_log_snapshot_cap_smaller_than_count, setup_audio_ctx,
+                                        teardown_audio_ctx),
+        cmocka_unit_test(test_log_null_safety),
+    };
+
     int failed = 0;
     failed += cmocka_run_group_tests_name("config defaults", config_tests, NULL, NULL);
     failed += cmocka_run_group_tests_name("error handling", error_tests, group_setup_sdl,
@@ -481,5 +624,7 @@ int main(void)
     failed += cmocka_run_group_tests_name("volume percentage", volume_percent_tests,
                                           group_setup_sdl, group_teardown_sdl);
     failed += cmocka_run_group_tests_name("status strings", status_tests, NULL, NULL);
+    failed += cmocka_run_group_tests_name("call log", log_tests, group_setup_sdl,
+                                          group_teardown_sdl);
     return failed;
 }

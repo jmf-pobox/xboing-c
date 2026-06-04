@@ -14,6 +14,7 @@
 #include <stdio.h>
 
 #include "ball_system.h"
+#include "block_sound.h"
 #include "block_system.h"
 #include "block_types.h"
 #include "bonus_system.h"
@@ -65,90 +66,14 @@ sdl2_state_mode_t game_callbacks_attract_next(sdl2_state_mode_t current)
     return SDL2ST_NONE;
 }
 
-/* =========================================================================
- * Per-block hit sound — matches original/blocks.c:762 PlaySoundForBlock
- *
- * Plays the sound effect for a block being hit hard enough to destroy
- * (or, for HYPERSPACE_BLK, to absorb).  Intermediate hits that leave
- * the block alive (COUNTER countdown, BLACK_BLK cooldown flash) are
- * silent — they match the original where DrawBlock(KILL_BLK) is the
- * trigger, not the intermediate DrawBlock(COUNTER_BLK) etc.
- * ========================================================================= */
-
+/* Block-hit sound: delegates the type→name mapping to the pure
+ * block_sound module (testable without an audio context).  Silent
+ * for types that map to NULL (intermediate hits, sentinels, gaps). */
 static void play_block_hit_sound(sdl2_audio_t *audio, int block_type)
 {
-    if (!audio)
-        return;
-
-    const char *name = NULL;
-    switch (block_type)
-    {
-        case BOMB_BLK:
-            name = "bomb";
-            break;
-        case BULLET_BLK:
-        case MAXAMMO_BLK:
-            name = "ammo";
-            break;
-        case RED_BLK:
-        case GREEN_BLK:
-        case BLUE_BLK:
-        case TAN_BLK:
-        case PURPLE_BLK:
-        case YELLOW_BLK:
-        case COUNTER_BLK:
-        case RANDOM_BLK:
-        case DROP_BLK:
-            name = "touch";
-            break;
-        case ROAMER_BLK:
-            name = "ouch";
-            break;
-        case EXTRABALL_BLK:
-            name = "ddloo";
-            break;
-        case MGUN_BLK:
-            name = "mgun";
-            break;
-        case WALLOFF_BLK:
-            name = "wallsoff";
-            break;
-        case BONUSX2_BLK:
-        case BONUSX4_BLK:
-        case BONUS_BLK:
-            name = "gate";
-            break;
-        case REVERSE_BLK:
-            name = "warp";
-            break;
-        case PAD_SHRINK_BLK:
-            name = "wzzz2";
-            break;
-        case PAD_EXPAND_BLK:
-            name = "wzzz";
-            break;
-        case MULTIBALL_BLK:
-            name = "spring";
-            break;
-        case TIMER_BLK:
-            name = "bonus";
-            break;
-        case STICKY_BLK:
-            name = "sticky";
-            break;
-        case DEATH_BLK:
-            name = "evillaugh";
-            break;
-        case BLACK_BLK:
-            name = "metal";
-            break;
-        case HYPERSPACE_BLK:
-            name = "hypspc";
-            break;
-        default:
-            return;
-    }
-    sdl2_audio_play(audio, name);
+    const char *name = block_sound_name(block_type);
+    if (audio && name)
+        sdl2_audio_play(audio, name);
 }
 
 /* =========================================================================

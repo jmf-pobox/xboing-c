@@ -26,6 +26,12 @@
 /* Hash map capacity.  ~46 sounds at 64 slots gives ~72% load factor. */
 #define SDL2A_MAX_SOUNDS 64
 
+/* Capacity of the always-on call log ring buffer.  Each entry is
+ * ~72 bytes (name + status), so 256 entries ≈ 18KB per context.  The
+ * log records every sdl2_audio_play() call (including misses) for
+ * test assertions and live troubleshooting. */
+#define SDL2A_LOG_CAPACITY 256
+
 /* Default sound directory (relative to CWD). */
 #define SDL2A_DEFAULT_SOUND_DIR "sounds"
 
@@ -154,5 +160,33 @@ int sdl2_audio_count(const sdl2_audio_t *ctx);
 
 /* Return a human-readable string for a status code. */
 const char *sdl2_audio_status_string(sdl2_audio_status_t status);
+
+/*
+ * One entry in the audio call log.  Records the requested sound name
+ * and the status that sdl2_audio_play() returned.
+ */
+typedef struct
+{
+    char name[SDL2A_MAX_KEY_LEN + 1];
+    sdl2_audio_status_t status;
+} sdl2_audio_call_t;
+
+/*
+ * Snapshot the most recent calls in the ring buffer into `out`, oldest
+ * first.  Returns the number of entries written, capped at
+ * `out_capacity` and at the number of calls logged since the last
+ * sdl2_audio_log_clear().  Safe to call with ctx == NULL (returns 0).
+ */
+int sdl2_audio_log_snapshot(const sdl2_audio_t *ctx, sdl2_audio_call_t *out, int out_capacity);
+
+/* Reset the log to empty.  Safe to call with ctx == NULL. */
+void sdl2_audio_log_clear(sdl2_audio_t *ctx);
+
+/*
+ * Return the number of logged calls whose status is not SDL2A_OK.
+ * Tests use this to assert "no misnamed sounds fired" without having
+ * to inspect every log entry.  Safe to call with ctx == NULL.
+ */
+int sdl2_audio_log_error_count(const sdl2_audio_t *ctx);
 
 #endif /* SDL2_AUDIO_H */
