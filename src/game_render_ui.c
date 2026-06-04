@@ -926,37 +926,56 @@ static const char *rank_suffix(int rank)
 }
 
 /* Ball-border decoration around the bonus screen.  Mirrors
- * original/bonus.c:DrawBallBorder (lines 164-198): rows of ball
- * sprites along all four edges of the main window, 22px stride. */
+ * original/bonus.c:DrawBallBorder (lines 164-198): rows of animated
+ * ball sprites along all four edges of the main window, 22px
+ * stride, cycling through the ball-animation frames.  The original
+ * uses BALL_SLIDES=5 frames; modern catalog has SPR_BALL_1..4 (4
+ * frames) — same visual effect, one fewer phase.
+ *
+ * Border positions mirror the original constants: BORDER_LEFT=55,
+ * BORDER_TOP=73, BORDER_RIGHT/BOTTOM at TOTAL_W/H - 50/85.  Modern
+ * canvas is 575x720 vs original 565x710; the 10px tolerance leaves
+ * the border visually identical. */
 static void draw_ball_border(const game_ctx_t *ctx)
 {
-    sdl2_texture_info_t ball;
-    if (sdl2_texture_get(ctx->texture, SPR_BALL_LIFE, &ball) != SDL2T_OK)
+    static const char *const ball_frames[] = {SPR_BALL_1, SPR_BALL_2, SPR_BALL_3, SPR_BALL_4};
+    const int n_frames = (int)(sizeof(ball_frames) / sizeof(ball_frames[0]));
+    sdl2_texture_info_t balls[4];
+    for (int i = 0; i < n_frames; i++)
     {
-        return;
+        if (sdl2_texture_get(ctx->texture, ball_frames[i], &balls[i]) != SDL2T_OK)
+        {
+            return;
+        }
     }
+
     SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
-    const int W = SDL2R_LOGICAL_WIDTH;
-    const int H = SDL2R_LOGICAL_HEIGHT;
+    const int BORDER_LEFT = 55;
+    const int BORDER_TOP = 73;
+    const int BORDER_RIGHT = SDL2R_LOGICAL_WIDTH - 50;
+    const int BORDER_BOTTOM = SDL2R_LOGICAL_HEIGHT - 85;
     const int STRIDE = 22;
-    const int BORDER_INSET = 8;
+    int slide = 0;
+
     /* Top + bottom rows. */
-    for (int x = BORDER_INSET; x + ball.width < W - BORDER_INSET; x += STRIDE)
+    for (int x = BORDER_LEFT; x < BORDER_RIGHT; x += STRIDE)
     {
-        SDL_Rect top = {.x = x, .y = BORDER_INSET, .w = ball.width, .h = ball.height};
-        SDL_Rect bot = {
-            .x = x, .y = H - BORDER_INSET - ball.height, .w = ball.width, .h = ball.height};
-        SDL_RenderCopy(sdl, ball.texture, NULL, &top);
-        SDL_RenderCopy(sdl, ball.texture, NULL, &bot);
+        const sdl2_texture_info_t *f = &balls[slide % n_frames];
+        SDL_Rect top = {.x = x, .y = BORDER_TOP, .w = f->width, .h = f->height};
+        SDL_Rect bot = {.x = x, .y = BORDER_BOTTOM, .w = f->width, .h = f->height};
+        SDL_RenderCopy(sdl, f->texture, NULL, &top);
+        SDL_RenderCopy(sdl, f->texture, NULL, &bot);
+        slide++;
     }
-    /* Left + right columns (skip corners — already drawn above). */
-    for (int y = BORDER_INSET + STRIDE; y + ball.height < H - BORDER_INSET; y += STRIDE)
+    /* Left + right columns. */
+    for (int y = BORDER_TOP; y < BORDER_BOTTOM; y += STRIDE)
     {
-        SDL_Rect lhs = {.x = BORDER_INSET, .y = y, .w = ball.width, .h = ball.height};
-        SDL_Rect rhs = {
-            .x = W - BORDER_INSET - ball.width, .y = y, .w = ball.width, .h = ball.height};
-        SDL_RenderCopy(sdl, ball.texture, NULL, &lhs);
-        SDL_RenderCopy(sdl, ball.texture, NULL, &rhs);
+        const sdl2_texture_info_t *f = &balls[slide % n_frames];
+        SDL_Rect lhs = {.x = BORDER_LEFT, .y = y, .w = f->width, .h = f->height};
+        SDL_Rect rhs = {.x = BORDER_RIGHT, .y = y, .w = f->width, .h = f->height};
+        SDL_RenderCopy(sdl, f->texture, NULL, &lhs);
+        SDL_RenderCopy(sdl, f->texture, NULL, &rhs);
+        slide++;
     }
 }
 
@@ -1057,12 +1076,26 @@ void game_render_bonus(const game_ctx_t *ctx)
     }
 
     /* "Level bonus - level N x 100 = M points" — yellow, with the
-     * total computed (original/bonus.c:406-411).  Modern uses level
-     * starting from 1, no start-level offset. */
+     * total computed.  Adjusts for start_level via the original's
+     * formula (original/bonus.c:400-413): theLevel = level -
+     * starting_level + 1.  If the timer ran out (time_secs == 0),
+     * the original shows "No level bonus - Timer ran out." instead
+     * (original/bonus.c:415-422). */
     if (state >= BONUS_STATE_LEVEL)
     {
-        int lvl = ctx->level_number;
-        snprintf(buf, sizeof(buf), "Level bonus - level %d x 100 = %d points", lvl, lvl * 100);
+        int time_secs = bonus_system_get_time_bonus_secs(ctx->bonus);
+        if (time_secs > 0)
+        {
+            int adj_level = ctx->level_number - ctx->start_level + 1;
+            if (adj_level < 1)
+                adj_level = 1;
+            snprintf(buf, sizeof(buf), "Level bonus - level %d x 100 = %d points", adj_level,
+                     adj_level * 100);
+        }
+        else
+        {
+            snprintf(buf, sizeof(buf), "No level bonus - Timer ran out.");
+        }
         sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TEXT, buf, ypos, yellow, W);
         ypos += 30;
     }
@@ -1154,10 +1187,12 @@ void game_render_bonus(const game_ctx_t *ctx)
     sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TEXT, "Press space for next level",
                                   SDL2R_LOGICAL_HEIGHT - 60, tan, W);
 
-    /* Save-token floppy icon — bottom-right corner.  Only drawn
-     * when the current level granted a save (level % SAVE_LEVEL == 0,
-     * original/bonus.c:243-253). */
-    if (bonus_system_should_save(ctx->level_number, 1))
+    /* Save-token floppy icon — bottom-right corner.  Drawn when
+     * the current run grants a save token: (level - starting_level
+     * + 1) % SAVE_LEVEL == 0 (original/bonus.c:243).  Using
+     * ctx->start_level honours -startlevel N runs that begin
+     * higher than 1. */
+    if (bonus_system_should_save(ctx->level_number, ctx->start_level))
     {
         sdl2_texture_info_t floppy;
         if (sdl2_texture_get(ctx->texture, SPR_FLOPPY, &floppy) == SDL2T_OK)

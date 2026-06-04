@@ -714,7 +714,9 @@ void BonusScreenForCapture(Display *display, Window window, int scenario)
      *   1 — early level, no save token, no killer
      *   2 — save-granted level (level % SAVE_LEVEL == 0)
      *   3 — killer active at level end (super-bonus prompt)
-     *   4 — late level (high time bonus, dense score)
+     *   4 — late level — exercises a high score / level-bonus
+     *       value (level 25 × 100 = 2500 points, vs scenarios 1-3
+     *       at 300/500/700) with a tight time-remaining of 60s
      */
     switch (scenario)
     {
@@ -762,7 +764,7 @@ void BonusScreenForCapture(Display *display, Window window, int scenario)
     Togglex4Bonus(display, False);
     DrawSpecials(display);
 
-    SetupBonusScreen(display, mainWindow);
+    SetupBonusScreen(display, window);
 }
 
 void FreeBonus(Display *display)

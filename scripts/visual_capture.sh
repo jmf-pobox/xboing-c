@@ -36,9 +36,10 @@ case "$VARIANT" in
 esac
 
 # Bonus-screen capture passes the scenario index through to the
-# binary (original/bonus.c::BonusScreenForCapture).  Env var keeps
-# the script's CLI surface unchanged.
-if [[ -n "${BONUS_SCENARIO:-}" ]]; then
+# binary.  Only the original parses -bonus-scenario; the modern
+# binary doesn't (and would error).  Env var keeps the script's
+# CLI surface unchanged.
+if [[ "$VARIANT" == "original" && -n "${BONUS_SCENARIO:-}" ]]; then
     EXTRA_ARGS="$EXTRA_ARGS -bonus-scenario $BONUS_SCENARIO"
 fi
 
