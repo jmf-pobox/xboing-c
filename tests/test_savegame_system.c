@@ -6,6 +6,7 @@
  * Bead: xboing-c-1d0.
  */
 
+#include <limits.h>
 #include <setjmp.h>
 #include <stdarg.h>
 #include <stddef.h>
@@ -506,6 +507,57 @@ static void test_load_rejects_out_of_range_paddle_size(void **vstate)
     assert_int_equal(savegame_system_load(ctx), 0);
 }
 
+/* Cursor finding round 2: ball dx/dy flow into abs() / collision loop.
+ * INT_MIN crashes abs(); huge values turn the loop into CPU exhaustion. */
+
+static void test_load_rejects_intmin_ball_velocity(void **vstate)
+{
+    fixture_t *f = *vstate;
+    game_ctx_t *ctx = f->ctx;
+    seed_state(ctx);
+
+    savegame_data_t info;
+    savegame_system_capture(ctx, &info, NULL);
+    /* Find an active ball and tamper its velocity. */
+    int found = 0;
+    for (int i = 0; i < MAX_BALLS; i++)
+    {
+        if (info.balls[i].active)
+        {
+            info.balls[i].dx = INT_MIN;
+            found = 1;
+            break;
+        }
+    }
+    assert_true(found);
+    write_info_directly(ctx, &info);
+
+    clear_state(ctx);
+    assert_int_equal(savegame_system_load(ctx), 0);
+}
+
+static void test_load_rejects_oversized_ball_position(void **vstate)
+{
+    fixture_t *f = *vstate;
+    game_ctx_t *ctx = f->ctx;
+    seed_state(ctx);
+
+    savegame_data_t info;
+    savegame_system_capture(ctx, &info, NULL);
+    for (int i = 0; i < MAX_BALLS; i++)
+    {
+        if (info.balls[i].active)
+        {
+            info.balls[i].x = 1000000;
+            break;
+        }
+    }
+    write_info_directly(ctx, &info);
+
+    clear_state(ctx);
+    assert_int_equal(savegame_system_load(ctx), 0);
+}
+
 int main(void)
 {
     const struct CMUnitTest tests[] = {
@@ -530,6 +582,8 @@ int main(void)
                                         teardown),
         cmocka_unit_test_setup_teardown(test_load_rejects_out_of_range_paddle_size, setup,
                                         teardown),
+        cmocka_unit_test_setup_teardown(test_load_rejects_intmin_ball_velocity, setup, teardown),
+        cmocka_unit_test_setup_teardown(test_load_rejects_oversized_ball_position, setup, teardown),
     };
     return cmocka_run_group_tests(tests, NULL, NULL);
 }

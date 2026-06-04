@@ -51,6 +51,20 @@
  * (~0-127) pass while preventing negative-modulo OOB. */
 #define SAVEGAME_MAX_ANIM_INDEX 4095
 
+/* Ball coordinates: play area is GAME_PLAY_WIDTH×GAME_PLAY_HEIGHT.
+ * Allow a generous margin (±200) so just-launched balls or mid-bounce
+ * positions slightly out of bounds still load, while INT_MAX-ish
+ * coordinates are rejected. */
+#define SAVEGAME_MIN_BALL_COORD (-200)
+#define SAVEGAME_MAX_BALL_X (GAME_PLAY_WIDTH + 200)
+#define SAVEGAME_MAX_BALL_Y (GAME_PLAY_HEIGHT + 200)
+
+/* Ball velocity: legitimate game speeds are ±5-10 px/tick.  Cap at
+ * ±50 so attackers can't supply INT_MIN (abs() UB) or large dx/dy
+ * that turn the collision loop into a CPU exhaustion attack
+ * (step = abs(dx) iterations per update). */
+#define SAVEGAME_MAX_BALL_VELOCITY 50
+
 static int in_range(int v, int lo, int hi)
 {
     return v >= lo && v <= hi;
@@ -78,13 +92,27 @@ static int validate_info(const savegame_data_t *info)
     {
         return 0;
     }
-    /* Ball state/wait_mode are small enums.  Position bounds are
-     * lenient — the gameplay layer clamps offscreen balls. */
+    /* Per-ball: state/wait_mode are small enums.  Position and
+     * velocity must be bounded — abs(dx) is the inner-loop step
+     * count in ball_system.c, so INT_MIN (abs() UB) or huge values
+     * are rejected.  Inactive slots aren't subject to coord checks
+     * (their fields are write-zero on save). */
     for (int i = 0; i < MAX_BALLS; i++)
     {
         const savegame_ball_t *b = &info->balls[i];
         if (!in_range(b->state, BALL_POP, BALL_NONE) ||
             !in_range(b->wait_mode, BALL_POP, BALL_NONE))
+        {
+            return 0;
+        }
+        if (!b->active)
+        {
+            continue;
+        }
+        if (!in_range(b->x, SAVEGAME_MIN_BALL_COORD, SAVEGAME_MAX_BALL_X) ||
+            !in_range(b->y, SAVEGAME_MIN_BALL_COORD, SAVEGAME_MAX_BALL_Y) ||
+            !in_range(b->dx, -SAVEGAME_MAX_BALL_VELOCITY, SAVEGAME_MAX_BALL_VELOCITY) ||
+            !in_range(b->dy, -SAVEGAME_MAX_BALL_VELOCITY, SAVEGAME_MAX_BALL_VELOCITY))
         {
             return 0;
         }
