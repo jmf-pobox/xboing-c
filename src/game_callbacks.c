@@ -31,6 +31,7 @@
 #include "paddle_system.h"
 #include "paths.h"
 #include "presents_system.h"
+#include "savegame_system.h"
 #include "score_logic.h"
 #include "score_system.h"
 #include "sdl2_audio.h"
@@ -653,8 +654,7 @@ static void bonus_cb_on_bullet_consumed(void *ud)
 
 static void bonus_cb_on_save_triggered(void *ud)
 {
-    (void)ud;
-    /* TODO: auto-save game state (bead 4.3) */
+    (void)savegame_system_autosave((game_ctx_t *)ud);
 }
 
 static void bonus_cb_on_sound(const char *name, void *ud)

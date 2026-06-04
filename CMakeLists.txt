@@ -486,6 +486,33 @@ target_include_directories(savegame_io PUBLIC
 )
 target_compile_options(savegame_io PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
 
+# --- Savegame system library (Phase 3) -------------------------------------
+#
+# Orchestrates capture/restore of full mid-level game state on top of
+# savegame_io and per-subsystem accessors.  Composes the game context, so
+# this lib links against every subsystem.  capture/restore are pure (no
+# I/O); save/load/autosave wrap them with file I/O and user messages.
+
+add_library(savegame_system STATIC src/savegame_system.c)
+target_include_directories(savegame_system PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+target_compile_options(savegame_system PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+target_link_libraries(savegame_system PUBLIC
+    savegame_io
+    ball_system
+    block_system
+    paddle_system
+    gun_system
+    score_system
+    level_system
+    special_system
+    eyedude_system
+    message_system
+    paths
+    sdl2_state
+)
+
 # --- Level editor system library -------------------------------------------
 #
 # Pure C module — no SDL2 or X11 dependency.  Owns editor state machine,
@@ -577,6 +604,7 @@ if(SDL2_FOUND AND SDL2_IMAGE_FOUND AND SDL2_MIXER_FOUND AND SDL2_TTF_FOUND)
         # Persistence
         highscore_io
         savegame_io
+        savegame_system
         config_io
         paths
         # Math
