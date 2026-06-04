@@ -152,6 +152,13 @@ int snapshotFrames = 0;
 int visualCaptureMode = -1;
 int visualCaptureInterval = 100;
 
+/*
+ * Bonus-screen capture scenario index: 1..4 select pre-canned
+ * game-state configurations for -visual-capture bonus.  Only
+ * meaningful when visualCaptureMode == MODE_BONUS.
+ */
+int bonusScenario = 1;
+
 static void InitialiseGraphics(Display *display, Window window)
 {
     XGCValues gcv;
@@ -757,11 +764,29 @@ static void ParseCommandLine(char **argv, int argc)
                     visualCaptureMode = MODE_HIGHSCORE;
                 else if (!strcmp(mode_buf, "preview"))
                     visualCaptureMode = MODE_PREVIEW;
+                else if (!strcmp(mode_buf, "bonus"))
+                    visualCaptureMode = MODE_BONUS;
                 else
                 {
                     WarningMessage("Unknown mode for -visual-capture");
                     PrintUsage();
                 }
+            }
+            else
+                PrintUsage();
+        }
+        else if (!compareArgument(argv[i], "-bonus-scenario", 15))
+        {
+            /* Visual-capture scenario index for -visual-capture bonus
+             * (1..4 — see BonusScreenForCapture in bonus.c). */
+            i++;
+            if (i < argc)
+            {
+                int n = atoi(argv[i]);
+                if (n >= 1 && n <= 4)
+                    bonusScenario = n;
+                else
+                    WarningMessage("-bonus-scenario must be 1..4");
             }
             else
                 PrintUsage();

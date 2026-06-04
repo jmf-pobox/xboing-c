@@ -1145,6 +1145,7 @@ static void handleGameMode(Display *display)
 
 extern int visualCaptureMode;
 extern int visualCaptureInterval;
+extern int bonusScenario;
 
 static int vc_capturing(int target_mode)
 {
@@ -1212,6 +1213,33 @@ static const char *intro_state_name(int s)
             return "text";
         case INTRO_EXPLODE:
             return "explode";
+        default:
+            return NULL;
+    }
+}
+
+static const char *bonus_state_name(int s)
+{
+    switch (s)
+    {
+        case BONUS_TEXT:
+            return "title";
+        case BONUS_SCORE:
+            return "score";
+        case BONUS_BONUS:
+            return "bonus";
+        case BONUS_LEVEL:
+            return "level";
+        case BONUS_BULLET:
+            return "bullets";
+        case BONUS_TIME:
+            return "time";
+        case BONUS_HSCORE:
+            return "hscore";
+        case BONUS_END_TEXT:
+            return "end-text";
+        case BONUS_FINISH:
+            return "finish";
         default:
             return NULL;
     }
@@ -1356,6 +1384,7 @@ static void handleGameStates(Display *display)
     int vc_pre_keysedit = KeysEditState;
     int vc_pre_highscore = HighScoreState;
     int vc_pre_preview = PreviewState;
+    int vc_pre_bonus = BonusState;
 
     /* Switch on the current game mode */
     switch (mode)
@@ -1505,6 +1534,13 @@ static void handleGameStates(Display *display)
             mode_str = "preview";
             name_fn = preview_state_name;
         }
+        else if (mode == MODE_BONUS && vc_capturing(MODE_BONUS))
+        {
+            pre_substate = vc_pre_bonus;
+            post_substate = BonusState;
+            mode_str = "bonus";
+            name_fn = bonus_state_name;
+        }
 
         if (mode_str && name_fn)
         {
@@ -1579,6 +1615,19 @@ static void handleEventLoop(Display *display)
 
     /* Grab the pointer to the main window */
     GrabPointer(display, mainWindow);
+
+    /*
+     * Visual-capture: force-enter MODE_BONUS with synthesized state
+     * for the bonus-screen scenario.  The normal entry path requires
+     * completing a level via gameplay (CheckGameRules at level.c:404)
+     * which can't be driven by a headless capture script.  Synthesize
+     * the same end-of-level state the gameplay path would produce.
+     */
+    if (visualCaptureMode == MODE_BONUS)
+    {
+        BonusScreenForCapture(display, mainWindow, bonusScenario);
+        mode = MODE_BONUS;
+    }
 
     /*
      * Visual-fidelity snapshot mode: advance the game `snapshotFrames`
