@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <time.h>
 #include <unistd.h>
 
 #include <cmocka.h>
@@ -78,7 +79,11 @@ static int teardown(void **vstate)
         (void)unlink(level_path);
     }
     game_destroy(f->ctx);
-    /* Best-effort dir cleanup (ignore EBUSY if tests run in parallel). */
+    /* Save files live at $XDG_DATA_HOME/xboing/save-*.dat, so the
+     * intermediate xboing/ subdir must be removed before the parent. */
+    char xboing_dir[300];
+    snprintf(xboing_dir, sizeof(xboing_dir), "%s/xboing", f->tmp_xdg);
+    (void)rmdir(xboing_dir);
     (void)rmdir(f->tmp_xdg);
     unsetenv("XDG_DATA_HOME");
     free(f);
@@ -296,6 +301,37 @@ static void test_restore_info_only_leaves_grid_untouched(void **vstate)
 }
 
 /* =========================================================================
+ * game_time round-trip: capture computes elapsed = (now - game_start) -
+ * paused_seconds; restore rebases game_start so the next capture reads
+ * the same value back.
+ * ========================================================================= */
+
+static void test_game_time_round_trip(void **vstate)
+{
+    fixture_t *f = *vstate;
+    game_ctx_t *ctx = f->ctx;
+    /* Pretend the session started 100s ago with 25s spent paused. */
+    ctx->game_start = time(NULL) - 100;
+    ctx->paused_seconds = 25;
+
+    savegame_data_t info;
+    savegame_system_capture(ctx, &info, NULL);
+    /* Allow ±1s for clock-tick boundary between capture and the
+     * test's time() call. */
+    assert_in_range(info.game_time, 74UL, 76UL);
+
+    /* Restore into a fresh state and re-capture; the elapsed value
+     * must round-trip cleanly. */
+    ctx->game_start = 0;
+    ctx->paused_seconds = 0;
+    savegame_system_restore(ctx, &info, NULL);
+
+    savegame_data_t info2;
+    savegame_system_capture(ctx, &info2, NULL);
+    assert_in_range(info2.game_time, info.game_time - 1UL, info.game_time + 1UL);
+}
+
+/* =========================================================================
  * Disk round-trip: save → wipe → load → expect seed values back.
  * Exercises the full save/load I/O path including JSON write/read.
  * ========================================================================= */
@@ -406,6 +442,8 @@ int main(void)
         cmocka_unit_test_setup_teardown(test_restore_null_inputs_safe, setup, teardown),
         cmocka_unit_test_setup_teardown(test_restore_info_only_leaves_grid_untouched, setup,
                                         teardown),
+        /* Time accounting */
+        cmocka_unit_test_setup_teardown(test_game_time_round_trip, setup, teardown),
         /* Disk I/O paths */
         cmocka_unit_test_setup_teardown(test_save_then_load_round_trip, setup, teardown),
         cmocka_unit_test_setup_teardown(test_load_with_no_save_files_fails, setup, teardown),

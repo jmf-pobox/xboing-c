@@ -26,12 +26,14 @@
  * caller does not need the block grid snapshot (used by autosave).
  *
  * After this call:
- *   - out_info->version  == SAVEGAME_IO_VERSION (2)
  *   - out_info contains player, paddle, gun, specials, eyedude,
  *     and per-ball state
  *   - out_level (if non-NULL) contains the block grid with
  *     occupied/type/counter_slide/random/hit_points and BLACK_BLK
  *     next_frame_offset (frame-relative)
+ *
+ * The schema version is emitted as a JSON literal by savegame_io
+ * on write; savegame_data_t itself carries no version field.
  */
 void savegame_system_capture(const game_ctx_t *ctx, savegame_data_t *out_info,
                              savegame_level_t *out_level);
@@ -42,8 +44,8 @@ void savegame_system_capture(const game_ctx_t *ctx, savegame_data_t *out_info,
  *
  * `info` must be non-NULL.  `level` may be NULL when the caller
  * doesn't have a block grid snapshot (autosave-then-load path); in
- * that case the canonical level file is reloaded by the caller
- * before calling restore.
+ * that case the block grid is left untouched.  The caller is
+ * responsible for reloading the canonical level file when needed.
  */
 void savegame_system_restore(game_ctx_t *ctx, const savegame_data_t *info,
                              const savegame_level_t *level);

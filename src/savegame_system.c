@@ -9,6 +9,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 
 #include "ball_system.h"
 #include "block_system.h"
@@ -43,7 +44,16 @@ void savegame_system_capture(const game_ctx_t *ctx, savegame_data_t *out_info,
     out_info->level = (unsigned long)ctx->level_number;
     out_info->level_time = ctx->time_bonus_total;
     out_info->time_remaining = ctx->time_remaining;
-    out_info->game_time = (unsigned long)(ctx->paused_seconds);
+    /* game_time = elapsed session seconds, net of paused.  Matches the
+     * formula in game_modes.c when posting a highscore. */
+    {
+        time_t now = time(NULL);
+        unsigned long elapsed = (ctx->game_start > 0 && now >= ctx->game_start)
+                                    ? (unsigned long)(now - ctx->game_start)
+                                    : 0UL;
+        unsigned long paused = (unsigned long)ctx->paused_seconds;
+        out_info->game_time = (elapsed > paused) ? (elapsed - paused) : 0UL;
+    }
     out_info->lives_left = ctx->lives_left;
     out_info->start_level = ctx->start_level;
     out_info->user_tilts = ctx->user_tilts;
@@ -164,7 +174,14 @@ void savegame_system_restore(game_ctx_t *ctx, const savegame_data_t *info,
     ctx->level_number = (int)info->level;
     ctx->time_bonus_total = info->level_time;
     ctx->time_remaining = info->time_remaining;
-    ctx->paused_seconds = (int)info->game_time;
+    /* Rebase game_start so subsequent reads of elapsed game_time
+     * match the saved value.  Capture's formula will then yield
+     * info->game_time at the moment of restore. */
+    {
+        time_t now = time(NULL);
+        ctx->game_start = now - (time_t)info->game_time;
+        ctx->paused_seconds = 0;
+    }
     ctx->lives_left = info->lives_left;
     ctx->start_level = info->start_level;
     ctx->user_tilts = info->user_tilts;
