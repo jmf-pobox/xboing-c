@@ -93,7 +93,16 @@ typedef struct
     savegame_ball_t balls[MAX_BALLS];
 } savegame_data_t;
 
-/* Per-cell block state for save-level.dat. */
+/* Per-cell block state for save-level.dat.
+ *
+ * `hit_points` is informational: it's deterministic from
+ * (block_type, row) via score_logic::score_block_hit_points, so on
+ * restore the value is recomputed by block_system_add and any saved
+ * value is overwritten.  We still capture and write it so the JSON
+ * file is a complete snapshot of cell state.
+ *
+ * Damage/cooldown for BLACK_BLK is tracked via `next_frame_offset`,
+ * not `hit_points`. */
 typedef struct
 {
     int occupied;
