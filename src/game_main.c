@@ -25,6 +25,11 @@
 
 int main(int argc, char *argv[])
 {
+    /* Production seeding policy.  game_create() does not seed; the
+     * caller owns this decision so tests can stay deterministic or
+     * unseeded as needed. */
+    game_seed_rng_default();
+
     game_ctx_t *ctx = game_create(argc, argv);
     if (!ctx)
     {

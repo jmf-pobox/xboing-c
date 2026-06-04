@@ -615,6 +615,11 @@ if(SDL2_FOUND AND SDL2_IMAGE_FOUND AND SDL2_MIXER_FOUND AND SDL2_TTF_FOUND)
     # Builds a real game_ctx_t, mutates state, captures, restores, asserts.
     xboing_add_integration_test(test_savegame_system)
 
+    # RNG seeding contract (bead xboing-c-hty).  Pins the caller-seeds
+    # invariant: game_create never calls srand, game_seed_rng_default is
+    # the production policy entry point.
+    xboing_add_integration_test(test_rng_seeding)
+
     # Editor integration test (bead xboing-3w5.1.4)
     # Enters EDIT mode, draws blocks, clears grid, tests play-test
     # transitions and editor key commands through the full stack.
