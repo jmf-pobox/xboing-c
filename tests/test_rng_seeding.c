@@ -53,10 +53,12 @@ static void test_caller_seed_is_deterministic(void **state)
 }
 
 /* =========================================================================
- * Different seeds produce different sequences.  Pinned so a future
- * change that turns game_seed_rng_default into a no-op (e.g.,
- * srand(0) hard-coded) doesn't silently revert non-determinism in
- * production.
+ * srand semantics baseline: distinct seeds produce divergent rand()
+ * sequences.  This is the assumption game_seed_rng_default relies on
+ * — if a future libc change or a Makefile-level link substitution
+ * made srand a no-op (rand always returning the same sequence
+ * regardless of seed), the wrapper's whole purpose would silently
+ * evaporate.  This test pins that assumption.
  * ========================================================================= */
 
 static void test_different_seeds_diverge(void **state)
@@ -74,11 +76,12 @@ static void test_different_seeds_diverge(void **state)
         if (rand() == seq1[i])
             matches++;
     }
-    /* Two distinct seeds producing 8 identical rand() values is
-     * vanishingly improbable for any sane libc — each rand() draws
-     * from [0, RAND_MAX] independently.  Anything < 8 matches means
-     * the seeds are doing their job; the exact collision probability
-     * depends on RAND_MAX (libc-dependent). */
+    /* Distinct seeds drive the PRNG into distinct deterministic
+     * trajectories.  Eight consecutive matches across two different
+     * trajectories would mean srand is effectively ignored.  The
+     * exact tail probability depends on RAND_MAX and the libc PRNG;
+     * what we're asserting is the qualitative behavior, not a
+     * specific collision rate. */
     assert_true(matches < 8);
 }
 
