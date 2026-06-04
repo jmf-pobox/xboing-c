@@ -35,6 +35,13 @@ case "$VARIANT" in
     *)        die "Unknown variant '$VARIANT' — use 'original' or 'modern'" ;;
 esac
 
+# Bonus-screen capture passes the scenario index through to the
+# binary (original/bonus.c::BonusScreenForCapture).  Env var keeps
+# the script's CLI surface unchanged.
+if [[ -n "${BONUS_SCENARIO:-}" ]]; then
+    EXTRA_ARGS="$EXTRA_ARGS -bonus-scenario $BONUS_SCENARIO"
+fi
+
 [[ -x "${RUN_DIR}/${BINARY#./}" ]] || die "${RUN_DIR}/${BINARY#./} not found or not executable"
 
 mkdir -p "$OUT_DIR"

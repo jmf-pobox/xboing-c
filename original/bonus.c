@@ -703,6 +703,68 @@ void RedrawBonus(Display *display, Window window)
     /* Took this out as some people were cheating!!! */
 }
 
+void BonusScreenForCapture(Display *display, Window window, int scenario)
+{
+    /* Visual-capture entry point.  Synthesizes a representative
+     * end-of-level game state and runs the same setup
+     * CheckGameRules (level.c) uses when a level finishes.
+     *
+     * Scenarios chosen to exercise the substates visible in the
+     * bonus animation:
+     *   1 — early level, no save token, no killer
+     *   2 — save-granted level (level % SAVE_LEVEL == 0)
+     *   3 — killer active at level end (super-bonus prompt)
+     *   4 — late level (high time bonus, dense score)
+     */
+    switch (scenario)
+    {
+        case 1:
+            SetTheScore(45000UL);
+            SetLevelNumber(3UL);
+            SetLevelTimeBonus(display, timeWindow, 180);
+            SetLivesLeft(3);
+            SetNumberBullets(8);
+            ToggleKiller(display, False);
+            break;
+
+        case 2:
+            SetTheScore(85000UL);
+            SetLevelNumber(5UL);
+            SetLevelTimeBonus(display, timeWindow, 142);
+            SetLivesLeft(2);
+            SetNumberBullets(12);
+            ToggleKiller(display, False);
+            break;
+
+        case 3:
+            SetTheScore(125000UL);
+            SetLevelNumber(7UL);
+            SetLevelTimeBonus(display, timeWindow, 100);
+            SetLivesLeft(2);
+            SetNumberBullets(20);
+            ToggleKiller(display, True);
+            break;
+
+        case 4:
+        default:
+            SetTheScore(450000UL);
+            SetLevelNumber(25UL);
+            SetLevelTimeBonus(display, timeWindow, 60);
+            SetLivesLeft(1);
+            SetNumberBullets(30);
+            ToggleKiller(display, False);
+            break;
+    }
+
+    /* Mirror CheckGameRules (level.c:406-408): clear x2/x4 so the
+     * bonus screen displays cleanly. */
+    Togglex2Bonus(display, False);
+    Togglex4Bonus(display, False);
+    DrawSpecials(display);
+
+    SetupBonusScreen(display, mainWindow);
+}
+
 void FreeBonus(Display *display)
 {
     /* Free all the hungry memory leaks */

@@ -26,6 +26,7 @@ PREFIX         ?= /usr/local
         cppcheck cppcheck-src cppcheck-tests \
         tidy check ci \
         audio-literals audio-literals-check \
+        golden-screen golden-all golden-bonus modern-screen \
         original-build capture-original visual-check visual-check-setup
 
 # --- Default ---------------------------------------------------------------
@@ -136,6 +137,12 @@ golden-screen: original-build ## Capture original goldens for one screen. Usage:
 
 golden-all: original-build ## Capture original goldens for all attract screens (one-time).
 	scripts/visual_capture.sh original "all:$(or $(INTERVAL),200)" tests/golden/original/
+
+golden-bonus: original-build ## Capture original bonus-screen goldens for all 4 scenarios.
+	for s in 1 2 3 4; do \
+	    mkdir -p tests/golden/original/bonus-$$s; \
+	    BONUS_SCENARIO=$$s scripts/visual_capture.sh original "bonus:$(or $(INTERVAL),200)" tests/golden/original/bonus-$$s; \
+	done
 
 modern-screen: build ## Capture modern screenshots for one screen. Usage: make modern-screen SCREEN=intro INTERVAL=200
 	scripts/visual_capture.sh modern "$(SCREEN):$(or $(INTERVAL),200)" .tmp/visual-check/modern/

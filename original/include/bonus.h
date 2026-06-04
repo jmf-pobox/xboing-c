@@ -102,4 +102,13 @@ int GetNumberBonus(void);
 
 extern enum BonusStates BonusState;
 
+/*
+ * Visual-capture helper: synthesize game state for a representative
+ * end-of-level scenario, then enter MODE_BONUS via SetupBonusScreen.
+ * Used by -visual-capture bonus, not by gameplay code.  Scenario
+ * indices: 1 = early level, 2 = save-granted level, 3 = killer
+ * active, 4 = late level.
+ */
+void BonusScreenForCapture(Display *display, Window window, int scenario);
+
 #endif
