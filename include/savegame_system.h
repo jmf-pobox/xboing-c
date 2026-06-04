@@ -64,8 +64,18 @@ int savegame_system_save(game_ctx_t *ctx);
  * canonical level file (matches the spec's auto-save scheme where
  * level files are absent after a bonus-screen autosave).
  *
- * Posts a user-visible message on success or failure.
- * Returns 1 on success, 0 on failure.
+ * Posts a user-visible message on success, partial-success, or
+ * failure.
+ *
+ * Return value:
+ *   1 — info was successfully read, validated, and applied.  The
+ *       grid may be from the saved snapshot, the canonical level
+ *       file, OR (in the partial case where the autosave path has
+ *       no snapshot AND the canonical .data is missing) the
+ *       block grid is empty and the message reflects that.
+ *   0 — no save file present, the save was rejected as corrupted
+ *       (validate_info / validate_level failed), or the underlying
+ *       read returned an I/O error.  The context is left unchanged.
  */
 int savegame_system_load(game_ctx_t *ctx);
 

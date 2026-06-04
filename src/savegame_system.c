@@ -409,7 +409,24 @@ static int reload_canonical_level(game_ctx_t *ctx, int level_number)
         return 0;
     }
     block_system_clear_all(ctx->block);
-    return level_system_load_file(ctx->level, level_path) == 0;
+    return level_system_load_file(ctx->level, level_path) == LEVEL_SYS_OK;
+}
+
+/* Refresh level_system metadata (title, time_bonus) without disturbing
+ * the block grid the caller will replace.  Returns LEVEL_SYS_OK or an
+ * error code from level_system_load_file. */
+static level_system_status_t refresh_level_metadata(game_ctx_t *ctx, int level_number)
+{
+    int file_num = level_system_wrap_number(level_number);
+    char filename[32];
+    snprintf(filename, sizeof(filename), "level%02d.data", file_num);
+
+    char level_path[PATHS_MAX_PATH];
+    if (paths_level_file(&ctx->paths, filename, level_path, sizeof(level_path)) != PATHS_OK)
+    {
+        return LEVEL_SYS_ERR_FILE_NOT_FOUND;
+    }
+    return level_system_load_file(ctx->level, level_path);
 }
 
 int savegame_system_load(game_ctx_t *ctx)
@@ -456,6 +473,12 @@ int savegame_system_load(game_ctx_t *ctx)
     int level_ok = 1;
     if (has_level_snapshot)
     {
+        /* Refresh level metadata (title, time_bonus) from the canonical
+         * .data file before applying the saved grid.  Without this the
+         * UI shows the previously-loaded level's title even after a
+         * cross-level load.  Best-effort: a missing canonical file is
+         * tolerated since the grid snapshot fully replaces the grid. */
+        (void)refresh_level_metadata(ctx, (int)info.level);
         savegame_system_restore(ctx, &info, &lvl);
     }
     else

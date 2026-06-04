@@ -395,8 +395,8 @@ static void test_autosave_writes_info_and_deletes_stale_level(void **vstate)
     assert_int_equal(savegame_system_save(ctx), 1);
     char info_path[PATHS_MAX_PATH];
     char level_path[PATHS_MAX_PATH];
-    (void)paths_save_info(&ctx->paths, info_path, sizeof(info_path));
-    (void)paths_save_level(&ctx->paths, level_path, sizeof(level_path));
+    assert_int_equal(paths_save_info(&ctx->paths, info_path, sizeof(info_path)), PATHS_OK);
+    assert_int_equal(paths_save_level(&ctx->paths, level_path, sizeof(level_path)), PATHS_OK);
     assert_int_equal(savegame_io_exists(level_path), 1);
 
     /* Now autosave: info should be rewritten, level file removed. */
