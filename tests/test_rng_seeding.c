@@ -17,6 +17,7 @@
 
 #include <cmocka.h>
 
+#include "game_context.h"
 #include "game_init.h"
 
 /* =========================================================================
@@ -73,10 +74,62 @@ static void test_different_seeds_diverge(void **state)
         if (rand() == seq1[i])
             matches++;
     }
-    /* Two distinct seeds producing 8 identical rand() values would
-     * be a 1-in-2^248 collision.  Anything < 8 matches means the
-     * seeds are doing their job. */
+    /* Two distinct seeds producing 8 identical rand() values is
+     * vanishingly improbable for any sane libc — each rand() draws
+     * from [0, RAND_MAX] independently.  Anything < 8 matches means
+     * the seeds are doing their job; the exact collision probability
+     * depends on RAND_MAX (libc-dependent). */
     assert_true(matches < 8);
+}
+
+/* =========================================================================
+ * game_create() does not call srand() — the load-bearing claim of
+ * the caller-seeds design.  Verified two ways:
+ *
+ *   (a) Determinism: starting from the same caller-set seed, two
+ *       independent game_create+destroy cycles leave rand() in the
+ *       same state.  If game_create called srand(time(NULL))
+ *       internally, the two cycles would (in most cases) end up in
+ *       different rand() states; this test catches that.
+ *
+ *   (b) Consumption: game_create+destroy DOES consume at least one
+ *       rand() call (ball mass init, level RNG, etc).  Asserting
+ *       this rules out a regression where game_create somehow
+ *       short-circuits rand consumption.
+ *
+ * This is the test Copilot review #142 asked for — it exercises
+ * game_create rather than testing srand semantics in isolation.
+ * ========================================================================= */
+
+static char s_arg_prog[] = "test_rng_seeding";
+
+static void test_game_create_does_not_seed(void **state)
+{
+    (void)state;
+    char *argv[] = {s_arg_prog, NULL};
+
+    /* (a) Determinism: same caller seed → same rand() state after
+     *     game_create+destroy. */
+    srand(0xABCDEF);
+    game_ctx_t *c1 = game_create(1, argv);
+    assert_non_null(c1);
+    game_destroy(c1);
+    int val_a = rand();
+
+    srand(0xABCDEF);
+    game_ctx_t *c2 = game_create(1, argv);
+    assert_non_null(c2);
+    game_destroy(c2);
+    int val_b = rand();
+
+    assert_int_equal(val_a, val_b);
+
+    /* (b) Consumption: game_create+destroy moves the rand() state
+     *     forward, so the first rand() after the cycle differs from
+     *     the first rand() without the cycle. */
+    srand(0xABCDEF);
+    int fresh = rand();
+    assert_int_not_equal(fresh, val_a);
 }
 
 int main(void)
@@ -85,6 +138,7 @@ int main(void)
         cmocka_unit_test(test_seed_rng_default_smoke),
         cmocka_unit_test(test_caller_seed_is_deterministic),
         cmocka_unit_test(test_different_seeds_diverge),
+        cmocka_unit_test(test_game_create_does_not_seed),
     };
     return cmocka_run_group_tests(tests, NULL, NULL);
 }
