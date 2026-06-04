@@ -337,6 +337,8 @@ sdl2_cli_status_t sdl2_cli_parse(int argc, char *const argv[], sdl2_cli_config_t
                 config->visual_capture_mode = SDL2ST_HIGHSCORE;
             else if (strcmp(mode_buf, "preview") == 0)
                 config->visual_capture_mode = SDL2ST_PREVIEW;
+            else if (strcmp(mode_buf, "bonus") == 0)
+                config->visual_capture_mode = SDL2ST_BONUS;
             else
             {
                 if (bad_option != NULL)

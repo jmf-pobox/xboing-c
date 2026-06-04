@@ -19,11 +19,13 @@
 #include "demo_system.h"
 #include "game_context.h"
 #include "game_render.h"
+#include "highscore_io.h"
 #include "highscore_system.h"
 #include "intro_system.h"
 #include "keys_system.h"
 #include "level_system.h"
 #include "presents_system.h"
+#include "score_system.h"
 #include "sdl2_font.h"
 #include "sdl2_renderer.h"
 #include "sdl2_state.h"
@@ -898,138 +900,275 @@ void game_render_keysedit(const game_ctx_t *ctx)
  * Bonus tally screen — score breakdown between levels
  * ========================================================================= */
 
+/* Ordinal suffix for high-score ranking — "st"/"nd"/"rd"/"th".
+ * Matches original/bonus.c:DoHighScore (lines 546-571). */
+static const char *rank_suffix(int rank)
+{
+    switch (rank)
+    {
+        case 1:
+            return "st";
+        case 2:
+            return "nd";
+        case 3:
+            return "rd";
+        case 4:
+        case 5:
+        case 6:
+        case 7:
+        case 8:
+        case 9:
+        case 10:
+            return "th";
+        default:
+            return "";
+    }
+}
+
+/* Ball-border decoration around the bonus screen.  Mirrors
+ * original/bonus.c:DrawBallBorder (lines 164-198): rows of ball
+ * sprites along all four edges of the main window, 22px stride. */
+static void draw_ball_border(const game_ctx_t *ctx)
+{
+    sdl2_texture_info_t ball;
+    if (sdl2_texture_get(ctx->texture, SPR_BALL_LIFE, &ball) != SDL2T_OK)
+    {
+        return;
+    }
+    SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
+    const int W = SDL2R_LOGICAL_WIDTH;
+    const int H = SDL2R_LOGICAL_HEIGHT;
+    const int STRIDE = 22;
+    const int BORDER_INSET = 8;
+    /* Top + bottom rows. */
+    for (int x = BORDER_INSET; x + ball.width < W - BORDER_INSET; x += STRIDE)
+    {
+        SDL_Rect top = {.x = x, .y = BORDER_INSET, .w = ball.width, .h = ball.height};
+        SDL_Rect bot = {
+            .x = x, .y = H - BORDER_INSET - ball.height, .w = ball.width, .h = ball.height};
+        SDL_RenderCopy(sdl, ball.texture, NULL, &top);
+        SDL_RenderCopy(sdl, ball.texture, NULL, &bot);
+    }
+    /* Left + right columns (skip corners — already drawn above). */
+    for (int y = BORDER_INSET + STRIDE; y + ball.height < H - BORDER_INSET; y += STRIDE)
+    {
+        SDL_Rect lhs = {.x = BORDER_INSET, .y = y, .w = ball.width, .h = ball.height};
+        SDL_Rect rhs = {
+            .x = W - BORDER_INSET - ball.width, .y = y, .w = ball.width, .h = ball.height};
+        SDL_RenderCopy(sdl, ball.texture, NULL, &lhs);
+        SDL_RenderCopy(sdl, ball.texture, NULL, &rhs);
+    }
+}
+
 void game_render_bonus(const game_ctx_t *ctx)
 {
     bonus_state_t state = bonus_system_get_state(ctx->bonus);
     if (state == BONUS_STATE_FINISH)
         return;
 
+    /* Original uses pure colors: white text, red headers, yellow
+     * bonus lines, blue messages (Sorry/Bonus void), tan footer.
+     * Match those choices — the modern's softened red/green palette
+     * was a guess. */
     SDL_Color white = {255, 255, 255, 255};
     SDL_Color yellow = {255, 255, 0, 255};
-    SDL_Color green = {0, 255, 0, 255};
-    SDL_Color red = {255, 80, 80, 255};
+    SDL_Color blue = {127, 127, 255, 255};
+    SDL_Color red = {255, 0, 0, 255};
+    SDL_Color tan = {210, 180, 140, 255};
 
-    /* Title */
-    sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TITLE, "BONUS", PLAY_AREA_Y + 40, red,
-                                  PLAY_AREA_W);
+    const int W = SDL2R_LOGICAL_WIDTH;
+    const int center_x = W / 2;
 
-    /* Display score running total */
-    unsigned long dscore = bonus_system_get_display_score(ctx->bonus);
-    char score_buf[64];
-    snprintf(score_buf, sizeof(score_buf), "Score: %lu", dscore);
-    sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TEXT, score_buf, PLAY_AREA_Y + 100, white,
-                                  PLAY_AREA_W);
+    /* Decorative ball border around the full window — matches the
+     * original's DrawBallBorder. */
+    draw_ball_border(ctx);
+
+    /* Small XBOING title pixmap at top.  Replaces the previous "BONUS"
+     * text — the original (bonus.c:218 DrawSmallIntroTitle) uses the
+     * gold pixmap from the presents/intro asset set. */
+    sdl2_texture_info_t title;
+    int title_bottom = 60;
+    if (sdl2_texture_get(ctx->texture, SPR_TITLE_SMALL, &title) == SDL2T_OK)
+    {
+        SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
+        SDL_Rect dst = {
+            .x = center_x - title.width / 2, .y = 60, .w = title.width, .h = title.height};
+        SDL_RenderCopy(sdl, title.texture, NULL, &dst);
+        title_bottom = dst.y + dst.h;
+    }
+
+    /* Per-line ypos accumulator — mirrors the original's `ypos`
+     * walker.  Start below the title with a comfortable gap. */
+    int ypos = title_bottom + 30;
+    char buf[80];
+
+    /* "- Level N -" — red header.  Always drawn once BONUS mode
+     * is active. */
+    snprintf(buf, sizeof(buf), "- Level %d -", ctx->level_number);
+    sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TITLE, buf, ypos, red, W);
+    ypos += 40;
 
     if (state >= BONUS_STATE_SCORE)
-        sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_DATA, "Congratulations!",
-                                      PLAY_AREA_Y + 160, yellow, PLAY_AREA_W);
+    {
+        sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TEXT,
+                                      "Congratulations on finishing this level.", ypos, white, W);
+        ypos += 35;
+    }
 
+    /* Bonus-coin tally line (one of: super-bonus / no-coins / coins-void
+     * / animated row).  Mirrors original/bonus.c:280-389 DoBonuses. */
     if (state >= BONUS_STATE_BONUS)
     {
-        /* Animated coin row: draw one BONUS_BLK sprite per coin already
-         * consumed by the state machine (initial_coins - live_coins).
-         * Mirrors original/bonus.c:280-389 DoBonuses centred-row layout.
-         *
-         * Fallback labels for the non-animated paths in the original:
-         *   timer-void (time_bonus_secs == 0): bonus_system skips coin
-         *     drain entirely so initial > 0 yet drawn == 0 — show the
-         *     "Bonus coins void" message (original/bonus.c:288-303).
-         *   no-coins (initial == 0): "Sorry, no bonus coins collected"
-         *     (original/bonus.c:312-328).
-         *   super-bonus (initial > 8): one-shot "Super Bonus - N"
-         *     (original/bonus.c:330-351). */
         int initial = bonus_system_get_initial_coins(ctx->bonus);
         int live = bonus_system_get_coins(ctx->bonus);
         int drawn = initial - live;
         int time_secs = bonus_system_get_time_bonus_secs(ctx->bonus);
-        SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
-        int center_x = PLAY_AREA_X + PLAY_AREA_W / 2;
-        int row_y = PLAY_AREA_Y + 200;
         sdl2_texture_info_t coin_tex;
         if (time_secs == 0 && initial > 0)
         {
-            sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_DATA,
-                                          "Bonus coins void - Timer ran out!", row_y, green,
-                                          PLAY_AREA_W);
+            sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TEXT,
+                                          "Bonus coins void - Timer ran out!", ypos, blue, W);
         }
-        else if (initial > 0 && initial <= 8 && drawn > 0 &&
+        else if (initial == 0)
+        {
+            sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TEXT,
+                                          "Sorry, no bonus coins collected.", ypos, blue, W);
+        }
+        else if (initial > 8)
+        {
+            snprintf(buf, sizeof(buf), "Super Bonus - %d", initial);
+            sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TITLE, buf, ypos, yellow, W);
+        }
+        else if (drawn > 0 &&
                  sdl2_texture_get(ctx->texture, SPR_BLOCK_BONUS_1, &coin_tex) == SDL2T_OK)
         {
+            SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
             for (int i = 0; i < drawn && i < initial; i++)
             {
                 SDL_Rect dst = {.x = bonus_row_item_x(center_x, initial, BONUS_COIN_STRIDE,
                                                       BONUS_COIN_PADDING, i),
-                                .y = row_y,
+                                .y = ypos,
                                 .w = coin_tex.width,
                                 .h = coin_tex.height};
                 SDL_RenderCopy(sdl, coin_tex.texture, NULL, &dst);
             }
         }
-        else if (initial == 0)
-        {
-            sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_DATA,
-                                          "Sorry, no bonus coins collected.", row_y, green,
-                                          PLAY_AREA_W);
-        }
-        else if (initial > 8)
-        {
-            char buf[64];
-            snprintf(buf, sizeof(buf), "Super Bonus - %d", initial);
-            sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TITLE, buf, row_y, green,
-                                          PLAY_AREA_W);
-        }
+        ypos += 35;
     }
 
+    /* "Level bonus - level N x 100 = M points" — yellow, with the
+     * total computed (original/bonus.c:406-411).  Modern uses level
+     * starting from 1, no start-level offset. */
     if (state >= BONUS_STATE_LEVEL)
     {
-        char buf[64];
-        snprintf(buf, sizeof(buf), "Level Bonus: %d x 100", ctx->level_number);
-        sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_DATA, buf, PLAY_AREA_Y + 240, green,
-                                      PLAY_AREA_W);
+        int lvl = ctx->level_number;
+        snprintf(buf, sizeof(buf), "Level bonus - level %d x 100 = %d points", lvl, lvl * 100);
+        sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TEXT, buf, ypos, yellow, W);
+        ypos += 30;
     }
 
+    /* Bullet-bonus row.  Mirrors original/bonus.c:431-490 DoBullets. */
     if (state >= BONUS_STATE_BULLET)
     {
-        /* Animated bullet row: same pattern as coins but stride 10.
-         * Mirrors original/bonus.c:431-490 DoBullets. */
         int initial_b = bonus_system_get_initial_bullets(ctx->bonus);
         int live_b = bonus_system_get_bullets(ctx->bonus);
         int drawn_b = initial_b - live_b;
-        SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
-        int center_x = PLAY_AREA_X + PLAY_AREA_W / 2;
-        int row_y = PLAY_AREA_Y + 280;
         sdl2_texture_info_t bullet_tex;
-        if (initial_b > 0 && drawn_b > 0 &&
-            sdl2_texture_get(ctx->texture, SPR_BULLET, &bullet_tex) == SDL2T_OK)
+        if (initial_b == 0)
         {
+            sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TEXT,
+                                          "You have used all your bullets. No bonus!", ypos, blue,
+                                          W);
+        }
+        else if (drawn_b > 0 && sdl2_texture_get(ctx->texture, SPR_BULLET, &bullet_tex) == SDL2T_OK)
+        {
+            SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
             for (int i = 0; i < drawn_b && i < initial_b; i++)
             {
                 SDL_Rect dst = {.x = bonus_row_item_x(center_x, initial_b, BONUS_BULLET_STRIDE,
                                                       BONUS_BULLET_PADDING, i),
-                                .y = row_y,
+                                .y = ypos,
                                 .w = bullet_tex.width,
                                 .h = bullet_tex.height};
                 SDL_RenderCopy(sdl, bullet_tex.texture, NULL, &dst);
             }
         }
-        else if (initial_b == 0)
-        {
-            sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_DATA,
-                                          "You have used all your bullets. No bonus!", row_y, green,
-                                          PLAY_AREA_W);
-        }
+        ypos += 35;
     }
 
+    /* "Time bonus - X seconds x 100 = N points" — yellow, computed
+     * total (original/bonus.c:501-510). */
     if (state >= BONUS_STATE_TIME)
-        sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_DATA, "Time Bonus...",
-                                      PLAY_AREA_Y + 320, green, PLAY_AREA_W);
+    {
+        int secs = bonus_system_get_time_bonus_secs(ctx->bonus);
+        if (secs > 0)
+        {
+            snprintf(buf, sizeof(buf), "Time bonus - %d seconds x 100 = %d points", secs,
+                     secs * 100);
+            sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TEXT, buf, ypos, yellow, W);
+        }
+        else
+        {
+            sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TEXT,
+                                          "No time bonus - not quick enough!", ypos, yellow, W);
+        }
+        ypos += 30;
+    }
 
+    /* High-score ranking — red text.  Matches DoHighScore (bonus.c:528-586).
+     * Personal table is the reference per original (PERSONAL precedes GLOBAL
+     * in the legacy ranking calculation). */
+    if (state >= BONUS_STATE_HSCORE)
+    {
+        unsigned long current_score = ctx->score ? score_system_get(ctx->score) : 0UL;
+        int rank = highscore_io_get_ranking(&ctx->hs_personal, current_score);
+        if (rank == 1)
+        {
+            snprintf(buf, sizeof(buf), "You are ranked 1st. Well done!");
+        }
+        else if (rank > 0)
+        {
+            snprintf(buf, sizeof(buf), "You are currently ranked %d%s.", rank, rank_suffix(rank));
+        }
+        else
+        {
+            snprintf(buf, sizeof(buf), "Keep on trying!");
+        }
+        sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TEXT, buf, ypos, red, W);
+        ypos += 30;
+    }
+
+    /* "Prepare for level N" — yellow.  No trailing exclamation mark
+     * (the original is sober: "Prepare for level 4"). */
     if (state >= BONUS_STATE_END_TEXT)
     {
-        char buf[64];
-        snprintf(buf, sizeof(buf), "Prepare for level %d!", ctx->level_number + 1);
-        sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TEXT, buf, PLAY_AREA_Y + 400, yellow,
-                                      PLAY_AREA_W);
+        snprintf(buf, sizeof(buf), "Prepare for level %d", ctx->level_number + 1);
+        sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TEXT, buf, ypos, yellow, W);
+        /* This is the last accumulating line; the footer + floppy
+         * below use fixed positions, so no further ypos increment. */
+    }
+
+    /* Persistent footer — "Press space for next level" in tan,
+     * always shown.  Original draws this from DrawTitleText at
+     * mode entry (bonus.c:239-240). */
+    sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TEXT, "Press space for next level",
+                                  SDL2R_LOGICAL_HEIGHT - 60, tan, W);
+
+    /* Save-token floppy icon — bottom-right corner.  Only drawn
+     * when the current level granted a save (level % SAVE_LEVEL == 0,
+     * original/bonus.c:243-253). */
+    if (bonus_system_should_save(ctx->level_number, 1))
+    {
+        sdl2_texture_info_t floppy;
+        if (sdl2_texture_get(ctx->texture, SPR_FLOPPY, &floppy) == SDL2T_OK)
+        {
+            SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
+            SDL_Rect dst = {.x = W - 80 - floppy.width,
+                            .y = SDL2R_LOGICAL_HEIGHT - 60 - floppy.height,
+                            .w = floppy.width,
+                            .h = floppy.height};
+            SDL_RenderCopy(sdl, floppy.texture, NULL, &dst);
+        }
     }
 }
 
