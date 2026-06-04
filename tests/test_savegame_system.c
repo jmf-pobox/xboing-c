@@ -433,6 +433,79 @@ static void test_load_after_autosave_restores_info_fields(void **vstate)
     assert_int_equal(ctx->bonus_count, 3);
 }
 
+/* =========================================================================
+ * Load rejects malformed saves (Cursor finding: untrusted JSON drives
+ * out-of-range state into render code → OOB array index, signed
+ * overflow).  Validator runs in savegame_system_load between read
+ * and restore.
+ * ========================================================================= */
+
+static void write_info_directly(game_ctx_t *ctx, const savegame_data_t *info)
+{
+    char info_path[PATHS_MAX_PATH];
+    assert_int_equal(paths_save_info(&ctx->paths, info_path, sizeof(info_path)), PATHS_OK);
+    assert_int_equal(savegame_io_write(info_path, info), SAVEGAME_IO_OK);
+    /* Ensure no stale level file taints the load path. */
+    char level_path[PATHS_MAX_PATH];
+    if (paths_save_level(&ctx->paths, level_path, sizeof(level_path)) == PATHS_OK)
+    {
+        (void)savegame_io_delete(level_path);
+    }
+}
+
+static void test_load_rejects_negative_eyedude_slide(void **vstate)
+{
+    fixture_t *f = *vstate;
+    game_ctx_t *ctx = f->ctx;
+    seed_state(ctx);
+
+    /* Build a well-formed save then tamper with one field. */
+    savegame_data_t info;
+    savegame_system_capture(ctx, &info, NULL);
+    info.eyedude.slide = -1;
+    write_info_directly(ctx, &info);
+
+    clear_state(ctx);
+    /* Load must refuse to apply this state. */
+    assert_int_equal(savegame_system_load(ctx), 0);
+    /* Verify nothing leaked through: cleared state survived. */
+    assert_int_equal(score_system_get(ctx->score), 0UL);
+}
+
+static void test_load_rejects_oversized_next_frame_offset(void **vstate)
+{
+    fixture_t *f = *vstate;
+    game_ctx_t *ctx = f->ctx;
+    seed_state(ctx);
+    assert_int_equal(savegame_system_save(ctx), 1);
+
+    /* Rewrite the level file with an out-of-range cooldown. */
+    char level_path[PATHS_MAX_PATH];
+    assert_int_equal(paths_save_level(&ctx->paths, level_path, sizeof(level_path)), PATHS_OK);
+    savegame_level_t lvl;
+    assert_int_equal(savegame_level_read(level_path, &lvl), SAVEGAME_IO_OK);
+    lvl.cells[3][4].next_frame_offset = 1000000; /* well over the cap */
+    assert_int_equal(savegame_level_write(level_path, &lvl), SAVEGAME_IO_OK);
+
+    clear_state(ctx);
+    assert_int_equal(savegame_system_load(ctx), 0);
+}
+
+static void test_load_rejects_out_of_range_paddle_size(void **vstate)
+{
+    fixture_t *f = *vstate;
+    game_ctx_t *ctx = f->ctx;
+    seed_state(ctx);
+
+    savegame_data_t info;
+    savegame_system_capture(ctx, &info, NULL);
+    info.paddle_size_type = 99;
+    write_info_directly(ctx, &info);
+
+    clear_state(ctx);
+    assert_int_equal(savegame_system_load(ctx), 0);
+}
+
 int main(void)
 {
     const struct CMUnitTest tests[] = {
@@ -450,6 +523,12 @@ int main(void)
         cmocka_unit_test_setup_teardown(test_autosave_writes_info_and_deletes_stale_level, setup,
                                         teardown),
         cmocka_unit_test_setup_teardown(test_load_after_autosave_restores_info_fields, setup,
+                                        teardown),
+        /* Validation against malformed input */
+        cmocka_unit_test_setup_teardown(test_load_rejects_negative_eyedude_slide, setup, teardown),
+        cmocka_unit_test_setup_teardown(test_load_rejects_oversized_next_frame_offset, setup,
+                                        teardown),
+        cmocka_unit_test_setup_teardown(test_load_rejects_out_of_range_paddle_size, setup,
                                         teardown),
     };
     return cmocka_run_group_tests(tests, NULL, NULL);

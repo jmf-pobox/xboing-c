@@ -26,6 +26,97 @@
 #include "special_system.h"
 
 /* =========================================================================
+ * Validation — reject malformed save data before it reaches the
+ * subsystems.  Save files are user-editable; restoring untrusted
+ * out-of-range enum or count values has caused real crashes
+ * (eyedude.slide negative → negative modulo → OOB index into
+ * left_keys[]; large next_frame_offset → signed-int overflow when
+ * added to current frame).
+ *
+ * Bounds chosen for defense-in-depth, not for accuracy: a tampered
+ * file far outside these ranges is unambiguously invalid, while
+ * any legitimately produced save sits well within them.
+ * ========================================================================= */
+
+#define SAVEGAME_MAX_LEVEL 999
+#define SAVEGAME_MAX_LIVES 99
+#define SAVEGAME_MAX_BULLETS 9999
+#define SAVEGAME_MAX_TILTS 99
+#define SAVEGAME_MAX_BONUS_COUNT 99
+/* Original BLACK cooldown is 30 frames; cap at ~10s at 60fps to
+ * absorb any reasonable per-tick rate without enabling overflow. */
+#define SAVEGAME_MAX_FRAME_OFFSET 600
+#define SAVEGAME_MAX_COUNTER_SLIDE 9
+/* Generous bounds for animation/state indices so legitimate ranges
+ * (~0-127) pass while preventing negative-modulo OOB. */
+#define SAVEGAME_MAX_ANIM_INDEX 4095
+
+static int in_range(int v, int lo, int hi)
+{
+    return v >= lo && v <= hi;
+}
+
+static int validate_info(const savegame_data_t *info)
+{
+    if (!in_range((int)info->level, 1, SAVEGAME_MAX_LEVEL) ||
+        !in_range(info->lives_left, 0, SAVEGAME_MAX_LIVES) ||
+        !in_range(info->num_bullets, 0, SAVEGAME_MAX_BULLETS) ||
+        !in_range(info->user_tilts, 0, SAVEGAME_MAX_TILTS) ||
+        !in_range(info->bonus_count, 0, SAVEGAME_MAX_BONUS_COUNT))
+    {
+        return 0;
+    }
+    if (!in_range(info->paddle_size_type, PADDLE_SIZE_SMALL, PADDLE_SIZE_HUGE))
+    {
+        return 0;
+    }
+    /* Eyedude: state/dir are small enums; slide drives a modulo
+     * sprite-table index and MUST be non-negative. */
+    if (!in_range(info->eyedude.state, EYEDUDE_STATE_NONE, EYEDUDE_STATE_DIE) ||
+        !in_range(info->eyedude.dir, 0, EYEDUDE_DIR_DEAD) ||
+        !in_range(info->eyedude.slide, 0, SAVEGAME_MAX_ANIM_INDEX))
+    {
+        return 0;
+    }
+    /* Ball state/wait_mode are small enums.  Position bounds are
+     * lenient — the gameplay layer clamps offscreen balls. */
+    for (int i = 0; i < MAX_BALLS; i++)
+    {
+        const savegame_ball_t *b = &info->balls[i];
+        if (!in_range(b->state, BALL_POP, BALL_NONE) ||
+            !in_range(b->wait_mode, BALL_POP, BALL_NONE))
+        {
+            return 0;
+        }
+    }
+    return 1;
+}
+
+static int validate_level(const savegame_level_t *level)
+{
+    for (int r = 0; r < MAX_ROW; r++)
+    {
+        for (int c = 0; c < MAX_COL; c++)
+        {
+            const savegame_cell_t *cell = &level->cells[r][c];
+            if (!cell->occupied)
+            {
+                continue;
+            }
+            /* block_type accepts NONE_BLK/KILL_BLK negative sentinels
+             * via the existing block_types.h range. */
+            if (!in_range(cell->block_type, NONE_BLK, MAX_BLOCKS - 1) ||
+                !in_range(cell->counter_slide, 0, SAVEGAME_MAX_COUNTER_SLIDE) ||
+                !in_range(cell->next_frame_offset, 0, SAVEGAME_MAX_FRAME_OFFSET))
+            {
+                return 0;
+            }
+        }
+    }
+    return 1;
+}
+
+/* =========================================================================
  * Pure capture — no I/O, no message
  * ========================================================================= */
 
@@ -343,12 +434,24 @@ int savegame_system_load(game_ctx_t *ctx)
         message_system_set(ctx->message, "No saved game found", 1, frame);
         return 0;
     }
+    if (!validate_info(&info))
+    {
+        int frame = (int)sdl2_state_frame(ctx->state);
+        message_system_set(ctx->message, "Save file corrupted", 1, frame);
+        return 0;
+    }
 
     /* Try the level snapshot; fall back to canonical .data file when
      * the autosave path skipped writing one. */
     savegame_level_t lvl;
     savegame_level_init(&lvl);
     int has_level_snapshot = (savegame_level_read(level_path, &lvl) == SAVEGAME_IO_OK);
+    if (has_level_snapshot && !validate_level(&lvl))
+    {
+        int frame = (int)sdl2_state_frame(ctx->state);
+        message_system_set(ctx->message, "Save file corrupted", 1, frame);
+        return 0;
+    }
 
     int level_ok = 1;
     if (has_level_snapshot)
