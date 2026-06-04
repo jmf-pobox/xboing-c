@@ -24,6 +24,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include <SDL2/SDL.h>
 
@@ -687,6 +688,20 @@ game_ctx_t *game_create(int argc, char *argv[])
 fail:
     game_destroy(ctx);
     return NULL;
+}
+
+/* =========================================================================
+ * game_seed_rng_default
+ *
+ * Production seeding policy: time(NULL).  The library never calls
+ * this on the caller's behalf — production main() invokes it once
+ * before game_create(), tests choose their own srand() seed (or
+ * choose not to seed).  See include/game_init.h for the contract.
+ * ========================================================================= */
+
+void game_seed_rng_default(void)
+{
+    srand((unsigned)time(NULL));
 }
 
 /* =========================================================================

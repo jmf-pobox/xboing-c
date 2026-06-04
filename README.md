@@ -2,7 +2,7 @@
 
 An SDL2 port of XBoing 2.4, the X11 breakout/blockout arcade game written by Justin C. Kibell between 1993 and 1997. All 80 original levels, 30 block types, power-ups, multiball, and the built-in level editor are preserved.
 
-![XBoing gameplay](screenshots/xb-game.gif)
+![XBoing gameplay](screenshots/gameplay.gif)
 
 ## Install and play
 
@@ -33,7 +33,7 @@ Justin C. Kibell wrote the original XBoing on a SparcStation 2 to learn Xlib. Ve
 
 The 1996 sources are preserved verbatim in [`original/`](original/), including Kibell's [original README](original/README) and [copyright notice](original/COPYRIGHT).
 
-![Block types](screenshots/xb-blocks.gif) ![Level editor](screenshots/xb-editor.gif) ![Level preview](screenshots/xb-prev.gif)
+![Block types](screenshots/block-legend.gif) ![Level editor](screenshots/level-editor.gif) ![Level preview](screenshots/level-preview.gif)
 
 ### Acknowledgements
 

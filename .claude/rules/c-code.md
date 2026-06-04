@@ -1,7 +1,7 @@
 ---
 paths:
-  - "src/**/*.c"
-  - "include/**/*.h"
+  - "**/*.c"
+  - "**/*.h"
 ---
 
 # C Code Hygiene
