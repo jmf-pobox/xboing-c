@@ -276,17 +276,17 @@ target_link_libraries(block_system PUBLIC score_logic)
 
 # --- Block sound mapping (pure) ---------------------------------------------
 #
-# Pure C module — no SDL2 dependency.  Maps block_type to sound asset name.
-# Mirrors original/blocks.c:762 PlaySoundForBlock.  Extracted from
-# game_callbacks.c so the table can be tested exhaustively without an audio
-# context.
+# Pure C module — no SDL2 dependency, no block_system dependency.  Only
+# uses the block_type integer constants from block_types.h.  Maps block_type
+# to sound asset name.  Mirrors original/blocks.c:762 PlaySoundForBlock.
+# Extracted from game_callbacks.c so the table can be tested exhaustively
+# without an audio context.
 
 add_library(block_sound STATIC src/block_sound.c)
 target_include_directories(block_sound PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 target_compile_options(block_sound PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
-target_link_libraries(block_sound PUBLIC block_system)
 
 # --- Paddle system library --------------------------------------------------
 #

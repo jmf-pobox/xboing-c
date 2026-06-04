@@ -29,6 +29,6 @@ grep -rho 'sdl2_audio_play([^,]*,[[:space:]]*"[^"]*"' \
     --exclude=sdl2_audio.c \
     --exclude=block_sound.c \
     src/ \
-    | grep -oP '"[^"]*"' \
+    | grep -o '"[^"]*"' \
     | tr -d '"' \
     | sort -u

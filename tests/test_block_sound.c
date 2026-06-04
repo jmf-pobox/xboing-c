@@ -17,15 +17,20 @@
 #include "block_sound.h"
 #include "block_types.h"
 
+/* Compile-time guard: if MAX_BLOCKS changes (new block type added),
+ * this static_assert fails to force the author to audit the
+ * exhaustive table below and the switch in src/block_sound.c. */
+_Static_assert(MAX_BLOCKS == 30,
+               "MAX_BLOCKS changed — audit test_block_sound_exhaustive() and "
+               "block_sound_name() to cover the new type(s).");
+
 static void test_block_sound_exhaustive(void **state)
 {
     (void)state;
     /* Asserts the current block-type → sound-name mapping for every
      * type defined in block_types.h.  Regressions on these entries
-     * (renames, deletions, wrong names) fail here.  Note: a NEW type
-     * added to block_types.h won't fail this test — additions must
-     * be explicitly registered below.  Component 4's
-     * audio-literals-check provides the additional guard. */
+     * (renames, deletions, wrong names) fail here.  Additions are
+     * caught at compile time by the _Static_assert above. */
     assert_string_equal(block_sound_name(BOMB_BLK), "bomb");
     assert_string_equal(block_sound_name(BULLET_BLK), "ammo");
     assert_string_equal(block_sound_name(MAXAMMO_BLK), "ammo");
