@@ -78,6 +78,75 @@ handlers in per-tick code causes multi-fire bugs.
 - Tests registered via `xboing_add_integration_test()` in
   `tests/CMakeLists.txt`
 
+### Savegame fixture pattern — seeding arbitrary game state
+
+Save/load v2 (`docs/specs/2026-05-28-savegame-v2.md`, ADR-038) is
+the load-bearing mechanism for reaching deep game state in tests.
+
+**The problem it solves.** Without a fixture mechanism, a test that
+needs to verify behavior at level 25 with KILLER active and a
+half-damaged BLACK_BLK on the grid would have to either:
+
+1. Replay 25 levels of synthetic input — slow, brittle, and
+   re-runs every time the physics or scoring evolves.
+2. Hand-construct the in-memory `game_ctx_t` by calling every
+   subsystem's setter — verbose and silently goes stale when a
+   subsystem grows new fields.
+
+**The pattern.** The pure
+`savegame_system_capture` / `savegame_system_restore` functions
+(`include/savegame_system.h`) are the canonical way to seed deep
+state.  A test writes a `savegame_data_t` + `savegame_level_t` in
+memory, calls `savegame_system_restore(ctx, &info, &lvl)`, and the
+context is now in that state — same as if the player had played
+there and pressed `X`.
+
+```c
+savegame_data_t info;
+savegame_level_t lvl;
+savegame_io_init(&info);
+savegame_level_init(&lvl);
+info.level = 25;
+info.score = 125000;
+info.lives_left = 2;
+info.balls[0] = (savegame_ball_t){
+    .active = 1, .state = BALL_ACTIVE,
+    .x = 247, .y = 520, .dx = 3, .dy = -4,
+};
+info.specials.killer = 1;
+lvl.cells[3][4] = (savegame_cell_t){
+    .occupied = 1, .block_type = BLACK_BLK,
+    .next_frame_offset = 20, /* mid-cooldown */
+};
+savegame_system_restore(ctx, &info, &lvl);
+/* The ctx is now at level 25 with KILLER, a moving ball, and a
+ * BLACK_BLK that will exit cooldown in 20 frames.  Tick from here. */
+```
+
+**Disk-backed variant.** When the test wants to exercise the JSON
+I/O too (or share a fixture between tests), write the same data
+via `savegame_io_write` + `savegame_level_write` to a tmp path and
+call `savegame_system_load(ctx)` after pointing `XDG_DATA_HOME` at
+the tmp dir.  See `tests/test_savegame_system.c::setup` for the
+canonical `XDG_DATA_HOME` redirection pattern that preserves the
+caller's environment.
+
+**Why this matters for Layer 4.**  The visual fidelity pipeline
+captures golden screenshots of specific game states.  Without the
+fixture pattern, reaching "level 25 with active KILLER + 3
+explosions in progress" requires scripting 25 levels of replay,
+and every physics change re-breaks those replays.  With the fixture,
+the test writes a JSON file with the desired state, loads it,
+captures the screenshot — and the only failure mode the test cares
+about is the rendering, not the path to get there.
+
+**Caveat: it doesn't match the original 1996 behavior.** The
+original loads `BALL_CREATE → BALL_READY` (ball reset to paddle,
+waiting for space).  V2 resumes the ball mid-flight.  This is a
+deliberate deviation, documented in ADR-038.  The fixture pattern
+is the reason — without mid-flight resume, the loaded state isn't
+actually "the saved state" and the fixture leverage evaporates.
+
 ## Layer 3: Replay / Golden Tests
 
 Record inputs, replay deterministically, compare results.
