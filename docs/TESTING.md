@@ -124,12 +124,21 @@ savegame_system_restore(ctx, &info, &lvl);
 ```
 
 **Disk-backed variant.** When the test wants to exercise the JSON
-I/O too (or share a fixture between tests), write the same data
-via `savegame_io_write` + `savegame_level_write` to a tmp path and
-call `savegame_system_load(ctx)` after pointing `XDG_DATA_HOME` at
-the tmp dir.  See `tests/test_savegame_system.c::setup` for the
-canonical `XDG_DATA_HOME` redirection pattern that preserves the
-caller's environment.
+I/O too (or share a fixture between tests):
+
+1. Point `XDG_DATA_HOME` at a per-test tmp directory (the canonical
+   redirection pattern preserves the caller's prior value — see
+   `tests/test_savegame_system.c::setup`).
+2. Use `paths_save_info` / `paths_save_level` to resolve the exact
+   paths the load path will read from (under
+   `$XDG_DATA_HOME/xboing/`).
+3. Write the fixture data with `savegame_io_write` /
+   `savegame_level_write` at those resolved paths.
+4. Call `savegame_system_load(ctx)`.
+
+`savegame_system_load` itself does not take a path — it always
+reads from the standard XDG-resolved locations, so the redirect-
+then-write pattern is what gives the test control.
 
 **Why this matters for Layer 4.**  The visual fidelity pipeline
 captures golden screenshots of specific game states.  Without the

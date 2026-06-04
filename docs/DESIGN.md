@@ -2201,12 +2201,13 @@ a saved game mid-flight.  On `LoadSavedGame` the code calls:
   BALL_CREATE state, running an ~0.7 s birth animation, then
   transitioning to BALL_READY where the ball sits on the paddle
   waiting for the player to press space
-- `TurnSpecialsOff()` — clear sticky / fast-gun / killer / x2 / x4
+- `TurnSpecialsOff()` — clear sticky / fast-gun / walls-off /
+  killer / x2 / x4 (per `original/special.c:88-94`)
 - `ChangeEyeDudeMode(EYEDUDE_NONE)` — clear the EyeDude state
 - `SetReverseOff()` — clear paddle reverse
 - `ResetNumberBonus()` — bonus counter cleared
-- `ReadNextLevel(savelevel.dat)` — block grid loaded from the
-  saved snapshot
+- `ReadNextLevel($HOME/.xboing-savelevel)` — block grid loaded
+  from the saved snapshot (`original/file.c:232-237`)
 
 The effect is "restart this level at the saved score/lives, with the
 block grid as you left it, but everything else fresh."  Save is also
