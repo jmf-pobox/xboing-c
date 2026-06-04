@@ -2239,7 +2239,7 @@ into a general-purpose game-state fixture:
 
 1. **Arbitrary level seed.**  A test can write a `save-info.dat` +
    `save-level.dat` pair representing any specific game state
-   (level N, paddle at position X, ball at (Y, Z) with velocity
+   (level N, paddle at pixel column P, ball at (x, y) with velocity
    (dx, dy), KILLER mode active, BLACK_BLK at row R col C with
    cooldown offset F) and load that state directly into a real
    `game_ctx_t`.  Without mid-flight resume the test could only
@@ -2261,7 +2261,7 @@ into a general-purpose game-state fixture:
    through BLACK_BLK after a specific sequence on level 12," the
    reproduction is a save file checked into the repo, not a 12-
    level scripted replay that breaks the moment unrelated physics
-   change.
+   changes.
 
 The cost of the deviation is the ball-moves-immediately feel that
 the original didn't have.  The benefit is several orders of

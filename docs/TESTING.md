@@ -99,7 +99,7 @@ half-damaged BLACK_BLK on the grid would have to either:
 state.  A test writes a `savegame_data_t` + `savegame_level_t` in
 memory, calls `savegame_system_restore(ctx, &info, &lvl)`, and the
 context is now in that state — same as if the player had played
-there and pressed `X`.
+there, saved with `Z`, and later loaded with `X`.
 
 ```c
 savegame_data_t info;
