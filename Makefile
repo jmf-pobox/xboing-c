@@ -26,7 +26,8 @@ PREFIX         ?= /usr/local
         cppcheck cppcheck-src cppcheck-tests \
         tidy check ci \
         audio-literals audio-literals-check \
-        golden-screen golden-all golden-bonus modern-screen \
+        golden-screen golden-all golden-bonus golden-bonus-all \
+        modern-screen modern-bonus modern-bonus-all bonus-fixtures \
         original-build capture-original visual-check visual-check-setup
 
 # --- Default ---------------------------------------------------------------
@@ -118,12 +119,18 @@ visual-check-setup: ## Set up the managed venv and Python deps for `make visual-
 	~/.local/bin/uv venv .tmp/venv
 	~/.local/bin/uv pip install --python .tmp/venv/bin/python anthropic pyyaml
 
-visual-check: build ## LLM-based visual-fidelity comparison (modern vs. tests/golden/original/). Reads ANTHROPIC_API_KEY from env or `secret-tool lookup service anthropic`. Run `make visual-check-setup` once to install deps.
+visual-check: build bonus-fixtures ## LLM-based visual-fidelity comparison (modern vs. tests/golden/original/). Reads ANTHROPIC_API_KEY from env or `secret-tool lookup service anthropic`. Run `make visual-check-setup` once to install deps.
 	@if [ -n "$$DISPLAY" ]; then \
 		for screen in presents intro instruct demo keys keysedit preview highscore; do \
 			if ! [ -d .tmp/visual-check/modern/$$screen ]; then \
 				echo "Capturing modern $$screen screenshots..."; \
 				BUILD_DIR=$(BUILD_DIR) scripts/visual_capture.sh modern "$$screen:200" .tmp/visual-check/modern/; \
+			fi; \
+		done; \
+		for n in 1 2 3 4; do \
+			if ! [ -d .tmp/visual-check/modern/bonus-$$n ]; then \
+				echo "Capturing modern bonus scenario $$n screenshots..."; \
+				BUILD_DIR=$(BUILD_DIR) BONUS_SCENARIO="$$n" scripts/visual_capture.sh modern "bonus:2400" ".tmp/visual-check/modern/bonus-$$n/"; \
 			fi; \
 		done; \
 	fi
@@ -138,14 +145,27 @@ golden-screen: original-build ## Capture original goldens for one screen. Usage:
 golden-all: original-build ## Capture original goldens for all attract screens (one-time).
 	scripts/visual_capture.sh original "all:$(or $(INTERVAL),200)" tests/golden/original/
 
-golden-bonus: original-build ## Capture original bonus-screen goldens for all 4 scenarios.
-	for s in 1 2 3 4; do \
-	    mkdir -p tests/golden/original/bonus-$$s; \
-	    BONUS_SCENARIO=$$s scripts/visual_capture.sh original "bonus:$(or $(INTERVAL),200)" tests/golden/original/bonus-$$s; \
+golden-bonus: original-build ## Capture original goldens for one bonus scenario. Usage: make golden-bonus SCENARIO=1 [INTERVAL=2400]
+	BONUS_SCENARIO="$(or $(SCENARIO),1)" scripts/visual_capture.sh original "bonus:$(or $(INTERVAL),2400)" "tests/golden/original/bonus-$(or $(SCENARIO),1)/"
+
+golden-bonus-all: original-build ## Capture original goldens for all 4 bonus scenarios.
+	for n in 1 2 3 4; do \
+	    BONUS_SCENARIO="$$n" scripts/visual_capture.sh original "bonus:$(or $(INTERVAL),2400)" "tests/golden/original/bonus-$$n/"; \
 	done
 
 modern-screen: build ## Capture modern screenshots for one screen. Usage: make modern-screen SCREEN=intro INTERVAL=200
 	scripts/visual_capture.sh modern "$(SCREEN):$(or $(INTERVAL),200)" .tmp/visual-check/modern/
+
+bonus-fixtures: build ## Generate savegame v2 fixtures for bonus-screen modern capture (4 scenarios).
+	$(BUILD_DIR)/gen_bonus_fixtures tests/fixtures/bonus/
+
+modern-bonus: build bonus-fixtures ## Capture modern bonus screenshots for one scenario. Usage: make modern-bonus SCENARIO=1 [INTERVAL=2400]
+	BUILD_DIR=$(BUILD_DIR) BONUS_SCENARIO="$(or $(SCENARIO),1)" scripts/visual_capture.sh modern "bonus:$(or $(INTERVAL),2400)" ".tmp/visual-check/modern/bonus-$(or $(SCENARIO),1)/"
+
+modern-bonus-all: build bonus-fixtures ## Capture modern bonus screenshots for all 4 scenarios.
+	for n in 1 2 3 4; do \
+	    BUILD_DIR=$(BUILD_DIR) BONUS_SCENARIO="$$n" scripts/visual_capture.sh modern "bonus:$(or $(INTERVAL),2400)" ".tmp/visual-check/modern/bonus-$$n/"; \
+	done
 
 dogfood: deb ## Install .deb, launch xboing from .tmp/, verify window opens (requires sudo; skips window check if headless or xwininfo missing).
 	mkdir -p .tmp

@@ -146,6 +146,11 @@ typedef struct game_ctx
     int vc_mode;
     int vc_interval;
 
+    /* Autoload: -load CLI flag asks main() to call
+     * savegame_system_load and enter SDL2ST_GAME before the event
+     * loop, bypassing the attract cycle. */
+    bool autoload;
+
     /* Attract-mode display overrides (don't affect game state) */
     int attract_level_display; /* 0 = use real level_number */
 

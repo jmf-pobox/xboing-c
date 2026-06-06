@@ -64,3 +64,32 @@ pairs:
     a: tests/golden/original/instruct/sparkle-010.png
     b: .tmp/visual-check/modern/instruct/sparkle-000.png
     expected: diff
+
+  # ----- Bonus screen — scenario 1 (vanilla early level) ------------
+  - name: bonus-1/title
+    a: tests/golden/original/bonus-1/bonus/title-000.png
+    b: .tmp/visual-check/modern/bonus-1/bonus/title-000.png
+    expected: diff
+
+  # `expected: equivalent` after the renderer rewrite — the LLM
+  # judge reported this pair as visually equivalent.  Tightening
+  # so a regression that reintroduces a visible delta fails.
+  - name: bonus-1/end-text
+    a: tests/golden/original/bonus-1/bonus/end-text-000.png
+    b: .tmp/visual-check/modern/bonus-1/bonus/end-text-000.png
+    expected: equivalent
+
+  # ----- Bonus screen — scenario 3 (Killer active) ------------------
+  - name: bonus-3/end-text
+    a: tests/golden/original/bonus-3/bonus/end-text-000.png
+    b: .tmp/visual-check/modern/bonus-3/bonus/end-text-000.png
+    expected: diff
+
+  # ----- Bonus screen — scenario 4 (late level 25 + high score) -----
+  # Level 25 is also save-granted (a side effect of `level % 5 == 0`),
+  # but the scenario's primary purpose is exercising high score
+  # values and a late-game state.
+  - name: bonus-4/end-text
+    a: tests/golden/original/bonus-4/bonus/end-text-000.png
+    b: .tmp/visual-check/modern/bonus-4/bonus/end-text-000.png
+    expected: diff

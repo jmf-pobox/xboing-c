@@ -31,8 +31,19 @@ Read `docs/TESTING.md` for the full 5-layer testing guide.
 ## SDL Video Drivers
 
 - `SDL_VIDEODRIVER=dummy` — no rendering surface, fast, for logic tests
-- `SDL_VIDEODRIVER=offscreen` — real rendering without display, for screenshot tests
-- Screenshot tests are ASan-only (SDL_mixer teardown crash in non-ASan)
+- `SDL_VIDEODRIVER=offscreen` — real rendering without display, for headless pixel tests **only**
+- Offscreen is **not** for visual-fidelity comparison against goldens — use the live X11 + ImageMagick capture pipeline (`make modern-screen`, `make modern-bonus`). See `docs/TESTING.md` Layer 4.
+- The one existing offscreen test is ASan-only and DISABLED in ctest (SDL_mixer teardown crash)
+
+## Deep Game State
+
+When a test needs MODE_GAME / MODE_BONUS state without driving
+input, use the savegame v2 fixture pattern: build
+`savegame_data_t` + `savegame_level_t` in memory, call
+`savegame_system_restore(ctx, &info, &lvl)`. For end-of-level
+states, an empty grid trips `block_system_still_active==false`
+on the next tick. See `tools/gen_bonus_fixtures.c` for the
+reference setup and `docs/TESTING.md` for the full pattern.
 
 ## Ball Tests
 

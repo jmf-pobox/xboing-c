@@ -2288,3 +2288,109 @@ deviation comes close to this ratio.
   `ctx->resume_at_ms = 0` to skip the freeze).  Not implemented
   because the testability benefit is the primary motivator and
   the current behavior doesn't impede it.
+
+## ADR-039: Bonus screen visual fidelity — trust the goldens, not the source
+
+**Status:** Accepted (2026-06-06)
+**Context:** `xboing-c-hlf` — bonus-screen renderer rewrite.
+
+The original (`original/bonus.c::SetupBonusScreen`) explicitly
+calls `DrawBallBorder` (`bonus.c:215`) and `DrawSmallIntroTitle`
+(`bonus.c:218`) on `mainWindow` before `XUnmapWindow(playWindow)`
+exposes that region.  Static reading of the X11 ordering says
+the ball border and XBOING title pixmap should both be visible
+on the bonus screen.
+
+The 32 authentic original goldens at
+`tests/golden/original/bonus-{1..4}/bonus/`, captured via the
+real `CheckGameRules` entry path established by `xboing-c-z0n`,
+show neither.  All four scenarios, all eight substates, no chrome.
+A maintainer's manual gameplay screenshot (2026-06-06) confirms
+independently.
+
+**Decision:** When the captured goldens disagree with what the
+original-source static analysis predicts, the goldens are the
+authority.  The modern renderer matches what real X11 gameplay
+produces, not what the original's draw calls describe.
+
+The likely mechanism — `WindowFadeEffect` (`bonus.c:224`) or
+`ClearMainWindow` re-tiling the space background, or X11
+`backing-store` semantics, or compositor interaction —
+doesn't change the verdict.  Three independent sources of
+ground truth converge on "no chrome."
+
+**Consequences:**
+
+- `src/game_render_ui.c::game_render_bonus` does not draw a
+  ball border or an XBOING title pixmap.  The `draw_ball_border`
+  static helper is removed entirely (no other callers).
+- This is the canonical example of the "goldens are the spec"
+  rule for visual fidelity work in this repo.  Future deltas
+  between original-source and captured behavior are resolved in
+  favor of the captured behavior.
+- A research artifact at
+  `docs/research/2026-06-06-bonus-capture-real-entry.md` and a
+  review at
+  `docs/reviews/2026-06-06-bonus-renderer-rewrite-review.md`
+  record the analysis chain.
+
+## ADR-040: Bonus coin count synced once at mode entry, not per pickup
+
+**Status:** Accepted (2026-06-06)
+**Context:** `xboing-c-hlf` — bonus-screen renderer rewrite.
+
+The game has two parallel bonus-coin counters:
+
+- `game_ctx_t::bonus_count` — incremented in
+  `src/game_callbacks.c:296` when the player collects a
+  `BONUS_BLK`.  The persistence field on the savegame
+  (`savegame_data_t::bonus_count`, `include/savegame_io.h:85`).
+- `bonus_system_t::coin_count` — the renderer-side accumulator
+  that `bonus_system_begin` captures into `initial_coin_count`
+  and animates down during the bonus tally.
+
+These are intentionally separate: `game_ctx` is the
+gameplay-truth field that persists across the
+save/load boundary; `bonus_system` is a stateful renderer.
+Before this work, no code synced one to the other in production
+— `bonus_system::coin_count` started at 0 and stayed there.
+Every bonus screen showed "Sorry, no bonus coins collected"
+regardless of how many were actually collected.
+
+**Decision:** Sync `game_ctx::bonus_count` →
+`bonus_system::coin_count` once, at `mode_bonus_enter`, before
+the call to `bonus_system_begin`.
+
+Alternatives considered:
+
+- **Sync at point of collection** (`game_callbacks.c::cb_block_picked_up`
+  also calls `bonus_system_inc_coins`).  Matches the original's
+  `IncNumberBonus` pattern.  Rejected because it requires two
+  source-of-truth fields kept in sync across every gameplay
+  event, and savegame load would need an additional sync step
+  anyway.
+- **Push `coin_count` into `bonus_system_env_t`** and consume it
+  inside `bonus_system_begin`.  Rejected because it would break
+  the 9 existing `bonus_system_inc_coins` tests that rely on
+  `inc_coins` accumulating into the same field that `begin`
+  reads.
+
+The chosen single sync point keeps `bonus_system` testable in
+isolation (tests use `inc_coins`; production uses the new
+`bonus_system_set_coins` setter).  The ordering constraint —
+setter must precede `bonus_system_begin` — is annotated at the
+call site with a citation to `bonus_system.c:189, 196` so a
+future "clean up the order" pass cannot silently break the
+score computation.
+
+**Consequences:**
+
+- New public API `bonus_system_set_coins(ctx, count)` in
+  `include/bonus_system.h`.  Guard: `count < 0` is a no-op.
+- The setter does not clamp to `BONUS_MAX_COINS` — the original
+  doesn't cap `numBonus`, and `bonus_system_compute_total`
+  handles the super-bonus threshold internally.
+- `bonus_system_inc_coins` remains exclusively a test helper.
+- The reset path is unchanged: `ctx->bonus_count` is reset to
+  0 by `game_rules_next_level` (`src/game_rules.c:231`) after
+  the bonus screen finishes, which is the correct moment.

@@ -87,7 +87,8 @@ Key targets:
 | **Valgrind** | Memory debugging | `apt install valgrind` |
 | **shellcheck** | Shell script linting | `apt install shellcheck` |
 | **ImageMagick** | Screenshot capture (`import`) | `apt install imagemagick` |
-| **xdotool** | X11 keystroke injection for automated capture | `apt install xdotool` |
+| **xdotool** | X11 keystroke injection — native X11 sessions only (`XDG_SESSION_TYPE=x11`). Under XWayland, Mutter blocks focus transfer; xdotool delivers no keys to SDL2 windows. See `docs/TESTING.md` for the savegame-fixture + `-load` alternative that avoids key injection entirely. | `apt install xdotool` |
+| **ydotool** (Wayland) | uinput-based keystroke injection — works regardless of compositor focus. Required only if you need to drive the modern SDL2 binary via keystrokes on a Wayland session. | `apt install ydotool` |
 
 ## Quality Gates
 

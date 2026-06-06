@@ -19,6 +19,7 @@
 #include "dialogue_system.h"
 #include "game_context.h"
 #include "game_input.h"
+#include "savegame_system.h"
 #include "sdl2_input.h"
 #include "sdl2_loop.h"
 #include "sdl2_state.h"
@@ -36,8 +37,41 @@ int main(int argc, char *argv[])
         return EXIT_SUCCESS;
     }
 
-    /* Start with the presents splash screen */
-    sdl2_state_transition(ctx->state, SDL2ST_PRESENTS);
+    /* -load: skip attract, enter GAME, then load the savegame. Order
+     * matters — sdl2_state_transition is synchronous and fires
+     * mode_game_enter which reloads the canonical level file.
+     * savegame_system_load runs AFTER so its block grid replaces
+     * the freshly-loaded one (matches the production X-key flow,
+     * where load runs while already in MODE_GAME). */
+    if (ctx->autoload)
+    {
+        sdl2_state_transition(ctx->state, SDL2ST_GAME);
+        if (!savegame_system_load(ctx))
+        {
+            /* When visual-capture is also active, the capture pipeline
+             * is waiting on substate signals that will never be
+             * emitted from the attract cycle.  Exit non-zero so the
+             * driving script fails fast instead of stalling out on a
+             * read timeout. */
+            if (ctx->vc_mode >= 0)
+            {
+                fprintf(stderr, "xboing: -load failed under -visual-capture; aborting capture\n");
+                game_destroy(ctx);
+                return EXIT_FAILURE;
+            }
+            /* Interactive use: surface the failure on stderr so the
+             * user knows their savegame didn't load before the
+             * attract cycle starts up.  The mode_game_enter
+             * message_system_set call is invisible after the
+             * SDL2ST_PRESENTS transition below. */
+            fprintf(stderr, "xboing: -load failed; starting attract cycle instead\n");
+            sdl2_state_transition(ctx->state, SDL2ST_PRESENTS);
+        }
+    }
+    else
+    {
+        sdl2_state_transition(ctx->state, SDL2ST_PRESENTS);
+    }
 
     /* --- Event loop ------------------------------------------------------ */
 

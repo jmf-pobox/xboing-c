@@ -1,0 +1,34 @@
+{
+  "version": 2,
+  "score": 125000,
+  "level": 7,
+  "level_time": 100,
+  "time_remaining": 100,
+  "game_time": 0,
+  "lives_left": 2,
+  "start_level": 1,
+  "user_tilts": 0,
+  "bonus_count": 5,
+  "paddle_pos": 0,
+  "paddle_size_type": 6,
+  "paddle_size": 50,
+  "paddle_reverse": 0,
+  "paddle_sticky": 0,
+  "num_bullets": 20,
+  "gun_unlimited": 0,
+  "specials": {
+    "sticky": 0, "saving": 0, "fast_gun": 0, "no_walls": 0,
+    "killer": 1, "x2": 0, "x4": 0
+  },
+  "eyedude": {
+    "state": 0, "dir": 0, "x": 0, "y": 0,
+    "slide": 0, "inc": 0, "turn": 0
+  },
+  "balls": [
+    {"active": 0, "state": 0, "x": 0, "y": 0, "dx": 0, "dy": 0, "wait_mode": 0},
+    {"active": 0, "state": 0, "x": 0, "y": 0, "dx": 0, "dy": 0, "wait_mode": 0},
+    {"active": 0, "state": 0, "x": 0, "y": 0, "dx": 0, "dy": 0, "wait_mode": 0},
+    {"active": 0, "state": 0, "x": 0, "y": 0, "dx": 0, "dy": 0, "wait_mode": 0},
+    {"active": 0, "state": 0, "x": 0, "y": 0, "dx": 0, "dy": 0, "wait_mode": 0}
+  ]
+}
