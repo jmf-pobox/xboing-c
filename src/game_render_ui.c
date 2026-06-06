@@ -1063,8 +1063,18 @@ void game_render_bonus(const game_ctx_t *ctx)
         }
         else if (sdl2_texture_get(ctx->texture, SPR_BLOCK_BONUS_1, &coin_tex) == SDL2T_OK)
         {
+            /* Draw only the coins already animated, matching the
+             * original's incremental DrawTheBonus per-step pattern
+             * (bonus.c:355-373).  drawn = initial - live grows by
+             * 1 each BONUS_STEP_DELAY tick as do_bonuses decrements
+             * the live count; once live hits 0 all coins stay on
+             * screen for the remainder of the sequence. */
+            int live = bonus_system_get_coins(ctx->bonus);
+            int drawn = initial - live;
+            if (drawn < 0)
+                drawn = 0;
             SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
-            for (int i = 0; i < initial; i++)
+            for (int i = 0; i < drawn; i++)
             {
                 SDL_Rect dst = {.x = bonus_row_item_x(center_x, initial, BONUS_COIN_STRIDE,
                                                       BONUS_COIN_PADDING, i),
@@ -1116,8 +1126,17 @@ void game_render_bonus(const game_ctx_t *ctx)
             sdl2_texture_info_t bullet_tex;
             if (sdl2_texture_get(ctx->texture, SPR_BULLET, &bullet_tex) == SDL2T_OK)
             {
+                /* Draw only the bullets already animated, matching
+                 * the original's incremental DrawTheBullet pattern
+                 * (bonus.c:464-489).  bonus_system_get_bullets
+                 * returns the live count remaining; drawn grows
+                 * one per BONUS_STEP_DELAY tick. */
+                int live_b = bonus_system_get_bullets(ctx->bonus);
+                int drawn_b = initial_b - live_b;
+                if (drawn_b < 0)
+                    drawn_b = 0;
                 SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
-                for (int i = 0; i < initial_b; i++)
+                for (int i = 0; i < drawn_b; i++)
                 {
                     SDL_Rect dst = {.x = bonus_row_item_x(center_x, initial_b, BONUS_BULLET_STRIDE,
                                                           BONUS_BULLET_PADDING, i),

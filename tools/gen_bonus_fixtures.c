@@ -61,7 +61,11 @@ static const scenario_t SCENARIOS[] = {
 
 static int mkdir_p(const char *path)
 {
-    char buf[512];
+    /* Sized to match the caller's dir[1024] limit in write_one so
+     * the two buffer caps are coherent — accepting a path in
+     * write_one only to fail it here with ENAMETOOLONG would be
+     * confusing. */
+    char buf[1024];
     size_t len = strlen(path);
     if (len >= sizeof(buf))
     {

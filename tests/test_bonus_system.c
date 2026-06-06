@@ -722,7 +722,11 @@ static void test_renderer_accessors_null_safe(void **state)
  * original/bonus.c playSoundFile calls.
  * ========================================================================= */
 
-/* Helper: run a full bonus sequence to completion (or safety limit). */
+/* Helper: run a full bonus sequence to completion.  Asserts the
+ * loop exited because the sequence finished, not because the
+ * safety cap was hit — a regression that stalls a state (e.g.
+ * WAIT that never expires) would otherwise let sound/pacing
+ * tests pass with partial execution. */
 static void drive_sequence(bonus_system_t *ctx)
 {
     int frame = 0;
@@ -733,6 +737,7 @@ static void drive_sequence(bonus_system_t *ctx)
         bonus_system_update(ctx, frame);
         safety++;
     }
+    assert_true(bonus_system_is_finished(ctx));
 }
 
 /* "bonus" sound fires once per coin animated (bonus.c:366). */
