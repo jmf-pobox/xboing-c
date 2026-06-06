@@ -1009,9 +1009,11 @@ void game_render_bonus(const game_ctx_t *ctx)
     }
 
     /* State-driven content lines.  `ypos` starts at 180 per the
-     * original's ResetBonus (bonus.c:837) and advances per-line by
-     * `font->ascent + GAP*k` matching each DoX function's
-     * post-draw increment in bonus.c. */
+     * original's ResetBonus (bonus.c:837).  Per-line advancement
+     * matches each DoX function's specific post-draw increment in
+     * bonus.c — most use `font->ascent + GAP*k`, but a few are
+     * hard-coded (e.g. DoScore at bonus.c:278 advances by
+     * `35 + GAP`).  Each branch below cites its source line. */
     int ypos = 180;
     char buf[80];
 
