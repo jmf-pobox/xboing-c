@@ -5,11 +5,13 @@
  * Each fixture represents a level frozen one tick before completion:
  * empty block grid (cells all unoccupied), with scenario-specific
  * score / level / time / ammo / lives / killer state.  When the
- * modern binary loads the fixture (via X-key while in MODE_GAME),
- * game_rules_check sees no required blocks remaining and transitions
- * to SDL2ST_BONUS on the next tick.  The capture script
- * (scripts/visual_capture.sh modern bonus) then snapshots each
- * substate as the bonus state machine runs.
+ * modern binary loads the fixture — either via X-key while in
+ * MODE_GAME during normal play, or via the `-load` autoload CLI
+ * flag the capture script uses — game_rules_check sees no
+ * required blocks remaining and transitions to SDL2ST_BONUS on
+ * the next tick.  The capture script (scripts/visual_capture.sh
+ * modern bonus) then snapshots each substate as the bonus state
+ * machine runs.
  *
  * Usage:
  *   ./gen_bonus_fixtures <output-root>

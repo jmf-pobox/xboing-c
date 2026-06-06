@@ -59,6 +59,12 @@ int main(int argc, char *argv[])
                 game_destroy(ctx);
                 return EXIT_FAILURE;
             }
+            /* Interactive use: surface the failure on stderr so the
+             * user knows their savegame didn't load before the
+             * attract cycle starts up.  The mode_game_enter
+             * message_system_set call is invisible after the
+             * SDL2ST_PRESENTS transition below. */
+            fprintf(stderr, "xboing: -load failed; starting attract cycle instead\n");
             sdl2_state_transition(ctx->state, SDL2ST_PRESENTS);
         }
     }
