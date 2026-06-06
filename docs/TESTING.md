@@ -304,10 +304,11 @@ logic captures three patterns of state machine:
   PRESENTS branch in `vc_check` for the pattern.
 - **Fast LIVE states with WAIT in between (bonus screen).** Each
   content state runs for exactly one sub-frame, then the state
-  machine sets WAIT for `BONUS_LINE_DELAY=100` frames before the
-  next content state runs. Pre/post sampling at render-frame
-  granularity is hopeless — both samples land on WAIT and the
-  LIVE state vanishes. **The fix is a monotonic
+  machine sets WAIT for `BONUS_LINE_DELAY=2400` sub-frames
+  (≈ 3 s at default modern speed, matching the original's
+  3-second pause between content lines). Pre/post sampling at
+  render-frame granularity is hopeless — both samples land on
+  WAIT and the LIVE state vanishes. **The fix is a monotonic
   `_get_highest_reached()` accessor on the system itself**,
   updated whenever a new content state is entered and queried by
   `vc_check`. See `bonus_system_get_highest_reached()` for the

@@ -119,12 +119,18 @@ visual-check-setup: ## Set up the managed venv and Python deps for `make visual-
 	~/.local/bin/uv venv .tmp/venv
 	~/.local/bin/uv pip install --python .tmp/venv/bin/python anthropic pyyaml
 
-visual-check: build ## LLM-based visual-fidelity comparison (modern vs. tests/golden/original/). Reads ANTHROPIC_API_KEY from env or `secret-tool lookup service anthropic`. Run `make visual-check-setup` once to install deps.
+visual-check: build bonus-fixtures ## LLM-based visual-fidelity comparison (modern vs. tests/golden/original/). Reads ANTHROPIC_API_KEY from env or `secret-tool lookup service anthropic`. Run `make visual-check-setup` once to install deps.
 	@if [ -n "$$DISPLAY" ]; then \
 		for screen in presents intro instruct demo keys keysedit preview highscore; do \
 			if ! [ -d .tmp/visual-check/modern/$$screen ]; then \
 				echo "Capturing modern $$screen screenshots..."; \
 				BUILD_DIR=$(BUILD_DIR) scripts/visual_capture.sh modern "$$screen:200" .tmp/visual-check/modern/; \
+			fi; \
+		done; \
+		for n in 1 2 3 4; do \
+			if ! [ -d .tmp/visual-check/modern/bonus-$$n ]; then \
+				echo "Capturing modern bonus scenario $$n screenshots..."; \
+				BUILD_DIR=$(BUILD_DIR) BONUS_SCENARIO="$$n" scripts/visual_capture.sh modern "bonus:2400" ".tmp/visual-check/modern/bonus-$$n/"; \
 			fi; \
 		done; \
 	fi
