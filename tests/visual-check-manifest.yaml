@@ -64,3 +64,26 @@ pairs:
     a: tests/golden/original/instruct/sparkle-010.png
     b: .tmp/visual-check/modern/instruct/sparkle-000.png
     expected: diff
+
+  # ----- Bonus screen — scenario 1 (vanilla early level) ------------
+  - name: bonus-1/title
+    a: tests/golden/original/bonus-1/bonus/title-000.png
+    b: .tmp/visual-check/modern/bonus-1/bonus/title-000.png
+    expected: diff
+
+  - name: bonus-1/end-text
+    a: tests/golden/original/bonus-1/bonus/end-text-000.png
+    b: .tmp/visual-check/modern/bonus-1/bonus/end-text-000.png
+    expected: diff
+
+  # ----- Bonus screen — scenario 3 (Killer active) ------------------
+  - name: bonus-3/end-text
+    a: tests/golden/original/bonus-3/bonus/end-text-000.png
+    b: .tmp/visual-check/modern/bonus-3/bonus/end-text-000.png
+    expected: diff
+
+  # ----- Bonus screen — scenario 4 (save-granted level + high coins) -
+  - name: bonus-4/end-text
+    a: tests/golden/original/bonus-4/bonus/end-text-000.png
+    b: .tmp/visual-check/modern/bonus-4/bonus/end-text-000.png
+    expected: diff

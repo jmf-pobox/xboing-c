@@ -242,17 +242,19 @@ Use `make capture` targets on a workstation, not in CI.
 Adding a new screen (e.g., bonus, gameover) requires changes in
 **four** places. Missing any one of them causes silent failures.
 
-1. **`src/game_init.c`** — add a name function and `vc_check` branch:
+1. **`src/game_init.c`** — add a name function and `vc_check` branch.
+   For state machines whose content states (the ones the screen
+   actually renders) live longer than one sub-frame, map each
+   named state and leave wait/idle states as `NULL`:
 
    ```c
-   static const char *vc_bonus_name(int s)
+   static const char *vc_intro_name(int s)
    {
        switch (s) {
-           case BONUS_STATE_TITLE: return "title";
-           case BONUS_STATE_SHOW:  return "show";
-           /* Persistent / WAIT states MUST be named — they're how
-            * interval-sampling catches frames after fast transitions. */
-           case BONUS_STATE_WAIT:  return "wait";
+           case INTRO_STATE_TITLE:   return "title";
+           case INTRO_STATE_BLOCKS:  return "blocks";
+           case INTRO_STATE_TEXT:    return "text";
+           case INTRO_STATE_EXPLODE: return "explode";
            default: return NULL;
        }
    }
@@ -282,20 +284,36 @@ Adding a new screen (e.g., bonus, gameover) requires changes in
 
 ### State-transition gotchas
 
-Some screens transition through multiple sub-states in a single
-tick because of `ATTRACT_FRAME_MULTIPLIER=6` (each game tick runs
-6 sub-system updates). The `vc_check` logic catches this via two
-paths:
+`mode_*_update` handlers call their system's `_update()` six
+times per tick (`ATTRACT_FRAME_MULTIPLIER`) to compensate for the
+modern fixed-timestep loop's slower tick rate. The `vc_check`
+logic captures three patterns of state machine:
 
-- **Pre/post transition detection** — signals the *pre* state's
-  name when the tick changes the state
-- **Persistent-state interval sampling** — signals every `INTERVAL`
-  frames while a state is held (e.g., WAIT, SPARKLE)
-
-If your screen only produces one screenshot named `title-000.png`
-when more states exist, check that the persistent states (typically
-WAIT) are named in your `vc_*_name()` function. An unnamed state
-returns NULL from the name function and never gets sampled.
+- **Persistent states (SPARKLE, intro EXPLODE, etc.).** State sits
+  in one value for many ticks. Pre/post-transition detection fires
+  the *pre* state's name on the tick the state changes; the
+  persistent-state interval sampler then emits at the `INTERVAL`
+  cadence while the new state is held. If your screen only
+  produces `title-000.png` when more states exist, check that the
+  persistent in-between states are named.
+- **Multi-update cycling (e.g., `presents` credit stages).** State
+  flashes through several values in a single tick. The relevant
+  module exposes a separate accessor (e.g.,
+  `presents_system_get_credits_stage`) that vc_check reads
+  *after* the 6× loop to detect the latest "real" stage. See the
+  PRESENTS branch in `vc_check` for the pattern.
+- **Fast LIVE states with WAIT in between (bonus screen).** Each
+  content state runs for exactly one sub-frame, then the state
+  machine sets WAIT for `BONUS_LINE_DELAY=100` frames before the
+  next content state runs. Pre/post sampling at render-frame
+  granularity is hopeless — both samples land on WAIT and the
+  LIVE state vanishes. **The fix is a monotonic
+  `_get_highest_reached()` accessor on the system itself**,
+  updated whenever a new content state is entered and queried by
+  `vc_check`. See `bonus_system_get_highest_reached()` for the
+  reference implementation. Renderers with `state >= X` content
+  gating also benefit from this getter because raw enum values
+  break when `WAIT > END_TEXT`.
 
 ### Build dependency gotcha
 
@@ -325,24 +343,79 @@ make golden-all INTERVAL=200                     # all attract screens
 The original binary supports `-visual-capture <mode>` directly.
 Goldens land in `tests/golden/original/<mode>/` and are committed.
 
-### Capturing dialogue / pause overlays
+### Capturing dialogue / pause overlays — and the xdotool trap
 
-These screens require key injection. Use `xdotool` against the
-running window:
+These screens require key injection. The right tool depends on
+the display server, and getting it wrong wastes hours:
 
 ```bash
-./original/xboing &
-sleep 2
-xdotool search --name "XBoing" key q       # open quit dialogue
-sleep 0.3
-import -window "$(xdotool search --name 'XBoing' | head -1)" \
-    tests/golden/original/dialogue/quit-000.png
-pkill -f xboing
+if [[ "$XDG_SESSION_TYPE" == "wayland" ]]; then
+    # XWayland-hosted SDL2: Mutter blocks xdotool focus transfer.
+    # Use ydotool (kernel uinput) or skip key injection entirely
+    # via the savegame-fixture + -load pattern below.
+    : # use ydotool, or autoload
+else
+    # Native X11: xdotool works against the legacy original/xboing.
+    ./original/xboing &
+    sleep 2
+    xdotool search --name "XBoing" key q
+    sleep 0.3
+    import -window "$(xdotool search --name 'XBoing' | head -1)" \
+        tests/golden/original/dialogue/quit-000.png
+    pkill -f xboing
+fi
 ```
 
-For programmatic capture in tests, see
-`tests/test_attract_screenshots.c::test_capture_dialogue` —
-uses `SDL_VIDEODRIVER=offscreen` + `sdl2_renderer_save_screenshot`.
+The trap: `xdotool key --window <wid>` sends X11 events with
+`send_event=True` which SDL2 filters out, and on Wayland the
+plain `xdotool key` form doesn't help either because Mutter
+won't transfer Wayland focus to an XWayland window via
+`windowactivate`. Symptom: window found, xdotool exits 0,
+binary stays on the title screen.
+
+### Capturing in-game / bonus screens — the savegame fixture pattern
+
+For screens that aren't reachable from the attract cycle
+(`SDL2ST_GAME`, `SDL2ST_BONUS`, anything that needs prior
+gameplay), the documented capture path is **savegame v2
+fixture + `-load`**, not keystroke automation. This works
+identically on native X11 and Wayland, has no focus games,
+and exercises real production code paths.
+
+Components:
+
+1. **Fixture generator** (`tools/gen_bonus_fixtures.c`) — writes
+   pairs of JSON files (`save-info.dat` + `save-level.dat`) per
+   scenario. For bonus capture each fixture has an *empty*
+   block grid: on load, `game_rules_check` sees no required
+   blocks remaining and transitions to `SDL2ST_BONUS` on the
+   first tick of `MODE_GAME`. Scenario stats (level, score,
+   ammo, killer flag) come from `savegame_data_t`.
+2. **Committed fixtures** at `tests/fixtures/bonus/scenario-N/`.
+   Generated once via `make bonus-fixtures`, then committed.
+3. **`-load` CLI flag** (`src/sdl2_cli.c`, consumed in
+   `src/game_main.c`) — when set, the binary enters
+   `SDL2ST_GAME` and immediately calls `savegame_system_load`.
+   The state transition fires `mode_game_enter` first (which
+   reloads the canonical level file), then the load replaces
+   the grid with the fixture — mirroring the production X-key
+   flow.
+4. **Script glue** (`scripts/visual_capture.sh`) — when
+   `VARIANT=modern` and `MODE=bonus*`, sets
+   `XDG_DATA_HOME=$(pwd)/tests/fixtures/bonus/scenario-$N`
+   so `savegame_system_load` reads from the fixture, and
+   appends `-load` to the binary's argv. `BONUS_SCENARIO=N`
+   env var selects which scenario.
+
+Run end-to-end:
+
+```bash
+make bonus-fixtures               # one-time; regenerate if scenarios change
+make modern-bonus                 # captures all 4 scenarios × 8 substates
+```
+
+Output lands at
+`.tmp/visual-check/modern/bonus-{1..4}/bonus/<substate>-000.png`.
 
 ### LLM judge comparison
 
@@ -378,15 +451,34 @@ eog .tmp/visual-check/modern/preview/wait-002.png &
 Each instance is a separate window — arrange them on screen for
 direct comparison.
 
-### Headless pixel comparison
+### Headless pixel comparison — not for visual fidelity work
 
 `tests/test_attract_screenshots.c` captures framebuffers using
-`SDL_VIDEODRIVER=offscreen` (real rendering without a display).
-Use `offscreen`, NOT `dummy` — `dummy` produces black pixels.
+`SDL_VIDEODRIVER=offscreen`. This path is **not** the
+recommended way to verify visual fidelity against goldens — use
+the live X11 + ImageMagick `import` pipeline above (the same
+flow that produced every committed golden). Reasons offscreen
+fails for fidelity work:
 
-This test is disabled in the default ctest suite (crashes in
-non-ASan builds due to a pre-existing SDL_mixer teardown bug).
-Run under ASan:
+- The test is `DISABLED TRUE` in ctest because of a pre-existing
+  SDL_mixer teardown crash in non-ASan builds. The workaround is
+  `-nosound`, which is the kind of stabilizing flag we don't
+  ship behind.
+- Polling state machines like `bonus_system` at
+  `sdl2_state_update` granularity misses every LIVE substate
+  inside the 6× per-tick sub-frame loop. The X11 capture
+  pipeline avoids this because the binary itself emits
+  `XBOING_SNAPSHOT` signals from inside the production update
+  loop.
+- Captures land as `.bmp`; the goldens are `.png`. Conversion
+  layer adds another step that can drift.
+
+Use offscreen only for non-fidelity headless rendering tests
+that need pixel data (e.g., asserting a specific glyph drew
+where expected within a single test). For golden comparison,
+use the X11 capture pipeline.
+
+If you must run the legacy offscreen test:
 
 ```bash
 SDL_VIDEODRIVER=offscreen SDL_AUDIODRIVER=dummy \

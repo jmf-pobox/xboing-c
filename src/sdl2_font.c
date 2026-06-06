@@ -347,6 +347,20 @@ int sdl2_font_line_height(const sdl2_font_t *ctx, sdl2_font_id_t font_id)
     return ctx->slots[font_id].line_height;
 }
 
+int sdl2_font_ascent(const sdl2_font_t *ctx, sdl2_font_id_t font_id)
+{
+    if (ctx == NULL || !is_valid_font_id(font_id))
+    {
+        return 0;
+    }
+    TTF_Font *font = ctx->slots[font_id].font;
+    if (font == NULL)
+    {
+        return 0;
+    }
+    return TTF_FontAscent(font);
+}
+
 const char *sdl2_font_status_string(sdl2_font_status_t status)
 {
     switch (status)

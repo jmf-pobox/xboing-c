@@ -34,6 +34,37 @@ static int g_finished_level;
 static int g_sound_count;
 static char g_last_sound[64];
 
+/* Sound history buffer — captures every name passed to fire_sound
+ * during a sequence so tests can assert specific names landed in
+ * the right order.  Capacity 256 covers the longest realistic
+ * sequence (e.g. BONUS_MAX_COINS=30 coins + 30 bullets + applause
+ * + 2 Doh* paths = 63; comfortable margin above any future test
+ * scenario).  Overflow is an assert (see on_sound). */
+#define SOUND_HISTORY_CAP 256
+static char g_sound_history[SOUND_HISTORY_CAP][64];
+static int g_sound_history_len;
+
+static int sound_history_contains(const char *name)
+{
+    for (int i = 0; i < g_sound_history_len; i++)
+    {
+        if (strcmp(g_sound_history[i], name) == 0)
+            return 1;
+    }
+    return 0;
+}
+
+static int sound_history_count(const char *name)
+{
+    int n = 0;
+    for (int i = 0; i < g_sound_history_len; i++)
+    {
+        if (strcmp(g_sound_history[i], name) == 0)
+            n++;
+    }
+    return n;
+}
+
 static void reset_tracking(void)
 {
     g_score_added = 0;
@@ -44,6 +75,7 @@ static void reset_tracking(void)
     g_finished_level = 0;
     g_sound_count = 0;
     g_last_sound[0] = '\0';
+    g_sound_history_len = 0;
 }
 
 static void on_score_add(unsigned long pts, void *ud)
@@ -73,6 +105,14 @@ static void on_sound(const char *name, void *ud)
     {
         strncpy(g_last_sound, name, sizeof(g_last_sound) - 1);
         g_last_sound[sizeof(g_last_sound) - 1] = '\0';
+        /* Loud failure on overflow — silent drops would mask
+         * subsequent count assertions and produce confusing
+         * "off by N" failures. */
+        assert_true(g_sound_history_len < SOUND_HISTORY_CAP);
+        strncpy(g_sound_history[g_sound_history_len], name,
+                sizeof(g_sound_history[0]) - 1);
+        g_sound_history[g_sound_history_len][sizeof(g_sound_history[0]) - 1] = '\0';
+        g_sound_history_len++;
     }
 }
 
@@ -234,6 +274,62 @@ static void test_reset_coins(void **state)
     bonus_system_inc_coins(ctx);
     bonus_system_reset_coins(ctx);
     assert_int_equal(bonus_system_get_coins(ctx), 0);
+
+    bonus_system_destroy(ctx);
+}
+
+static void test_set_coins_sets_count(void **state)
+{
+    (void)state;
+    bonus_system_t *ctx = bonus_system_create(NULL, NULL);
+
+    bonus_system_set_coins(ctx, 5);
+    assert_int_equal(bonus_system_get_coins(ctx), 5);
+
+    /* Overwrites prior value (the canonical sync semantic). */
+    bonus_system_set_coins(ctx, 2);
+    assert_int_equal(bonus_system_get_coins(ctx), 2);
+
+    bonus_system_destroy(ctx);
+}
+
+static void test_set_coins_negative_is_noop(void **state)
+{
+    (void)state;
+    bonus_system_t *ctx = bonus_system_create(NULL, NULL);
+
+    bonus_system_set_coins(ctx, 3);
+    bonus_system_set_coins(ctx, -1);
+    assert_int_equal(bonus_system_get_coins(ctx), 3);
+
+    /* NULL ctx is also a no-op (no crash). */
+    bonus_system_set_coins(NULL, 1);
+
+    bonus_system_destroy(ctx);
+}
+
+static void test_set_coins_then_begin_uses_set_value(void **state)
+{
+    (void)state;
+    reset_tracking();
+    bonus_system_callbacks_t cbs = make_callbacks();
+    bonus_system_t *ctx = bonus_system_create(&cbs, NULL);
+
+    /* Set via setter (the canonical production path), then begin. */
+    bonus_system_set_coins(ctx, 4);
+    bonus_system_env_t env = make_env(10000, 3, 1, 20, 5, 0);
+    bonus_system_begin(ctx, &env, 0);
+
+    /* Storage: initial_count captures the set value. */
+    assert_int_equal(bonus_system_get_initial_coins(ctx), 4);
+
+    /* Computation: total uses the set value, not 0.
+     * Per ADR-040, this is the failure mode that goes silently
+     * wrong if the setter is called AFTER begin. */
+    unsigned long expected =
+        bonus_system_compute_total(4, env.level, env.starting_level, env.time_bonus_secs,
+                                   env.bullet_count);
+    assert_int_equal(g_score_added, expected);
 
     bonus_system_destroy(ctx);
 }
@@ -619,6 +715,211 @@ static void test_renderer_accessors_null_safe(void **state)
 }
 
 /* =========================================================================
+ * Group 7: Sound mapping (original/bonus.c playSoundFile parity)
+ *
+ * Each test drives the state machine to a specific branch and
+ * asserts the right sound fires.  Cited line numbers refer to
+ * original/bonus.c playSoundFile calls.
+ * ========================================================================= */
+
+/* Helper: run a full bonus sequence to completion (or safety limit). */
+static void drive_sequence(bonus_system_t *ctx)
+{
+    int frame = 0;
+    int safety = 0;
+    while (!bonus_system_is_finished(ctx) && safety < 5000)
+    {
+        frame++;
+        bonus_system_update(ctx, frame);
+        safety++;
+    }
+}
+
+/* "bonus" sound fires once per coin animated (bonus.c:366). */
+static void test_sound_per_coin_bonus(void **state)
+{
+    (void)state;
+    reset_tracking();
+    bonus_system_callbacks_t cbs = make_callbacks();
+    bonus_system_t *ctx = bonus_system_create(&cbs, NULL);
+
+    bonus_system_inc_coins(ctx);
+    bonus_system_inc_coins(ctx);
+    bonus_system_inc_coins(ctx);
+    bonus_system_env_t env = make_env(0, 1, 1, 30, 0, 0);
+    bonus_system_begin(ctx, &env, 0);
+    drive_sequence(ctx);
+
+    assert_int_equal(sound_history_count("bonus"), 3);
+    bonus_system_destroy(ctx);
+}
+
+/* "Doh1" fires when no coins were collected (bonus.c:315). */
+static void test_sound_no_coins_doh1(void **state)
+{
+    (void)state;
+    reset_tracking();
+    bonus_system_callbacks_t cbs = make_callbacks();
+    bonus_system_t *ctx = bonus_system_create(&cbs, NULL);
+
+    bonus_system_env_t env = make_env(0, 1, 1, 30, 0, 0);
+    bonus_system_begin(ctx, &env, 0);
+    drive_sequence(ctx);
+
+    assert_true(sound_history_contains("Doh1"));
+    assert_false(sound_history_contains("wzzz"));
+    bonus_system_destroy(ctx);
+}
+
+/* "Doh4" fires in do_bonuses when timer ran out (bonus.c:292). */
+static void test_sound_timer_void_doh4(void **state)
+{
+    (void)state;
+    reset_tracking();
+    bonus_system_callbacks_t cbs = make_callbacks();
+    bonus_system_t *ctx = bonus_system_create(&cbs, NULL);
+
+    bonus_system_inc_coins(ctx);
+    bonus_system_inc_coins(ctx);
+    bonus_system_env_t env = make_env(0, 1, 1, 0, 0, 0);
+    bonus_system_begin(ctx, &env, 0);
+    drive_sequence(ctx);
+
+    /* Timer ran out path plays "Doh4" twice — once in do_bonuses
+     * (coins voided) and once in do_time_bonus (no time bonus). */
+    assert_int_equal(sound_history_count("Doh4"), 2);
+    bonus_system_destroy(ctx);
+}
+
+/* "Doh2" fires in do_level when timer ran out (bonus.c:421). */
+static void test_sound_no_level_bonus_doh2(void **state)
+{
+    (void)state;
+    reset_tracking();
+    bonus_system_callbacks_t cbs = make_callbacks();
+    bonus_system_t *ctx = bonus_system_create(&cbs, NULL);
+
+    bonus_system_env_t env = make_env(0, 5, 1, 0, 3, 0);
+    bonus_system_begin(ctx, &env, 0);
+    drive_sequence(ctx);
+
+    assert_true(sound_history_contains("Doh2"));
+    bonus_system_destroy(ctx);
+}
+
+/* "Doh3" fires in do_bullets when none remain (bonus.c:450). */
+static void test_sound_no_bullets_doh3(void **state)
+{
+    (void)state;
+    reset_tracking();
+    bonus_system_callbacks_t cbs = make_callbacks();
+    bonus_system_t *ctx = bonus_system_create(&cbs, NULL);
+
+    bonus_system_env_t env = make_env(0, 1, 1, 30, 0, 0);
+    bonus_system_begin(ctx, &env, 0);
+    drive_sequence(ctx);
+
+    assert_true(sound_history_contains("Doh3"));
+    assert_false(sound_history_contains("wzzz"));
+    bonus_system_destroy(ctx);
+}
+
+/* "key" fires once per bullet animated (bonus.c:473). */
+static void test_sound_per_bullet_key(void **state)
+{
+    (void)state;
+    reset_tracking();
+    bonus_system_callbacks_t cbs = make_callbacks();
+    bonus_system_t *ctx = bonus_system_create(&cbs, NULL);
+
+    bonus_system_env_t env = make_env(0, 1, 1, 30, 5, 0);
+    bonus_system_begin(ctx, &env, 0);
+    drive_sequence(ctx);
+
+    assert_int_equal(sound_history_count("key"), 5);
+    bonus_system_destroy(ctx);
+}
+
+/* "applause" fires once on entering end-text (bonus.c:600). */
+static void test_sound_end_text_applause(void **state)
+{
+    (void)state;
+    reset_tracking();
+    bonus_system_callbacks_t cbs = make_callbacks();
+    bonus_system_t *ctx = bonus_system_create(&cbs, NULL);
+
+    bonus_system_inc_coins(ctx);
+    bonus_system_env_t env = make_env(0, 1, 1, 30, 1, 0);
+    bonus_system_begin(ctx, &env, 0);
+    drive_sequence(ctx);
+
+    assert_int_equal(sound_history_count("applause"), 1);
+    bonus_system_destroy(ctx);
+}
+
+/* Per-coin pacing: the BONUS_STEP_DELAY wait between coin drops
+ * is exactly observed — no drop during the wait window, exactly
+ * one drop when the wait expires.  This test fails loudly if
+ * anyone sets BONUS_STEP_DELAY to 0 or removes the
+ * self-rearming set_bonus_wait call. */
+static void test_per_coin_pacing(void **state)
+{
+    (void)state;
+    reset_tracking();
+    bonus_system_callbacks_t cbs = make_callbacks();
+    bonus_system_t *ctx = bonus_system_create(&cbs, NULL);
+
+    bonus_system_inc_coins(ctx);
+    bonus_system_inc_coins(ctx);
+    bonus_system_inc_coins(ctx);
+    bonus_system_env_t env = make_env(0, 1, 1, 30, 0, 0);
+    bonus_system_begin(ctx, &env, 0);
+
+    /* Advance past TEXT and SCORE waits until the BONUS body
+     * fires its first coin.  After the first drop the state is
+     * WAIT (the self-rearming wait scheduled BONUS_STEP_DELAY
+     * sub-frames later). */
+    int frame = 0;
+    int coins_at_bonus_entry = -1;
+    while (frame < 500)
+    {
+        frame++;
+        bonus_system_update(ctx, frame);
+        if (bonus_system_get_highest_reached(ctx) >= BONUS_STATE_BONUS &&
+            bonus_system_get_coins(ctx) < 3)
+        {
+            coins_at_bonus_entry = bonus_system_get_coins(ctx);
+            break;
+        }
+    }
+    assert_int_equal(coins_at_bonus_entry, 2); /* one of the three coins dropped */
+
+    /* During the BONUS_STEP_DELAY wait window, no further coin
+     * may drop.  Advance up to (but not including) the expiry
+     * tick. */
+    for (int i = 0; i < BONUS_STEP_DELAY - 1; i++)
+    {
+        frame++;
+        bonus_system_update(ctx, frame);
+        assert_int_equal(bonus_system_get_coins(ctx), coins_at_bonus_entry);
+    }
+
+    /* The next sub-frame expires the wait (transitions WAIT →
+     * BONUS without entering the body). */
+    frame++;
+    bonus_system_update(ctx, frame);
+    assert_int_equal(bonus_system_get_coins(ctx), coins_at_bonus_entry);
+
+    /* The tick after that runs do_bonuses once and drops exactly
+     * one coin. */
+    frame++;
+    bonus_system_update(ctx, frame);
+    assert_int_equal(bonus_system_get_coins(ctx), coins_at_bonus_entry - 1);
+
+    bonus_system_destroy(ctx);
+}
+
+/* =========================================================================
  * Test runner
  * ========================================================================= */
 
@@ -641,6 +942,9 @@ int main(void)
         cmocka_unit_test(test_inc_dec_coins),
         cmocka_unit_test(test_dec_coins_floor),
         cmocka_unit_test(test_reset_coins),
+        cmocka_unit_test(test_set_coins_sets_count),
+        cmocka_unit_test(test_set_coins_negative_is_noop),
+        cmocka_unit_test(test_set_coins_then_begin_uses_set_value),
 
         /* Group 4: Save trigger */
         cmocka_unit_test(test_save_trigger_at_5),
@@ -667,6 +971,16 @@ int main(void)
         cmocka_unit_test(test_get_bullets_returns_live_env_value),
         cmocka_unit_test(test_get_time_bonus_secs_returns_env_value),
         cmocka_unit_test(test_renderer_accessors_null_safe),
+
+        /* Group 7: Sound mapping (original/bonus.c parity) */
+        cmocka_unit_test(test_sound_per_coin_bonus),
+        cmocka_unit_test(test_sound_no_coins_doh1),
+        cmocka_unit_test(test_sound_timer_void_doh4),
+        cmocka_unit_test(test_sound_no_level_bonus_doh2),
+        cmocka_unit_test(test_sound_no_bullets_doh3),
+        cmocka_unit_test(test_sound_per_bullet_key),
+        cmocka_unit_test(test_sound_end_text_applause),
+        cmocka_unit_test(test_per_coin_pacing),
     };
 
     return cmocka_run_group_tests(tests, NULL, NULL);

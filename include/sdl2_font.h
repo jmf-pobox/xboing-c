@@ -127,6 +127,14 @@ sdl2_font_status_t sdl2_font_measure(sdl2_font_t *ctx, sdl2_font_id_t font_id, c
  */
 int sdl2_font_line_height(const sdl2_font_t *ctx, sdl2_font_id_t font_id);
 
+/*
+ * Return the ascent (baseline-to-top distance) in pixels for a font
+ * slot.  Used by layout code that mirrors the original X11 font
+ * metrics where ypos walkers advance by `font->ascent + GAP`.
+ * Returns 0 if ctx is NULL or font_id is invalid.
+ */
+int sdl2_font_ascent(const sdl2_font_t *ctx, sdl2_font_id_t font_id);
+
 /* Return a human-readable string for a status code. */
 const char *sdl2_font_status_string(sdl2_font_status_t status);
 

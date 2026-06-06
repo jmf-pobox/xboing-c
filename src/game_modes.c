@@ -722,7 +722,20 @@ static void mode_bonus_enter(sdl2_state_mode_t mode, void *ud)
         .bullet_count = gun_system_get_ammo(ctx->gun),
         .highscore_rank = rank,
     };
+
+    /* Set coins BEFORE begin — bonus_system_begin captures
+     * initial_coin_count and computes the bonus total from
+     * ctx->coin_count at that point (bonus_system.c:189, 196).
+     * Reversing this order silently produces wrong initial
+     * counts AND a wrong score total.  See ADR-040. */
+    bonus_system_set_coins(ctx->bonus, ctx->bonus_count);
     bonus_system_begin(ctx->bonus, &env, 0);
+
+    /* "- Bonus Tally -" persists through the entire sequence
+     * (original/bonus.c:232 — DrawTitleText calls SetCurrentMessage
+     * with UpdateFlag=True, meaning show immediately and don't
+     * clear until replaced).  auto_clear=0 matches. */
+    message_system_set(ctx->message, "- Bonus Tally -", 0, attract_frame_counter);
 }
 
 static void mode_bonus_update(sdl2_state_mode_t mode, void *ud)

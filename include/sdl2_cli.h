@@ -74,6 +74,11 @@ typedef struct
     /* Visual-capture: -1 = off, 0+ = SDL2ST_* mode, 99 = all */
     int visual_capture_mode;
     int visual_capture_interval;
+
+    /* Autoload: when true, main() calls savegame_system_load and
+     * enters SDL2ST_GAME immediately, bypassing the attract cycle.
+     * Reads from the standard XDG-resolved save paths. */
+    bool autoload;
 } sdl2_cli_config_t;
 
 /* =========================================================================

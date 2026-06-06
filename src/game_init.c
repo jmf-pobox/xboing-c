@@ -293,6 +293,7 @@ game_ctx_t *game_create(int argc, char *argv[])
     ctx->debug_mode = cli.debug;
     ctx->vc_mode = cli.visual_capture_mode;
     ctx->vc_interval = cli.visual_capture_interval;
+    ctx->autoload = cli.autoload;
 
     /* Load high score tables */
     highscore_io_init_table(&ctx->hs_global);
@@ -872,15 +873,50 @@ static const char *vc_highscore_name(int s)
     }
 }
 
+static const char *vc_bonus_name(int s)
+{
+    switch (s)
+    {
+        case BONUS_STATE_TEXT:
+            return "title";
+        case BONUS_STATE_SCORE:
+            return "score";
+        case BONUS_STATE_BONUS:
+            return "bonus";
+        case BONUS_STATE_LEVEL:
+            return "level";
+        case BONUS_STATE_BULLET:
+            return "bullets";
+        case BONUS_STATE_TIME:
+            return "time";
+        case BONUS_STATE_HSCORE:
+            return "hscore";
+        case BONUS_STATE_END_TEXT:
+            return "end-text";
+        default:
+            return NULL;
+    }
+}
+
 static void vc_signal_modern(const char *mode_name, const char *substate, int seq)
 {
+    /* Pre-signal pause: the SDL_RenderPresent that ran in
+     * game_render_frame queues a frame for the X server.  Under
+     * XWayland+Mutter the actual on-screen update lags by up to
+     * ~50 ms after present, especially on the first frame of a
+     * newly-entered state.  Sleep BEFORE printing the signal so
+     * the script's `import -window` sees the just-rendered frame,
+     * not the previous one. */
+    SDL_Delay(150);
     printf("XBOING_SNAPSHOT %s/%s/%03d\n", mode_name, substate, seq);
     fflush(stdout);
-    SDL_Delay(100);
+    /* Post-signal pause: hold the binary while the script's
+     * ImageMagick `import` runs (typically ~50 ms). */
+    SDL_Delay(200);
 }
 
 static void vc_check(game_ctx_t *ctx, int pre_presents, int pre_credits, int pre_intro,
-                     int pre_demo, int pre_keys, int pre_highscore)
+                     int pre_demo, int pre_keys, int pre_highscore, int pre_bonus)
 {
     static sdl2_state_mode_t prev_mode = SDL2ST_NONE;
     static unsigned long next_capture_frame = 0;
@@ -994,6 +1030,18 @@ static void vc_check(game_ctx_t *ctx, int pre_presents, int pre_credits, int pre
         post_sub = (int)highscore_system_get_state(ctx->highscore_display);
         mode_str = "highscore";
     }
+    else if (mode == SDL2ST_BONUS)
+    {
+        /* The raw state is unobservable at render-frame granularity —
+         * mode_bonus_update runs bonus_system_update 6× per tick so
+         * LIVE substates flash by inside one render frame.  Use the
+         * monotonic highest_reached query instead: it advances when
+         * the state machine enters a new content state, and we can
+         * detect that increment between render frames. */
+        pre_sub = pre_bonus;
+        post_sub = (int)bonus_system_get_highest_reached(ctx->bonus);
+        mode_str = "bonus";
+    }
 
     if (!mode_str)
         return;
@@ -1011,6 +1059,8 @@ static void vc_check(game_ctx_t *ctx, int pre_presents, int pre_credits, int pre
         name_fn = vc_keys_name;
     else if (mode == SDL2ST_HIGHSCORE)
         name_fn = vc_highscore_name;
+    else if (mode == SDL2ST_BONUS)
+        name_fn = vc_bonus_name;
 
     if (!name_fn)
         return;
@@ -1053,6 +1103,7 @@ static int vc_pre_intro_state;
 static int vc_pre_demo_state;
 static int vc_pre_keys_state;
 static int vc_pre_highscore_state;
+static int vc_pre_bonus_state;
 
 static void stub_tick(void *user_data)
 {
@@ -1064,6 +1115,7 @@ static void stub_tick(void *user_data)
     vc_pre_demo_state = (int)demo_system_get_state(ctx->demo);
     vc_pre_keys_state = (int)keys_system_get_state(ctx->keys);
     vc_pre_highscore_state = (int)highscore_system_get_state(ctx->highscore_display);
+    vc_pre_bonus_state = (int)bonus_system_get_highest_reached(ctx->bonus);
 
     sdl2_state_update(ctx->state);
 }
@@ -1077,7 +1129,7 @@ static void stub_render(double alpha, void *user_data)
 
     if (ctx->vc_mode >= 0)
         vc_check(ctx, vc_pre_presents_state, vc_pre_credits_stage, vc_pre_intro_state,
-                 vc_pre_demo_state, vc_pre_keys_state, vc_pre_highscore_state);
+                 vc_pre_demo_state, vc_pre_keys_state, vc_pre_highscore_state, vc_pre_bonus_state);
 }
 
 /* =========================================================================

@@ -1,125 +1,149 @@
-# Session Resume — XBoing Modernization
+# Resume — Bonus Screen Visual Fidelity (renderer rewrite complete)
 
-**Date:** 2026-05-27
-**Master at:** `548d56b` (PR #126 merged)
-**Active branch:** `fix/attract-pixel-polish` (3 commits, not yet PR'd)
+**Last updated:** 2026-06-06
+**Branch:** `feat/bonus-modern-capture` (uncommitted; not pushed)
+**Tip of master:** `7571c1e feat(bonus): capture infra + 32 original goldens + renderer rewrite (#143)`
+**Active epic:** `xboing-c-hlf` (in_progress, P1) — child of `xboing-c-y7s`
 
-## What We Accomplished This Session
+## Where we are
 
-### Keybinding Infrastructure (PR #124, merged)
+`xboing-c-hlf` step 4 (modern renderer rewrite) is **implementation
+complete**. Visual fidelity essentially achieved on the
+representative `bonus-1/end-text` pair (LLM judge verdict:
+`equivalent`). Quality gates green: format-check, cppcheck,
+ctest debug 57/57, asan-test 57/57, markdownlint 86/0.
 
-Built comprehensive keybinding test infrastructure (28 CMocka tests)
-covering all implemented key bindings. Test-driven development found
-and fixed multiple bugs:
+Remaining: user visual verification, then commit and PR.
 
-- C key cycle handler was missing entirely
-- C key cycle order wrong (PREVIEW/HIGHSCORE swapped vs natural cycle)
-- J/L paddle keys ignored in mouse mode (keyboard and mouse both ran
-  every frame; mouse overwrote keyboard)
-- Paddle speed 5x too fast (original gates with PADDLE_ANIMATE_DELAY=5)
-- Smooth paddle interpolation (VELOCITY=4px/frame, every frame)
-- Ball stuck in BALL_CREATE state (exact-frame == checks; changed to >=)
-- P pause toggled on/off within one frame (just_pressed in per-tick code)
-- All just_pressed handlers moved from per-tick to once-per-frame
-- D kill ball, T tilt, A audio mute, H/h highscores, G toggle sound
+## What was done this session (2026-06-06)
 
-Extracted attract cycle order into `game_callbacks_attract_next()` as
-single source of truth — both C-key and natural callbacks use it.
+### Original-side capture restored (`xboing-c-52s`, `xboing-c-z0n` — closed)
 
-### Dialogue System (PR #125, merged)
+- TEMPORARY `DoEndText` wait reverted to `LINE_DELAY * 2`.
+- Force-entry helper `setup_bonus_capture_scenario` in
+  `original/main.c` drives the real `CheckGameRules` path.
+- `bonus_state_name` + `MODE_BONUS` branch in `vc_check`.
+- `-bonus-scenario N` CLI flag, `bonus` mode in `-visual-capture`.
+- 32 authentic goldens at `tests/golden/original/bonus-{1..4}/`.
 
-Pixel-match dialogue renderer rewriting `game_render_dialogue()` to
-match original/dialogue.c: stone tile background, 4px red border,
-TEXT_ICON sprite, green shadow-centred message, white separator,
-yellow input text or question mark sprite. User verified identical.
+Research and review: `docs/research/2026-06-06-bonus-capture-real-entry.md`,
+`docs/reviews/2026-06-06-bonus-capture-real-entry-review.md`.
 
-- Q key: "Exit XBoing you wimp? [y/n]" confirmation dialogue
-- Escape key: "Abort current game? [y/n]" during gameplay
-- W key: "Input game starting level number." numeric dialogue
-- Pending flag pattern (quit/abort/level_pending) following
-  wisdom_pending precedent
-- Ball jitter fix during dialogue (render_alpha frozen)
-- Dialogue sounds wired (click/key/tone)
-- Full design with peer review (4 blocking findings addressed)
+### Modern-side renderer rewrite (`xboing-c-hlf` step 4)
 
-### Documentation Restructuring (PR #126, merged)
+Spec, peer review, ADRs, then implementation:
 
-CLAUDE.md reduced from 741 to 136 lines based on Anthropic's
-200-line recommendation. Research showed instruction adherence
-degrades uniformly as CLAUDE.md length increases.
+- `docs/specs/2026-06-06-bonus-renderer-rewrite.md`
+- `docs/reviews/2026-06-06-bonus-renderer-rewrite-review.md`
+- `docs/DESIGN.md` ADR-039 (goldens are authority over original-
+  source draw analysis) and ADR-040 (bonus-coin sync at mode
+  entry, not per pickup).
 
-New architecture:
+Implementation:
 
-- **Tier 1:** Root CLAUDE.md (136 lines) — behavioral contract + @imports
-- **Tier 2:** @-imported docs — BUILDING.md, TESTING.md, GIT.md, WORKFLOW.md
-- **Tier 3:** .claude/rules/ — path-scoped rules for C code, tests,
-  Makefile, scripts, delegation, markdown, CI, CLAUDE.md maintenance
-- **Tier 4:** Sub-directory CLAUDE.md — original/, tests/, src/, .github/
+- `src/game_render_ui.c::game_render_bonus` — removed
+  `draw_ball_border` static helper, its call, and the
+  `SPR_TITLE_SMALL` XBOING pixmap block.
+- `src/game_render.c:1217` — added `SDL2ST_BONUS` to the outer
+  HUD shell mode list (renders score, lives, message, specials,
+  timer over the bonus content).
+- `src/game_modes.c::mode_bonus_enter` — call
+  `bonus_system_set_coins(ctx->bonus, ctx->bonus_count)` before
+  `bonus_system_begin` (ordering documented inline citing ADR-040
+  and `bonus_system.c:189,196`); also set
+  `message_system_set(ctx->message, "- Bonus Tally -", 0,
+  attract_frame_counter)`.
+- `include/bonus_system.h` + `src/bonus_system.c` — new
+  `bonus_system_set_coins(ctx, count)` public API with NULL /
+  negative-count guard.
+- `tests/test_bonus_system.c` — three new tests covering
+  set/overwrite, NULL/negative guard, and the set-then-begin
+  ordering contract (60/60 bonus_system tests pass).
+- `tools/gen_bonus_fixtures.c` — added `bonus_count` and
+  `level_time` to per-scenario fixture data so the modern
+  capture path renders bonus coins and the timer.
+- `original/main.c::setup_bonus_capture_scenario` —
+  per-scenario `lives_left` matching `gen_bonus_fixtures.c`.
 
-Added `original/CLAUDE.md` with module mapping, key constants,
-coordinate systems, font names, and citation rules for reading the
-1996 source.
+### Modern-side capture infrastructure (also `xboing-c-hlf`)
 
-docs/TESTING.md now has 5-layer pyramid including Layer 4 (visual
-fidelity) which was the missing layer that caused process failures.
+- `Makefile` — `bonus-fixtures`, `modern-bonus`,
+  `modern-bonus-all` targets.
+- `scripts/visual_capture.sh` — modern variant + `bonus` mode
+  sets `XDG_DATA_HOME` to the scenario fixture and appends
+  `-load`.
+- `tests/visual-check-manifest.yaml` — extended with 4 bonus
+  pairs (scenario 1 title + end-text, scenario 3 end-text,
+  scenario 4 end-text).
 
-### Attract Loop Pixel Polish (branch, in progress)
+### Quality
 
-Golden references captured for all 8 attract screens. Three remaining
-screens polished:
+- `make format-check`: clean
+- `make cppcheck-src`: clean (45 files, 0 errors)
+- `make test` (debug): 57/57 pass, 1 disabled (offscreen — known)
+- `make asan-test`: 57/57 pass under ASan + UBSan
+- `make lint`: 86 files, 0 errors
+- Code review on diff: clean, no critical/important findings
 
-| Screen | Status | LLM Judge Result |
-|--------|--------|------------------|
-| KEYSEDIT | Done | 1 minor (bottom spacing) |
-| HIGHSCORE | Done | Glow phase varies (correct behavior) |
-| PREVIEW | Done | Content differs by level (expected) |
+### Visual fidelity vs goldens (LLM judge)
 
-### Infrastructure
+`.tmp/bonus-final-report.md`:
 
-- Quarry enabled and synced for this project (semantic search active)
-- xdotool installed for automated screenshot capture
-- Highscore file generator for populating original binary's score table
-- Automated filmstrip capture script (15s intervals, 6 min cycle)
+- `bonus-1/end-text`: verdict `equivalent` — LLM judge cannot
+  distinguish modern from original.
+- `bonus-1/title`: still `diff`, but the findings are
+  capture-timing differences (different ticks captured between
+  original and modern), not renderer bugs.
+- `bonus-3/end-text`: 1 finding — lives count diff. Documented
+  capture-path artifact: `CheckAndAddExtraLife` static
+  accumulator adds +1 life on tick 1 in the original-side
+  capture path for scenarios with score ≥ 100,000. Modern
+  fixture path doesn't fire that, so shows fixture value
+  exactly. Not a renderer bug.
+- `bonus-4/end-text`: 1 finding — same lives capture-path
+  artifact.
 
-## Where We Are
+## State of the working tree
 
-### Outer Loop: Attract Cycle Visual Fidelity
+### Staged for deletion (the 32 wrong PR #143 goldens)
 
-All 8 attract screens have golden references and polished rendering:
+`tests/golden/original/bonus-{1..4}/bonus/*.png` — `git rm`-ed,
+replaced by fresh authentic captures (still untracked).
 
-| Screen | Golden | Polished | Shipped |
-|--------|--------|----------|---------|
-| Presents | ✓ | ✓ | PR #116 |
-| Intro | ✓ | ✓ | PR #115 |
-| Instruct | ✓ | ✓ | PR #115 |
-| Demo | ✓ | ✓ | PR #123 |
-| Keys | ✓ | ✓ | PR #123 |
-| Keysedit | ✓ | ✓ | On branch |
-| Highscore | ✓ | ✓ | On branch |
-| Preview | ✓ | ✓ | On branch |
+### Untracked
 
-### Inner Loop: Current Branch
+- `tests/golden/original/bonus-{1..4}/bonus/*.png` — 32 authentic captures
+- `docs/research/2026-06-06-bonus-capture-real-entry.md`
+- `docs/reviews/2026-06-06-bonus-capture-real-entry-review.md`
+- `docs/specs/2026-06-06-bonus-renderer-rewrite.md`
+- `docs/reviews/2026-06-06-bonus-renderer-rewrite-review.md`
+- `tests/fixtures/bonus/scenario-{1..4}/xboing/*.dat`
+- `tools/gen_bonus_fixtures.c`
 
-`fix/attract-pixel-polish` — ready for PR.
+### Modified
 
-Additional work this session:
+- `original/{main.c, init.c, bonus.c, include/bonus.h}`
+- `src/{game_render.c, game_render_ui.c, game_modes.c, bonus_system.c, game_init.c, game_main.c, sdl2_cli.c, sdl2_font.c}`
+- `include/{bonus_system.h, game_context.h, sdl2_cli.h, sdl2_font.h}`
+- `tests/{test_bonus_system.c, CLAUDE.md, visual-check-manifest.yaml}`
+- `Makefile`, `CMakeLists.txt`, `scripts/visual_capture.sh`
+- `docs/{BUILDING.md, TESTING.md, DESIGN.md}`
+- `.claude/rules/tests.md`
 
-- Visual capture infrastructure extended to all 8 attract screens
-- `visual_capture.sh` FIFO hang fix (game exit without DONE signal)
-- `make visual-check` screen list expanded from 3 to 8
-- Window title changed to "- XBoing II -" (matching original)
-- Keysedit: alternating green text, shadow on key bindings, wider spacing
-- Highscore: spacing fixes, time/date color for current score highlight
-- Preview: cycling backgrounds, removed spurious title overlay
-- `make dogfood` updated for new window title
+## What's next
 
-### Known Issues
+1. **User visual verification** — open at least one modern/original
+   pair in eog side-by-side, confirm parity.
+2. **Commit** — single feature commit on this branch.
+3. **PR** — push, open PR, follow 2-loop review workflow in
+   `docs/GIT.md`.
+4. **`xboing-c-hlf` close** after merge.
 
-- Screenshot test disabled in non-ASan builds (SDL_mixer teardown)
-- Font width slightly wider than original (Liberation Sans vs Helvetica)
+## Open beads at session pause
 
-### What's Next
-
-1. PR for attract pixel polish (review + merge)
-2. Gameplay screens: bonus, level complete, game over
-3. Remaining polish: animation timing, sparkle effects
+```text
+xboing-c-hlf  P1  in_progress  Visual fidelity: end-of-level (bonus) screen
+              ├── ✓ xboing-c-52s (closed)
+              └── ✓ xboing-c-z0n (closed)
+xboing-c-y7s  P1  open         [epic] Visual fidelity audit (parent of hlf)
+```

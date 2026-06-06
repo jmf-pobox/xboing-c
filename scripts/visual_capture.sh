@@ -35,12 +35,28 @@ case "$VARIANT" in
     *)        die "Unknown variant '$VARIANT' — use 'original' or 'modern'" ;;
 esac
 
-# Bonus-screen capture passes the scenario index through to the
-# binary.  Only the original parses -bonus-scenario; the modern
-# binary doesn't (and would error).  Env var keeps the script's
-# CLI surface unchanged.
+# Only the original binary parses -bonus-scenario.  The env var keeps
+# the script CLI surface unchanged for both variants.
 if [[ "$VARIANT" == "original" && -n "${BONUS_SCENARIO:-}" ]]; then
     EXTRA_ARGS="$EXTRA_ARGS -bonus-scenario $BONUS_SCENARIO"
+fi
+
+# Modern bonus capture: load a pre-generated savegame v2 fixture.
+# The fixture has score/level/lives/specials set per scenario and an
+# empty block grid; on load the modern binary enters SDL2ST_GAME and
+# game_rules_check transitions to SDL2ST_BONUS on the next tick.
+# See tools/gen_bonus_fixtures.c and docs/TESTING.md "savegame
+# fixture pattern".
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+if [[ "$VARIANT" == "modern" && "$MODE" == bonus* ]]; then
+    SCENARIO="${BONUS_SCENARIO:-1}"
+    FIXTURE_ROOT="$REPO_ROOT/tests/fixtures/bonus/scenario-$SCENARIO"
+    [[ -f "$FIXTURE_ROOT/xboing/save-info.dat" ]] || \
+        die "fixture missing: $FIXTURE_ROOT/xboing/save-info.dat (run 'make bonus-fixtures')"
+    [[ -f "$FIXTURE_ROOT/xboing/save-level.dat" ]] || \
+        die "fixture missing: $FIXTURE_ROOT/xboing/save-level.dat (run 'make bonus-fixtures')"
+    export XDG_DATA_HOME="$FIXTURE_ROOT"
+    EXTRA_ARGS="$EXTRA_ARGS -load"
 fi
 
 [[ -x "${RUN_DIR}/${BINARY#./}" ]] || die "${RUN_DIR}/${BINARY#./} not found or not executable"

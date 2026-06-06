@@ -27,7 +27,34 @@
 #define BONUS_TIME_SCORE 100    /* Points per second remaining */
 #define BONUS_MAX_COINS 8       /* Threshold: > 8 triggers super bonus */
 #define BONUS_SAVE_LEVEL 5      /* Save enabled every N levels */
-#define BONUS_LINE_DELAY 100    /* Frames between state transitions */
+/* Frames between content-state transitions (e.g. SCORE→BONUS).
+ * The original uses LINE_DELAY=100 game ticks at SLOW_SPEED=30ms,
+ * giving ~3 seconds of WAIT between each content line.  Modern
+ * keeps the same numeric value (100 sub-frames ≈ 125 ms at default
+ * speed) — a deliberate tooling-driven game-feel deviation, kept
+ * short so the visual-capture pipeline can sample each substate
+ * without each scenario taking ~25 seconds.  The per-step pacing
+ * within BONUS / BULLET states (BONUS_STEP_DELAY below) DOES
+ * match the original exactly; only the inter-state pause is
+ * compressed.  See docs/specs/2026-06-06-bonus-renderer-rewrite.md. */
+#define BONUS_LINE_DELAY 100
+
+/* Per-step pacing for coin/bullet animations within
+ * BONUS_STATE_BONUS / BONUS_STATE_BULLET.  The original drops one
+ * item per main-loop iteration at SLOW_SPEED=30 ms/tick
+ * (original/main.h:83 and the SetGameSpeed(SLOW_SPEED) call at
+ * the head of each DoX function) — 30 ms per coin / per bullet.
+ *
+ * Modern equivalent at default speed (SDL2L_DEFAULT_SPEED=5):
+ *   sdl2_loop tick interval = SDL2L_TICK_UNIT_US * (10 - speed)
+ *                            = 1500 µs * 5 = 7.5 ms / game tick
+ *   ATTRACT_FRAME_MULTIPLIER = 6 bonus_system_update calls per
+ *   game tick → each sub-frame = 7.5 ms / 6 = 1.25 ms.
+ *
+ * Original 30 ms / 1.25 ms per sub-frame = 24 sub-frames per
+ * step.  References: original/bonus.c:355-373 (DoBonuses coin
+ * loop) and original/bonus.c:464-489 (DoBullets bullet loop). */
+#define BONUS_STEP_DELAY 24
 
 /* =========================================================================
  * State machine states — match legacy enum BonusStates
@@ -155,6 +182,15 @@ void bonus_system_inc_coins(bonus_system_t *ctx);
 /* Decrement the bonus coin count (internal animation use) */
 void bonus_system_dec_coins(bonus_system_t *ctx);
 
+/*
+ * Set the bonus coin count from an external source.  Called once
+ * at MODE_BONUS entry to sync the gameplay-truth field
+ * (game_ctx_t::bonus_count) into the renderer-side accumulator.
+ * Must precede bonus_system_begin — see ADR-040.  Negative counts
+ * and a NULL ctx are no-ops.
+ */
+void bonus_system_set_coins(bonus_system_t *ctx, int count);
+
 /* Return the current bonus coin count */
 int bonus_system_get_coins(const bonus_system_t *ctx);
 
@@ -192,6 +228,19 @@ void bonus_system_reset_coins(bonus_system_t *ctx);
 
 /* Return the current state machine state */
 bonus_state_t bonus_system_get_state(const bonus_system_t *ctx);
+
+/*
+ * Return the highest content state the sequence has reached so far.
+ * Always in TEXT..END_TEXT (WAIT and FINISH excluded).  Monotonic
+ * within a single begin()..finish cycle; reset by begin().
+ *
+ * Useful where the raw state value misleads — e.g., during WAIT
+ * (enum value 8) the renderer needs to know "we just finished
+ * SCORE" rather than "we're at value 8 which is >= END_TEXT (7)".
+ * Visual-capture uses the same getter to detect substate
+ * transitions across the multi-update-per-tick attract loop.
+ */
+bonus_state_t bonus_system_get_highest_reached(const bonus_system_t *ctx);
 
 /* Return true if the bonus sequence is complete */
 int bonus_system_is_finished(const bonus_system_t *ctx);

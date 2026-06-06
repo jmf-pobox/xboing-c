@@ -153,11 +153,11 @@ int visualCaptureMode = -1;
 int visualCaptureInterval = 100;
 
 /*
- * Bonus-screen capture scenario index: 1..4 select pre-canned
- * game-state configurations for -visual-capture bonus.  Only
- * meaningful when visualCaptureMode == MODE_BONUS.
+ * Scenario index (1..4) for `-visual-capture bonus`.  Selects a
+ * canned end-of-level state set for the force-entry helper in
+ * main.c.  Only consulted when visualCaptureMode == MODE_BONUS.
  */
-int bonusScenario = 1;
+int bonusCaptureScenario = 1;
 
 static void InitialiseGraphics(Display *display, Window window)
 {
@@ -722,7 +722,7 @@ static void ParseCommandLine(char **argv, int argc)
         else if (!compareArgument(argv[i], "-visual-capture", 15))
         {
             /* Syntax: -visual-capture <mode>[:<interval>]
-             * mode = all|presents|intro|instruct|demo|keys|keysedit|highscore|preview
+             * mode = all|presents|intro|instruct|demo|keys|keysedit|highscore|preview|bonus
              * interval = frames between captures within each sub-state (default 100) */
             i++;
             if (i < argc)
@@ -777,16 +777,18 @@ static void ParseCommandLine(char **argv, int argc)
         }
         else if (!compareArgument(argv[i], "-bonus-scenario", 15))
         {
-            /* Visual-capture scenario index for -visual-capture bonus
-             * (1..4 — see BonusScreenForCapture in bonus.c). */
+            /* Select a scenario index (1..4) for `-visual-capture bonus`. */
             i++;
             if (i < argc)
             {
                 int n = atoi(argv[i]);
                 if (n >= 1 && n <= 4)
-                    bonusScenario = n;
+                    bonusCaptureScenario = n;
                 else
-                    WarningMessage("-bonus-scenario must be 1..4");
+                {
+                    WarningMessage("-bonus-scenario range is [1-4]");
+                    PrintUsage();
+                }
             }
             else
                 PrintUsage();

@@ -1145,7 +1145,7 @@ static void handleGameMode(Display *display)
 
 extern int visualCaptureMode;
 extern int visualCaptureInterval;
-extern int bonusScenario;
+extern int bonusCaptureScenario;
 
 static int vc_capturing(int target_mode)
 {
@@ -1213,33 +1213,6 @@ static const char *intro_state_name(int s)
             return "text";
         case INTRO_EXPLODE:
             return "explode";
-        default:
-            return NULL;
-    }
-}
-
-static const char *bonus_state_name(int s)
-{
-    switch (s)
-    {
-        case BONUS_TEXT:
-            return "title";
-        case BONUS_SCORE:
-            return "score";
-        case BONUS_BONUS:
-            return "bonus";
-        case BONUS_LEVEL:
-            return "level";
-        case BONUS_BULLET:
-            return "bullets";
-        case BONUS_TIME:
-            return "time";
-        case BONUS_HSCORE:
-            return "hscore";
-        case BONUS_END_TEXT:
-            return "end-text";
-        case BONUS_FINISH:
-            return "finish";
         default:
             return NULL;
     }
@@ -1330,6 +1303,34 @@ static const char *preview_state_name(int s)
             return "level";
         case PREVIEW_TEXT:
             return "text";
+        default:
+            return NULL;
+    }
+}
+
+static const char *bonus_state_name(int s)
+{
+    /* BONUS_WAIT and BONUS_FINISH return NULL: WAIT is the
+     * inter-content idle state (no render), FINISH transitions
+     * the mode back to MODE_GAME (no bonus-screen render). */
+    switch (s)
+    {
+        case BONUS_TEXT:
+            return "title";
+        case BONUS_SCORE:
+            return "score";
+        case BONUS_BONUS:
+            return "bonus";
+        case BONUS_LEVEL:
+            return "level";
+        case BONUS_BULLET:
+            return "bullets";
+        case BONUS_TIME:
+            return "time";
+        case BONUS_HSCORE:
+            return "hscore";
+        case BONUS_END_TEXT:
+            return "end-text";
         default:
             return NULL;
     }
@@ -1587,6 +1588,104 @@ static void handleGameStates(Display *display)
  */
 extern int snapshotFrames;
 
+/*
+ * Force-entry for `-visual-capture bonus`.  Drives the real
+ * CheckGameRules path (level.c:404) by setting up scenario state,
+ * loading and then clearing the block grid, and switching to
+ * MODE_GAME.  On the very next tick, CheckGameRules sees no
+ * killable blocks and transitions to MODE_BONUS, calling
+ * SetupBonusScreen for us — same as a player finishing a level.
+ *
+ * Design: docs/research/2026-06-06-bonus-capture-real-entry.md
+ * Review: docs/reviews/2026-06-06-bonus-capture-real-entry-review.md
+ *
+ * Setters that SetupStage→ReadNextLevel overwrites (bullets, bonus
+ * coin count, killer flag) MUST be called AFTER SetupStage.  Time
+ * bonus is set to `seconds + 1` because HandleGameTimer decrements
+ * it once on tick 1 before SetupBonusScreen reads the value.
+ */
+static void setup_bonus_capture_scenario(Display *display)
+{
+    long score_val;
+    int level_num;
+    int time_bonus_secs;
+    int num_bullets;
+    int num_bonus_coins;
+    int lives_left;
+    int killer_on;
+    int i;
+
+    /* Per-scenario data MUST match tools/gen_bonus_fixtures.c so the
+     * original and modern captures are comparable.  Drift here makes
+     * the LLM-judge report flag spurious differences. */
+    switch (bonusCaptureScenario)
+    {
+        case 1:
+            level_num = 3;
+            score_val = 45000L;
+            time_bonus_secs = 180;
+            num_bullets = 8;
+            num_bonus_coins = 2;
+            lives_left = 3;
+            killer_on = False;
+            break;
+        case 2:
+            level_num = 5;
+            score_val = 85000L;
+            time_bonus_secs = 142;
+            num_bullets = 12;
+            num_bonus_coins = 3;
+            lives_left = 2;
+            killer_on = False;
+            break;
+        case 3:
+            level_num = 7;
+            score_val = 125000L;
+            time_bonus_secs = 100;
+            num_bullets = 20;
+            num_bonus_coins = 5;
+            lives_left = 2;
+            killer_on = True;
+            break;
+        case 4:
+        default:
+            level_num = 25;
+            score_val = 450000L;
+            time_bonus_secs = 60;
+            num_bullets = 30;
+            num_bonus_coins = 7;
+            lives_left = 1;
+            killer_on = False;
+            break;
+    }
+
+    MapAllWindows(display);
+
+    SetTheScore((u_long)score_val);
+    SetLevelNumber(level_num);
+    SetLivesLeft(lives_left);
+
+    gameActive = True;
+
+    SetupStage(display, playWindow);
+
+    ClearBlockArray();
+
+    /* Setters that SetupStage→ReadNextLevel overwrites from the level
+     * data file (file.c:366 for time bonus, file.c:117-118 for bullets
+     * and bonus coin count) and from TurnSpecialsOff (file.c:121 →
+     * special.c calls ToggleKiller(False)) must be applied AFTER. */
+    SetLevelTimeBonus(display, timeWindow, time_bonus_secs + 1);
+    SetNumberBullets(num_bullets);
+    ResetNumberBonus();
+    for (i = 0; i < num_bonus_coins; i++)
+        IncNumberBonus();
+    if (killer_on)
+        ToggleKiller(display, True);
+
+    mode = MODE_GAME;
+}
+
 static void handleEventLoop(Display *display)
 {
     XEvent event;
@@ -1616,18 +1715,6 @@ static void handleEventLoop(Display *display)
     /* Grab the pointer to the main window */
     GrabPointer(display, mainWindow);
 
-    /*
-     * Visual-capture: force-enter MODE_BONUS with synthesized state
-     * for the bonus-screen scenario.  The normal entry path requires
-     * completing a level via gameplay (CheckGameRules at level.c:404)
-     * which can't be driven by a headless capture script.  Synthesize
-     * the same end-of-level state the gameplay path would produce.
-     */
-    if (visualCaptureMode == MODE_BONUS)
-    {
-        BonusScreenForCapture(display, mainWindow, bonusScenario);
-        mode = MODE_BONUS;
-    }
 
     /*
      * Visual-fidelity snapshot mode: advance the game `snapshotFrames`
@@ -1693,6 +1780,11 @@ static void handleEventLoop(Display *display)
         XChangeProperty(display, mainWindow, net_wm_pid, XA_CARDINAL, 32,
                         PropModeReplace, (unsigned char *)&pid_val, 1);
     }
+
+    /* Visual-capture bonus: force-enter the bonus screen via the
+     * real CheckGameRules path before the main loop starts. */
+    if (visualCaptureMode == MODE_BONUS)
+        setup_bonus_capture_scenario(display);
 
     /* Loop forever and ever */
     while (True)

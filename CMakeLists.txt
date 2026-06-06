@@ -625,6 +625,15 @@ if(SDL2_FOUND AND SDL2_IMAGE_FOUND AND SDL2_MIXER_FOUND AND SDL2_TTF_FOUND)
         RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
 endif()
 
+# --- Tools (build-time helpers, not shipped) -------------------------------
+
+# gen_bonus_fixtures — writes savegame v2 JSON files for bonus-screen
+# visual-capture scenarios.  Not installed.  Used by `make
+# golden-bonus-modern` to seed XDG_DATA_HOME before the capture run.
+add_executable(gen_bonus_fixtures tools/gen_bonus_fixtures.c)
+target_compile_options(gen_bonus_fixtures PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+target_link_libraries(gen_bonus_fixtures PRIVATE savegame_io)
+
 # --- Tests ------------------------------------------------------------------
 
 option(BUILD_TESTING "Build unit tests" ON)

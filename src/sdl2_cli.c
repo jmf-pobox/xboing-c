@@ -113,6 +113,7 @@ sdl2_cli_config_t sdl2_cli_config_defaults(void)
     cfg.grab = false;
     cfg.visual_capture_mode = -1;
     cfg.visual_capture_interval = 100;
+    cfg.autoload = false;
     return cfg;
 }
 
@@ -190,6 +191,11 @@ sdl2_cli_status_t sdl2_cli_parse(int argc, char *const argv[], sdl2_cli_config_t
         if (match_option(arg, "-grab"))
         {
             config->grab = true;
+            continue;
+        }
+        if (match_option(arg, "-load"))
+        {
+            config->autoload = true;
             continue;
         }
 

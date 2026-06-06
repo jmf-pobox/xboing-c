@@ -1216,7 +1216,7 @@ void game_render_frame(const game_ctx_t *ctx)
 
     if (effective == SDL2ST_INTRO || effective == SDL2ST_INSTRUCT || effective == SDL2ST_DEMO ||
         effective == SDL2ST_PREVIEW || effective == SDL2ST_KEYS || effective == SDL2ST_KEYSEDIT ||
-        effective == SDL2ST_HIGHSCORE)
+        effective == SDL2ST_HIGHSCORE || effective == SDL2ST_BONUS)
     {
         game_render_score(ctx);
         game_render_lives(ctx);

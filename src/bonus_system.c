@@ -26,6 +26,14 @@ struct bonus_system
     int wait_frame;          /* Target frame for wait expiry */
     int finished;            /* Set to 1 after on_finished fires */
 
+    /* Highest content state ever reached this sequence.  Tracks
+     * monotonic progression through TEXT → SCORE → BONUS → LEVEL →
+     * BULLET → TIME → HSCORE → END_TEXT.  WAIT and FINISH are
+     * excluded.  Used by the renderer to gate content lines and by
+     * the visual-capture machinery to detect substate transitions
+     * (the raw state value can't — WAIT > END_TEXT in the enum). */
+    bonus_state_t highest_reached;
+
     /* Coin count (accumulated during gameplay) */
     int coin_count;
 
@@ -53,6 +61,16 @@ struct bonus_system
 
 static void set_bonus_wait(bonus_system_t *ctx, bonus_state_t next, int target_frame)
 {
+    /* set_bonus_wait is the canonical end-of-state-body call.  Each
+     * LIVE state's body (do_text, do_score, …) calls this exactly
+     * once after drawing its content, transitioning to WAIT.  We use
+     * this hook to advance highest_reached — it tracks the highest
+     * content state whose body has just COMPLETED.  Renderer gates
+     * (at_or_past_X = highest >= X) then map exactly to the
+     * original's incremental drawing semantics: state X's content
+     * appears once X's body has run. */
+    if (ctx->state <= BONUS_STATE_END_TEXT && ctx->state > ctx->highest_reached)
+        ctx->highest_reached = ctx->state;
     ctx->wait_mode = next;
     ctx->wait_frame = target_frame;
     ctx->state = BONUS_STATE_WAIT;
@@ -161,6 +179,7 @@ void bonus_system_begin(bonus_system_t *ctx, const bonus_system_env_t *env, int 
 
     ctx->env = *env;
     ctx->state = BONUS_STATE_TEXT;
+    ctx->highest_reached = BONUS_STATE_TEXT;
     ctx->display_score = env->score;
     ctx->first_time = 1;
     ctx->finished = 0;
@@ -191,10 +210,15 @@ void bonus_system_begin(bonus_system_t *ctx, const bonus_system_env_t *env, int 
         }
     }
 
-    /* Arm timer: transition to BONUS_STATE_SCORE after 5 frames.
-     * set_bonus_wait sets state to BONUS_STATE_WAIT — the first
-     * update() call will poll the timer and transition when ready. */
-    set_bonus_wait(ctx, BONUS_STATE_SCORE, frame + 5);
+    /* Arm timer: transition to BONUS_STATE_SCORE after the standard
+     * BONUS_LINE_DELAY.  Original (bonus.c:257) used 5 frames at
+     * ~833 fps — fast.  Modern (~133 tps × 6 sub-frames per tick =
+     * ~800 sub-frames per second) needs the full line delay so the
+     * TEXT-state chrome stays on screen long enough for the
+     * visual-capture pipeline to sample it via persistent
+     * interval-sampling.  No gameplay effect: TEXT draws no content
+     * line, just sets the initial ypos. */
+    set_bonus_wait(ctx, BONUS_STATE_SCORE, frame + BONUS_LINE_DELAY);
 }
 
 /* =========================================================================
@@ -207,6 +231,8 @@ static void do_bonus_wait(bonus_system_t *ctx, int frame)
     {
         ctx->state = ctx->wait_mode;
         ctx->first_time = 1;
+        /* highest_reached is updated by set_bonus_wait when each
+         * LIVE state's body finishes — see comment there. */
     }
 }
 
@@ -220,8 +246,9 @@ static void do_bonuses(bonus_system_t *ctx, int frame)
 {
     if (ctx->env.time_bonus_secs == 0)
     {
-        /* Timer ran out — no coins count */
-        fire_sound(ctx, "wzzz");
+        /* Timer ran out — coins are voided.  Original plays "Doh4"
+         * (bonus.c:292). */
+        fire_sound(ctx, "Doh4");
         set_bonus_wait(ctx, BONUS_STATE_LEVEL, frame + BONUS_LINE_DELAY);
         ctx->first_time = 1;
         return;
@@ -229,8 +256,9 @@ static void do_bonuses(bonus_system_t *ctx, int frame)
 
     if (ctx->coin_count == 0 && ctx->first_time)
     {
-        /* No coins collected */
-        fire_sound(ctx, "wzzz");
+        /* No coins collected.  Original plays "Doh1"
+         * (bonus.c:315). */
+        fire_sound(ctx, "Doh1");
         set_bonus_wait(ctx, BONUS_STATE_LEVEL, frame + BONUS_LINE_DELAY);
         ctx->first_time = 1;
         return;
@@ -238,7 +266,7 @@ static void do_bonuses(bonus_system_t *ctx, int frame)
 
     if (ctx->coin_count > BONUS_MAX_COINS && ctx->first_time)
     {
-        /* Super bonus — one-shot display */
+        /* Super bonus — one-shot display (bonus.c:334). */
         fire_sound(ctx, "supbons");
         ctx->display_score += BONUS_SUPER_SCORE;
         ctx->coin_count = 0;
@@ -247,7 +275,9 @@ static void do_bonuses(bonus_system_t *ctx, int frame)
         return;
     }
 
-    /* Animate one coin per frame */
+    /* Animate one coin per visible step.  Original drops one
+     * coin per game tick (bonus.c:355-373) — see BONUS_STEP_DELAY
+     * for the modern cadence rationale. */
     if (ctx->coin_count > 0)
     {
         ctx->coin_count--;
@@ -258,6 +288,12 @@ static void do_bonuses(bonus_system_t *ctx, int frame)
         {
             set_bonus_wait(ctx, BONUS_STATE_LEVEL, frame + BONUS_LINE_DELAY);
             ctx->first_time = 1;
+        }
+        else
+        {
+            /* Pace the next coin so the row drops visibly instead
+             * of completing in a single visual frame. */
+            set_bonus_wait(ctx, BONUS_STATE_BONUS, frame + BONUS_STEP_DELAY);
         }
     }
 }
@@ -272,6 +308,11 @@ static void do_level(bonus_system_t *ctx, int frame)
             ctx->display_score += (unsigned long)adjusted * BONUS_LEVEL_SCORE;
         }
     }
+    else
+    {
+        /* No level bonus — timer ran out (bonus.c:421). */
+        fire_sound(ctx, "Doh2");
+    }
     set_bonus_wait(ctx, BONUS_STATE_BULLET, frame + BONUS_LINE_DELAY);
 }
 
@@ -283,19 +324,23 @@ static void do_bullets(bonus_system_t *ctx, int frame)
 
         if (ctx->env.bullet_count == 0)
         {
-            /* No bullets — skip animation */
-            fire_sound(ctx, "wzzz");
+            /* No bullets — skip animation.  Original plays "Doh3"
+             * (bonus.c:450). */
+            fire_sound(ctx, "Doh3");
             set_bonus_wait(ctx, BONUS_STATE_TIME, frame + BONUS_LINE_DELAY);
             ctx->first_time = 1;
             return;
         }
     }
 
-    /* Animate one bullet per frame */
+    /* Animate one bullet per visible step.  Original plays "key"
+     * per bullet (bonus.c:473) — see BONUS_STEP_DELAY for the
+     * modern cadence rationale. */
     if (ctx->env.bullet_count > 0)
     {
         ctx->env.bullet_count--;
         ctx->display_score += BONUS_BULLET_SCORE;
+        fire_sound(ctx, "key");
 
         if (ctx->callbacks.on_bullet_consumed)
         {
@@ -307,6 +352,11 @@ static void do_bullets(bonus_system_t *ctx, int frame)
             set_bonus_wait(ctx, BONUS_STATE_TIME, frame + BONUS_LINE_DELAY);
             ctx->first_time = 1;
         }
+        else
+        {
+            /* Pace the next bullet so the row drops visibly. */
+            set_bonus_wait(ctx, BONUS_STATE_BULLET, frame + BONUS_STEP_DELAY);
+        }
     }
 }
 
@@ -315,6 +365,11 @@ static void do_time_bonus(bonus_system_t *ctx, int frame)
     if (ctx->env.time_bonus_secs > 0)
     {
         ctx->display_score += (unsigned long)ctx->env.time_bonus_secs * BONUS_TIME_SCORE;
+    }
+    else
+    {
+        /* No time bonus — timer ran out (bonus.c:520). */
+        fire_sound(ctx, "Doh4");
     }
     set_bonus_wait(ctx, BONUS_STATE_HSCORE, frame + BONUS_LINE_DELAY);
 }
@@ -433,6 +488,15 @@ void bonus_system_dec_coins(bonus_system_t *ctx)
     }
 }
 
+void bonus_system_set_coins(bonus_system_t *ctx, int count)
+{
+    if (ctx == NULL || count < 0)
+    {
+        return;
+    }
+    ctx->coin_count = count;
+}
+
 int bonus_system_get_coins(const bonus_system_t *ctx)
 {
     if (ctx == NULL)
@@ -497,6 +561,15 @@ bonus_state_t bonus_system_get_state(const bonus_system_t *ctx)
         return BONUS_STATE_TEXT;
     }
     return ctx->state;
+}
+
+bonus_state_t bonus_system_get_highest_reached(const bonus_system_t *ctx)
+{
+    if (ctx == NULL)
+    {
+        return BONUS_STATE_TEXT;
+    }
+    return ctx->highest_reached;
 }
 
 int bonus_system_is_finished(const bonus_system_t *ctx)

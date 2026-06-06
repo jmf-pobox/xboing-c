@@ -26,7 +26,8 @@ PREFIX         ?= /usr/local
         cppcheck cppcheck-src cppcheck-tests \
         tidy check ci \
         audio-literals audio-literals-check \
-        golden-screen golden-all golden-bonus modern-screen \
+        golden-screen golden-all golden-bonus golden-bonus-all \
+        modern-screen modern-bonus modern-bonus-all bonus-fixtures \
         original-build capture-original visual-check visual-check-setup
 
 # --- Default ---------------------------------------------------------------
@@ -138,14 +139,27 @@ golden-screen: original-build ## Capture original goldens for one screen. Usage:
 golden-all: original-build ## Capture original goldens for all attract screens (one-time).
 	scripts/visual_capture.sh original "all:$(or $(INTERVAL),200)" tests/golden/original/
 
-golden-bonus: original-build ## Capture original bonus-screen goldens for all 4 scenarios.
-	for s in 1 2 3 4; do \
-	    mkdir -p tests/golden/original/bonus-$$s; \
-	    BONUS_SCENARIO=$$s scripts/visual_capture.sh original "bonus:$(or $(INTERVAL),200)" tests/golden/original/bonus-$$s; \
+golden-bonus: original-build ## Capture original goldens for one bonus scenario. Usage: make golden-bonus SCENARIO=1 INTERVAL=200
+	BONUS_SCENARIO="$(or $(SCENARIO),1)" scripts/visual_capture.sh original "bonus:$(or $(INTERVAL),200)" "tests/golden/original/bonus-$(or $(SCENARIO),1)/"
+
+golden-bonus-all: original-build ## Capture original goldens for all 4 bonus scenarios.
+	for n in 1 2 3 4; do \
+	    BONUS_SCENARIO="$$n" scripts/visual_capture.sh original "bonus:$(or $(INTERVAL),200)" "tests/golden/original/bonus-$$n/"; \
 	done
 
 modern-screen: build ## Capture modern screenshots for one screen. Usage: make modern-screen SCREEN=intro INTERVAL=200
 	scripts/visual_capture.sh modern "$(SCREEN):$(or $(INTERVAL),200)" .tmp/visual-check/modern/
+
+bonus-fixtures: build ## Generate savegame v2 fixtures for bonus-screen modern capture (4 scenarios).
+	./build/gen_bonus_fixtures tests/fixtures/bonus/
+
+modern-bonus: build bonus-fixtures ## Capture modern bonus screenshots for one scenario. Usage: make modern-bonus SCENARIO=1 INTERVAL=200
+	BONUS_SCENARIO="$(or $(SCENARIO),1)" scripts/visual_capture.sh modern "bonus:$(or $(INTERVAL),200)" ".tmp/visual-check/modern/bonus-$(or $(SCENARIO),1)/"
+
+modern-bonus-all: build bonus-fixtures ## Capture modern bonus screenshots for all 4 scenarios.
+	for n in 1 2 3 4; do \
+	    BONUS_SCENARIO="$$n" scripts/visual_capture.sh modern "bonus:$(or $(INTERVAL),200)" ".tmp/visual-check/modern/bonus-$$n/"; \
+	done
 
 dogfood: deb ## Install .deb, launch xboing from .tmp/, verify window opens (requires sudo; skips window check if headless or xwininfo missing).
 	mkdir -p .tmp
