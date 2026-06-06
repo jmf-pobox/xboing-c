@@ -47,7 +47,20 @@ int main(int argc, char *argv[])
     {
         sdl2_state_transition(ctx->state, SDL2ST_GAME);
         if (!savegame_system_load(ctx))
+        {
+            /* When visual-capture is also active, the capture pipeline
+             * is waiting on substate signals that will never be
+             * emitted from the attract cycle.  Exit non-zero so the
+             * driving script fails fast instead of stalling out on a
+             * read timeout. */
+            if (ctx->vc_mode >= 0)
+            {
+                fprintf(stderr, "xboing: -load failed under -visual-capture; aborting capture\n");
+                game_destroy(ctx);
+                return EXIT_FAILURE;
+            }
             sdl2_state_transition(ctx->state, SDL2ST_PRESENTS);
+        }
     }
     else
     {
