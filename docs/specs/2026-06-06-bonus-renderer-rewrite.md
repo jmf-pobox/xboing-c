@@ -244,9 +244,21 @@ applied via `set_bonus_wait` between each coin/bullet step in
 gives a game tick of `SDL2L_TICK_UNIT_US * (10 - SDL2L_DEFAULT_SPEED)
 = 1500 µs * 5 = 7.5 ms`. With 6 `bonus_system_update` calls per
 game tick, each sub-frame = 1.25 ms. Original `SLOW_SPEED = 30 ms`
-per coin/bullet → 30 / 1.25 = 24 sub-frames per step. Exact
-match at default speed; both scale identically with the user's
-speed setting (1-9 in modern, equivalent in original).
+per coin/bullet → 30 / 1.25 = 24 sub-frames per step.
+
+`BONUS_LINE_DELAY = 2400` (revised 2026-06-06 from initial value
+of 100). Original `LINE_DELAY=100` game ticks × `SLOW_SPEED=30 ms`
+= 3 seconds of WAIT between content states — readable rhythm for
+the player. The earlier modern value of 100 sub-frames was 24×
+too short; maintainer manually confirmed the bonus screen flashed
+by in ~2 seconds, unreadable. 2400 sub-frames × 1.25 ms = 3 s,
+matching original wall-clock. Total scenario duration ~25 s.
+
+`BONUS_INIT_DELAY = 120` for the initial TEXT→SCORE snap
+(original `bonus.c:257` uses `frame + 5` at SLOW_SPEED = 150 ms).
+
+Both scale identically with the user's speed setting (1-9 in
+modern, equivalent in original): faster speed → shorter delays.
 
 New tests in `tests/test_bonus_system.c` (Group 7, 8 cases):
 

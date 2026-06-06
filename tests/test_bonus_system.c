@@ -419,7 +419,7 @@ static void test_full_sequence(void **state)
     /* Drive the state machine forward until finished */
     int frame = 0;
     int safety = 0;
-    while (!bonus_system_is_finished(ctx) && safety < 2000)
+    while (!bonus_system_is_finished(ctx) && safety < 60000)
     {
         frame++;
         bonus_system_update(ctx, frame);
@@ -457,7 +457,7 @@ static void test_sequence_timer_expired(void **state)
     /* Drive to completion */
     int frame = 0;
     int safety = 0;
-    while (!bonus_system_is_finished(ctx) && safety < 2000)
+    while (!bonus_system_is_finished(ctx) && safety < 60000)
     {
         frame++;
         bonus_system_update(ctx, frame);
@@ -487,7 +487,7 @@ static void test_sequence_no_coins_no_bullets(void **state)
     /* Drive to completion */
     int frame = 0;
     int safety = 0;
-    while (!bonus_system_is_finished(ctx) && safety < 2000)
+    while (!bonus_system_is_finished(ctx) && safety < 60000)
     {
         frame++;
         bonus_system_update(ctx, frame);
@@ -523,7 +523,7 @@ static void test_sequence_super_bonus(void **state)
     int frame = 0;
     int safety = 0;
     int found_supbons = 0;
-    while (!bonus_system_is_finished(ctx) && safety < 2000)
+    while (!bonus_system_is_finished(ctx) && safety < 60000)
     {
         frame++;
         bonus_system_update(ctx, frame);
@@ -731,7 +731,7 @@ static void drive_sequence(bonus_system_t *ctx)
 {
     int frame = 0;
     int safety = 0;
-    while (!bonus_system_is_finished(ctx) && safety < 5000)
+    while (!bonus_system_is_finished(ctx) && safety < 60000)
     {
         frame++;
         bonus_system_update(ctx, frame);
@@ -886,7 +886,7 @@ static void test_per_coin_pacing(void **state)
      * sub-frames later). */
     int frame = 0;
     int coins_at_bonus_entry = -1;
-    while (frame < 500)
+    while (frame < 30000)
     {
         frame++;
         bonus_system_update(ctx, frame);

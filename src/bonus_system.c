@@ -219,14 +219,9 @@ void bonus_system_begin(bonus_system_t *ctx, const bonus_system_env_t *env, int 
     /* Arm timer: transition to BONUS_STATE_SCORE.  The original
      * (bonus.c:257) used `frame + 5` here — 5 game ticks at the
      * SLOW_SPEED (30 ms/tick) DrawTitleText just installed, so
-     * ~150 ms before BONUS_SCORE renders.  Modern reuses
-     * BONUS_LINE_DELAY (100 sub-frames ≈ 125 ms at default speed)
-     * — close to the original 150 ms and convenient since TEXT
-     * draws no content the renderer gates on.  Sticking with one
-     * constant keeps the inter-state delay table uniform; the
-     * gameplay-perceptible per-step pacing matches exactly via
-     * BONUS_STEP_DELAY. */
-    set_bonus_wait(ctx, BONUS_STATE_SCORE, frame + BONUS_LINE_DELAY);
+     * ~150 ms before BONUS_SCORE renders.  BONUS_INIT_DELAY
+     * matches that timing exactly at default modern speed. */
+    set_bonus_wait(ctx, BONUS_STATE_SCORE, frame + BONUS_INIT_DELAY);
 }
 
 /* =========================================================================

@@ -27,24 +27,25 @@
 #define BONUS_TIME_SCORE 100    /* Points per second remaining */
 #define BONUS_MAX_COINS 8       /* Threshold: > 8 triggers super bonus */
 #define BONUS_SAVE_LEVEL 5      /* Save enabled every N levels */
-/* Frames between content-state transitions (e.g. SCORE→BONUS).
+/* Sub-frames between content-state transitions (e.g. SCORE→BONUS).
  * The original uses LINE_DELAY=100 game ticks at SLOW_SPEED=30 ms
  * (original/bonus.c:88, main.h:83), giving ~3 seconds of WAIT
- * between each content line.  Note that the original used a
- * SHORTER wait for the very first TEXT→SCORE transition
- * (`frame + 5` at original/bonus.c:257 — ~150 ms once SLOW_SPEED
- * takes effect); modern reuses BONUS_LINE_DELAY there too (see
- * comment at the call site).
+ * between each content line — enough time for the player to read
+ * the line before the next renders.  Modern at default speed
+ * runs ATTRACT_FRAME_MULTIPLIER=6 sub-frames per 7.5 ms game
+ * tick = ~1.25 ms/sub-frame, so 2400 sub-frames ≈ 3 seconds —
+ * exact wall-clock match.
  *
- * Modern keeps the same numeric value 100 (100 sub-frames ≈
- * 125 ms at default speed) for all inter-state transitions — a
- * deliberate tooling-driven game-feel deviation, kept short so
- * the visual-capture pipeline can sample each substate without
- * each scenario taking ~25 seconds.  The per-step pacing within
- * BONUS / BULLET states (BONUS_STEP_DELAY below) DOES match the
- * original exactly; only the inter-state pause is compressed.
- * See docs/specs/2026-06-06-bonus-renderer-rewrite.md. */
-#define BONUS_LINE_DELAY 100
+ * Visual capture takes ~25 s per scenario at this value; that
+ * tooling cost is fine for the once-per-release run, and the
+ * gameplay readability matters more. */
+#define BONUS_LINE_DELAY 2400
+
+/* Sub-frames for the very first TEXT→SCORE snap.  Original
+ * (bonus.c:257) used `frame + 5` at SLOW_SPEED=30 ms ≈ 150 ms —
+ * a brief beat before "Congratulations" appears.  120 sub-frames
+ * ≈ 150 ms at default modern speed. */
+#define BONUS_INIT_DELAY 120
 
 /* Per-step pacing for coin/bullet animations within
  * BONUS_STATE_BONUS / BONUS_STATE_BULLET.  The original drops one
