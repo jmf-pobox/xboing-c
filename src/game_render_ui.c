@@ -1056,10 +1056,12 @@ void game_render_bonus(const game_ctx_t *ctx)
         {
             snprintf(buf, sizeof(buf), "Super Bonus - %d", initial);
             sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TITLE, buf, ypos, blue, W);
-            /* Advance by title_ascent to match the TITLE font used
-             * for this line; mixing text_ascent here would skew
-             * spacing for the following content. */
-            ypos += title_ascent + GAP * 2;
+            /* Advance by text_ascent to match original/bonus.c:349
+             * — the original is internally inconsistent here,
+             * drawing the line with titleFont but advancing ypos
+             * by textFont->ascent.  Matching keeps the subsequent
+             * line positions identical to the original. */
+            ypos += text_ascent + GAP * 2;
         }
         else if (sdl2_texture_get(ctx->texture, SPR_BLOCK_BONUS_1, &coin_tex) == SDL2T_OK)
         {

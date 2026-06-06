@@ -37,9 +37,12 @@ static char g_last_sound[64];
 /* Sound history buffer — captures every name passed to fire_sound
  * during a sequence so tests can assert specific names landed in
  * the right order.  Capacity 256 covers the longest realistic
- * sequence (e.g. BONUS_MAX_COINS=30 coins + 30 bullets + applause
- * + 2 Doh* paths = 63; comfortable margin above any future test
- * scenario).  Overflow is an assert (see on_sound). */
+ * sequence: BONUS_MAX_COINS=8 means at most 8 per-coin "bonus"
+ * sounds (or one "supbons" when count > 8), plus per-bullet "key"
+ * sounds (e.g. 30 in scenario 4), plus the terminal "applause"
+ * and any Doh* paths.  Worst case ~40; 256 is a comfortable
+ * margin above any future test scenario.  Overflow is an assert
+ * (see on_sound). */
 #define SOUND_HISTORY_CAP 256
 static char g_sound_history[SOUND_HISTORY_CAP][64];
 static int g_sound_history_len;

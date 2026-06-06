@@ -411,7 +411,8 @@ Run end-to-end:
 
 ```bash
 make bonus-fixtures               # one-time; regenerate if scenarios change
-make modern-bonus                 # captures all 4 scenarios × 8 substates
+make modern-bonus-all             # captures all 4 scenarios × 8 substates
+# (or `make modern-bonus SCENARIO=N` for a single scenario)
 ```
 
 Output lands at

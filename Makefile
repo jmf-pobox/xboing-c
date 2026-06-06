@@ -151,14 +151,14 @@ modern-screen: build ## Capture modern screenshots for one screen. Usage: make m
 	scripts/visual_capture.sh modern "$(SCREEN):$(or $(INTERVAL),200)" .tmp/visual-check/modern/
 
 bonus-fixtures: build ## Generate savegame v2 fixtures for bonus-screen modern capture (4 scenarios).
-	./build/gen_bonus_fixtures tests/fixtures/bonus/
+	$(BUILD_DIR)/gen_bonus_fixtures tests/fixtures/bonus/
 
 modern-bonus: build bonus-fixtures ## Capture modern bonus screenshots for one scenario. Usage: make modern-bonus SCENARIO=1 [INTERVAL=2400]
-	BONUS_SCENARIO="$(or $(SCENARIO),1)" scripts/visual_capture.sh modern "bonus:$(or $(INTERVAL),2400)" ".tmp/visual-check/modern/bonus-$(or $(SCENARIO),1)/"
+	BUILD_DIR=$(BUILD_DIR) BONUS_SCENARIO="$(or $(SCENARIO),1)" scripts/visual_capture.sh modern "bonus:$(or $(INTERVAL),2400)" ".tmp/visual-check/modern/bonus-$(or $(SCENARIO),1)/"
 
 modern-bonus-all: build bonus-fixtures ## Capture modern bonus screenshots for all 4 scenarios.
 	for n in 1 2 3 4; do \
-	    BONUS_SCENARIO="$$n" scripts/visual_capture.sh modern "bonus:$(or $(INTERVAL),2400)" ".tmp/visual-check/modern/bonus-$$n/"; \
+	    BUILD_DIR=$(BUILD_DIR) BONUS_SCENARIO="$$n" scripts/visual_capture.sh modern "bonus:$(or $(INTERVAL),2400)" ".tmp/visual-check/modern/bonus-$$n/"; \
 	done
 
 dogfood: deb ## Install .deb, launch xboing from .tmp/, verify window opens (requires sudo; skips window check if headless or xwininfo missing).
