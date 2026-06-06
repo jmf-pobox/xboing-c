@@ -91,7 +91,13 @@ static int mkdir_p(const char *path)
 static int write_one(const char *root, const scenario_t *s)
 {
     char dir[1024];
-    snprintf(dir, sizeof(dir), "%s/scenario-%d/xboing", root, s->scenario);
+    int n = snprintf(dir, sizeof(dir), "%s/scenario-%d/xboing", root, s->scenario);
+    if (n < 0 || (size_t)n >= sizeof(dir))
+    {
+        errno = ENAMETOOLONG;
+        fprintf(stderr, "scenario %d dir path too long for root '%s'\n", s->scenario, root);
+        return -1;
+    }
     if (mkdir_p(dir) != 0)
     {
         fprintf(stderr, "mkdir_p(%s): %s\n", dir, strerror(errno));
@@ -127,8 +133,15 @@ static int write_one(const char *root, const scenario_t *s)
 
     char info_path[1100];
     char level_path[1100];
-    snprintf(info_path, sizeof(info_path), "%s/save-info.dat", dir);
-    snprintf(level_path, sizeof(level_path), "%s/save-level.dat", dir);
+    int ni = snprintf(info_path, sizeof(info_path), "%s/save-info.dat", dir);
+    int nl = snprintf(level_path, sizeof(level_path), "%s/save-level.dat", dir);
+    if (ni < 0 || (size_t)ni >= sizeof(info_path) ||
+        nl < 0 || (size_t)nl >= sizeof(level_path))
+    {
+        errno = ENAMETOOLONG;
+        fprintf(stderr, "scenario %d output path too long under '%s'\n", s->scenario, dir);
+        return -1;
+    }
 
     if (savegame_io_write(info_path, &info) != SAVEGAME_IO_OK)
     {

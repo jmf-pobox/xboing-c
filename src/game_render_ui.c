@@ -937,13 +937,16 @@ void game_render_bonus(const game_ctx_t *ctx)
      * `state >= X` would draw every line at once during the first
      * WAIT period.
      *
-     * The "past_X" predicate matches the original's incremental
-     * drawing semantics: X's content is on screen once we've moved
-     * past X (highest > X).  END_TEXT is the cap, so for it we use
-     * `highest >= END_TEXT`.  This mirrors what the visual-capture
-     * pipeline captured in the goldens: each *-000 snapshot fires
-     * at the transition AWAY from its named state, by which time
-     * that state's content is already drawn. */
+     * The "at_or_past_X" predicate matches the original's
+     * incremental drawing semantics: X's content is on screen
+     * once X's body has run at least once.  set_bonus_wait
+     * (bonus_system.c) advances `highest_reached` to the current
+     * state at the end of each body, so `highest >= X` becomes
+     * true exactly when X's body has executed once — including
+     * the X==END_TEXT cap.  This mirrors what the visual-capture
+     * pipeline captured in the goldens: each *-000 snapshot
+     * fires at the transition AWAY from its named state, by
+     * which time that state's content is already drawn. */
     bonus_state_t highest = bonus_system_get_highest_reached(ctx->bonus);
     bool at_or_past_score = highest >= BONUS_STATE_SCORE;
     bool at_or_past_bonus = highest >= BONUS_STATE_BONUS;
@@ -1053,7 +1056,10 @@ void game_render_bonus(const game_ctx_t *ctx)
         {
             snprintf(buf, sizeof(buf), "Super Bonus - %d", initial);
             sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TITLE, buf, ypos, blue, W);
-            ypos += text_ascent + GAP * 2;
+            /* Advance by title_ascent to match the TITLE font used
+             * for this line; mixing text_ascent here would skew
+             * spacing for the following content. */
+            ypos += title_ascent + GAP * 2;
         }
         else if (sdl2_texture_get(ctx->texture, SPR_BLOCK_BONUS_1, &coin_tex) == SDL2T_OK)
         {

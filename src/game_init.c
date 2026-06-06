@@ -112,6 +112,8 @@ static void print_usage(FILE *out)
                  "  -nickname <name>    Set high-score nickname\n"
                  "  -debug              Enable debug mode\n"
                  "  -grab               Grab pointer to window\n"
+                 "  -load               On startup, autoload the saved game (skips\n"
+                 "                      attract cycle); used by visual-capture scripts\n"
                  "\n"
                  "Audio options:\n"
                  "  -sound              Enable sound (default)\n"

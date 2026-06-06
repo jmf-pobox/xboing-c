@@ -61,14 +61,20 @@ struct bonus_system
 
 static void set_bonus_wait(bonus_system_t *ctx, bonus_state_t next, int target_frame)
 {
-    /* set_bonus_wait is the canonical end-of-state-body call.  Each
-     * LIVE state's body (do_text, do_score, …) calls this exactly
-     * once after drawing its content, transitioning to WAIT.  We use
-     * this hook to advance highest_reached — it tracks the highest
-     * content state whose body has just COMPLETED.  Renderer gates
-     * (at_or_past_X = highest >= X) then map exactly to the
-     * original's incremental drawing semantics: state X's content
-     * appears once X's body has run. */
+    /* set_bonus_wait is the canonical end-of-state-body call and
+     * the single hook that advances `highest_reached`.  Most LIVE
+     * states (do_text, do_score, …) call it once at end-of-body
+     * to transition to the next content state.  do_bonuses and
+     * do_bullets ALSO call it once per pacing step to re-arm WAIT
+     * back into the SAME state (next == ctx->state) — see
+     * BONUS_STEP_DELAY for the rationale.  Multiple calls in the
+     * same state are correct: the `state > highest_reached`
+     * guard makes the highest_reached advance idempotent, so a
+     * self-rearm keeps highest_reached pinned to the current
+     * state without double-advancing.  Renderer gates
+     * (at_or_past_X = highest >= X) then map to the original's
+     * incremental drawing semantics: state X's content appears
+     * once X's body has run at least once. */
     if (ctx->state <= BONUS_STATE_END_TEXT && ctx->state > ctx->highest_reached)
         ctx->highest_reached = ctx->state;
     ctx->wait_mode = next;
