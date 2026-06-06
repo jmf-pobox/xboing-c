@@ -629,7 +629,9 @@ endif()
 
 # gen_bonus_fixtures — writes savegame v2 JSON files for bonus-screen
 # visual-capture scenarios.  Not installed.  Used by `make
-# golden-bonus-modern` to seed XDG_DATA_HOME before the capture run.
+# bonus-fixtures` to seed tests/fixtures/bonus/scenario-N/ which the
+# `make modern-bonus` / `modern-bonus-all` targets then point
+# XDG_DATA_HOME at before the capture run.
 add_executable(gen_bonus_fixtures tools/gen_bonus_fixtures.c)
 target_compile_options(gen_bonus_fixtures PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
 target_link_libraries(gen_bonus_fixtures PRIVATE savegame_io)

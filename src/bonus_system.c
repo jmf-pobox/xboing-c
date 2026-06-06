@@ -210,14 +210,16 @@ void bonus_system_begin(bonus_system_t *ctx, const bonus_system_env_t *env, int 
         }
     }
 
-    /* Arm timer: transition to BONUS_STATE_SCORE after the standard
-     * BONUS_LINE_DELAY.  Original (bonus.c:257) used 5 frames at
-     * ~833 fps — fast.  Modern (~133 tps × 6 sub-frames per tick =
-     * ~800 sub-frames per second) needs the full line delay so the
-     * TEXT-state chrome stays on screen long enough for the
-     * visual-capture pipeline to sample it via persistent
-     * interval-sampling.  No gameplay effect: TEXT draws no content
-     * line, just sets the initial ypos. */
+    /* Arm timer: transition to BONUS_STATE_SCORE.  The original
+     * (bonus.c:257) used `frame + 5` here — 5 game ticks at the
+     * SLOW_SPEED (30 ms/tick) DrawTitleText just installed, so
+     * ~150 ms before BONUS_SCORE renders.  Modern reuses
+     * BONUS_LINE_DELAY (100 sub-frames ≈ 125 ms at default speed)
+     * — close to the original 150 ms and convenient since TEXT
+     * draws no content the renderer gates on.  Sticking with one
+     * constant keeps the inter-state delay table uniform; the
+     * gameplay-perceptible per-step pacing matches exactly via
+     * BONUS_STEP_DELAY. */
     set_bonus_wait(ctx, BONUS_STATE_SCORE, frame + BONUS_LINE_DELAY);
 }
 

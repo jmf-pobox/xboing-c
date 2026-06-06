@@ -64,7 +64,13 @@ static int mkdir_p(const char *path)
     char buf[512];
     size_t len = strlen(path);
     if (len >= sizeof(buf))
+    {
+        /* Set errno so the caller's strerror(errno) reports the
+         * actual cause rather than whatever value happened to be
+         * in errno from a prior unrelated syscall. */
+        errno = ENAMETOOLONG;
         return -1;
+    }
     memcpy(buf, path, len + 1);
 
     for (size_t i = 1; i < len; i++)

@@ -28,15 +28,22 @@
 #define BONUS_MAX_COINS 8       /* Threshold: > 8 triggers super bonus */
 #define BONUS_SAVE_LEVEL 5      /* Save enabled every N levels */
 /* Frames between content-state transitions (e.g. SCORE→BONUS).
- * The original uses LINE_DELAY=100 game ticks at SLOW_SPEED=30ms,
- * giving ~3 seconds of WAIT between each content line.  Modern
- * keeps the same numeric value (100 sub-frames ≈ 125 ms at default
- * speed) — a deliberate tooling-driven game-feel deviation, kept
- * short so the visual-capture pipeline can sample each substate
- * without each scenario taking ~25 seconds.  The per-step pacing
- * within BONUS / BULLET states (BONUS_STEP_DELAY below) DOES
- * match the original exactly; only the inter-state pause is
- * compressed.  See docs/specs/2026-06-06-bonus-renderer-rewrite.md. */
+ * The original uses LINE_DELAY=100 game ticks at SLOW_SPEED=30 ms
+ * (original/bonus.c:88, main.h:83), giving ~3 seconds of WAIT
+ * between each content line.  Note that the original used a
+ * SHORTER wait for the very first TEXT→SCORE transition
+ * (`frame + 5` at original/bonus.c:257 — ~150 ms once SLOW_SPEED
+ * takes effect); modern reuses BONUS_LINE_DELAY there too (see
+ * comment at the call site).
+ *
+ * Modern keeps the same numeric value 100 (100 sub-frames ≈
+ * 125 ms at default speed) for all inter-state transitions — a
+ * deliberate tooling-driven game-feel deviation, kept short so
+ * the visual-capture pipeline can sample each substate without
+ * each scenario taking ~25 seconds.  The per-step pacing within
+ * BONUS / BULLET states (BONUS_STEP_DELAY below) DOES match the
+ * original exactly; only the inter-state pause is compressed.
+ * See docs/specs/2026-06-06-bonus-renderer-rewrite.md. */
 #define BONUS_LINE_DELAY 100
 
 /* Per-step pacing for coin/bullet animations within
