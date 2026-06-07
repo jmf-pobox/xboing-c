@@ -5,6 +5,8 @@
  * caller-provided buffers.  See include/paths.h for API docs.
  */
 
+#define _GNU_SOURCE /* secure_getenv (AT_SECURE-aware env lookup) */
+
 #include "paths.h"
 
 #include <dirent.h> /* opendir/closedir for asset-dir readability check */
@@ -107,10 +109,19 @@ static void parse_data_dirs(paths_config_t *cfg, const char *dirs)
 
 paths_status_t paths_init(paths_config_t *cfg)
 {
+    /* XBOING_SCORE_FILE drives the elevated /var/games write path
+     * (highscore_io_insert_global_atomic runs after sys_priv_elevate).
+     * Honoring an attacker-controlled value from a setgid execution
+     * context would let any local user redirect the elevated write to
+     * any file the games group can touch.  secure_getenv returns NULL
+     * under AT_SECURE so the binary falls back to the hard-coded
+     * /var/games/xboing/scores.dat path when invoked via setgid.
+     * The other env vars only affect read paths or the unelevated
+     * personal write, so plain getenv is fine for those. */
     return paths_init_explicit(cfg, getenv("HOME"), getenv("XDG_DATA_HOME"),
                                getenv("XDG_CONFIG_HOME"), getenv("XDG_DATA_DIRS"),
                                getenv("XBOING_LEVELS_DIR"), getenv("XBOING_SOUND_DIR"),
-                               getenv("XBOING_SCORE_FILE"));
+                               secure_getenv("XBOING_SCORE_FILE"));
 }
 
 paths_status_t paths_init_explicit(paths_config_t *cfg, const char *home, const char *xdg_data_home,
