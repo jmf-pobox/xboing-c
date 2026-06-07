@@ -63,6 +63,7 @@ typedef struct
     unsigned long level;
     unsigned long game_time; /* total seconds */
     unsigned long timestamp; /* unix time */
+    unsigned long user_id;   /* getuid() of the player — global-table dedup key */
     char name[HIGHSCORE_NAME_LEN];
 } highscore_entry_t;
 

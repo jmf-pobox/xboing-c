@@ -12,6 +12,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 #include "ball_system.h"
 #include "ball_types.h"
@@ -173,16 +174,33 @@ static void try_spawn_bonus(game_ctx_t *ctx, int frame)
 
 void game_rules_next_level(game_ctx_t *ctx)
 {
-    ctx->level_number++;
-
-    int file_num = level_system_wrap_number(ctx->level_number);
+    /* Resolve the next level's file before mutating ctx->level_number
+     * or clearing the block grid.  A failed load mid-mutation would
+     * leave the grid empty and level_number incremented — the next
+     * game_rules_check tick would see no required blocks and re-enter
+     * BONUS, looping forever. */
+    int next_level = ctx->level_number + 1;
+    int file_num = level_system_wrap_number(next_level);
     char filename[32];
     snprintf(filename, sizeof(filename), "level%02d.data", file_num);
 
     char level_path[PATHS_MAX_PATH];
-    if (paths_level_file(&ctx->paths, filename, level_path, sizeof(level_path)) != PATHS_OK)
+    if (paths_level_file(&ctx->paths, filename, level_path, sizeof(level_path)) != PATHS_OK ||
+        access(level_path, R_OK) != 0)
     {
-        fprintf(stderr, "Warning: could not find level file: %s\n", filename);
+        /* Resolve failed or file unreadable — original/level.c calls
+         * ShutDown which exits the process.  Modernized: end the game
+         * cleanly via the highscore screen so the player's score is
+         * still submitted (matches game_rules_ball_died semantics).
+         * Probe BEFORE clearing the grid so we don't strand the
+         * player on an empty board if the transition is delayed. */
+        fprintf(stderr, "xboing: cannot advance past level %d (no readable file for %s)\n",
+                ctx->level_number, filename);
+        if (ctx->audio)
+            sdl2_audio_play(ctx->audio, "game_over");
+        message_system_set(ctx->message, "- Level data missing -", 0,
+                           (int)sdl2_state_frame(ctx->state));
+        sdl2_state_transition(ctx->state, SDL2ST_HIGHSCORE);
         return;
     }
 
@@ -192,19 +210,41 @@ void game_rules_next_level(game_ctx_t *ctx)
     gun_system_clear(ctx->gun);
     special_system_turn_off(ctx->special);
 
-    /* Load the level */
+    /* Load the level — even after access() probe a parse failure can
+     * still occur on truncated/corrupt files.  Same end-the-game
+     * semantic as the unreadable path: the grid is already cleared,
+     * so we must move out of GAME mode to avoid the infinite
+     * BONUS-loop game_rules_check would otherwise trigger. */
+    if (level_system_load_file(ctx->level, level_path) != LEVEL_SYS_OK)
+    {
+        fprintf(stderr, "xboing: failed to parse level file %s; ending game on level %d\n",
+                level_path, ctx->level_number);
+        if (ctx->audio)
+            sdl2_audio_play(ctx->audio, "game_over");
+        message_system_set(ctx->message, "- Level data corrupt -", 0,
+                           (int)sdl2_state_frame(ctx->state));
+        sdl2_state_transition(ctx->state, SDL2ST_HIGHSCORE);
+        return;
+    }
     level_system_advance_background(ctx->level);
-    level_system_load_file(ctx->level, level_path);
+    ctx->level_number = next_level;
 
     /* Reset timer for new level */
     ctx->time_bonus_total = level_system_get_time_bonus(ctx->level);
     ctx->time_remaining = ctx->time_bonus_total;
     ctx->timer_frame_acc = 0;
 
-    /* Set level title as default message */
+    /* Display new level title in message bar and register as default.
+     * Mirrors original/file.c:SetupStage:148-150. */
     const char *title = level_system_get_title(ctx->level);
     if (title)
-        message_system_set_default(ctx->message, title);
+    {
+        char msg[80];
+        snprintf(msg, sizeof(msg), "- %s -", title);
+        message_system_set_default(ctx->message, msg);
+        int frame = (int)sdl2_state_frame(ctx->state);
+        message_system_set(ctx->message, msg, 0, frame);
+    }
 
     /* Reset paddle to center, clear reverse, place new ball.
      * Matches original/file.c:122 — SetReverseOff() inside SetupStage. */
@@ -230,8 +270,10 @@ void game_rules_next_level(game_ctx_t *ctx)
      * pickups across multiple levels. */
     ctx->bonus_count = 0;
 
-    if (ctx->audio)
-        sdl2_audio_play(ctx->audio, "applause");
+    /* No applause on level entry — original plays "applause" only at
+     * level-complete (original/level.c:413) and at the end of the bonus
+     * tally (original/bonus.c:600, mirrored in bonus_system.c::do_end_text).
+     * A third applause here would double-fire on every level transition. */
 }
 
 /* =========================================================================
@@ -249,13 +291,13 @@ void game_rules_ball_died(game_ctx_t *ctx)
 
     if (ctx->lives_left <= 0)
     {
-        /* Game over */
-        ctx->game_active = false;
+        /* Game over.  Don't clear ctx->game_active here — the highscore
+         * mode's on_enter uses it to distinguish real game-over from
+         * attract-cycle entry, and clears it itself after submitting. */
         if (ctx->audio)
             sdl2_audio_play(ctx->audio, "game_over");
         message_system_set(ctx->message, "GAME OVER", 0, 0);
 
-        /* Transition to high score screen (will be wired in phase 3) */
         sdl2_state_transition(ctx->state, SDL2ST_HIGHSCORE);
         return;
     }

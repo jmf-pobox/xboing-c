@@ -472,7 +472,7 @@ if(SDL2_FOUND AND SDL2_IMAGE_FOUND AND SDL2_MIXER_FOUND AND SDL2_TTF_FOUND)
         level_system special_system bonus_system sfx_system eyedude_system
         message_system editor_system
         # Persistence
-        highscore_io savegame_io savegame_system config_io paths
+        highscore_io savegame_io savegame_system config_io paths sys_priv
         # Math
         score_logic m
         # UI sequencers
@@ -511,7 +511,7 @@ if(SDL2_FOUND AND SDL2_IMAGE_FOUND AND SDL2_MIXER_FOUND AND SDL2_TTF_FOUND)
         ball_system block_system block_sound paddle_system gun_system score_system
         level_system special_system bonus_system sfx_system eyedude_system
         message_system editor_system
-        highscore_io savegame_io savegame_system config_io paths
+        highscore_io savegame_io savegame_system config_io paths sys_priv
         score_logic m
         presents_system intro_system demo_system keys_system
         dialogue_system highscore_system
@@ -548,7 +548,7 @@ if(SDL2_FOUND AND SDL2_IMAGE_FOUND AND SDL2_MIXER_FOUND AND SDL2_TTF_FOUND)
         ball_system block_system block_sound paddle_system gun_system score_system
         level_system special_system bonus_system sfx_system eyedude_system
         message_system editor_system
-        highscore_io savegame_io savegame_system config_io paths
+        highscore_io savegame_io savegame_system config_io paths sys_priv
         score_logic m
         presents_system intro_system demo_system keys_system
         dialogue_system highscore_system
@@ -586,7 +586,7 @@ if(SDL2_FOUND AND SDL2_IMAGE_FOUND AND SDL2_MIXER_FOUND AND SDL2_TTF_FOUND)
             ball_system block_system block_sound paddle_system gun_system score_system
             level_system special_system bonus_system sfx_system eyedude_system
             message_system editor_system
-            highscore_io savegame_io savegame_system config_io paths
+            highscore_io savegame_io savegame_system config_io paths sys_priv
             score_logic m
             presents_system intro_system demo_system keys_system
             dialogue_system highscore_system

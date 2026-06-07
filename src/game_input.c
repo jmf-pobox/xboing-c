@@ -336,7 +336,11 @@ void game_input_global(game_ctx_t *ctx)
     {
         char range_msg[64];
         snprintf(range_msg, sizeof(range_msg), "Level range is [1-%d]", LEVEL_MAX_NUM);
-        message_system_set(ctx->message, range_msg, 0, frame);
+        /* auto_clear=1: transient hint, expires after MESSAGE_CLEAR_DELAY.
+         * Without this, a cancelled dialog leaves the range hint stuck
+         * in the message bar forever (mode_dialogue_exit's level_pending
+         * cancel branch doesn't touch the bar). */
+        message_system_set(ctx->message, range_msg, 1, frame);
 
         if (sdl2_state_push_dialogue(ctx->state) == SDL2ST_OK)
         {

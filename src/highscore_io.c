@@ -7,10 +7,13 @@
 #include "highscore_io.h"
 
 #include <errno.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/file.h>
 #include <sys/stat.h>
+#include <unistd.h>
 
 /* =========================================================================
  * Internal: JSON writing helpers
@@ -105,8 +108,9 @@ static int write_table_json(FILE *fp, const highscore_table_t *table)
         const highscore_entry_t *e = &table->entries[i];
         if (fprintf(fp,
                     "    {\"score\": %lu, \"level\": %lu, "
-                    "\"game_time\": %lu, \"timestamp\": %lu, \"name\": ",
-                    e->score, e->level, e->game_time, e->timestamp) < 0)
+                    "\"game_time\": %lu, \"timestamp\": %lu, "
+                    "\"user_id\": %lu, \"name\": ",
+                    e->score, e->level, e->game_time, e->timestamp, e->user_id) < 0)
         {
             return -1;
         }
@@ -338,11 +342,13 @@ static int read_table_json(FILE *fp, highscore_table_t *table)
                 return -1;
             }
 
+            int array_closed = 0;
             for (int i = 0; i < HIGHSCORE_NUM_ENTRIES; i++)
             {
                 c = skip_ws(fp);
                 if (c == ']')
                 {
+                    array_closed = 1;
                     break;
                 }
                 if (c == ',')
@@ -351,6 +357,7 @@ static int read_table_json(FILE *fp, highscore_table_t *table)
                 }
                 if (c == ']')
                 {
+                    array_closed = 1;
                     break;
                 }
                 if (c != '{')
@@ -407,6 +414,10 @@ static int read_table_json(FILE *fp, highscore_table_t *table)
                     {
                         e->timestamp = read_ulong(fp);
                     }
+                    else if (strcmp(ekey, "user_id") == 0)
+                    {
+                        e->user_id = read_ulong(fp);
+                    }
                     else if (strcmp(ekey, "name") == 0)
                     {
                         c = skip_ws(fp);
@@ -427,14 +438,21 @@ static int read_table_json(FILE *fp, highscore_table_t *table)
                 }
             }
 
-            /* Skip to end of array. */
-            c = skip_ws(fp);
-            if (c != ']')
+            /* Skip to end of array only if the inner loop hit the
+             * NUM_ENTRIES cap before seeing `]` — otherwise the inner
+             * loop already consumed the closing bracket and another
+             * skip_ws here would eat the surrounding `}` or trailing
+             * key, silently destroying the parse for empty-array files. */
+            if (!array_closed)
             {
-                /* Consume remaining entries (if > NUM_ENTRIES). */
-                while (c != ']' && c != EOF)
+                c = skip_ws(fp);
+                if (c != ']')
                 {
-                    c = fgetc(fp);
+                    /* Consume remaining entries (if > NUM_ENTRIES). */
+                    while (c != ']' && c != EOF)
+                    {
+                        c = fgetc(fp);
+                    }
                 }
             }
         }
@@ -617,6 +635,164 @@ void highscore_io_sort(highscore_table_t *table)
     }
 }
 
+/* =========================================================================
+ * Global atomic insert — read-modify-write under flock with uid dedup.
+ * ========================================================================= */
+
+highscore_io_result_t
+highscore_io_insert_global_atomic(const char *path, unsigned long score, unsigned long level,
+                                  unsigned long game_time, unsigned long timestamp,
+                                  unsigned long user_id, const char *name, const char *master_text)
+{
+    if (!path || !name)
+    {
+        return HIGHSCORE_IO_ERR_NULL;
+    }
+
+    ensure_parent_dir(path);
+
+    /* Lock file lives next to the table file.  flock(LOCK_EX)
+     * serializes concurrent writers (multiple users finishing games
+     * at the same time). */
+    char lock_path[1024];
+    snprintf(lock_path, sizeof(lock_path), "%s.lock", path);
+
+    int lock_fd = open(lock_path, O_CREAT | O_RDWR, 0664);
+    if (lock_fd < 0)
+    {
+        return HIGHSCORE_IO_ERR_OPEN;
+    }
+    if (flock(lock_fd, LOCK_EX) != 0)
+    {
+        close(lock_fd);
+        return HIGHSCORE_IO_ERR_OPEN;
+    }
+
+    /* Re-read from disk so we see any concurrent updates. */
+    highscore_table_t table;
+    highscore_io_result_t rd = highscore_io_read(path, &table);
+    if (rd == HIGHSCORE_IO_ERR_VERSION)
+    {
+        /* Refuse to clobber a wrong-version file under the global lock —
+         * the player would lose other users' scores.  Sysadmin must
+         * resolve before any further global writes. */
+        flock(lock_fd, LOCK_UN);
+        close(lock_fd);
+        fprintf(stderr,
+                "xboing: global high score file %s has unsupported version; "
+                "refusing to overwrite\n",
+                path);
+        return HIGHSCORE_IO_ERR_VERSION;
+    }
+    if (rd != HIGHSCORE_IO_OK)
+    {
+        /* File missing or unparseable — initialise an empty table.
+         * Postinst seeds the file but a sysadmin may have wiped it. */
+        highscore_io_init_table(&table);
+    }
+
+    /* Per-uid dedup (original/highscore.c:721-737).  If this user
+     * already has an entry, keep whichever score is higher.  Walking
+     * the array is fine — HIGHSCORE_NUM_ENTRIES is 10.
+     *
+     * Original assumes one entry per uid as an invariant.  A
+     * hand-edited file can violate it.  Be defensive: find the
+     * highest existing score for our uid, gate on it, then remove
+     * EVERY entry for our uid before the standard rank insert.  Net
+     * effect: post-insert the table holds exactly one entry per uid
+     * regardless of pre-existing duplicates. */
+    unsigned long existing_best = 0;
+    int existing_count = 0;
+    for (int i = 0; i < HIGHSCORE_NUM_ENTRIES; i++)
+    {
+        if (table.entries[i].user_id == user_id && table.entries[i].score > 0)
+        {
+            existing_count++;
+            if (table.entries[i].score > existing_best)
+            {
+                existing_best = table.entries[i].score;
+            }
+        }
+    }
+    if (existing_count > 0 && score <= existing_best)
+    {
+        flock(lock_fd, LOCK_UN);
+        close(lock_fd);
+        return HIGHSCORE_IO_ERR_NOT_RANKED;
+    }
+    if (existing_count > 0)
+    {
+        /* Compact: copy non-our-uid entries, zero-fill the tail. */
+        highscore_entry_t kept[HIGHSCORE_NUM_ENTRIES];
+        memset(kept, 0, sizeof(kept));
+        int n = 0;
+        for (int i = 0; i < HIGHSCORE_NUM_ENTRIES; i++)
+        {
+            if (table.entries[i].user_id != user_id)
+            {
+                kept[n++] = table.entries[i];
+            }
+        }
+        memcpy(table.entries, kept, sizeof(table.entries));
+    }
+
+    /* Standard rank insert.  Use strict > — original/highscore.c:743
+     * uses `score > ntohl(highScores[i].score)`; ties do NOT displace.
+     * (The display-side highscore_io_get_ranking uses >= because
+     * original/highscore.c:633 does too — different semantic.) */
+    int rank = -1;
+    for (int i = 0; i < HIGHSCORE_NUM_ENTRIES; i++)
+    {
+        if (score > table.entries[i].score)
+        {
+            rank = i;
+            break;
+        }
+    }
+    if (rank < 0)
+    {
+        flock(lock_fd, LOCK_UN);
+        close(lock_fd);
+        return HIGHSCORE_IO_ERR_NOT_RANKED;
+    }
+    for (int i = HIGHSCORE_NUM_ENTRIES - 1; i > rank; i--)
+    {
+        table.entries[i] = table.entries[i - 1];
+    }
+    highscore_entry_t *e = &table.entries[rank];
+    e->score = score;
+    e->level = level;
+    e->game_time = game_time;
+    e->timestamp = timestamp;
+    e->user_id = user_id;
+    strncpy(e->name, name, HIGHSCORE_NAME_LEN - 1);
+    e->name[HIGHSCORE_NAME_LEN - 1] = '\0';
+
+    /* New boing master — update master_name and master_text together
+     * so they always describe the same person.  Original writes both
+     * unconditionally at i==0 (highscore.c:744 ShiftScoresDown sets
+     * name, :749 SetBoingMasterText sets text); the caller may pass
+     * NULL/empty for master_text on a cancelled wisdom dialog, in
+     * which case we use the default placeholder rather than leave the
+     * previous master's quote attached to a new name. */
+    if (rank == 0)
+    {
+        strncpy(table.master_name, name, HIGHSCORE_NAME_LEN - 1);
+        table.master_name[HIGHSCORE_NAME_LEN - 1] = '\0';
+        const char *text =
+            (master_text && master_text[0] != '\0') ? master_text : "Anyone play this game?";
+        strncpy(table.master_text, text, HIGHSCORE_NAME_LEN - 1);
+        table.master_text[HIGHSCORE_NAME_LEN - 1] = '\0';
+    }
+
+    highscore_io_result_t wr = highscore_io_write(path, &table);
+
+    flock(lock_fd, LOCK_UN);
+    close(lock_fd);
+
+    return wr;
+}
+
 highscore_io_result_t highscore_io_insert(highscore_table_t *table, unsigned long score,
                                           unsigned long level, unsigned long game_time,
                                           unsigned long timestamp, const char *name)
@@ -626,7 +802,9 @@ highscore_io_result_t highscore_io_insert(highscore_table_t *table, unsigned lon
         return HIGHSCORE_IO_ERR_NULL;
     }
 
-    /* Find the insertion rank. */
+    /* Find the insertion rank.  Use strict > — original/highscore.c:777
+     * uses `score > ntohl(highScores[i].score)` for the personal insert,
+     * so ties do not displace. */
     int rank = -1;
     for (int i = 0; i < HIGHSCORE_NUM_ENTRIES; i++)
     {
@@ -654,6 +832,7 @@ highscore_io_result_t highscore_io_insert(highscore_table_t *table, unsigned lon
     e->level = level;
     e->game_time = game_time;
     e->timestamp = timestamp;
+    e->user_id = 0; /* personal-table entries don't track uid */
     strncpy(e->name, name, HIGHSCORE_NAME_LEN - 1);
     e->name[HIGHSCORE_NAME_LEN - 1] = '\0';
 
@@ -676,13 +855,57 @@ int highscore_io_get_ranking(const highscore_table_t *table, unsigned long score
 
     for (int i = 0; i < HIGHSCORE_NUM_ENTRIES; i++)
     {
-        if (score > table->entries[i].score)
+        /* Match original/highscore.c:633 — ties rank ahead. */
+        if (score >= table->entries[i].score)
         {
             return i + 1; /* 1-based rank */
         }
     }
 
     return -1;
+}
+
+int highscore_io_would_be_global_master(const highscore_table_t *table, unsigned long score,
+                                        unsigned long user_id)
+{
+    if (!table)
+    {
+        return 0;
+    }
+
+    /* Per-uid dedup: the locked insert returns NOT_RANKED whenever
+     * new_score <= MAX(our existing scores).  Walk every entry rather
+     * than breaking at the first match — a hand-edited file may carry
+     * duplicates, and the insert dedups against the highest of them. */
+    unsigned long existing_best = 0;
+    for (int i = 0; i < HIGHSCORE_NUM_ENTRIES; i++)
+    {
+        if (table->entries[i].user_id == user_id && table->entries[i].score > existing_best)
+        {
+            existing_best = table->entries[i].score;
+        }
+    }
+    if (existing_best > 0 && score <= existing_best)
+    {
+        return 0;
+    }
+
+    /* Find the top score from users other than us.  The atomic insert
+     * uses strict > (matching original/highscore.c:743), so we must
+     * strictly beat top_other to land at rank 0. */
+    unsigned long top_other = 0;
+    for (int i = 0; i < HIGHSCORE_NUM_ENTRIES; i++)
+    {
+        if (table->entries[i].user_id == user_id)
+        {
+            continue;
+        }
+        if (table->entries[i].score > top_other)
+        {
+            top_other = table->entries[i].score;
+        }
+    }
+    return score > top_other ? 1 : 0;
 }
 
 /* =========================================================================

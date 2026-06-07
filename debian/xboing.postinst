@@ -1,0 +1,51 @@
+#!/bin/sh
+# postinst — create the shared high-score directory + seed file.
+#
+# Debian Policy 11.5: shared game state lives under /var/games/<game>/.
+# The xboing binary is installed setgid games (debian/rules) so any
+# user can update the global scores file via the games group.
+
+set -e
+
+case "$1" in
+    configure)
+        # Record the desired binary ownership via dpkg-statoverride so
+        # it persists across upgrades and is reset on remove.
+        if ! dpkg-statoverride --list /usr/games/xboing >/dev/null 2>&1; then
+            dpkg-statoverride --update --add root games 2755 /usr/games/xboing
+        fi
+
+        # Create the directory the first time.  Idempotent on upgrade.
+        if [ ! -d /var/games/xboing ]; then
+            mkdir -p /var/games/xboing
+        fi
+        chown root:games /var/games/xboing
+        chmod 2775 /var/games/xboing
+
+        # Seed an empty scores file so the first run has something to
+        # read.  The file format is a JSON skeleton matching
+        # highscore_io_init_table.
+        if [ ! -f /var/games/xboing/scores.dat ]; then
+            cat > /var/games/xboing/scores.dat <<'JSON'
+{
+  "version": 1,
+  "master_name": "",
+  "master_text": "Anyone play this game?",
+  "entries": []
+}
+JSON
+        fi
+        chown root:games /var/games/xboing/scores.dat
+        chmod 0664 /var/games/xboing/scores.dat
+        ;;
+    abort-upgrade|abort-remove|abort-deconfigure)
+        ;;
+    *)
+        echo "postinst called with unknown argument: $1" >&2
+        exit 1
+        ;;
+esac
+
+#DEBHELPER#
+
+exit 0

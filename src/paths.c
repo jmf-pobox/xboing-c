@@ -275,7 +275,7 @@ static paths_status_t xdg_user_path(const paths_config_t *cfg, const char *leaf,
 
 paths_status_t paths_score_file_global(const paths_config_t *cfg, char *buf, size_t bufsize)
 {
-    /* 1. Legacy env var override. */
+    /* XBOING_SCORE_FILE env var override for tests / sysadmin use. */
     if (cfg->xboing_score_file[0] != '\0')
     {
         if (safe_copy(buf, bufsize, cfg->xboing_score_file) != 0)
@@ -283,27 +283,18 @@ paths_status_t paths_score_file_global(const paths_config_t *cfg, char *buf, siz
         return PATHS_OK;
     }
 
-    /* 2. If a legacy file exists on disk, use it (migration compat). */
-    paths_status_t st = build_path(buf, bufsize, cfg->home, ".xboing.scr", NULL, NULL);
-    if (st == PATHS_TRUNCATED)
+    /* FHS 11.5: shared game state lives under /var/games/<game>/.
+     * The .deb postinst creates this directory as root:games 2775 and
+     * seeds scores.dat as root:games 0664.  The xboing binary is
+     * installed setgid games so writes (when implemented) can land
+     * here without being world-writable. */
+    if (safe_copy(buf, bufsize, "/var/games/xboing/scores.dat") != 0)
         return PATHS_TRUNCATED;
-    if (file_exists(buf))
-        return PATHS_OK;
-
-    /* 3. Default to XDG for new installs: XDG_DATA_HOME/xboing/scores.dat */
-    return xdg_user_path(cfg, "scores.dat", buf, bufsize);
+    return PATHS_OK;
 }
 
 paths_status_t paths_score_file_personal(const paths_config_t *cfg, char *buf, size_t bufsize)
 {
-    /* 1. If a legacy file exists on disk, use it (migration compat). */
-    paths_status_t st = build_path(buf, bufsize, cfg->home, ".xboing-scores", NULL, NULL);
-    if (st == PATHS_TRUNCATED)
-        return PATHS_TRUNCATED;
-    if (file_exists(buf))
-        return PATHS_OK;
-
-    /* 2. Default to XDG for new installs: XDG_DATA_HOME/xboing/personal-scores.dat */
     return xdg_user_path(cfg, "personal-scores.dat", buf, bufsize);
 }
 

@@ -2394,3 +2394,291 @@ score computation.
 - The reset path is unchanged: `ctx->bonus_count` is reset to
   0 by `game_rules_next_level` (`src/game_rules.c:231`) after
   the bonus screen finishes, which is the correct moment.
+
+## ADR-041: Multi-user global high scores via setgid-games + flock
+
+**Status:** Accepted (2026-06-07)
+**Context:** `feat/multi-user-global-scores` — shared system-wide
+high score table.
+
+The original game (1996) installed setgid `games` and wrote a single
+shared global score file at a system path (`/var/games/xboing/scores`
+on Debian Policy systems). It used `lockf()` around each insert and
+deduplicated by `getuid()` so one player could not dominate the table.
+
+The pre-existing modern build wrote both "global" and "personal" score
+files under `$XDG_DATA_HOME/xboing/`, scoped to one Unix user. That
+removed the multi-user semantic entirely — every user saw their own
+"global" table, and the per-uid dedup was meaningless.
+
+**Decision:** Restore the original's deployment model on modern Linux:
+
+1. **Path.** `paths_score_file_global` returns
+   `/var/games/xboing/scores.dat` per FHS Section 11.5. The personal
+   path stays at `$XDG_DATA_HOME/xboing/personal-scores.dat` (one
+   per-user file, no cross-user contention).
+2. **Binary mode.** `/usr/games/xboing` is installed mode `2755`,
+   owner `root:games` (Debian Policy 11.5). `debian/rules` uses
+   `override_dh_fixperms: dh_fixperms --exclude=usr/games/xboing`
+   so `dh_fixperms` does not strip the setgid bit.
+3. **Persistent permissions.** `debian/xboing.postinst` registers
+   `dpkg-statoverride --update --add root games 2755 /usr/games/xboing`
+   so the mode survives package upgrades. The postinst also creates
+   `/var/games/xboing/` mode `2775 root:games` (setgid directory so
+   files created inside inherit group=games) and seeds an empty
+   `scores.dat` mode `0664 root:games`. `debian/xboing.postrm` reverses
+   both on purge.
+4. **Egid drop.** `sys_priv_init()` (`src/sys_priv.c`) saves the
+   elevated egid at startup and immediately drops to the real gid.
+   Every file the binary opens during normal play is created with the
+   user's primary gid. `sys_priv_elevate` / `sys_priv_drop` wrap the
+   brief window around the global file write, restoring egid=games
+   only for that write.
+5. **Atomic locked insert.** `highscore_io_insert_global_atomic`
+   (`src/highscore_io.c`) opens `<scores.dat>.lock` with `O_CREAT`,
+   acquires `flock(LOCK_EX)`, re-reads the table from disk under the
+   lock, applies per-uid dedup (mirrors `original/highscore.c:721-737`
+   but iterates ALL entries with the caller's uid so a hand-edited file
+   with duplicates self-heals), runs the standard rank insert with
+   strict `>` (matches `original/highscore.c:743`), writes via temp+
+   rename, releases the lock. Failure modes (NOT_RANKED, version
+   mismatch, write failure) return distinct codes; the caller in
+   `game_modes.c::submit_score` logs every non-OK to stderr.
+6. **Master text gating.** `master_text` (the boing-master "words of
+   wisdom") is written only by the global insert at rank 0. The
+   personal table has no master_text concept (matches
+   `original/highscore.c:771-790` which has no `SetBoingMasterText`
+   call in the PERSONAL branch).
+
+Alternatives considered:
+
+- **Keep XDG-only.** Rejected: the deployment loses the multi-user
+  semantic the original was built for; per-uid dedup becomes dead
+  code; comparing Jim to Jim is not a leaderboard.
+- **fcntl(F_OFD_SETLKW) instead of flock.** Either would work. `flock`
+  was chosen because the lock is on a sidecar file, not the data file
+  itself, so the well-known flock-vs-NFS surprise does not apply
+  (`/var/games/` is local on every deployment we target).
+- **System-wide read-only score directory with per-user writes via
+  a SUID helper.** Rejected: a setuid root binary is a much bigger
+  attack surface than a setgid games binary, and the SUID helper
+  doubles the install/upgrade footprint.
+
+**Consequences:**
+
+- Dev mode (`./build/xboing`, no `.deb` installed) cannot write to
+  `/var/games/xboing/`. `submit_score` logs the failure to stderr
+  but the game continues. Sysadmins can override the path with
+  `XBOING_SCORE_FILE`.
+- `g_games_gid_saved` is file-static in `src/sys_priv.c`; no module
+  outside `sys_priv` consumes it.
+- A wrong-version file at `/var/games/xboing/scores.dat` (someone
+  manually edited it to `"version": 99`) is refused under the lock —
+  `highscore_io_insert_global_atomic` returns `HIGHSCORE_IO_ERR_VERSION`
+  rather than silently overwriting the legitimate data.
+- The 4-cycle review loop on this branch surfaced one subtle bug per
+  cycle in this subsystem; future modifications should expect at
+  least 2 review iterations before convergence.
+
+## ADR-042: `game_active` is the score-submission gate, not a death sentinel
+
+**Status:** Accepted (2026-06-07)
+**Context:** `feat/multi-user-global-scores` — first iteration of the
+multi-user highscore work shipped with zero scores being recorded
+because `game_active` was cleared before `mode_highscore_enter` could
+gate on it.
+
+`ctx->game_active` was originally used by attract-cycle logic to
+distinguish "real game in progress" from "demo gameplay running for
+the attract loop." Three code paths cleared it:
+
+1. `game_rules.c::game_rules_ball_died` set `game_active = false`
+   immediately before `sdl2_state_transition(SDL2ST_HIGHSCORE)`.
+2. `game_modes.c::mode_game_enter`'s abort-confirmation branch
+   similarly cleared it before transitioning to HIGHSCORE.
+3. `game_modes.c::mode_highscore_update` cleared it on the START key
+   when transitioning back to INTRO.
+
+When the wisdom-prompt / score-submission logic was added later in
+`mode_highscore_enter`, the author gated insertion on
+`ctx->game_active && !ctx->score_submitted`. But (1) and (2) had
+already cleared `game_active` before the on_enter handler ran.
+The insert branch was dead — every game over silently failed to
+record a score.
+
+**Decision:** `game_active` is the sentinel for "this entry to
+`mode_highscore_enter` is from a real game-over, not from an attract
+cycle pressing H." It stays true through:
+
+- `game_rules_ball_died` (no longer clears it)
+- `mode_game_enter`'s abort branch (no longer clears it)
+- The wisdom dialog round-trip (push → pop → re-enter `mode_highscore_enter`)
+- The Q-cancel round-trip (push → pop → re-enter `mode_highscore_enter`)
+
+It is cleared in exactly one place: `mode_highscore_update` on the
+START key, when transitioning back to attract (`game_modes.c:957`).
+
+The "GAME OVER" message bar preservation (`mode_highscore_enter`
+skipping its `<h>/<H>` label set when `ctx->game_active` is true)
+piggybacks on the same gate. Both behaviors collapse into "is this a
+real game-over flow?" with one boolean.
+
+Alternatives considered:
+
+- **A new flag `ctx->just_died`.** Rejected: another flag means
+  another lifecycle, and the existing `game_active` already carried
+  the right semantic — it just needed to stop being cleared
+  prematurely.
+- **Local `just_submitted` flag in `mode_highscore_enter`.** Tried in
+  cycle 1; broke on the third entry to `mode_highscore_enter` (Q-cancel
+  during HIGHSCORE) because the local resets every call. Replaced
+  with `ctx->game_active` in cycle 2.
+
+**Consequences:**
+
+- `game_rules.c:253-262` no longer clears `game_active`. Comment cites
+  this ADR.
+- `mode_highscore_enter` submits when `!ctx->score_submitted &&
+  ctx->game_active && final_score > 0`. `score_submitted` becomes true
+  on first insert; `game_active` carries the death-flow signal across
+  dialog re-entries.
+- Pressing H from attract never enters the submission branch:
+  `game_active` is false during attract (only set true by
+  `start_new_game`).
+- A future refactor that re-introduces an early `game_active = false`
+  in either `game_rules_ball_died` or the abort branch will silently
+  break score recording again. The header comment at
+  `game_rules.c:game_rules_ball_died` references this ADR.
+
+## ADR-043: Bonus screen renderer reads from captured env, not live `ctx`
+
+**Status:** Accepted (2026-06-07)
+**Context:** `feat/multi-user-global-scores` — defense-in-depth after
+the `do_finish` multi-fire bug surfaced an ordering trap.
+
+The bonus screen renderer (`src/game_render_ui.c`) draws four pieces
+of level-derived data: the "- Level N -" title, the "Level bonus -
+level N x 100 = N00 points" line, the "Prepare for level N+1" end
+text, and the floppy save-token visibility check. The `bonus_system`
+state machine captures a snapshot of game state into `env` at
+`bonus_system_begin`; the field `env.level` and `env.starting_level`
+are the level numbers at the moment the bonus started.
+
+Before this work, the renderer read `ctx->level_number` and
+`ctx->start_level` live on every render frame. That was correct as
+long as `game_rules_next_level` (which increments `level_number`)
+fired only after the bonus finished. The `do_finish` multi-fire bug
+(see ADR below or commit log) made that ordering assumption fragile:
+during the bug, `level_number` advanced 5× inside one render tick and
+the title "- Level 6 -" appeared after clearing "level 1."
+
+**Decision:** Bonus-screen-rendered level values come from
+`bonus_system` accessors that read `env`, not from `ctx`:
+
+- `bonus_system_get_level(ctx->bonus)` → `env.level`
+- `bonus_system_get_starting_level(ctx->bonus)` → `env.starting_level`
+- `bonus_system_get_highscore_rank(ctx->bonus)` → `env.highscore_rank`
+  (rank against the GLOBAL table at the moment of begin, matching
+  `original/bonus.c:528-579` / `original/highscore.c:622-640`)
+
+The renderer uses these in every bonus content branch
+(`game_render_ui.c:997-1213`). `ctx->level_number` and `ctx->start_level`
+are still used in `bonus_system_should_save` style call sites that
+fall back to the same env accessors.
+
+The convention: **anything drawn on the bonus screen that depends on
+level state comes from the bonus env, never from live `ctx`.**
+
+Alternatives considered:
+
+- **Document the ordering** — leave the renderer reading `ctx` but
+  warn future readers. Rejected: the cycle-1 `do_finish` bug exists
+  precisely because someone broke an undocumented ordering. A renderer
+  that depends on global state at the wrong tick is a class of bug
+  the type system can rule out by reading from a frozen snapshot.
+- **Snapshot `ctx` into the env at begin and forget the accessors** —
+  add `level`, `starting_level`, `highscore_rank` to a render context
+  struct that the bonus state machine doesn't own. Rejected: same
+  effect with two snapshot owners. The env already owns these.
+
+**Consequences:**
+
+- Three new accessors in `include/bonus_system.h`:
+  `bonus_system_get_level`, `bonus_system_get_starting_level`,
+  `bonus_system_get_highscore_rank`. All three return 0 / -1 when
+  `bonus_system_begin` was never called — render paths are gated to
+  MODE_BONUS so this is unreachable in production.
+- A unit test
+  (`tests/test_bonus_system.c::test_get_highscore_rank_returns_env_value`)
+  asserts the env values flow through.
+- Visual capture goldens for the bonus screen remain valid: nothing
+  about the rendered pixels changed, only the source of the integers
+  feeding the format strings.
+
+## ADR-044: Failed level load ends the game via HIGHSCORE, not ShutDown
+
+**Status:** Accepted (2026-06-07)
+**Context:** `feat/multi-user-global-scores` — a level data corruption
+or missing-file race during `game_rules_next_level` previously caused
+an infinite bonus-tally loop.
+
+`original/file.c::SetupStage` calls `ShutDown` (which calls `exit()`)
+if `ReadNextLevel` returns False. The original's failure mode is
+process termination.
+
+Modern `game_rules_next_level` previously did `level_number++` then
+attempted to load the file. On load failure it logged a warning and
+returned. By that time the block grid had been cleared, so the next
+`game_rules_check` tick saw `!block_system_still_active` and re-fired
+the BONUS transition. After bonus completed, the same load-fail path
+ran again. The player was stuck in a perpetual "applause / Prepare for
+level N+1 / fresh empty level" loop until they killed the process.
+
+**Decision:**
+
+1. **Probe before destruction.** `access(level_path, R_OK)` runs
+   before `block_system_clear_all`. If the file is missing or
+   unreadable, return early with the grid intact — the player keeps
+   playing the level they were on.
+2. **Load failure ends the game cleanly.** Once the grid IS cleared
+   and `level_system_load_file` still fails (parse error on a readable
+   file), the modernized equivalent of `ShutDown` is:
+   - `sdl2_audio_play("game_over")`
+   - `message_system_set("- Level data corrupt -")` (or
+     "- Level data missing -" on the access-fail path)
+   - `sdl2_state_transition(SDL2ST_HIGHSCORE)`
+3. **Score preservation.** `ctx->game_active` is still true at this
+   point (per ADR-042), so `mode_highscore_enter` submits the player's
+   score normally. Their game ends in the same way as a natural
+   game-over, with their progress recorded.
+
+Alternatives considered:
+
+- **Match the original's `exit()`.** Rejected: killing the process
+  loses the score and surprises the player. The original ran inside
+  an X11 session where window destruction was a clear signal; the
+  modern SDL2 binary should fail gracefully and let the player see
+  their game ended.
+- **Reload the previous level and continue.** Rejected: the grid is
+  already cleared; reloading the same level introduces a new failure
+  mode (what if the previous level file is also corrupt?). Better to
+  end the game cleanly.
+- **Detect corruption earlier in the install pipeline.** A future
+  hardening task, but does not help once the file is corrupt at
+  runtime.
+
+**Consequences:**
+
+- `game_rules.c::game_rules_next_level` adds `#include <unistd.h>` for
+  `access()`. The probe is non-atomic; comment cites the TOCTOU
+  assumption (level data is a read-only installed asset, race window
+  is empty in practice).
+- The "- Level data corrupt -" message stays visible because of the
+  ADR-042 "GAME OVER" preservation logic (`mode_highscore_enter` does
+  not overwrite when `ctx->game_active` is true).
+- No regression test for this path (would require staging a corrupt
+  level file under the test's `XBOING_LEVELS_DIR`). A characterization
+  test is a candidate for follow-up work.
+- The `level_system_advance_background` call moved AFTER the successful
+  load (was previously before), so a failed load no longer drifts the
+  background cycle out of step with the level number.

@@ -374,7 +374,9 @@ static void test_score_global_legacy_override(void **state)
     assert_string_equal(buf, "/custom/scores.dat");
 }
 
-/* TC-22: Global score — defaults to XDG on fresh install (no legacy file). */
+/* TC-22: Global score — defaults to /var/games/xboing/scores.dat (FHS 11.5)
+ * when no env-var override is set.  The .deb postinst creates this
+ * directory as root:games 2775 and seeds scores.dat as root:games 0664. */
 static void test_score_global_xdg_default(void **state)
 {
     (void)state;
@@ -384,8 +386,7 @@ static void test_score_global_xdg_default(void **state)
     char buf[PATHS_MAX_PATH];
     paths_status_t st = paths_score_file_global(&cfg, buf, sizeof(buf));
     assert_int_equal(st, PATHS_OK);
-    /* No legacy file on disk → XDG path. */
-    assert_string_equal(buf, "/nonexistent/home/.local/share/xboing/scores.dat");
+    assert_string_equal(buf, "/var/games/xboing/scores.dat");
 }
 
 /* TC-23: Personal score — defaults to XDG on fresh install (no legacy file). */
