@@ -2468,8 +2468,27 @@ Alternatives considered:
 
 - Dev mode (`./build/xboing`, no `.deb` installed) cannot write to
   `/var/games/xboing/`. `submit_score` logs the failure to stderr
-  but the game continues. Sysadmins can override the path with
-  `XBOING_SCORE_FILE`.
+  but the game continues. `XBOING_SCORE_FILE` is honored as an
+  override in **dev / non-setgid** runs (read via `getenv` paths
+  before the elevated write), but `paths_init` reads it through
+  `secure_getenv` so AT_SECURE — i.e., the packaged setgid-games
+  binary — falls back to the hard-coded `/var/games/xboing/scores.dat`.
+  This is intentional: honoring an attacker-controlled env value
+  in a setgid context would let any local user redirect the
+  elevated write to any file the `games` group can touch (security
+  finding from PR #145 review). Sysadmins who need to redirect on
+  a production install should either patch `paths_score_file_global`
+  or use a bind mount.
+- The global file is written **in place** (open existing → ftruncate
+  → write → fsync), not via temp+rename. The temp+rename pattern
+  would create a new player-owned inode, allowing the player to
+  edit `/var/games/xboing/scores.dat` directly outside the locked
+  dedup path. In-place writing preserves the postinst-set
+  root:games / 0664 metadata. Trade-off: a crash mid-write leaves
+  a corrupt file (the next successful write replaces it); torn
+  reads can't happen because the surrounding `flock(LOCK_EX)`
+  serializes writers. Personal table keeps temp+rename — it's
+  single-writer per user, atomicity > ownership-preservation.
 - `g_games_gid_saved` is file-static in `src/sys_priv.c`; no module
   outside `sys_priv` consumes it.
 - A wrong-version file at `/var/games/xboing/scores.dat` (someone
