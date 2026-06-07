@@ -573,13 +573,31 @@ highscore_io_result_t highscore_io_write(const char *path, const highscore_table
 
     ensure_parent_dir(path);
 
-    /* Write to a temp file, then rename for atomicity. */
+    /* Write to a temp file, then rename for atomicity.  When invoked
+     * under setgid-games (the multi-user global write path), the
+     * directory is group-writable so a malicious group member could
+     * pre-create scores.dat.tmp as a symlink pointing at an arbitrary
+     * file the games group can touch — fopen("w") would follow it and
+     * truncate the target.  Defenses: O_EXCL refuses to open an
+     * existing path (races become a clear error rather than a
+     * follow); O_NOFOLLOW refuses any symlink at the leaf.  If a
+     * stale .tmp exists from a crashed prior run, unlink it first
+     * (best-effort — same-uid can clean, cross-uid will fail at
+     * O_EXCL and surface the problem). */
     char tmp_path[1024];
     snprintf(tmp_path, sizeof(tmp_path), "%s.tmp", path);
+    (void)unlink(tmp_path);
 
-    FILE *fp = fopen(tmp_path, "w");
+    int tmp_fd = open(tmp_path, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, 0664);
+    if (tmp_fd < 0)
+    {
+        return HIGHSCORE_IO_ERR_OPEN;
+    }
+    FILE *fp = fdopen(tmp_fd, "w");
     if (!fp)
     {
+        close(tmp_fd);
+        (void)unlink(tmp_path);
         return HIGHSCORE_IO_ERR_OPEN;
     }
 
@@ -677,11 +695,15 @@ highscore_io_insert_global_atomic(const char *path, unsigned long score, unsigne
 
     /* Lock file lives next to the table file.  flock(LOCK_EX)
      * serializes concurrent writers (multiple users finishing games
-     * at the same time). */
+     * at the same time).  O_NOFOLLOW refuses to open a symlink — the
+     * global directory is group-writable (setgid games), so any
+     * member of the games group could pre-create scores.dat.lock as
+     * a symlink to elsewhere; without O_NOFOLLOW the setgid process
+     * would happily follow it. */
     char lock_path[1024];
     snprintf(lock_path, sizeof(lock_path), "%s.lock", path);
 
-    int lock_fd = open(lock_path, O_CREAT | O_RDWR, 0664);
+    int lock_fd = open(lock_path, O_CREAT | O_RDWR | O_NOFOLLOW, 0664);
     if (lock_fd < 0)
     {
         return HIGHSCORE_IO_ERR_OPEN;

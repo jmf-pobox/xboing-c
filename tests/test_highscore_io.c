@@ -298,9 +298,11 @@ static void test_insert_tie_does_not_displace(void **state)
     snprintf(t.entries[0].name, sizeof(t.entries[0].name), "Original");
 
     highscore_io_result_t r = highscore_io_insert(&t, 5000, 1, 60, 1700000004UL, "TieAttempt");
-    /* Tie with rank 9 (empty slot at score=0) — > is satisfied, ranks last. */
+    /* Strict-> insert: the new 5000 cannot displace index 0 (also 5000),
+     * but DOES beat index 1 (score=0 from init_table).  Lands at rank 1
+     * (second place).  The key invariant being asserted: the existing
+     * rank-0 entry is untouched. */
     assert_int_equal(r, HIGHSCORE_IO_OK);
-    /* Original entry at rank 0 must still be there, untouched. */
     assert_int_equal((int)t.entries[0].score, 5000);
     assert_string_equal(t.entries[0].name, "Original");
 }
