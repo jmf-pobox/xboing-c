@@ -2440,10 +2440,13 @@ removed the multi-user semantic entirely — every user saw their own
    lock, applies per-uid dedup (mirrors `original/highscore.c:721-737`
    but iterates ALL entries with the caller's uid so a hand-edited file
    with duplicates self-heals), runs the standard rank insert with
-   strict `>` (matches `original/highscore.c:743`), writes via temp+
-   rename, releases the lock. Failure modes (NOT_RANKED, version
-   mismatch, write failure) return distinct codes; the caller in
-   `game_modes.c::submit_score` logs every non-OK to stderr.
+   strict `>` (matches `original/highscore.c:743`), writes the new
+   content **in place** via `ftruncate` + write + `fsync` on the
+   existing file (preserves the postinst-set `root:games` inode —
+   see Consequences for why temp+rename is wrong here), releases the
+   lock. Failure modes (NOT_RANKED, version mismatch, write failure)
+   return distinct codes; the caller in `game_modes.c::submit_score`
+   logs every non-OK to stderr.
 6. **Master text gating.** `master_text` (the boing-master "words of
    wisdom") is written only by the global insert at rank 0. The
    personal table has no master_text concept (matches

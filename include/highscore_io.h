@@ -76,20 +76,33 @@ highscore_io_result_t highscore_io_read(const char *path, highscore_table_t *tab
 highscore_io_result_t highscore_io_write(const char *path, const highscore_table_t *table);
 
 /*
- * Atomic per-uid-dedup global insert.
+ * Per-uid-dedup global insert, serialized by flock.
  *
  * Acquires an exclusive flock on `<path>.lock`, re-reads `path`, applies
  * the original game's per-uid dedup rule (highscore.c:721-737) — if the
  * caller's uid already has an entry, keep whichever score is higher —
- * then performs a standard rank insert and writes atomically.  Releases
- * the lock on return.
+ * then performs a standard rank insert and writes the result back to
+ * `path`.  Releases the lock on return.
+ *
+ * Concurrency model:
+ *   - flock(LOCK_EX) serializes concurrent writers — no torn reads.
+ *   - The write is **in place** on the existing inode (open → ftruncate
+ *     → write → fsync), NOT temp+rename.  This preserves the postinst-
+ *     set `root:games` ownership / `0664` mode.  See ADR-041.
+ *   - Trade-off: a crash mid-write leaves a corrupt file (the next
+ *     successful write replaces it).  Torn reads still can't happen
+ *     under the lock.  If your deployment needs crash-atomic global
+ *     scores, write to a different module — this one is tuned for
+ *     multi-user trust, not crash safety.
  *
  * Caller is responsible for elevating privileges (sys_priv_elevate)
  * before calling and dropping (sys_priv_drop) after.
  *
  * Returns HIGHSCORE_IO_OK if the score was inserted, HIGHSCORE_IO_ERR_NOT_RANKED
  * if it did not make the table (or the user already has a higher score),
- * or an I/O error code on file-system failure.
+ * HIGHSCORE_IO_ERR_VERSION if the on-disk file has an unsupported version
+ * (refused under the lock rather than overwritten), or another I/O error
+ * code on file-system failure.
  */
 highscore_io_result_t
 highscore_io_insert_global_atomic(const char *path, unsigned long score, unsigned long level,

@@ -756,7 +756,13 @@ highscore_io_insert_global_atomic(const char *path, unsigned long score, unsigne
     char lock_path[1024];
     snprintf(lock_path, sizeof(lock_path), "%s.lock", path);
 
-    int lock_fd = open(lock_path, O_CREAT | O_RDWR | O_NOFOLLOW, 0664);
+    /* O_RDONLY suffices for flock — we never write to the lock file,
+     * only acquire/release the lock on its fd.  Opening O_RDWR would
+     * require group-write permission on the lock file at open time;
+     * if a non-postinst path created the file under an umask of 0022
+     * (giving 0644 rather than 0664), a second user could no longer
+     * acquire the lock.  Read-only open avoids that umask trap. */
+    int lock_fd = open(lock_path, O_CREAT | O_RDONLY | O_NOFOLLOW, 0664);
     if (lock_fd < 0)
     {
         return HIGHSCORE_IO_ERR_OPEN;
