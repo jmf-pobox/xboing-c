@@ -377,7 +377,7 @@ static void test_score_global_legacy_override(void **state)
 /* TC-22: Global score — defaults to /var/games/xboing/scores.dat (FHS 11.5)
  * when no env-var override is set.  The .deb postinst creates this
  * directory as root:games 2775 and seeds scores.dat as root:games 0664. */
-static void test_score_global_xdg_default(void **state)
+static void test_score_global_fhs_default(void **state)
 {
     (void)state;
     paths_config_t cfg;
@@ -857,7 +857,7 @@ int main(void)
         cmocka_unit_test(test_sound_null_name),
         /* Group 4: Score files */
         cmocka_unit_test(test_score_global_legacy_override),
-        cmocka_unit_test(test_score_global_xdg_default),
+        cmocka_unit_test(test_score_global_fhs_default),
         cmocka_unit_test(test_score_personal_xdg_default),
         cmocka_unit_test(test_score_personal_custom_xdg),
         /* Group 5: Save files */

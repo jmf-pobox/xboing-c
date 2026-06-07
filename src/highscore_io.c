@@ -649,7 +649,31 @@ highscore_io_insert_global_atomic(const char *path, unsigned long score, unsigne
         return HIGHSCORE_IO_ERR_NULL;
     }
 
-    ensure_parent_dir(path);
+    /* Do NOT ensure_parent_dir here.  The global score directory is
+     * provisioned by debian/xboing.postinst as `root:games` mode 2775;
+     * creating it on the fly as the calling user would land on mode
+     * 0755 owned by user:user-primary-group, breaking the trust model
+     * and locking out other users from a leaderboard the package
+     * promised to keep shared.  Surface the missing directory as an
+     * OPEN error instead — sysadmin can fix the install. */
+    struct stat parent_st;
+    char parent[1024];
+    snprintf(parent, sizeof(parent), "%s", path);
+    {
+        char *slash = strrchr(parent, '/');
+        if (slash && slash != parent)
+        {
+            *slash = '\0';
+        }
+        else
+        {
+            parent[0] = '\0';
+        }
+    }
+    if (parent[0] != '\0' && (stat(parent, &parent_st) != 0 || !S_ISDIR(parent_st.st_mode)))
+    {
+        return HIGHSCORE_IO_ERR_OPEN;
+    }
 
     /* Lock file lives next to the table file.  flock(LOCK_EX)
      * serializes concurrent writers (multiple users finishing games

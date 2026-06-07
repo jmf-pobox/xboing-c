@@ -286,8 +286,9 @@ paths_status_t paths_score_file_global(const paths_config_t *cfg, char *buf, siz
     /* FHS 11.5: shared game state lives under /var/games/<game>/.
      * The .deb postinst creates this directory as root:games 2775 and
      * seeds scores.dat as root:games 0664.  The xboing binary is
-     * installed setgid games so writes (when implemented) can land
-     * here without being world-writable. */
+     * installed setgid games so writes by submit_score (via
+     * highscore_io_insert_global_atomic) land here without the file
+     * being world-writable. */
     if (safe_copy(buf, bufsize, "/var/games/xboing/scores.dat") != 0)
         return PATHS_TRUNCATED;
     return PATHS_OK;

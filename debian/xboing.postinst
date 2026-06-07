@@ -10,7 +10,9 @@ set -e
 case "$1" in
     configure)
         # Record the desired binary ownership via dpkg-statoverride so
-        # it persists across upgrades and is reset on remove.
+        # it persists across upgrades.  The override record is removed
+        # by postrm on purge (not remove) per the dpkg convention —
+        # remove keeps state in case the package is reinstalled.
         if ! dpkg-statoverride --list /usr/games/xboing >/dev/null 2>&1; then
             dpkg-statoverride --update --add root games 2755 /usr/games/xboing
         fi
