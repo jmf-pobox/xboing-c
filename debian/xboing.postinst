@@ -17,18 +17,42 @@ case "$1" in
             dpkg-statoverride --update --add root games 2755 /usr/games/xboing
         fi
 
-        # Create the directory the first time.  Idempotent on upgrade.
-        if [ ! -d /var/games/xboing ]; then
-            mkdir -p /var/games/xboing
+        # Symlink safety: /var/games/xboing is intentionally group-
+        # writable (2775 root:games) so games-group members can
+        # acquire the score lock at runtime.  That means a malicious
+        # group member could pre-create the directory or scores.dat
+        # as a symlink before postinst runs and trick the root-run
+        # chown/chmod into operating on the target.  Refuse those
+        # paths instead of touching them; sysadmin can investigate.
+        if [ -L /var/games/xboing ]; then
+            echo "xboing postinst: /var/games/xboing is a symlink; refusing." >&2
+            exit 1
         fi
-        chown root:games /var/games/xboing
-        chmod 2775 /var/games/xboing
+        if [ -L /var/games/xboing/scores.dat ]; then
+            echo "xboing postinst: /var/games/xboing/scores.dat is a symlink; refusing." >&2
+            exit 1
+        fi
+        if [ -e /var/games/xboing ] && [ ! -d /var/games/xboing ]; then
+            echo "xboing postinst: /var/games/xboing exists but is not a directory; refusing." >&2
+            exit 1
+        fi
+        if [ -e /var/games/xboing/scores.dat ] && [ ! -f /var/games/xboing/scores.dat ]; then
+            echo "xboing postinst: /var/games/xboing/scores.dat exists but is not a regular file; refusing." >&2
+            exit 1
+        fi
 
-        # Seed an empty scores file so the first run has something to
-        # read.  The file format is a JSON skeleton matching
-        # highscore_io_init_table.
+        # Create the directory with safe perms atomically via install(1).
+        # `install -d` is idempotent on existing dirs and applies the
+        # requested ownership/mode without following symlinks at the
+        # leaf (the -L check above already refused any symlink target).
+        install -d -o root -g games -m 2775 /var/games/xboing
+
+        # Seed an empty scores file via install(1) so the create +
+        # chown + chmod happen in one step, never against a symlink.
+        # JSON skeleton matches highscore_io_init_table().
         if [ ! -f /var/games/xboing/scores.dat ]; then
-            cat > /var/games/xboing/scores.dat <<'JSON'
+            tmp_seed=$(mktemp /var/games/xboing/.scores.dat.seed.XXXXXX)
+            cat > "$tmp_seed" <<'JSON'
 {
   "version": 1,
   "master_name": "",
@@ -36,9 +60,17 @@ case "$1" in
   "entries": []
 }
 JSON
+            chown root:games "$tmp_seed"
+            chmod 0664 "$tmp_seed"
+            mv -n "$tmp_seed" /var/games/xboing/scores.dat
+            rm -f "$tmp_seed"
+        else
+            # Existing file (upgrade path): apply ownership/mode but
+            # only after the -L / -f guards above confirmed it's a
+            # regular file, not a symlink to elsewhere.
+            chown root:games /var/games/xboing/scores.dat
+            chmod 0664 /var/games/xboing/scores.dat
         fi
-        chown root:games /var/games/xboing/scores.dat
-        chmod 0664 /var/games/xboing/scores.dat
         ;;
     abort-upgrade|abort-remove|abort-deconfigure)
         ;;

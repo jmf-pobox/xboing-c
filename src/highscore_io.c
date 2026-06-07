@@ -627,6 +627,59 @@ highscore_io_result_t highscore_io_write(const char *path, const highscore_table
     return HIGHSCORE_IO_OK;
 }
 
+/*
+ * In-place writer for the global score file.  Used by
+ * highscore_io_insert_global_atomic to preserve the postinst-set
+ * root:games inode ownership.  The temp+rename pattern in
+ * highscore_io_write would otherwise create a new player-owned
+ * inode, after which the player could edit the global leaderboard
+ * directly outside the locked dedup path.
+ *
+ * Opens existing file only (no O_CREAT).  O_NOFOLLOW refuses
+ * symlinks at the leaf.  ftruncates to 0 then writes the JSON.
+ * Not crash-atomic against a half-write — but the caller holds
+ * flock(LOCK_EX), so concurrent writers can't observe a torn
+ * file, and a crash leaves a corrupt file that the next successful
+ * write replaces.  Trade-off documented in ADR-041.
+ */
+static highscore_io_result_t write_table_inplace(const char *path, const highscore_table_t *table)
+{
+    int fd = open(path, O_WRONLY | O_NOFOLLOW);
+    if (fd < 0)
+    {
+        return HIGHSCORE_IO_ERR_OPEN;
+    }
+    if (ftruncate(fd, 0) != 0)
+    {
+        close(fd);
+        return HIGHSCORE_IO_ERR_WRITE;
+    }
+    FILE *fp = fdopen(fd, "w");
+    if (!fp)
+    {
+        close(fd);
+        return HIGHSCORE_IO_ERR_OPEN;
+    }
+    highscore_table_t sorted = *table;
+    highscore_io_sort(&sorted);
+    if (write_table_json(fp, &sorted) < 0)
+    {
+        fclose(fp);
+        return HIGHSCORE_IO_ERR_WRITE;
+    }
+    fflush(fp);
+    if (fsync(fileno(fp)) != 0)
+    {
+        fclose(fp);
+        return HIGHSCORE_IO_ERR_WRITE;
+    }
+    if (fclose(fp) != 0)
+    {
+        return HIGHSCORE_IO_ERR_WRITE;
+    }
+    return HIGHSCORE_IO_OK;
+}
+
 /* =========================================================================
  * Public API: Score management
  * ========================================================================= */
@@ -831,7 +884,11 @@ highscore_io_insert_global_atomic(const char *path, unsigned long score, unsigne
         table.master_text[HIGHSCORE_NAME_LEN - 1] = '\0';
     }
 
-    highscore_io_result_t wr = highscore_io_write(path, &table);
+    /* Use in-place write rather than temp+rename: the latter would
+     * change the inode and leave the global file owned by the calling
+     * user, after which they could edit the leaderboard directly.
+     * See write_table_inplace's docstring and ADR-041. */
+    highscore_io_result_t wr = write_table_inplace(path, &table);
 
     flock(lock_fd, LOCK_UN);
     close(lock_fd);
