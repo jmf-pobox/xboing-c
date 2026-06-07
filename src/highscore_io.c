@@ -573,17 +573,21 @@ highscore_io_result_t highscore_io_write(const char *path, const highscore_table
 
     ensure_parent_dir(path);
 
-    /* Write to a temp file, then rename for atomicity.  When invoked
-     * under setgid-games (the multi-user global write path), the
-     * directory is group-writable so a malicious group member could
-     * pre-create scores.dat.tmp as a symlink pointing at an arbitrary
-     * file the games group can touch — fopen("w") would follow it and
-     * truncate the target.  Defenses: O_EXCL refuses to open an
-     * existing path (races become a clear error rather than a
-     * follow); O_NOFOLLOW refuses any symlink at the leaf.  If a
-     * stale .tmp exists from a crashed prior run, unlink it first
-     * (best-effort — same-uid can clean, cross-uid will fail at
-     * O_EXCL and surface the problem). */
+    /* Write to a temp file, then rename for atomicity.
+     *
+     * This path is used by the PERSONAL table writer (under
+     * $XDG_DATA_HOME/xboing/, single-user) and by integration tests
+     * that exercise highscore_io_write directly.  The global write
+     * path no longer calls this function — highscore_io_insert_
+     * global_atomic uses write_table_inplace below to preserve the
+     * postinst-set root:games inode on /var/games/xboing/scores.dat.
+     *
+     * Hardening kept as defense-in-depth: O_EXCL refuses any
+     * pre-existing leaf so a race against the temp filename surfaces
+     * as a clear error rather than a silent follow; O_NOFOLLOW refuses
+     * a symlink at the leaf.  Stale .tmp from a crashed prior run is
+     * unlink()'d first (best-effort — same-uid recovers, cross-uid
+     * fails at O_EXCL and surfaces the problem). */
     char tmp_path[1024];
     snprintf(tmp_path, sizeof(tmp_path), "%s.tmp", path);
     (void)unlink(tmp_path);
@@ -748,11 +752,13 @@ highscore_io_insert_global_atomic(const char *path, unsigned long score, unsigne
 
     /* Lock file lives next to the table file.  flock(LOCK_EX)
      * serializes concurrent writers (multiple users finishing games
-     * at the same time).  O_NOFOLLOW refuses to open a symlink — the
-     * global directory is group-writable (setgid games), so any
-     * member of the games group could pre-create scores.dat.lock as
-     * a symlink to elsewhere; without O_NOFOLLOW the setgid process
-     * would happily follow it. */
+     * at the same time).  O_NOFOLLOW is defense-in-depth: the
+     * production deployment provisions /var/games/xboing as 2755
+     * (root:games, NOT group-writable) so games-group members
+     * cannot create or replace files inside it, but a misconfigured
+     * install or a test/dev path could still leave the directory
+     * writable.  O_NOFOLLOW refuses to open a symlink at the leaf
+     * in either case. */
     char lock_path[1024];
     snprintf(lock_path, sizeof(lock_path), "%s.lock", path);
 

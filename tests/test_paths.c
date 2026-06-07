@@ -376,7 +376,9 @@ static void test_score_global_legacy_override(void **state)
 
 /* TC-22: Global score — defaults to /var/games/xboing/scores.dat (FHS 11.5)
  * when no env-var override is set.  The .deb postinst creates this
- * directory as root:games 2775 and seeds scores.dat as root:games 0664. */
+ * directory as root:games 2755 (NOT group-writable so games-group
+ * members cannot replace files inside it) and pre-seeds both
+ * scores.dat and scores.dat.lock as root:games 0664. */
 static void test_score_global_fhs_default(void **state)
 {
     (void)state;
