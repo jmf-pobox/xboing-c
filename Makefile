@@ -70,6 +70,23 @@ test: build ## Run the full ctest suite (debug build).
 run: build ## Build and run the game.
 	./$(BUILD_DIR)/xboing
 
+run-original: ## Run the preserved 1996 Xlib binary (./original/xboing) with -usedefcmap so it works against a TrueColor X / XWayland server (the 1996 build crashes with BadMatch otherwise).
+	./original/xboing -usedefcmap
+
+coverage: ## Build with --coverage, run ctest, print line/function/branch summary via gcovr.
+	cmake -B build-coverage -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_FLAGS="--coverage -O0 -g" -DCMAKE_EXE_LINKER_FLAGS="--coverage"
+	cmake --build build-coverage -j$(JOBS)
+	ctest --test-dir build-coverage --output-on-failure
+	gcovr --root . --filter 'src/' --filter 'include/' --exclude 'tests/' --print-summary
+
+coverage-html: ## coverage + browseable HTML report under build-coverage/html/.
+	cmake -B build-coverage -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_FLAGS="--coverage -O0 -g" -DCMAKE_EXE_LINKER_FLAGS="--coverage"
+	cmake --build build-coverage -j$(JOBS)
+	ctest --test-dir build-coverage --output-on-failure
+	mkdir -p build-coverage/html
+	gcovr --root . --filter 'src/' --filter 'include/' --exclude 'tests/' --html-details build-coverage/html/index.html
+	@echo "Open build-coverage/html/index.html"
+
 # --- Sanitizer build (ASan + UBSan) ----------------------------------------
 
 asan: asan-build ## Configure + build the sanitizer preset.
@@ -256,7 +273,14 @@ cppcheck-tests: ## Static analysis on tests/ (mirrors lint.yml cppcheck (tests) 
 cppcheck: cppcheck-src cppcheck-tests ## Run both cppcheck passes.
 
 tidy: build ## Run clang-tidy across src/ (uses build/compile_commands.json).
-	find src -name '*.c' -exec clang-tidy -p $(BUILD_DIR) {} +
+	# `--extra-arg-before=-Wno-unknown-warning-option` so clang-tidy
+	# tolerates GCC-only warning flags (-Wformat-overflow=2,
+	# -Wformat-truncation, -Wnull-dereference variants) that CMake
+	# wrote into the compile database for the gcc build.  Without
+	# this, every translation unit fails on the first unknown flag.
+	find src -name '*.c' -exec clang-tidy \
+	  --extra-arg-before=-Wno-unknown-warning-option \
+	  -p $(BUILD_DIR) {} +
 
 # --- One-shot ---------------------------------------------------------------
 
