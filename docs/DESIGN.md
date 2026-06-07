@@ -2424,7 +2424,7 @@ removed the multi-user semantic entirely — every user saw their own
 3. **Persistent permissions.** `debian/xboing.postinst` registers
    `dpkg-statoverride --update --add root games 2755 /usr/games/xboing`
    so the mode survives package upgrades. The postinst also creates
-   `/var/games/xboing/` mode `2775 root:games` (setgid directory so
+   `/var/games/xboing/` mode `2755 root:games` (setgid directory so
    files created inside inherit group=games) and seeds an empty
    `scores.dat` mode `0664 root:games`. `debian/xboing.postrm` reverses
    both on purge.

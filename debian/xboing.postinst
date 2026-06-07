@@ -17,19 +17,29 @@ case "$1" in
             dpkg-statoverride --update --add root games 2755 /usr/games/xboing
         fi
 
-        # Symlink safety: /var/games/xboing is intentionally group-
-        # writable (2775 root:games) so games-group members can
-        # acquire the score lock at runtime.  That means a malicious
-        # group member could pre-create the directory or scores.dat
-        # as a symlink before postinst runs and trick the root-run
-        # chown/chmod into operating on the target.  Refuse those
-        # paths instead of touching them; sysadmin can investigate.
+        # Symlink safety + perm hardening: the directory is 2755
+        # root:games (NOT group-writable).  Group members can
+        # traverse and read it but cannot create / delete / replace
+        # files inside.  That eliminates the entire class of
+        # symlink-TOCTOU races where a games-group attacker could
+        # pre-create or race-replace scores.dat / scores.dat.lock
+        # as a symlink.  flock() on the pre-existing lock file does
+        # NOT require directory write permission, only group write
+        # on the file itself (which is 0664 root:games below).
+        #
+        # We still refuse symlinks at the leaf as belt-and-braces
+        # in case the file was touched between earlier postinst
+        # invocations under a more permissive policy.
         if [ -L /var/games/xboing ]; then
             echo "xboing postinst: /var/games/xboing is a symlink; refusing." >&2
             exit 1
         fi
         if [ -L /var/games/xboing/scores.dat ]; then
             echo "xboing postinst: /var/games/xboing/scores.dat is a symlink; refusing." >&2
+            exit 1
+        fi
+        if [ -L /var/games/xboing/scores.dat.lock ]; then
+            echo "xboing postinst: /var/games/xboing/scores.dat.lock is a symlink; refusing." >&2
             exit 1
         fi
         if [ -e /var/games/xboing ] && [ ! -d /var/games/xboing ]; then
@@ -40,15 +50,24 @@ case "$1" in
             echo "xboing postinst: /var/games/xboing/scores.dat exists but is not a regular file; refusing." >&2
             exit 1
         fi
+        if [ -e /var/games/xboing/scores.dat.lock ] && [ ! -f /var/games/xboing/scores.dat.lock ]; then
+            echo "xboing postinst: /var/games/xboing/scores.dat.lock exists but is not a regular file; refusing." >&2
+            exit 1
+        fi
 
-        # Create the directory with safe perms atomically via install(1).
-        # `install -d` is idempotent on existing dirs and applies the
-        # requested ownership/mode without following symlinks at the
-        # leaf (the -L check above already refused any symlink target).
-        install -d -o root -g games -m 2775 /var/games/xboing
+        # Provision the directory with the LOCKED-DOWN policy first
+        # (no group write).  `install -d` is idempotent on existing
+        # dirs.  install(1) does not follow symlinks at the leaf in
+        # any safe distribution's coreutils; the -L guards above
+        # already refused any pre-existing symlink.
+        install -d -o root -g games -m 2755 /var/games/xboing
 
-        # Seed an empty scores file via install(1) so the create +
-        # chown + chmod happen in one step, never against a symlink.
+        # Seed an empty scores file.  mktemp creates with a name an
+        # attacker can't predict (random suffix), chmod+chown happen
+        # while the file is still under that name, then mv -n renames
+        # atomically into place.  -n refuses to clobber, so a racing
+        # creation of /var/games/xboing/scores.dat (impossible under
+        # the 2755 policy but enforced defensively) is surfaced.
         # JSON skeleton matches highscore_io_init_table().
         if [ ! -f /var/games/xboing/scores.dat ]; then
             tmp_seed=$(mktemp /var/games/xboing/.scores.dat.seed.XXXXXX)
@@ -65,11 +84,25 @@ JSON
             mv -n "$tmp_seed" /var/games/xboing/scores.dat
             rm -f "$tmp_seed"
         else
-            # Existing file (upgrade path): apply ownership/mode but
-            # only after the -L / -f guards above confirmed it's a
-            # regular file, not a symlink to elsewhere.
             chown root:games /var/games/xboing/scores.dat
             chmod 0664 /var/games/xboing/scores.dat
+        fi
+
+        # Pre-create the lock sidecar.  With dir 2755 the running
+        # xboing process (egid=games) cannot create files in the
+        # directory, so the lock file MUST exist at install time
+        # or highscore_io_insert_global_atomic's open(O_CREAT)
+        # will fail with EACCES.  flock() on this existing file
+        # works fine for any games-group member.
+        if [ ! -f /var/games/xboing/scores.dat.lock ]; then
+            tmp_lock=$(mktemp /var/games/xboing/.scores.dat.lock.seed.XXXXXX)
+            chown root:games "$tmp_lock"
+            chmod 0664 "$tmp_lock"
+            mv -n "$tmp_lock" /var/games/xboing/scores.dat.lock
+            rm -f "$tmp_lock"
+        else
+            chown root:games /var/games/xboing/scores.dat.lock
+            chmod 0664 /var/games/xboing/scores.dat.lock
         fi
         ;;
     abort-upgrade|abort-remove|abort-deconfigure)

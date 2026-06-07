@@ -721,7 +721,7 @@ highscore_io_insert_global_atomic(const char *path, unsigned long score, unsigne
     }
 
     /* Do NOT ensure_parent_dir here.  The global score directory is
-     * provisioned by debian/xboing.postinst as `root:games` mode 2775;
+     * provisioned by debian/xboing.postinst as `root:games` mode 2755;
      * creating it on the fly as the calling user would land on mode
      * 0755 owned by user:user-primary-group, breaking the trust model
      * and locking out other users from a leaderboard the package
