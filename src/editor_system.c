@@ -15,6 +15,8 @@
 #include <string.h>
 #include <sys/stat.h>
 
+#include "parse_util.h"
+
 /* =========================================================================
  * Internal constants
  * ========================================================================= */
@@ -716,8 +718,8 @@ static void do_load(editor_system_t *ctx)
     if (input == NULL || input[0] == '\0')
         return;
 
-    int num = atoi(input);
-    if (num > 0 && num <= EDITOR_MAX_LEVELS)
+    int num;
+    if (parse_int_in_range(input, 1, EDITOR_MAX_LEVELS, &num))
     {
         char path[1024];
         snprintf(path, sizeof(path), "%s/level%02d.data", ctx->levels_dir_readable, num);
@@ -758,8 +760,8 @@ static void do_save(editor_system_t *ctx)
     if (input == NULL || input[0] == '\0')
         return;
 
-    int num = atoi(input);
-    if (num > 0 && num <= EDITOR_MAX_LEVELS)
+    int num;
+    if (parse_int_in_range(input, 1, EDITOR_MAX_LEVELS, &num))
     {
         /* Ensure writable dir exists before first save. */
         if (mkdir_p(ctx->levels_dir_writable, 0755) != 0)
@@ -801,8 +803,8 @@ static void do_set_time(editor_system_t *ctx)
     if (input == NULL || input[0] == '\0')
         return;
 
-    int num = atoi(input);
-    if (num > 0 && num <= EDITOR_MAX_TIME)
+    int num;
+    if (parse_int_in_range(input, 1, EDITOR_MAX_TIME, &num))
     {
         if (ctx->cb.on_set_time != NULL)
             ctx->cb.on_set_time(num, ctx->user_data);

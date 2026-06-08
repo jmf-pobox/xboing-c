@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "parse_util.h"
 #include "sdl2_state.h"
 
 /* =========================================================================
@@ -316,9 +317,18 @@ sdl2_cli_status_t sdl2_cli_parse(int argc, char *const argv[], sdl2_cli_config_t
                     mlen = sizeof(mode_buf) - 1;
                 memcpy(mode_buf, val, mlen);
                 mode_buf[mlen] = '\0';
-                int iv = atoi(colon + 1);
-                if (iv > 0)
+                int iv;
+                if (parse_int_in_range(colon + 1, 1, INT_MAX, &iv))
+                {
                     config->visual_capture_interval = iv;
+                }
+                else
+                {
+                    fprintf(stderr,
+                            "xboing: -visual-capture interval `%s` is not a "
+                            "positive integer; using default\n",
+                            colon + 1);
+                }
             }
             else
             {

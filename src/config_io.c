@@ -21,6 +21,8 @@
 #include <string.h>
 #include <sys/stat.h>
 
+#include "parse_util.h"
+
 /* =========================================================================
  * Internal: directory creation
  * ========================================================================= */
@@ -205,16 +207,16 @@ static int read_config_toml(FILE *fp, config_data_t *data)
 
         if (strcmp(key, "speed") == 0 && val_type == 'i')
         {
-            int v = atoi(val);
-            if (v >= 1 && v <= 9)
+            int v;
+            if (parse_int_in_range(val, 1, 9, &v))
             {
                 data->speed = v;
             }
         }
         else if (strcmp(key, "start_level") == 0 && val_type == 'i')
         {
-            int v = atoi(val);
-            if (v >= 1 && v <= 80)
+            int v;
+            if (parse_int_in_range(val, 1, 80, &v))
             {
                 data->start_level = v;
             }
@@ -241,8 +243,8 @@ static int read_config_toml(FILE *fp, config_data_t *data)
         }
         else if (strcmp(key, "max_volume") == 0 && val_type == 'i')
         {
-            int v = atoi(val);
-            if (v >= 0 && v <= 100)
+            int v;
+            if (parse_int_in_range(val, 0, 100, &v))
             {
                 data->max_volume = v;
             }

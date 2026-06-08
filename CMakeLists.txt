@@ -235,6 +235,7 @@ target_include_directories(sdl2_cli PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 target_compile_options(sdl2_cli PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+target_link_libraries(sdl2_cli PRIVATE parse_util)
 
 # --- Ball physics system library ---------------------------------------------
 #
@@ -524,6 +525,7 @@ target_include_directories(editor_system PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 target_compile_options(editor_system PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+target_link_libraries(editor_system PRIVATE parse_util)
 
 # --- TOML config I/O library -----------------------------------------------
 #
@@ -536,6 +538,18 @@ target_include_directories(config_io PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 target_compile_options(config_io PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+target_link_libraries(config_io PRIVATE parse_util)
+
+# --- parse_util (strict integer string parsing) ------------------------------
+#
+# Pure C module — no SDL2 or X11 dependency.  Replaces atoi() at every site
+# that takes untrusted input (CLI args, config files, dialogue input).
+
+add_library(parse_util STATIC src/parse_util.c)
+target_include_directories(parse_util PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+target_compile_options(parse_util PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
 
 # --- XDG paths library -------------------------------------------------------
 #
