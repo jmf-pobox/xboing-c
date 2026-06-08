@@ -31,6 +31,7 @@ static int g_bullets_consumed;
 static int g_save_triggered;
 static int g_finished;
 static int g_finished_level;
+static int g_finished_count;
 static int g_sound_count;
 static char g_last_sound[64];
 
@@ -76,6 +77,7 @@ static void reset_tracking(void)
     g_save_triggered = 0;
     g_finished = 0;
     g_finished_level = 0;
+    g_finished_count = 0;
     g_sound_count = 0;
     g_last_sound[0] = '\0';
     g_sound_history_len = 0;
@@ -124,6 +126,7 @@ static void on_finished(int next_level, void *ud)
     (void)ud;
     g_finished = 1;
     g_finished_level = next_level;
+    g_finished_count++;
 }
 
 static bonus_system_callbacks_t make_callbacks(void)
@@ -296,16 +299,19 @@ static void test_set_coins_sets_count(void **state)
     bonus_system_destroy(ctx);
 }
 
-static void test_set_coins_negative_is_noop(void **state)
+static void test_set_coins_negative_clamps_to_zero(void **state)
 {
     (void)state;
     bonus_system_t *ctx = bonus_system_create(NULL, NULL);
 
     bonus_system_set_coins(ctx, 3);
+    /* Negative input clamps to 0 — matches bonus_system_dec_coins's
+     * floor and prevents an upstream logic bug from silently leaving
+     * the previous game's coin_count intact. */
     bonus_system_set_coins(ctx, -1);
-    assert_int_equal(bonus_system_get_coins(ctx), 3);
+    assert_int_equal(bonus_system_get_coins(ctx), 0);
 
-    /* NULL ctx is also a no-op (no crash). */
+    /* NULL ctx is still a no-op (no crash). */
     bonus_system_set_coins(NULL, 1);
 
     bonus_system_destroy(ctx);
@@ -577,6 +583,51 @@ static void test_skip_to_finish(void **state)
     bonus_system_destroy(ctx);
 }
 
+/* Regression: do_finish must be idempotent once the bonus sequence
+ * has signalled completion.  mode_bonus_update calls bonus_system_update
+ * inside a 6× ATTRACT_FRAME_MULTIPLIER loop; without a guard, every
+ * sub-frame after the state machine lands on FINISH would re-fire
+ * on_finished, and the production callback chain
+ * (bonus_cb_on_finished → game_rules_next_level) would increment
+ * ctx->level_number on every extra fire.  See bonus_system.c::do_finish
+ * — the `if (ctx->finished) return;` guard. */
+static void test_on_finished_fires_exactly_once(void **state)
+{
+    (void)state;
+    reset_tracking();
+    bonus_system_callbacks_t cbs = make_callbacks();
+    bonus_system_t *ctx = bonus_system_create(&cbs, NULL);
+
+    bonus_system_env_t env = make_env(0, 1, 1, 10, 0, 0);
+    bonus_system_begin(ctx, &env, 0);
+
+    int frame = 1;
+    bonus_system_skip(ctx, frame);
+    /* Pump updates until on_finished has fired at least once. */
+    int max_pumps = 100;
+    while (g_finished == 0 && max_pumps-- > 0)
+    {
+        frame++;
+        bonus_system_update(ctx, frame);
+    }
+    assert_int_equal(g_finished, 1);
+    assert_int_equal(g_finished_count, 1);
+
+    /* Now simulate mode_bonus_update's continued 6× loop — many more
+     * updates while the state machine sits at FINISH.  on_finished must
+     * NOT fire again, because each fire would advance level_number in
+     * production. */
+    for (int i = 0; i < 60; i++)
+    {
+        frame++;
+        bonus_system_update(ctx, frame);
+    }
+    assert_int_equal(g_finished_count, 1);
+    assert_int_equal(g_finished_level, 2); /* env.level (1) + 1 */
+
+    bonus_system_destroy(ctx);
+}
+
 /* Test: display score tracks running total */
 static void test_display_score(void **state)
 {
@@ -715,6 +766,35 @@ static void test_renderer_accessors_null_safe(void **state)
     assert_int_equal(bonus_system_get_initial_bullets(NULL), 0);
     assert_int_equal(bonus_system_get_bullets(NULL), 0);
     assert_int_equal(bonus_system_get_time_bonus_secs(NULL), 0);
+    /* highscore_rank: -1 sentinel for NULL ctx (no entry placed). */
+    assert_int_equal(bonus_system_get_highscore_rank(NULL), -1);
+    assert_int_equal(bonus_system_get_level(NULL), 0);
+    assert_int_equal(bonus_system_get_starting_level(NULL), 0);
+}
+
+static void test_get_highscore_rank_returns_env_value(void **state)
+{
+    (void)state;
+    bonus_system_t *ctx = bonus_system_create(NULL, NULL);
+
+    /* env.highscore_rank=1 (player is currently #1) — renderer should
+     * receive 1 and display "You are ranked 1st." */
+    bonus_system_env_t env_top = make_env(0, 1, 1, 0, 0, 1);
+    bonus_system_begin(ctx, &env_top, 0);
+    assert_int_equal(bonus_system_get_highscore_rank(ctx), 1);
+
+    /* env.highscore_rank=-1 (not placed) — renderer should receive -1
+     * and fall through to "Keep on trying!". */
+    bonus_system_env_t env_unplaced = make_env(0, 1, 1, 0, 0, -1);
+    bonus_system_begin(ctx, &env_unplaced, 0);
+    assert_int_equal(bonus_system_get_highscore_rank(ctx), -1);
+
+    /* env.highscore_rank=5 (mid-table) — passes through. */
+    bonus_system_env_t env_mid = make_env(0, 1, 1, 0, 0, 5);
+    bonus_system_begin(ctx, &env_mid, 0);
+    assert_int_equal(bonus_system_get_highscore_rank(ctx), 5);
+
+    bonus_system_destroy(ctx);
 }
 
 /* =========================================================================
@@ -951,7 +1031,7 @@ int main(void)
         cmocka_unit_test(test_dec_coins_floor),
         cmocka_unit_test(test_reset_coins),
         cmocka_unit_test(test_set_coins_sets_count),
-        cmocka_unit_test(test_set_coins_negative_is_noop),
+        cmocka_unit_test(test_set_coins_negative_clamps_to_zero),
         cmocka_unit_test(test_set_coins_then_begin_uses_set_value),
 
         /* Group 4: Save trigger */
@@ -969,6 +1049,7 @@ int main(void)
 
         /* Group 6: Skip and queries */
         cmocka_unit_test(test_skip_to_finish),
+        cmocka_unit_test(test_on_finished_fires_exactly_once),
         cmocka_unit_test(test_display_score),
         cmocka_unit_test(test_null_safety),
 
@@ -979,6 +1060,7 @@ int main(void)
         cmocka_unit_test(test_get_bullets_returns_live_env_value),
         cmocka_unit_test(test_get_time_bonus_secs_returns_env_value),
         cmocka_unit_test(test_renderer_accessors_null_safe),
+        cmocka_unit_test(test_get_highscore_rank_returns_env_value),
 
         /* Group 7: Sound mapping (original/bonus.c parity) */
         cmocka_unit_test(test_sound_per_coin_bonus),

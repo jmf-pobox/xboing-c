@@ -116,8 +116,15 @@ typedef struct game_ctx
     int start_level;      /* Level to start from (CLI or config) */
     bool game_active;     /* True while a game session is running */
     bool score_submitted; /* True after score inserted into highscore table */
-    time_t game_start;    /* Timestamp when game session began */
-    int paused_seconds;   /* Total seconds spent paused */
+    /* True once the active session has been seeded from a user-writable save
+     * file (via -load or the in-game X-key path).  Disqualifies the session
+     * from global Hall-of-Fame submission: save files are not integrity-
+     * protected, so a local user could otherwise edit their save to forge
+     * a shared score.  Personal-table inserts remain eligible — that file
+     * is already under the user's control. */
+    bool savegame_restored_session;
+    time_t game_start;  /* Timestamp when game session began */
+    int paused_seconds; /* Total seconds spent paused */
 
     /* Bonus spawning state (from main.c:handleGameMode) */
     bool bonus_block_active; /* True while a bonus block is on the grid */

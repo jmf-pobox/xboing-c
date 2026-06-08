@@ -996,8 +996,11 @@ void game_render_bonus(const game_ctx_t *ctx)
 
     /* Chrome: save-token floppy at bottom-right when granted.
      * Original (bonus.c:243-250) checks (level - starting + 1) %
-     * SAVE_LEVEL == 0. */
-    if (bonus_system_should_save(ctx->level_number, ctx->start_level))
+     * SAVE_LEVEL == 0.  Read from the bonus env (same reason as the
+     * level title above) — guards against any future ordering where
+     * ctx->level_number advances before the render frame. */
+    if (bonus_system_should_save(bonus_system_get_level(ctx->bonus),
+                                 bonus_system_get_starting_level(ctx->bonus)))
     {
         sdl2_texture_info_t floppy;
         if (sdl2_texture_get(ctx->texture, SPR_FLOPPY, &floppy) == SDL2T_OK)
@@ -1018,8 +1021,12 @@ void game_render_bonus(const game_ctx_t *ctx)
     char buf[80];
 
     /* "- Level N -" — red header (titleFont).  Drawn unconditionally;
-     * the original draws it in DrawTitleText during the TEXT state. */
-    snprintf(buf, sizeof(buf), "- Level %d -", ctx->level_number);
+     * the original draws it in DrawTitleText during the TEXT state.
+     * Read the level from the bonus env (captured at bonus_system_begin)
+     * — game_rules_next_level increments ctx->level_number when bonus
+     * completes, so reading ctx->level_number live here would risk
+     * drift if the increment ever moves earlier in the flow. */
+    snprintf(buf, sizeof(buf), "- Level %d -", bonus_system_get_level(ctx->bonus));
     sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TITLE, buf, ypos, red, W);
     ypos += title_ascent + GAP;
 
@@ -1097,11 +1104,13 @@ void game_render_bonus(const game_ctx_t *ctx)
 
     if (at_or_past_level)
     {
-        /* DoLevel (bonus.c:391-429). */
+        /* DoLevel (bonus.c:391-429).  Same env-vs-live reasoning as the
+         * "- Level N -" title above. */
         int time_secs = bonus_system_get_time_bonus_secs(ctx->bonus);
         if (time_secs > 0)
         {
-            int adj_level = ctx->level_number - ctx->start_level + 1;
+            int adj_level = bonus_system_get_level(ctx->bonus) -
+                            bonus_system_get_starting_level(ctx->bonus) + 1;
             if (adj_level < 1)
                 adj_level = 1;
             snprintf(buf, sizeof(buf), "Level bonus - level %d x 100 = %d points", adj_level,
@@ -1174,9 +1183,11 @@ void game_render_bonus(const game_ctx_t *ctx)
 
     if (at_or_past_hscore)
     {
-        /* DoHighScore (bonus.c:528-586). */
-        unsigned long current_score = ctx->score ? score_system_get(ctx->score) : 0UL;
-        int rank = highscore_io_get_ranking(&ctx->hs_personal, current_score);
+        /* DoHighScore (bonus.c:528-586) — read rank from the bonus env
+         * (captured at mode_bonus_enter against the freshly re-read
+         * GLOBAL table).  Original semantic is global rank, and the
+         * cached env value is immune to mid-display table mutations. */
+        int rank = bonus_system_get_highscore_rank(ctx->bonus);
         if (rank == 1)
         {
             snprintf(buf, sizeof(buf), "You are ranked 1st. Well done!");
@@ -1195,8 +1206,11 @@ void game_render_bonus(const game_ctx_t *ctx)
 
     if (at_or_past_end_text)
     {
-        /* DoEndText (bonus.c:588-603): terminal — no further ypos. */
-        snprintf(buf, sizeof(buf), "Prepare for level %d", ctx->level_number + 1);
+        /* DoEndText (bonus.c:588-603): terminal — no further ypos.
+         * Read from the bonus env (same reason as the title above) —
+         * the live ctx->level_number can drift during the FINISH→GAME
+         * transition window. */
+        snprintf(buf, sizeof(buf), "Prepare for level %d", bonus_system_get_level(ctx->bonus) + 1);
         sdl2_font_draw_shadow_centred(ctx->font, SDL2F_FONT_TEXT, buf, ypos, yellow, W);
     }
 }

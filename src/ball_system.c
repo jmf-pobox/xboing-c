@@ -919,13 +919,18 @@ static void update_guide(ball_system_t *ctx, const ball_system_env_t *env)
 {
     /*
      * Animate guide direction indicator.
-     * Matches MoveGuides() in original/ball.c:456 — guide steps every
-     * BALL_FRAME_RATE * 8 frames (40 frames at BALL_FRAME_RATE=5).
-     * Earlier modern code used `* 3` which sweeps 2.67x too fast and
-     * makes ball-launch aiming feel frantic.
+     * Original (ball.c:456) steps every 40 frames, but during
+     * MODE_BALL_WAIT the original main loop runs at FAST_SPEED
+     * (sleepSync 5 → 1.5 ms/frame), so 40 × 1.5 ms ≈ 60 ms per step.
+     * Modern ball_system_update is called once per game tick at
+     * default speed 5 (sdl2_loop 7.5 ms/tick), so the equivalent
+     * wall-clock cadence is 60 ms / 7.5 ms = 8 ticks per step.
+     * The previous `BALL_FRAME_RATE * 8 = 40` was 5× too slow
+     * because it treated modern ticks as if they had the original's
+     * 1.5 ms wall time.
      */
 
-    if ((env->frame % (BALL_FRAME_RATE * 8)) == 0)
+    if ((env->frame % 8) == 0)
     {
         ctx->guide_pos += ctx->guide_inc;
     }

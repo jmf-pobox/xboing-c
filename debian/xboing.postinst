@@ -1,0 +1,118 @@
+#!/bin/sh
+# postinst — create the shared high-score directory + seed file.
+#
+# Debian Policy 11.5: shared game state lives under /var/games/<game>/.
+# The xboing binary is installed setgid games (debian/rules) so any
+# user can update the global scores file via the games group.
+
+set -e
+
+case "$1" in
+    configure)
+        # Record the desired binary ownership via dpkg-statoverride so
+        # it persists across upgrades.  The override record is removed
+        # by postrm on purge (not remove) per the dpkg convention —
+        # remove keeps state in case the package is reinstalled.
+        if ! dpkg-statoverride --list /usr/games/xboing >/dev/null 2>&1; then
+            dpkg-statoverride --update --add root games 2755 /usr/games/xboing
+        fi
+
+        # Symlink safety + perm hardening: the directory is 2755
+        # root:games (NOT group-writable).  Group members can
+        # traverse and read it but cannot create / delete / replace
+        # files inside.  That eliminates the entire class of
+        # symlink-TOCTOU races where a games-group attacker could
+        # pre-create or race-replace scores.dat / scores.dat.lock
+        # as a symlink.  flock() on the pre-existing lock file does
+        # NOT require directory write permission, only group write
+        # on the file itself (which is 0664 root:games below).
+        #
+        # We still refuse symlinks at the leaf as belt-and-braces
+        # in case the file was touched between earlier postinst
+        # invocations under a more permissive policy.
+        if [ -L /var/games/xboing ]; then
+            echo "xboing postinst: /var/games/xboing is a symlink; refusing." >&2
+            exit 1
+        fi
+        if [ -L /var/games/xboing/scores.dat ]; then
+            echo "xboing postinst: /var/games/xboing/scores.dat is a symlink; refusing." >&2
+            exit 1
+        fi
+        if [ -L /var/games/xboing/scores.dat.lock ]; then
+            echo "xboing postinst: /var/games/xboing/scores.dat.lock is a symlink; refusing." >&2
+            exit 1
+        fi
+        if [ -e /var/games/xboing ] && [ ! -d /var/games/xboing ]; then
+            echo "xboing postinst: /var/games/xboing exists but is not a directory; refusing." >&2
+            exit 1
+        fi
+        if [ -e /var/games/xboing/scores.dat ] && [ ! -f /var/games/xboing/scores.dat ]; then
+            echo "xboing postinst: /var/games/xboing/scores.dat exists but is not a regular file; refusing." >&2
+            exit 1
+        fi
+        if [ -e /var/games/xboing/scores.dat.lock ] && [ ! -f /var/games/xboing/scores.dat.lock ]; then
+            echo "xboing postinst: /var/games/xboing/scores.dat.lock exists but is not a regular file; refusing." >&2
+            exit 1
+        fi
+
+        # Provision the directory with the LOCKED-DOWN policy first
+        # (no group write).  `install -d` is idempotent on existing
+        # dirs.  install(1) does not follow symlinks at the leaf in
+        # any safe distribution's coreutils; the -L guards above
+        # already refused any pre-existing symlink.
+        install -d -o root -g games -m 2755 /var/games/xboing
+
+        # Seed an empty scores file.  mktemp creates with a name an
+        # attacker can't predict (random suffix), chmod+chown happen
+        # while the file is still under that name, then mv -n renames
+        # atomically into place.  -n refuses to clobber, so a racing
+        # creation of /var/games/xboing/scores.dat (impossible under
+        # the 2755 policy but enforced defensively) is surfaced.
+        # JSON skeleton matches highscore_io_init_table().
+        if [ ! -f /var/games/xboing/scores.dat ]; then
+            tmp_seed=$(mktemp /var/games/xboing/.scores.dat.seed.XXXXXX)
+            cat > "$tmp_seed" <<'JSON'
+{
+  "version": 1,
+  "master_name": "",
+  "master_text": "Anyone play this game?",
+  "entries": []
+}
+JSON
+            chown root:games "$tmp_seed"
+            chmod 0664 "$tmp_seed"
+            mv -n "$tmp_seed" /var/games/xboing/scores.dat
+            rm -f "$tmp_seed"
+        else
+            chown root:games /var/games/xboing/scores.dat
+            chmod 0664 /var/games/xboing/scores.dat
+        fi
+
+        # Pre-create the lock sidecar.  With dir 2755 the running
+        # xboing process (egid=games) cannot create files in the
+        # directory, so the lock file MUST exist at install time
+        # or highscore_io_insert_global_atomic's open(O_CREAT)
+        # will fail with EACCES.  flock() on this existing file
+        # works fine for any games-group member.
+        if [ ! -f /var/games/xboing/scores.dat.lock ]; then
+            tmp_lock=$(mktemp /var/games/xboing/.scores.dat.lock.seed.XXXXXX)
+            chown root:games "$tmp_lock"
+            chmod 0664 "$tmp_lock"
+            mv -n "$tmp_lock" /var/games/xboing/scores.dat.lock
+            rm -f "$tmp_lock"
+        else
+            chown root:games /var/games/xboing/scores.dat.lock
+            chmod 0664 /var/games/xboing/scores.dat.lock
+        fi
+        ;;
+    abort-upgrade|abort-remove|abort-deconfigure)
+        ;;
+    *)
+        echo "postinst called with unknown argument: $1" >&2
+        exit 1
+        ;;
+esac
+
+#DEBHELPER#
+
+exit 0

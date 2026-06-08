@@ -304,6 +304,12 @@ void savegame_system_restore(game_ctx_t *ctx, const savegame_data_t *info,
         return;
     }
 
+    /* Mark this session as restored from a user-writable save.  The
+     * global Hall-of-Fame submit path consults this flag and skips the
+     * setgid-games write — save files have no integrity protection, so
+     * a local user could otherwise edit theirs to forge a shared score. */
+    ctx->savegame_restored_session = true;
+
     /* --- Player / meta --------------------------------------------------- */
     score_system_set(ctx->score, info->score);
     ctx->level_number = (int)info->level;

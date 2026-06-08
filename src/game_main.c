@@ -13,6 +13,8 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 #include <SDL2/SDL.h>
 
@@ -23,9 +25,14 @@
 #include "sdl2_input.h"
 #include "sdl2_loop.h"
 #include "sdl2_state.h"
+#include "sys_priv.h"
 
 int main(int argc, char *argv[])
 {
+    /* Setgid-games privilege management: save egid, drop to rgid.
+     * See sys_priv.h.  Must run before any file I/O. */
+    sys_priv_init();
+
     /* Production seeding policy.  game_create() does not seed; the
      * caller owns this decision so tests can stay deterministic or
      * unseeded as needed. */

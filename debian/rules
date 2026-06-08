@@ -22,3 +22,9 @@ override_dh_auto_install:
 	      debian/xboing/usr/share/xboing/fonts/LiberationSans-Regular.ttf
 	ln -s ../../fonts/truetype/liberation/LiberationSans-Bold.ttf \
 	      debian/xboing/usr/share/xboing/fonts/LiberationSans-Bold.ttf
+
+override_dh_fixperms:
+	dh_fixperms --exclude=usr/games/xboing
+	# Setgid + chgrp to games happen in postinst via dpkg-statoverride —
+	# fakeroot's chgrp can't change to arbitrary system groups at build
+	# time, so we record the permissions at install time instead.

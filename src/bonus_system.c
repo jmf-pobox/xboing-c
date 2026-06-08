@@ -391,6 +391,17 @@ static void do_end_text(bonus_system_t *ctx, int frame)
 
 static void do_finish(bonus_system_t *ctx)
 {
+    /* mode_bonus_update calls bonus_system_update 6× per tick.  Once
+     * the state machine lands on FINISH it stays there until begin()
+     * resets it, so without this guard every extra sub-frame would
+     * re-fire on_finished — and on_finished increments
+     * ctx->level_number.  The user-visible symptom is a fresh game's
+     * second cleared level showing as Level 7 in the bonus header. */
+    if (ctx->finished)
+    {
+        return;
+    }
+
     int next_level = ctx->env.level + 1;
 
     if (ctx->callbacks.on_finished)
@@ -398,8 +409,6 @@ static void do_finish(bonus_system_t *ctx)
         ctx->callbacks.on_finished(next_level, ctx->user_data);
     }
 
-    /* Mark sequence complete.  State stays at FINISH so callers
-     * can observe is_finished().  begin() resets everything. */
     ctx->finished = 1;
 }
 
@@ -467,6 +476,17 @@ void bonus_system_skip(bonus_system_t *ctx, int frame)
         return;
     }
 
+    /* Promote highest_reached so a later visual-capture probe of
+     * the just-completed bonus sequence sees END_TEXT as the deepest
+     * named state, not whatever state the player skipped from.  The
+     * renderer gates content on `state >= X` keyed off highest_reached,
+     * and a half-rendered skip frame would otherwise show partial
+     * content for one frame before the GAME transition takes effect. */
+    if (ctx->highest_reached < BONUS_STATE_END_TEXT)
+    {
+        ctx->highest_reached = BONUS_STATE_END_TEXT;
+    }
+
     /* Jump to finish on next update, matching legacy space-bar behavior */
     set_bonus_wait(ctx, BONUS_STATE_FINISH, frame);
 }
@@ -493,11 +513,15 @@ void bonus_system_dec_coins(bonus_system_t *ctx)
 
 void bonus_system_set_coins(bonus_system_t *ctx, int count)
 {
-    if (ctx == NULL || count < 0)
+    if (ctx == NULL)
     {
         return;
     }
-    ctx->coin_count = count;
+    /* Clamp negative to 0 — matches bonus_system_dec_coins's floor
+     * (it refuses to drop below 0) so an upstream logic bug that
+     * tries to set a negative count produces a defined empty-tally
+     * rather than silently preserving the previous game's value. */
+    ctx->coin_count = (count < 0) ? 0 : count;
 }
 
 int bonus_system_get_coins(const bonus_system_t *ctx)
@@ -543,6 +567,33 @@ int bonus_system_get_time_bonus_secs(const bonus_system_t *ctx)
         return 0;
     }
     return ctx->env.time_bonus_secs;
+}
+
+int bonus_system_get_level(const bonus_system_t *ctx)
+{
+    if (ctx == NULL)
+    {
+        return 0;
+    }
+    return ctx->env.level;
+}
+
+int bonus_system_get_starting_level(const bonus_system_t *ctx)
+{
+    if (ctx == NULL)
+    {
+        return 0;
+    }
+    return ctx->env.starting_level;
+}
+
+int bonus_system_get_highscore_rank(const bonus_system_t *ctx)
+{
+    if (ctx == NULL)
+    {
+        return -1;
+    }
+    return ctx->env.highscore_rank;
 }
 
 void bonus_system_reset_coins(bonus_system_t *ctx)

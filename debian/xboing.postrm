@@ -1,0 +1,29 @@
+#!/bin/sh
+# postrm — clean up the shared high-score directory on package purge.
+
+set -e
+
+case "$1" in
+    purge)
+        # Remove the directory and its contents.  Leaves player data
+        # in ~/.local/share/xboing/ alone (per-user, not our concern).
+        rm -rf /var/games/xboing
+
+        # Clean up the statoverride entry so a future reinstall
+        # starts from a clean state.
+        if dpkg-statoverride --list /usr/games/xboing >/dev/null 2>&1; then
+            dpkg-statoverride --remove /usr/games/xboing
+        fi
+        ;;
+    remove|upgrade|failed-upgrade|abort-install|abort-upgrade|disappear)
+        # Keep the directory across remove/upgrade — only purge wipes it.
+        ;;
+    *)
+        echo "postrm called with unknown argument: $1" >&2
+        exit 1
+        ;;
+esac
+
+#DEBHELPER#
+
+exit 0

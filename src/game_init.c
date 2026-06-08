@@ -306,7 +306,11 @@ game_ctx_t *game_create(int argc, char *argv[])
         highscore_io_read(score_path, &ctx->hs_global);
     if (paths_score_file_personal(&ctx->paths, score_path, sizeof(score_path)) == PATHS_OK)
         highscore_io_read(score_path, &ctx->hs_personal);
-    ctx->highscore_request_type = HIGHSCORE_TYPE_PERSONAL;
+    /* Original defaults to GLOBAL — original/highscore.c:136
+     * (static int scoreType = GLOBAL).  master_text only lives in the
+     * global table, so this also ensures new boing-master wisdom is
+     * visible on the post-game-over screen. */
+    ctx->highscore_request_type = HIGHSCORE_TYPE_GLOBAL;
 
     /* ---- Phase 2: SDL2 platform modules --------------------------------- */
 
@@ -651,7 +655,14 @@ game_ctx_t *game_create(int argc, char *argv[])
     /* Give initial ammo */
     gun_system_set_ammo(ctx->gun, GUN_AMMO_PER_LEVEL);
 
-    /* ---- Phase 6: Load initial level + place ball on paddle ------------- */
+    /* ---- Phase 6: Load initial level + place ball on paddle -------------
+     * Pre-load level data so attract-mode renderers have something
+     * to draw if they reach into level_system.  Do NOT advance the
+     * background — original/file.c::SetupStage is the only call that
+     * does so on game start, and start_new_game (game_modes.c:129)
+     * is its modern equivalent.  Advancing here AND in start_new_game
+     * skips bgrnd2 entirely; level 1 of a fresh process would render
+     * with bgrnd3. */
     {
         int file_num = level_system_wrap_number(ctx->level_number);
         char filename[32];
@@ -661,7 +672,6 @@ game_ctx_t *game_create(int argc, char *argv[])
         if (paths_level_file(&ctx->paths, filename, level_path, sizeof(level_path)) == PATHS_OK)
         {
             block_system_clear_all(ctx->block);
-            level_system_advance_background(ctx->level);
             level_system_load_file(ctx->level, level_path);
         }
         else

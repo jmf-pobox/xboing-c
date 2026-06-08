@@ -39,13 +39,13 @@
  * Visual capture takes ~25 s per scenario at this value; that
  * tooling cost is fine for the once-per-release run, and the
  * gameplay readability matters more. */
-#define BONUS_LINE_DELAY 2400
+#define BONUS_LINE_DELAY 2000 /* 20% faster than source-faithful 2400 */
 
 /* Sub-frames for the very first TEXT→SCORE snap.  Original
  * (bonus.c:257) used `frame + 5` at SLOW_SPEED=30 ms ≈ 150 ms —
  * a brief beat before "Congratulations" appears.  120 sub-frames
  * ≈ 150 ms at default modern speed. */
-#define BONUS_INIT_DELAY 120
+#define BONUS_INIT_DELAY 100 /* 20% faster than source-faithful 120 */
 
 /* Per-step pacing for coin/bullet animations within
  * BONUS_STATE_BONUS / BONUS_STATE_BULLET.  The original drops one
@@ -62,7 +62,7 @@
  * Original 30 ms / 1.25 ms per sub-frame = 24 sub-frames per
  * step.  References: original/bonus.c:355-373 (DoBonuses coin
  * loop) and original/bonus.c:464-489 (DoBullets bullet loop). */
-#define BONUS_STEP_DELAY 24
+#define BONUS_STEP_DELAY 20 /* 20% faster than source-faithful 24 */
 
 /* =========================================================================
  * State machine states — match legacy enum BonusStates
@@ -153,6 +153,14 @@ void bonus_system_destroy(bonus_system_t *ctx);
  * resets the state machine to BONUS_STATE_TEXT, and stores the
  * environment for subsequent update calls.
  *
+ * Also clears the internal `finished` flag.  Subsequent
+ * bonus_system_update calls progress the state machine until
+ * BONUS_STATE_FINISH, at which point on_finished fires exactly once
+ * and `finished` is set.  Further updates short-circuit until
+ * begin() is called again — callers are free to drive update() at
+ * any cadence (including the 6×-per-tick attract loop) without
+ * worrying about over-firing.
+ *
  * env: current game state snapshot.  Copied internally.
  * frame: current frame counter.
  */
@@ -226,6 +234,22 @@ int bonus_system_get_initial_bullets(const bonus_system_t *ctx);
  * Matches original/bonus.c:288-303.
  */
 int bonus_system_get_time_bonus_secs(const bonus_system_t *ctx);
+
+/* Return the level number captured at bonus_system_begin.  Renderers
+ * MUST use this rather than re-reading the game context's level_number
+ * — game_rules_next_level increments level_number when bonus completes
+ * and any stray read would render the wrong title. */
+int bonus_system_get_level(const bonus_system_t *ctx);
+
+/* Return the starting_level captured at bonus_system_begin. */
+int bonus_system_get_starting_level(const bonus_system_t *ctx);
+
+/* Return the global highscore rank captured at bonus_system_begin
+ * (-1 if the player didn't make the table).  Renderers MUST use this
+ * rather than recomputing rank against the personal table — original
+ * DoHighScore (bonus.c:528-579) calls GetHighScoreRanking which reads
+ * the GLOBAL table (highscore.c:622-640). */
+int bonus_system_get_highscore_rank(const bonus_system_t *ctx);
 
 /* Reset the bonus coin count to 0 */
 void bonus_system_reset_coins(bonus_system_t *ctx);

@@ -50,6 +50,7 @@
 #include "sdl2_state.h"
 #include "sfx_system.h"
 #include "special_system.h"
+#include "sys_priv.h"
 
 /* =========================================================================
  * MODE_GAME — core gameplay
@@ -65,6 +66,13 @@ static int wisdom_pending;
 static int quit_pending;
 static int abort_pending;
 static int level_pending;
+
+/* Stashed when the wisdom dialogue is pushed; consumed by the post-wisdom
+ * insert path so personal+global rows agree on score/time/name. */
+static unsigned long pending_final_score;
+static unsigned long pending_game_time;
+static unsigned long pending_ts;
+static char pending_name[HIGHSCORE_NAME_LEN];
 
 void game_modes_set_quit_pending(void)
 {
@@ -87,6 +95,7 @@ static void start_new_game(game_ctx_t *ctx)
     ctx->lives_left = 3;
     ctx->game_active = true;
     ctx->score_submitted = false;
+    ctx->savegame_restored_session = false;
     wisdom_pending = 0;
     quit_pending = 0;
     abort_pending = 0;
@@ -131,10 +140,22 @@ static void start_new_game(game_ctx_t *ctx)
     ctx->time_remaining = ctx->time_bonus_total;
     ctx->timer_frame_acc = 0;
 
-    /* Set level title as default message */
+    /* Display level title in the message bar and register it as the
+     * default for auto-clear messages to revert to.  Mirrors
+     * original/file.c:SetupStage:148-150, which calls
+     * SetCurrentMessage("- LevelName -", True) unconditionally on
+     * every new game and level load. */
     const char *title = level_system_get_title(ctx->level);
-    if (title)
-        message_system_set_default(ctx->message, title);
+    char msg[80];
+    if (title && title[0] != '\0')
+        snprintf(msg, sizeof(msg), "- %s -", title);
+    else
+        snprintf(msg, sizeof(msg), "- Untitled -");
+    message_system_set_default(ctx->message, msg);
+    {
+        int frame = (int)sdl2_state_frame(ctx->state);
+        message_system_set(ctx->message, msg, 0, frame);
+    }
 
     /* Place ball on paddle */
     ball_system_env_t env = game_callbacks_ball_env(ctx);
@@ -160,7 +181,8 @@ static void mode_game_enter(sdl2_state_mode_t mode, void *ud)
             const char *ans = dialogue_system_get_input(ctx->dialogue);
             if (ans && (ans[0] == 'y' || ans[0] == 'Y'))
             {
-                ctx->game_active = false;
+                /* Don't clear game_active — mode_highscore_enter uses it
+                 * to gate score submission and clears it after. */
                 ctx->highscore_request_type = HIGHSCORE_TYPE_PERSONAL;
                 sdl2_state_transition(ctx->state, SDL2ST_HIGHSCORE);
                 return;
@@ -178,6 +200,7 @@ static void mode_game_enter(sdl2_state_mode_t mode, void *ud)
         ctx->lives_left = 3;
         ctx->game_active = true;
         ctx->score_submitted = false;
+        ctx->savegame_restored_session = false;
         ctx->game_start = time(NULL);
         ctx->paused_seconds = 0;
         paddle_system_reset(ctx->paddle);
@@ -186,6 +209,21 @@ static void mode_game_enter(sdl2_state_mode_t mode, void *ud)
         ball_system_env_t env = game_callbacks_ball_env(ctx);
         ball_system_reset_start(ctx->ball, &env);
         gun_system_set_ammo(ctx->gun, GUN_MAX_AMMO);
+
+        /* Display the editor-loaded level's title — without this, the
+         * message bar shows whatever sticky was last set before EDIT
+         * (e.g. "Save the rainforests" from INSTRUCT).  Fall back to
+         * "- Untitled -" when the editor never named the level, so we
+         * never silently inherit a stale sticky. */
+        const char *title = level_system_get_title(ctx->level);
+        char msg[80];
+        if (title && title[0] != '\0')
+            snprintf(msg, sizeof(msg), "- %s -", title);
+        else
+            snprintf(msg, sizeof(msg), "- Untitled -");
+        message_system_set_default(ctx->message, msg);
+        int frame = (int)sdl2_state_frame(ctx->state);
+        message_system_set(ctx->message, msg, 0, frame);
     }
     else if (!ctx->game_active || prev == SDL2ST_HIGHSCORE || prev == SDL2ST_INTRO ||
              prev == SDL2ST_INSTRUCT || prev == SDL2ST_DEMO || prev == SDL2ST_KEYS ||
@@ -289,8 +327,13 @@ static void mode_pause_exit(sdl2_state_mode_t mode, void *ud)
 {
     (void)mode;
     game_ctx_t *ctx = ud;
+    /* Restore the level title (the default message) directly rather
+     * than blanking the bar.  message_system_set("", auto_clear=1)
+     * blanks `current` for MESSAGE_CLEAR_DELAY frames before reverting
+     * to default — visible 2 s of empty bar after unpause. */
     int frame = (int)sdl2_state_frame(ctx->state);
-    message_system_set(ctx->message, "", 1, frame);
+    const char *def = message_system_get_default(ctx->message);
+    message_system_set(ctx->message, def ? def : "", 0, frame);
 }
 
 /* =========================================================================
@@ -712,7 +755,23 @@ static void mode_bonus_enter(sdl2_state_mode_t mode, void *ud)
         sdl2_cursor_set(ctx->cursor, SDL2CUR_POINT);
 
     unsigned long score_val = score_system_get(ctx->score);
-    int rank = highscore_io_get_ranking(&ctx->hs_personal, score_val);
+    /* DoHighScore on the bonus screen — original/bonus.c:528-579 calls
+     * GetHighScoreRanking which reads GLOBAL (highscore.c:622-640).
+     * Re-read from disk first so other users' recent inserts are
+     * visible (matches the wisdom-prompt path in mode_highscore_enter).
+     * Read into a stack-local then swap on OK — highscore_io_read
+     * zeroes the destination on EOPEN/EREAD/EVERSION, so the in-memory
+     * cache must not be the destination on a transient read failure. */
+    {
+        char global_path[PATHS_MAX_PATH];
+        if (paths_score_file_global(&ctx->paths, global_path, sizeof(global_path)) == PATHS_OK)
+        {
+            highscore_table_t fresh;
+            if (highscore_io_read(global_path, &fresh) == HIGHSCORE_IO_OK)
+                ctx->hs_global = fresh;
+        }
+    }
+    int rank = highscore_io_get_ranking(&ctx->hs_global, score_val);
 
     bonus_system_env_t env = {
         .score = score_val,
@@ -748,6 +807,14 @@ static void mode_bonus_update(sdl2_state_mode_t mode, void *ud)
         attract_frame_counter++;
         sfx_system_update_glow(ctx->sfx, attract_frame_counter);
         bonus_system_update(ctx->bonus, attract_frame_counter);
+        /* Stop pumping once the sequence has signalled completion.
+         * do_finish is already guarded against re-entry, but skipping
+         * the rest of the burst avoids the no-op call chain through
+         * the state machine and keeps the loop honest. */
+        if (bonus_system_is_finished(ctx->bonus))
+        {
+            break;
+        }
     }
 
     /* Space skips the bonus tally */
@@ -806,6 +873,105 @@ static const char *get_player_name(const game_ctx_t *ctx)
  * MODE_HIGHSCORE — high score table display (attract mode cycling)
  * ========================================================================= */
 
+/* Submit a finished game's score to both the personal and global tables.
+ *
+ * master_text is passed only into the global insert, which applies it
+ * iff the new entry lands at rank 0 — mirroring original/highscore.c:747
+ * (SetBoingMasterText inside the GLOBAL branch).  Pass NULL when the
+ * player isn't the new boing master or cancelled the dialogue.
+ *
+ * Return value contract — narrow on purpose, do NOT use as a generic
+ * success indicator:
+ *
+ *   1: the GLOBAL atomic insert returned HIGHSCORE_IO_OK (player ranked
+ *      on the Hall of Fame).  Personal insert/write status is NOT
+ *      reflected here — they may have failed independently.
+ *   0: the global insert was rejected (NOT_RANKED, file resolve
+ *      failed, elevate failed, or any other error).
+ *
+ * Callers use the return only to decide which post-game table to
+ * display (matches original/level.c:446-449 ResetHighScore(PERSONAL)
+ * on global rejection).  Failure modes other than "did the player
+ * place globally" are surfaced via stderr inside this function; they
+ * do not affect the return value. */
+static int submit_score(game_ctx_t *ctx, unsigned long score, unsigned long game_time,
+                        unsigned long ts, const char *name, const char *master_text)
+{
+    /* Personal table — in-memory insert, then disk write.  Log every
+     * failure: silent loss on game-over is unrecoverable. */
+    highscore_io_result_t ins = highscore_io_insert(
+        &ctx->hs_personal, score, (unsigned long)ctx->level_number, game_time, ts, name);
+    if (ins == HIGHSCORE_IO_OK)
+    {
+        char score_path[PATHS_MAX_PATH];
+        if (paths_score_file_personal(&ctx->paths, score_path, sizeof(score_path)) != PATHS_OK)
+        {
+            fprintf(stderr, "xboing: personal high score path resolve failed; entry kept in "
+                            "memory only\n");
+        }
+        else
+        {
+            highscore_io_result_t pwr = highscore_io_write(score_path, &ctx->hs_personal);
+            if (pwr != HIGHSCORE_IO_OK)
+            {
+                fprintf(stderr, "xboing: personal high score write to %s failed (code %d)\n",
+                        score_path, (int)pwr);
+            }
+        }
+    }
+
+    /* Global table — atomic per-uid-deduped insert under flock,
+     * elevated to egid=games for the /var/games/xboing write.
+     * Restored sessions are ineligible: a local user could edit
+     * their save file to forge a score, then load it, then end
+     * the game.  Personal scores are still inserted above —
+     * that file is already under the user's control. */
+    int global_ok = 0;
+    if (ctx->savegame_restored_session)
+    {
+        return 0;
+    }
+    char global_path[PATHS_MAX_PATH];
+    if (paths_score_file_global(&ctx->paths, global_path, sizeof(global_path)) != PATHS_OK)
+    {
+        fprintf(stderr, "xboing: global high score path resolve failed; skipping global insert\n");
+    }
+    else if (sys_priv_elevate() != 0)
+    {
+        fprintf(stderr, "xboing: cannot elevate to write global high score; skipping\n");
+    }
+    else
+    {
+        highscore_io_result_t gres = highscore_io_insert_global_atomic(
+            global_path, score, (unsigned long)ctx->level_number, game_time, ts,
+            (unsigned long)getuid(), name, master_text);
+        sys_priv_drop();
+
+        /* Refresh in-memory copy on success AND on NOT_RANKED (the
+         * locked re-read inside _atomic may have surfaced other users'
+         * recent inserts; reflect them in the next display).  Skip
+         * refresh only on I/O errors that left disk untouched.  Swap
+         * on OK only — highscore_io_read zeroes its destination on
+         * failure and we'd rather keep the previous in-memory copy. */
+        if (gres == HIGHSCORE_IO_OK || gres == HIGHSCORE_IO_ERR_NOT_RANKED)
+        {
+            highscore_table_t fresh;
+            if (highscore_io_read(global_path, &fresh) == HIGHSCORE_IO_OK)
+                ctx->hs_global = fresh;
+        }
+        if (gres == HIGHSCORE_IO_OK)
+        {
+            global_ok = 1;
+        }
+        else if (gres != HIGHSCORE_IO_ERR_NOT_RANKED)
+        {
+            fprintf(stderr, "xboing: global high score insert to %s failed (code %d)\n",
+                    global_path, (int)gres);
+        }
+    }
+    return global_ok;
+}
+
 static void mode_highscore_enter(sdl2_state_mode_t mode, void *ud)
 {
     (void)mode;
@@ -817,31 +983,32 @@ static void mode_highscore_enter(sdl2_state_mode_t mode, void *ud)
     if (ctx->cursor)
         sdl2_cursor_set(ctx->cursor, SDL2CUR_POINT);
 
-    /* Returning from "words of wisdom" dialogue — save master text */
+    /* Did we just submit a score (game-over path)?  Mode_highscore_enter
+     * runs in two scenarios per game over: (1) wisdom_pending after the
+     * dialog closes, (2) fresh entry from game_rules_ball_died.  Either
+     * way, when the submission is from a real game-over we want to flip
+     * to PERSONAL if the global insert was rejected — matching
+     * original/level.c:446-449 which does ResetHighScore(PERSONAL) on
+     * global-insert failure. */
+    int just_submitted = 0;
+    int global_ok = 0;
+
+    /* Returning from "words of wisdom" dialogue — finalize the deferred
+     * insert using the captured wisdom text (NULL/empty when cancelled). */
     if (wisdom_pending)
     {
         wisdom_pending = 0;
+        const char *wisdom = NULL;
         if (!dialogue_system_was_cancelled(ctx->dialogue))
-        {
-            const char *wisdom = dialogue_system_get_input(ctx->dialogue);
-            if (wisdom != NULL && wisdom[0] != '\0')
-            {
-                strncpy(ctx->hs_personal.master_text, wisdom,
-                        sizeof(ctx->hs_personal.master_text) - 1);
-                ctx->hs_personal.master_text[sizeof(ctx->hs_personal.master_text) - 1] = '\0';
-
-                /* Re-save with updated master text */
-                char score_path[PATHS_MAX_PATH];
-                if (paths_score_file_personal(&ctx->paths, score_path, sizeof(score_path)) ==
-                    PATHS_OK)
-                    highscore_io_write(score_path, &ctx->hs_personal);
-            }
-        }
+            wisdom = dialogue_system_get_input(ctx->dialogue);
+        global_ok = submit_score(ctx, pending_final_score, pending_game_time, pending_ts,
+                                 pending_name, wisdom);
+        ctx->score_submitted = true;
+        just_submitted = 1;
         /* Fall through to display */
     }
     else if (!ctx->score_submitted && ctx->game_active)
     {
-        /* Insert the player's score into the personal table and save to disk */
         unsigned long final_score = score_system_get(ctx->score);
         if (final_score > 0)
         {
@@ -856,31 +1023,61 @@ static void mode_highscore_enter(sdl2_state_mode_t mode, void *ud)
             }
 
             const char *name = get_player_name(ctx);
+            unsigned long ts = (unsigned long)time(NULL);
 
-            int rank = highscore_io_get_ranking(&ctx->hs_personal, final_score);
-
-            highscore_io_result_t ins = highscore_io_insert(
-                &ctx->hs_personal, final_score, (unsigned long)ctx->level_number, game_time,
-                (unsigned long)time(NULL), name);
-            ctx->score_submitted = true;
-
-            if (ins == HIGHSCORE_IO_OK)
+            /* Boing-master prompt — original gates on global rank
+             * (highscore.c:622-640 reads GLOBAL inside GetHighScoreRanking,
+             * called from level.c:434 before either insert).  Re-read
+             * from disk so another user's recent insert is visible.
+             * Swap-on-OK so a transient read failure can't wipe the
+             * in-memory cache (highscore_io_read zeroes its destination
+             * on EOPEN/EREAD/EVERSION). */
             {
-                char score_path[PATHS_MAX_PATH];
-                if (paths_score_file_personal(&ctx->paths, score_path, sizeof(score_path)) ==
+                char global_path[PATHS_MAX_PATH];
+                if (paths_score_file_global(&ctx->paths, global_path, sizeof(global_path)) ==
                     PATHS_OK)
-                    highscore_io_write(score_path, &ctx->hs_personal);
-
-                /* New boing master — ask for words of wisdom */
-                if (rank == 1 && sdl2_state_push_dialogue(ctx->state) == SDL2ST_OK)
                 {
-                    dialogue_system_open(ctx->dialogue, "Words of wisdom Boing Master?",
-                                         DIALOGUE_ICON_TEXT, DIALOGUE_VALIDATION_TEXT);
-                    wisdom_pending = 1;
-                    return; /* Don't start display yet — wait for dialogue */
+                    highscore_table_t fresh;
+                    if (highscore_io_read(global_path, &fresh) == HIGHSCORE_IO_OK)
+                        ctx->hs_global = fresh;
                 }
             }
+
+            /* Use dedup-aware helper: prompts only when the locked
+             * insert will land us at rank 0, not when our existing
+             * higher score would block insertion.  Restored sessions
+             * skip the prompt entirely — submit_score will refuse
+             * the global write anyway, so there's no master text to
+             * collect. */
+            if (!ctx->savegame_restored_session &&
+                highscore_io_would_be_global_master(&ctx->hs_global, final_score,
+                                                    (unsigned long)getuid()) &&
+                sdl2_state_push_dialogue(ctx->state) == SDL2ST_OK)
+            {
+                pending_final_score = final_score;
+                pending_game_time = game_time;
+                pending_ts = ts;
+                strncpy(pending_name, name, sizeof(pending_name) - 1);
+                pending_name[sizeof(pending_name) - 1] = '\0';
+                dialogue_system_open(ctx->dialogue, "Words of wisdom Boing Master?",
+                                     DIALOGUE_ICON_TEXT, DIALOGUE_VALIDATION_TEXT);
+                wisdom_pending = 1;
+                return; /* Defer inserts until dialogue closes */
+            }
+
+            global_ok = submit_score(ctx, final_score, game_time, ts, name, NULL);
+            ctx->score_submitted = true;
+            just_submitted = 1;
         }
+    }
+
+    /* Post-game default table choice — original/level.c:446-449.  When
+     * the global insert was rejected (per-uid dedup or non-ranking
+     * score), show PERSONAL so the player sees their own progress
+     * instead of an irrelevant Hall of Fame. */
+    if (just_submitted && !global_ok)
+    {
+        ctx->highscore_request_type = HIGHSCORE_TYPE_PERSONAL;
     }
 
     highscore_type_t type = ctx->highscore_request_type;
@@ -890,10 +1087,23 @@ static void mode_highscore_enter(sdl2_state_mode_t mode, void *ud)
     highscore_system_set_current_score(ctx->highscore_display, score_system_get(ctx->score));
     highscore_system_begin(ctx->highscore_display, type, 0);
 
-    int frame = (int)sdl2_state_frame(ctx->state);
-    const char *label =
-        (type == HIGHSCORE_TYPE_GLOBAL) ? "<h> - Hall of Fame" : "<H> - Personal Best";
-    message_system_set(ctx->message, label, 0, frame);
+    /* Don't overwrite the in-game message bar when we arrived from
+     * game-over — game_rules_ball_died set "GAME OVER" and the player
+     * should see it (matches original/level.c:455 which sets
+     * "- Game Over - " in EndTheGame; original's highscore display
+     * never touches the message bar).  Gate on game_active, which
+     * stays true through the entire game-over highscore display
+     * (re-entries from dialog pop included) and is cleared by
+     * mode_highscore_update on START.  In the attract-cycle case
+     * game_active is false and the label tells the player which view
+     * they're on. */
+    if (!ctx->game_active)
+    {
+        int frame = (int)sdl2_state_frame(ctx->state);
+        const char *label =
+            (type == HIGHSCORE_TYPE_GLOBAL) ? "<h> - Hall of Fame" : "<H> - Personal Best";
+        message_system_set(ctx->message, label, 0, frame);
+    }
 }
 
 static void mode_highscore_update(sdl2_state_mode_t mode, void *ud)

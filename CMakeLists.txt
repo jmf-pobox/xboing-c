@@ -548,6 +548,13 @@ target_include_directories(paths PUBLIC
 )
 target_compile_options(paths PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
 
+# --- sys_priv (setgid-games privilege management) ---------------------------
+add_library(sys_priv STATIC src/sys_priv.c)
+target_include_directories(sys_priv PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+target_compile_options(sys_priv PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+
 # --- SDL2 game executable (integration layer) --------------------------------
 #
 # The new SDL2-based game binary.  Links all pure C system libraries and SDL2
@@ -607,6 +614,7 @@ if(SDL2_FOUND AND SDL2_IMAGE_FOUND AND SDL2_MIXER_FOUND AND SDL2_TTF_FOUND)
         savegame_system
         config_io
         paths
+        sys_priv
         # Math
         score_logic
         m
