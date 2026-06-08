@@ -14,6 +14,13 @@ bool parse_int_in_range(const char *s, int lo, int hi, int *out)
     {
         return false;
     }
+    /* strtol() skips leading whitespace, but the header contract
+     * promises strict parsing — optional sign then digits only.
+     * Reject leading whitespace at the boundary. */
+    if (s[0] != '+' && s[0] != '-' && !(s[0] >= '0' && s[0] <= '9'))
+    {
+        return false;
+    }
 
     errno = 0;
     char *end = NULL;

@@ -67,6 +67,18 @@ static void test_trailing_whitespace_rejected(void **state)
     assert_int_equal(v, 42);
 }
 
+/* strtol() skips leading whitespace by default — the helper must reject it
+ * to keep the "optional sign + digits" contract honest. */
+static void test_leading_whitespace_rejected(void **state)
+{
+    (void)state;
+    int v = 42;
+    assert_false(parse_int_in_range(" 12", 1, 100, &v));
+    assert_int_equal(v, 42);
+    assert_false(parse_int_in_range("\t12", 1, 100, &v));
+    assert_int_equal(v, 42);
+}
+
 static void test_non_numeric_rejected(void **state)
 {
     (void)state;
@@ -153,6 +165,7 @@ int main(void)
         cmocka_unit_test(test_above_range_rejected),
         cmocka_unit_test(test_partial_parse_rejected),
         cmocka_unit_test(test_trailing_whitespace_rejected),
+        cmocka_unit_test(test_leading_whitespace_rejected),
         cmocka_unit_test(test_non_numeric_rejected),
         cmocka_unit_test(test_empty_rejected),
         cmocka_unit_test(test_null_safe),
