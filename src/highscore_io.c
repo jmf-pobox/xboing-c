@@ -16,6 +16,39 @@
 #include <unistd.h>
 
 /* =========================================================================
+ * Internal: text sanitisation
+ * =========================================================================
+ *
+ * Strip C0 controls (0x00–0x1F), DEL (0x7F), and C1 controls (0x80–0x9F)
+ * in-place.  Tabs and newlines are not in the player-name domain, so we
+ * drop them too — names and master text are single-line UI strings.
+ *
+ * The shared global score file is written by one user and read/printed
+ * by every other user (`xboing -scores`); without this filter, one
+ * player can submit a nickname containing ANSI/OSC escapes that fire
+ * in another player's terminal.  Apply on every storage and read
+ * boundary so any in-memory entry is safe regardless of source.
+ */
+static void sanitize_text_inplace(char *s)
+{
+    if (!s)
+    {
+        return;
+    }
+    char *w = s;
+    for (const char *r = s; *r; r++)
+    {
+        unsigned char c = (unsigned char)*r;
+        if (c < 0x20 || c == 0x7F || (c >= 0x80 && c <= 0x9F))
+        {
+            continue;
+        }
+        *w++ = (char)c;
+    }
+    *w = '\0';
+}
+
+/* =========================================================================
  * Internal: JSON writing helpers
  * ========================================================================= */
 
@@ -323,6 +356,7 @@ static int read_table_json(FILE *fp, highscore_table_t *table)
                 return -1;
             }
             read_json_string(fp, table->master_name, HIGHSCORE_NAME_LEN);
+            sanitize_text_inplace(table->master_name);
         }
         else if (strcmp(key, "master_text") == 0)
         {
@@ -332,6 +366,7 @@ static int read_table_json(FILE *fp, highscore_table_t *table)
                 return -1;
             }
             read_json_string(fp, table->master_text, HIGHSCORE_NAME_LEN);
+            sanitize_text_inplace(table->master_text);
         }
         else if (strcmp(key, "entries") == 0)
         {
@@ -426,6 +461,7 @@ static int read_table_json(FILE *fp, highscore_table_t *table)
                             return -1;
                         }
                         read_json_string(fp, e->name, HIGHSCORE_NAME_LEN);
+                        sanitize_text_inplace(e->name);
                     }
                     else
                     {
@@ -653,16 +689,20 @@ static highscore_io_result_t write_table_inplace(const char *path, const highsco
     {
         return HIGHSCORE_IO_ERR_OPEN;
     }
-    if (ftruncate(fd, 0) != 0)
-    {
-        close(fd);
-        return HIGHSCORE_IO_ERR_WRITE;
-    }
+    /* fdopen first, ftruncate second: if fdopen fails, the file
+     * still has its old contents.  Truncating before fdopen would
+     * leave a zero-length leaderboard on the rare allocation
+     * failure. */
     FILE *fp = fdopen(fd, "w");
     if (!fp)
     {
         close(fd);
         return HIGHSCORE_IO_ERR_OPEN;
+    }
+    if (ftruncate(fileno(fp), 0) != 0)
+    {
+        fclose(fp);
+        return HIGHSCORE_IO_ERR_WRITE;
     }
     highscore_table_t sorted = *table;
     highscore_io_sort(&sorted);
@@ -878,6 +918,7 @@ highscore_io_insert_global_atomic(const char *path, unsigned long score, unsigne
     e->user_id = user_id;
     strncpy(e->name, name, HIGHSCORE_NAME_LEN - 1);
     e->name[HIGHSCORE_NAME_LEN - 1] = '\0';
+    sanitize_text_inplace(e->name);
 
     /* New boing master — update master_name and master_text together
      * so they always describe the same person.  Original writes both
@@ -890,10 +931,12 @@ highscore_io_insert_global_atomic(const char *path, unsigned long score, unsigne
     {
         strncpy(table.master_name, name, HIGHSCORE_NAME_LEN - 1);
         table.master_name[HIGHSCORE_NAME_LEN - 1] = '\0';
+        sanitize_text_inplace(table.master_name);
         const char *text =
             (master_text && master_text[0] != '\0') ? master_text : "Anyone play this game?";
         strncpy(table.master_text, text, HIGHSCORE_NAME_LEN - 1);
         table.master_text[HIGHSCORE_NAME_LEN - 1] = '\0';
+        sanitize_text_inplace(table.master_text);
     }
 
     /* Use in-place write rather than temp+rename: the latter would
@@ -950,12 +993,14 @@ highscore_io_result_t highscore_io_insert(highscore_table_t *table, unsigned lon
     e->user_id = 0; /* personal-table entries don't track uid */
     strncpy(e->name, name, HIGHSCORE_NAME_LEN - 1);
     e->name[HIGHSCORE_NAME_LEN - 1] = '\0';
+    sanitize_text_inplace(e->name);
 
     /* Update master if this is the new #1. */
     if (rank == 0)
     {
         strncpy(table->master_name, name, HIGHSCORE_NAME_LEN - 1);
         table->master_name[HIGHSCORE_NAME_LEN - 1] = '\0';
+        sanitize_text_inplace(table->master_name);
     }
 
     return HIGHSCORE_IO_OK;

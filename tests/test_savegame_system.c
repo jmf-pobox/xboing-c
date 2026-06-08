@@ -609,11 +609,35 @@ static void test_load_rejects_oversized_level_number(void **vstate)
     assert_int_equal(savegame_system_load(ctx), 0);
 }
 
+/* =========================================================================
+ * Global high-score eligibility: restored sessions must be marked
+ * ineligible so submit_score skips the setgid-games global write.
+ * ========================================================================= */
+
+static void test_restore_marks_session_ineligible_for_global(void **vstate)
+{
+    fixture_t *f = *vstate;
+    game_ctx_t *ctx = f->ctx;
+    /* Fresh-game default — no save load happened. */
+    ctx->savegame_restored_session = false;
+
+    savegame_data_t info;
+    savegame_io_init(&info);
+    info.level = 1;
+    info.lives_left = 3;
+
+    savegame_system_restore(ctx, &info, NULL);
+
+    assert_true(ctx->savegame_restored_session);
+}
+
 int main(void)
 {
     const struct CMUnitTest tests[] = {
         /* Pure capture/restore */
         cmocka_unit_test_setup_teardown(test_capture_restore_round_trip, setup, teardown),
+        cmocka_unit_test_setup_teardown(test_restore_marks_session_ineligible_for_global, setup,
+                                        teardown),
         cmocka_unit_test_setup_teardown(test_capture_null_inputs_safe, setup, teardown),
         cmocka_unit_test_setup_teardown(test_restore_null_inputs_safe, setup, teardown),
         cmocka_unit_test_setup_teardown(test_restore_info_only_leaves_grid_untouched, setup,

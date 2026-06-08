@@ -95,6 +95,7 @@ static void start_new_game(game_ctx_t *ctx)
     ctx->lives_left = 3;
     ctx->game_active = true;
     ctx->score_submitted = false;
+    ctx->savegame_restored_session = false;
     wisdom_pending = 0;
     quit_pending = 0;
     abort_pending = 0;
@@ -199,6 +200,7 @@ static void mode_game_enter(sdl2_state_mode_t mode, void *ud)
         ctx->lives_left = 3;
         ctx->game_active = true;
         ctx->score_submitted = false;
+        ctx->savegame_restored_session = false;
         ctx->game_start = time(NULL);
         ctx->paused_seconds = 0;
         paddle_system_reset(ctx->paddle);
@@ -919,8 +921,16 @@ static int submit_score(game_ctx_t *ctx, unsigned long score, unsigned long game
     }
 
     /* Global table — atomic per-uid-deduped insert under flock,
-     * elevated to egid=games for the /var/games/xboing write. */
+     * elevated to egid=games for the /var/games/xboing write.
+     * Restored sessions are ineligible: a local user could edit
+     * their save file to forge a score, then load it, then end
+     * the game.  Personal scores are still inserted above —
+     * that file is already under the user's control. */
     int global_ok = 0;
+    if (ctx->savegame_restored_session)
+    {
+        return 0;
+    }
     char global_path[PATHS_MAX_PATH];
     if (paths_score_file_global(&ctx->paths, global_path, sizeof(global_path)) != PATHS_OK)
     {
@@ -1035,8 +1045,12 @@ static void mode_highscore_enter(sdl2_state_mode_t mode, void *ud)
 
             /* Use dedup-aware helper: prompts only when the locked
              * insert will land us at rank 0, not when our existing
-             * higher score would block insertion. */
-            if (highscore_io_would_be_global_master(&ctx->hs_global, final_score,
+             * higher score would block insertion.  Restored sessions
+             * skip the prompt entirely — submit_score will refuse
+             * the global write anyway, so there's no master text to
+             * collect. */
+            if (!ctx->savegame_restored_session &&
+                highscore_io_would_be_global_master(&ctx->hs_global, final_score,
                                                     (unsigned long)getuid()) &&
                 sdl2_state_push_dialogue(ctx->state) == SDL2ST_OK)
             {

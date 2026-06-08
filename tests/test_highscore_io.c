@@ -593,6 +593,79 @@ static void test_atomic_does_not_clobber_wrong_version(void **state)
     cleanup_atomic_artifacts();
 }
 
+/* Control bytes injected through the global insert path must be stripped
+ * before the entry hits disk.  Without this, a player's nickname can carry
+ * ANSI/OSC escapes that fire in another player's terminal when running
+ * `xboing -scores`. */
+static void test_atomic_strips_control_bytes_from_name(void **state)
+{
+    (void)state;
+    /* "\x1b]0;evil\x07Player" — OSC + name.  After sanitisation the
+     * stored name should be just "0;evilPlayer" (the escape and BEL
+     * are removed; the ']' and '0' are printable so they stay). */
+    const char *malicious = "\x1b]0;evil\x07Player";
+    assert_int_equal(highscore_io_insert_global_atomic(tmp_path, 5000, 3, 120, 1700000000UL, 1000,
+                                                       malicious, "Quote\x1bQ"),
+                     HIGHSCORE_IO_OK);
+
+    highscore_table_t out;
+    assert_int_equal(highscore_io_read(tmp_path, &out), HIGHSCORE_IO_OK);
+
+    for (const char *p = out.entries[0].name; *p; p++)
+    {
+        unsigned char c = (unsigned char)*p;
+        assert_true(c >= 0x20 && c != 0x7F && !(c >= 0x80 && c <= 0x9F));
+    }
+    assert_string_equal(out.entries[0].name, "]0;evilPlayer");
+
+    for (const char *p = out.master_text; *p; p++)
+    {
+        unsigned char c = (unsigned char)*p;
+        assert_true(c >= 0x20 && c != 0x7F && !(c >= 0x80 && c <= 0x9F));
+    }
+    assert_string_equal(out.master_text, "QuoteQ");
+
+    cleanup_atomic_artifacts();
+}
+
+/* Personal-table insert sanitises the same way as the atomic global path. */
+static void test_insert_strips_control_bytes_from_name(void **state)
+{
+    (void)state;
+    highscore_table_t t;
+    highscore_io_init_table(&t);
+    assert_int_equal(
+        highscore_io_insert(&t, 5000, 3, 120, 1700000000UL, "Eve\x1b]2;x\x07il"),
+        HIGHSCORE_IO_OK);
+    assert_string_equal(t.entries[0].name, "Eve]2;xil");
+    assert_string_equal(t.master_name, "Eve]2;xil");
+}
+
+/* Read path scrubs control bytes too — defends against hand-edited
+ * files containing decoded \uXXXX escapes that resolve to controls. */
+static void test_read_strips_control_bytes(void **state)
+{
+    (void)state;
+    FILE *fp = fopen(tmp_path, "w");
+    assert_non_null(fp);
+    /*  is ESC;  is DEL.  Place them in name, master_name,
+     * and master_text. */
+    fprintf(fp, "{\"version\": 1,"
+                " \"master_name\": \"M\\u001bX\","
+                " \"master_text\": \"T\\u007fY\","
+                " \"entries\": ["
+                " {\"score\": 100, \"level\": 1, \"game_time\": 1,"
+                "  \"timestamp\": 1, \"user_id\": 1, \"name\": \"N\\u001bZ\"}"
+                "]}");
+    fclose(fp);
+
+    highscore_table_t t;
+    assert_int_equal(highscore_io_read(tmp_path, &t), HIGHSCORE_IO_OK);
+    assert_string_equal(t.master_name, "MX");
+    assert_string_equal(t.master_text, "TY");
+    assert_string_equal(t.entries[0].name, "NZ");
+}
+
 /* =========================================================================
  * Test runner
  * ========================================================================= */
@@ -650,6 +723,13 @@ int main(void)
         cmocka_unit_test_setup_teardown(test_read_empty_entries_array_parses, setup_tmpfile,
                                         teardown_tmpfile),
         cmocka_unit_test_setup_teardown(test_atomic_does_not_clobber_wrong_version, setup_tmpfile,
+                                        teardown_tmpfile),
+
+        /* Group 10: control-byte sanitisation */
+        cmocka_unit_test_setup_teardown(test_atomic_strips_control_bytes_from_name, setup_tmpfile,
+                                        teardown_tmpfile),
+        cmocka_unit_test(test_insert_strips_control_bytes_from_name),
+        cmocka_unit_test_setup_teardown(test_read_strips_control_bytes, setup_tmpfile,
                                         teardown_tmpfile),
     };
 
