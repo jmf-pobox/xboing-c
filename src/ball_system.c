@@ -738,7 +738,7 @@ static void update_a_ball(ball_system_t *ctx, const ball_system_env_t *env, int 
      * per-tick collision flow, after CheckForCollision has consumed the
      * pre-tick oldx/oldy at original/ball.c:1213-1214.
      *
-     * Ball-to-ball collision below does NOT read oldx/oldy, so this snapshot
+     * Ball-to-ball collision above does NOT read oldx/oldy, so this snapshot
      * could go either before or after it; we place it after to keep the
      * "snapshot at the very end of the tick" invariant clean. */
     b->oldx = b->ballx;
@@ -1019,11 +1019,15 @@ static int check_for_collision(ball_system_t *ctx, int x, int y, int *r, int *c,
         ret = ctx->callbacks.check_region(row - 1, col + 1, x, y, 0, ctx->user_data);
         if (ret != BALL_REGION_NONE)
         {
-            /* Original/ball.c:1499-1500 discards the hit but leaves r/c pointing
-             * at the would-be cell.  Caller will see REGION_NONE and continue
-             * the ray-march; row/col are no longer authoritative on the next
-             * iteration, but the per-iteration check_region calls don't depend
-             * on the base being stable so this is harmless cosmetic drift. */
+            /* Original/ball.c:1499-1500 discards the hit and points
+             * the r and c out-parameters at the would-be cell.  The
+             * caller continues the ray-march starting from this drifted
+             * base — a one-step shift toward the cell that nearly hit.
+             * Bug-for-bug parity with the original; not a no-op, but
+             * bounded and localised because subsequent NONE returns
+             * leave r/c alone (see else branch below).  The previous
+             * port drifted r/c on every NONE return regardless, which
+             * compounded across iterations. */
             *r = row - 1;
             *c = col + 1;
             return BALL_REGION_NONE;

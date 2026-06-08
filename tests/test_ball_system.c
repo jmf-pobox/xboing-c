@@ -1808,13 +1808,13 @@ static void test_raymarch_starts_at_pre_tick_position(void **state)
  * found the cell containing the block it was about to enter.
  *
  * We configure the mock to fire at row=5, col=4 only — when the ball y
- * reaches a window inside row 5's vertical span.  The pre-tick position
- * is in row 6 (one below the block), and the ray-march walks up through
- * row 5.  With the drift bug, by the time y reaches the window the
- * search base has drifted to row=0 col=9 — far away — and the cell at
- * row=5 col=4 never gets tested.  Without the drift, every iteration
- * tests row=5 col=4 (via the (-1, 0) neighbor of base (6, 4)) and the
- * window fires on the right y. */
+ * reaches a window inside row 5's vertical span (y_to_row(190, 32)=5,
+ * so both pre-tick y=190 and post-tick y=179 map to row 5).  The mock
+ * fires only on bottom-edge contact, near the block-pixel edge.
+ * With the drift bug, by the time y reaches the window the search base
+ * has drifted to (0, 9) — far from (5, 4) — and the cell never gets
+ * tested.  Without the drift, every iteration keeps base (5, 4) so the
+ * very first iteration after y enters the window finds the cell. */
 static void test_check_for_collision_search_base_does_not_drift(void **state)
 {
     (void)state;
