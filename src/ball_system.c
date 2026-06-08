@@ -733,12 +733,15 @@ static void update_a_ball(ball_system_t *ctx, const ball_system_env_t *env, int 
      * frame's ballx = oldx + dx step (line 473).  Must happen AFTER the
      * ray-march and ball-to-ball collision: those routines use oldx/oldy
      * as the pre-tick position when ray-marching from old → new.  Matches
-     * original/ball.c:1620-1621, which performs this update after MoveBall.
+     * original/ball.c:402-403 (the snapshot inside MoveBall) which is
+     * invoked from UpdateABall at original/ball.c:1318 — the end of the
+     * per-tick collision flow, after CheckForCollision has consumed the
+     * pre-tick oldx/oldy at original/ball.c:1213-1214.
      *
-     * Prior version did this BEFORE the ray-march at line 602, which
-     * pointed the ray-march at the NEW position and made it walk `step`
-     * more pixels past it.  Fast balls aimed at the seam between two
-     * horizontally-adjacent blocks then sampled deep inside one block, where
+     * Prior version did this BEFORE the ray-march, which pointed the
+     * ray-march at the NEW position and made it walk `step` more pixels
+     * past it.  Fast balls aimed at the seam between two horizontally-
+     * adjacent blocks then sampled deep inside one block, where
      * block_system_check_region's triangular-quadrant classification reports
      * LEFT/RIGHT instead of BOTTOM, so only dx reverses (often dx=0 for
      * straight-up shots) and the ball tunnels through to the next row. */

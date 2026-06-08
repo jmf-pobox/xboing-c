@@ -25,7 +25,6 @@
 #include <setjmp.h>
 #include <stdarg.h>
 #include <stddef.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -1712,9 +1711,12 @@ static void test_restore_ready_no_auto_activate_first_tick(void **state)
  *
  * Regression test for the seam-tunneling bug.  The fix moves the
  * oldx/oldy snapshot from BEFORE the ray-march to AFTER it, matching
- * original/ball.c:1620-1621.  Without the fix the ray-march starts at
- * the post-tick position and probes `step` more pixels past it, which
- * skips the pre-tick → post-tick path entirely on fast balls.
+ * the per-tick flow in original/ball.c:1213-1214 (ray-march reads
+ * pre-tick oldx/oldy) → original/ball.c:1318 (call to MoveBall) →
+ * original/ball.c:402-403 (MoveBall snapshots ballx/bally back into
+ * oldx/oldy).  Without the fix the ray-march starts at the post-tick
+ * position and probes `step` more pixels past it, skipping the
+ * pre-tick → post-tick path entirely on fast balls.
  *
  * We exercise this by configuring a windowed mock that fires only when
  * the ball center sits in a narrow y-band somewhere ALONG the trajectory.
