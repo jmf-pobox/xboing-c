@@ -1763,6 +1763,11 @@ static block_hit_result_t cb_on_block_hit_windowed(int row, int col, int ball_in
  * on iteration 0 and fires; the pre-fix ray-march starts at the post-tick
  * y (≈165) and never samples 180, so the mock never fires.
  *
+ * Companion test below (test_check_for_collision_search_base_does_not_drift)
+ * covers the second tunneling cause: the search base used to drift by
+ * (-1, +1) on every NONE return, so multi-iteration ray-marches lost
+ * the cell containing the block.
+ *
  * (We can't write a multi-iteration walk test here because the row/col
  * arguments to check_region drift diagonally each iteration thanks to a
  * legacy bug preserved at check_for_collision:989-995 — only iteration 0
@@ -1790,6 +1795,47 @@ static void test_raymarch_starts_at_pre_tick_position(void **state)
      * replace dy with -5) and pre-sets lastPaddleHitFrame so the auto-tilt
      * inside update() leaves our velocity alone. */
     ball_system_restore(ctx, 0, env.frame - 1, 1, BALL_ACTIVE, 220, 180, 0, -15, BALL_NONE);
+    ball_system_update(ctx, &env);
+
+    assert_true(bc.block_hit_count > 0);
+
+    ball_system_destroy(ctx);
+}
+
+/* Second tunneling cause: check_for_collision used to drift its row/col
+ * search base by (-1, +1) on every NONE return.  After ~10 ray-march
+ * iterations the base had drifted 10 cells away, so a fast ball never
+ * found the cell containing the block it was about to enter.
+ *
+ * We configure the mock to fire at row=5, col=4 only — when the ball y
+ * reaches a window inside row 5's vertical span.  The pre-tick position
+ * is in row 6 (one below the block), and the ray-march walks up through
+ * row 5.  With the drift bug, by the time y reaches the window the
+ * search base has drifted to row=0 col=9 — far away — and the cell at
+ * row=5 col=4 never gets tested.  Without the drift, every iteration
+ * tests row=5 col=4 (via the (-1, 0) neighbor of base (6, 4)) and the
+ * window fires on the right y. */
+static void test_check_for_collision_search_base_does_not_drift(void **state)
+{
+    (void)state;
+    test_windowed_cb_t bc = {0};
+    bc.hit_row = 5;
+    bc.hit_col = 4;
+    bc.hit_region = BALL_REGION_BOTTOM;
+    /* Block at row 5 with row_height=32 sits in y range 160..192 inclusive
+     * of any internal offset.  Configure the window to cover y=185-186,
+     * which the ray-march reaches at iteration 5 (pre-tick y=190, dy=-11). */
+    bc.y_min = 185;
+    bc.y_max = 186;
+    bc.block_hit_return = BLOCK_HIT_BOUNCE;
+
+    ball_system_callbacks_t cbs = {0};
+    cbs.check_region = cb_check_region_windowed;
+    cbs.on_block_hit = cb_on_block_hit_windowed;
+    ball_system_t *ctx = ball_system_create(&cbs, &bc, NULL);
+    ball_system_env_t env = make_env(100);
+
+    ball_system_restore(ctx, 0, env.frame - 1, 1, BALL_ACTIVE, 220, 190, 0, -11, BALL_NONE);
     ball_system_update(ctx, &env);
 
     assert_true(bc.block_hit_count > 0);
@@ -1879,6 +1925,7 @@ int main(void)
         cmocka_unit_test(test_restore_ready_no_auto_activate_first_tick),
         /* Group 15: Ray-march start position (xboing-c-qck) */
         cmocka_unit_test(test_raymarch_starts_at_pre_tick_position),
+        cmocka_unit_test(test_check_for_collision_search_base_does_not_drift),
     };
     return cmocka_run_group_tests(tests, NULL, NULL);
 }

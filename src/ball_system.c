@@ -730,21 +730,17 @@ static void update_a_ball(ball_system_t *ctx, const ball_system_env_t *env, int 
     }
 
     /* Snapshot the final post-tick position into oldx/oldy for the next
-     * frame's ballx = oldx + dx step (line 473).  Must happen AFTER the
-     * ray-march and ball-to-ball collision: those routines use oldx/oldy
-     * as the pre-tick position when ray-marching from old → new.  Matches
+     * frame's ballx = oldx + dx step.  Must happen AFTER the block-collision
+     * ray-march: the ray-march reads oldx/oldy as the pre-tick start point
+     * (see line where x_f and y_f are seeded above).  Matches
      * original/ball.c:402-403 (the snapshot inside MoveBall) which is
      * invoked from UpdateABall at original/ball.c:1318 — the end of the
      * per-tick collision flow, after CheckForCollision has consumed the
      * pre-tick oldx/oldy at original/ball.c:1213-1214.
      *
-     * Prior version did this BEFORE the ray-march, which pointed the
-     * ray-march at the NEW position and made it walk `step` more pixels
-     * past it.  Fast balls aimed at the seam between two horizontally-
-     * adjacent blocks then sampled deep inside one block, where
-     * block_system_check_region's triangular-quadrant classification reports
-     * LEFT/RIGHT instead of BOTTOM, so only dx reverses (often dx=0 for
-     * straight-up shots) and the ball tunnels through to the next row. */
+     * Ball-to-ball collision below does NOT read oldx/oldy, so this snapshot
+     * could go either before or after it; we place it after to keep the
+     * "snapshot at the very end of the tick" invariant clean. */
     b->oldx = b->ballx;
     b->oldy = b->bally;
 }
@@ -971,11 +967,22 @@ static int check_for_collision(ball_system_t *ctx, int x, int y, int *r, int *c,
     /*
      * Check each adjoining block and see if the ball has hit any region in it.
      * Returns the hit region or BALL_REGION_NONE.
-     * Matches CheckForCollision() in ball.c:1457-1506.
+     * Matches CheckForCollision() in original/ball.c:1460-1504.
      *
-     * NOTE: The legacy code at ball.c:1494-1498 has a bug: the last else-if
-     * (row-1, col+1) returns REGION_NONE even on a hit, and sets r,c to
-     * (row-1, col+1) before returning NONE. We preserve this behavior.
+     * Quirk preserved from the original: the 9th else-if at
+     * original/ball.c:1497-1502 checks (row-1, col+1) and, if a hit
+     * fires, sets *r = row-1, *c = col+1 but returns REGION_NONE —
+     * effectively discarding the hit while leaving row/col pointing
+     * at it.  We mirror that exact shape for visual-fidelity parity:
+     * the quirk only fires on the (row-1, col+1) hit path, NOT on
+     * the all-9-miss path.  An earlier port flattened both into a
+     * single "all misses → drift r/c by (-1, +1)" branch.  That was
+     * wrong: on consecutive ray-march iterations with no hit, the
+     * search base drifted diagonally (-1, +1) per step.  After ~10
+     * iterations the base was 10 rows up and 10 cols right of the
+     * ball, so a fast upward ball never found the cell containing
+     * the row it was about to enter, and tunneled through entire
+     * walls without bouncing.  See xboing-c-qck.
      */
 
     int ret, row, col;
@@ -988,11 +995,14 @@ static int check_for_collision(ball_system_t *ctx, int x, int y, int *r, int *c,
     row = *r;
     col = *c;
 
-    /* Check cell and 8 neighbors: center first, then orthogonal, then diagonal. */
-    static const int dr[] = {0, 1, -1, 0, 0, 1, -1, 1, -1};
-    static const int dc[] = {0, 0, 0, 1, -1, 1, -1, -1, 1};
+    /* Check cell and 8 neighbors in original's order:
+     * (0,0), (+1,0), (-1,0), (0,+1), (0,-1), (+1,+1), (-1,-1), (+1,-1)
+     * The 9th cell (-1, +1) is handled below to preserve the original quirk. */
+    static const int dr[] = {0, 1, -1, 0, 0, 1, -1, 1};
+    static const int dc[] = {0, 0, 0, 1, -1, 1, -1, -1};
 
-    for (int n = 0; n < 9; n++)
+    ret = BALL_REGION_NONE;
+    for (int n = 0; n < 8; n++)
     {
         ret = ctx->callbacks.check_region(row + dr[n], col + dc[n], x, y, 0, ctx->user_data);
         if (ret != BALL_REGION_NONE)
@@ -1001,13 +1011,24 @@ static int check_for_collision(ball_system_t *ctx, int x, int y, int *r, int *c,
             col += dc[n];
             break;
         }
-        if (n == 8)
+    }
+
+    if (ret == BALL_REGION_NONE)
+    {
+        /* 9th neighbor: (-1, +1).  Original quirk preserved verbatim. */
+        ret = ctx->callbacks.check_region(row - 1, col + 1, x, y, 0, ctx->user_data);
+        if (ret != BALL_REGION_NONE)
         {
-            /* Legacy bug: ball.c:1494-1498 sets r/c but returns REGION_NONE */
+            /* Original/ball.c:1499-1500 discards the hit but leaves r/c pointing
+             * at the would-be cell.  Caller will see REGION_NONE and continue
+             * the ray-march; row/col are no longer authoritative on the next
+             * iteration, but the per-iteration check_region calls don't depend
+             * on the base being stable so this is harmless cosmetic drift. */
             *r = row - 1;
             *c = col + 1;
             return BALL_REGION_NONE;
         }
+        /* All 9 missed.  Leave r/c unchanged at (row, col). */
     }
 
     (void)ball_index;
