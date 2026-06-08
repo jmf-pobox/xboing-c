@@ -1705,6 +1705,144 @@ static void test_restore_ready_no_auto_activate_first_tick(void **state)
     ball_system_destroy(ctx);
 }
 
+/* =========================================================================
+ * Group 15: Ray-march start position (xboing-c-qck)
+ * =========================================================================
+ *
+ * Regression test for the seam-tunneling bug.  The fix moves the
+ * oldx/oldy snapshot from BEFORE the ray-march to AFTER it, matching
+ * the per-tick flow in original/ball.c:1213-1214 (ray-march reads
+ * pre-tick oldx/oldy) → original/ball.c:1318 (call to MoveBall) →
+ * original/ball.c:402-403 (MoveBall snapshots ballx/bally back into
+ * oldx/oldy).  Without the fix the ray-march starts at the post-tick
+ * position and probes `step` more pixels past it, skipping the
+ * pre-tick → post-tick path entirely on fast balls.
+ *
+ * We exercise this by configuring a windowed mock that fires only when
+ * the ball center sits in a narrow y-band somewhere ALONG the trajectory.
+ * The buggy code samples past the band (starting at post-tick y); the
+ * fixed code walks through the band from pre-tick y → post-tick y and
+ * fires the bounce.
+ */
+
+typedef struct
+{
+    int hit_row;
+    int hit_col;
+    int hit_region;
+    int y_min;
+    int y_max;
+    int block_hit_count;
+    block_hit_result_t block_hit_return;
+} test_windowed_cb_t;
+
+static int cb_check_region_windowed(int row, int col, int bx, int by, int bdx, void *ud)
+{
+    test_windowed_cb_t *bc = (test_windowed_cb_t *)ud;
+    (void)bx;
+    (void)bdx;
+    if (row == bc->hit_row && col == bc->hit_col && by >= bc->y_min && by <= bc->y_max)
+    {
+        return bc->hit_region;
+    }
+    return BALL_REGION_NONE;
+}
+
+static block_hit_result_t cb_on_block_hit_windowed(int row, int col, int ball_index, void *ud)
+{
+    test_windowed_cb_t *bc = (test_windowed_cb_t *)ud;
+    (void)row;
+    (void)col;
+    (void)ball_index;
+    bc->block_hit_count++;
+    return bc->block_hit_return;
+}
+
+/* Pin the ray-march start point with a y-window covering the pre-tick y
+ * but excluding the post-tick y.  The fixed ray-march samples (220, 180)
+ * on iteration 0 and fires; the pre-fix ray-march starts at the post-tick
+ * y (≈165) and never samples 180, so the mock never fires.
+ *
+ * Companion test below (test_check_for_collision_search_base_does_not_drift)
+ * covers the second tunneling cause: the search base used to drift by
+ * (-1, +1) on every NONE return, so multi-iteration ray-marches lost
+ * the cell containing the block.
+ *
+ * (We can't write a multi-iteration walk test here because the row/col
+ * arguments to check_region drift diagonally each iteration thanks to a
+ * legacy bug preserved at check_for_collision:989-995 — only iteration 0
+ * is called with the original row/col base.) */
+static void test_raymarch_starts_at_pre_tick_position(void **state)
+{
+    (void)state;
+    test_windowed_cb_t bc = {0};
+    bc.hit_row = 5;
+    bc.hit_col = 4;
+    bc.hit_region = BALL_REGION_BOTTOM;
+    /* Window covers ONLY the pre-tick y (180), not the post-tick y (165). */
+    bc.y_min = 180;
+    bc.y_max = 180;
+    bc.block_hit_return = BLOCK_HIT_BOUNCE;
+
+    ball_system_callbacks_t cbs = {0};
+    cbs.check_region = cb_check_region_windowed;
+    cbs.on_block_hit = cb_on_block_hit_windowed;
+    ball_system_t *ctx = ball_system_create(&cbs, &bc, NULL);
+    ball_system_env_t env = make_env(100);
+
+    /* Restore an active ball at (220, 180), velocity (0, -15).  Restore
+     * bypasses the BALL_ACTIVE guide-direction override (which would
+     * replace dy with -5) and pre-sets lastPaddleHitFrame so the auto-tilt
+     * inside update() leaves our velocity alone. */
+    ball_system_restore(ctx, 0, env.frame - 1, 1, BALL_ACTIVE, 220, 180, 0, -15, BALL_NONE);
+    ball_system_update(ctx, &env);
+
+    assert_true(bc.block_hit_count > 0);
+
+    ball_system_destroy(ctx);
+}
+
+/* Second tunneling cause: check_for_collision used to drift its row/col
+ * search base by (-1, +1) on every NONE return.  After ~10 ray-march
+ * iterations the base had drifted 10 cells away, so a fast ball never
+ * found the cell containing the block it was about to enter.
+ *
+ * We configure the mock to fire at row=5, col=4 only — when the ball y
+ * reaches a window inside row 5's vertical span (y_to_row(190, 32)=5,
+ * so both pre-tick y=190 and post-tick y=179 map to row 5).  The mock
+ * fires only on bottom-edge contact, near the block-pixel edge.
+ * With the drift bug, by the time y reaches the window the search base
+ * has drifted to (0, 9) — far from (5, 4) — and the cell never gets
+ * tested.  Without the drift, every iteration keeps base (5, 4) so the
+ * very first iteration after y enters the window finds the cell. */
+static void test_check_for_collision_search_base_does_not_drift(void **state)
+{
+    (void)state;
+    test_windowed_cb_t bc = {0};
+    bc.hit_row = 5;
+    bc.hit_col = 4;
+    bc.hit_region = BALL_REGION_BOTTOM;
+    /* Block at row 5 with row_height=32 sits in y range 160..192 inclusive
+     * of any internal offset.  Configure the window to cover y=185-186,
+     * which the ray-march reaches at iteration 5 (pre-tick y=190, dy=-11). */
+    bc.y_min = 185;
+    bc.y_max = 186;
+    bc.block_hit_return = BLOCK_HIT_BOUNCE;
+
+    ball_system_callbacks_t cbs = {0};
+    cbs.check_region = cb_check_region_windowed;
+    cbs.on_block_hit = cb_on_block_hit_windowed;
+    ball_system_t *ctx = ball_system_create(&cbs, &bc, NULL);
+    ball_system_env_t env = make_env(100);
+
+    ball_system_restore(ctx, 0, env.frame - 1, 1, BALL_ACTIVE, 220, 190, 0, -11, BALL_NONE);
+    ball_system_update(ctx, &env);
+
+    assert_true(bc.block_hit_count > 0);
+
+    ball_system_destroy(ctx);
+}
+
 int main(void)
 {
     const struct CMUnitTest tests[] = {
@@ -1785,6 +1923,9 @@ int main(void)
         cmocka_unit_test(test_restore_invalid_index),
         cmocka_unit_test(test_restore_active_no_auto_tilt_first_tick),
         cmocka_unit_test(test_restore_ready_no_auto_activate_first_tick),
+        /* Group 15: Ray-march start position (xboing-c-qck) */
+        cmocka_unit_test(test_raymarch_starts_at_pre_tick_position),
+        cmocka_unit_test(test_check_for_collision_search_base_does_not_drift),
     };
     return cmocka_run_group_tests(tests, NULL, NULL);
 }
