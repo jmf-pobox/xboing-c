@@ -1200,6 +1200,11 @@ static void mode_dialogue_exit(sdl2_state_mode_t mode, void *ud)
             const char *ans = dialogue_system_get_input(ctx->dialogue);
             if (ans && ans[0] != '\0')
             {
+                /* atoi here is the .claude/rules/c-code.md exception:
+                 * the W-key dialogue runs DIALOGUE_VALIDATION_NUMERIC,
+                 * which filters keystrokes to digits-only at the input
+                 * gate.  By the time `ans` reaches us, it cannot contain
+                 * non-digit characters — strtol would buy us nothing. */
                 int num = atoi(ans);
                 int frame = (int)sdl2_state_frame(ctx->state);
                 if (num > 0 && num <= LEVEL_MAX_NUM)

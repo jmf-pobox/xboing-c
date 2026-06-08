@@ -67,6 +67,12 @@ target_compile_options(test_block_sound PRIVATE ${XBOING_STRICT_WARNINGS} -Werro
 target_link_libraries(test_block_sound PRIVATE block_sound ${CMOCKA_LIBRARIES})
 add_test(NAME test_block_sound COMMAND test_block_sound)
 
+# Strict-integer parsing tests (bead xboing-c-r68).  Pure C, no SDL2.
+add_executable(test_parse_util test_parse_util.c)
+target_compile_options(test_parse_util PRIVATE ${XBOING_STRICT_WARNINGS} -Werror ${CMOCKA_WARNING_FIXUPS})
+target_link_libraries(test_parse_util PRIVATE parse_util ${CMOCKA_LIBRARIES})
+add_test(NAME test_parse_util COMMAND test_parse_util)
+
 # Sprite catalog header-only tests (basket 1: block animation frame selection — beads ejn, qe2, ax9, agi)
 # sprite_catalog.h is header-only static inline; depends on block_types.h.
 add_executable(test_sprite_catalog test_sprite_catalog.c)
