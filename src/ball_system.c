@@ -689,6 +689,36 @@ static void update_a_ball(ball_system_t *ctx, const ball_system_env_t *env, int 
                         ddy = r / 4;
                         b->dy = abs(b->dy);
                         break;
+                    /* Corner-hit combinations.  Port of
+                     * original/ball.c:1273-1299: reverse both velocity
+                     * components so the ball bounces back diagonally.
+                     * The jitter constants are the original's full `r`,
+                     * not `r/4`, because corner contact is a stronger
+                     * event than a single-face contact. */
+                    case BALL_REGION_BOTTOM | BALL_REGION_RIGHT:
+                        ddy = r;
+                        ddx = r;
+                        b->dy = abs(b->dy);
+                        b->dx = abs(b->dx);
+                        break;
+                    case BALL_REGION_TOP | BALL_REGION_RIGHT:
+                        ddy = -r;
+                        ddx = r;
+                        b->dy = -(abs(b->dy));
+                        b->dx = abs(b->dx);
+                        break;
+                    case BALL_REGION_BOTTOM | BALL_REGION_LEFT:
+                        ddy = r;
+                        ddx = -r;
+                        b->dx = -(abs(b->dx));
+                        b->dy = abs(b->dy);
+                        break;
+                    case BALL_REGION_TOP | BALL_REGION_LEFT:
+                        ddy = -r;
+                        ddx = -r;
+                        b->dx = -(abs(b->dx));
+                        b->dy = -(abs(b->dy));
+                        break;
                     default:
                         break;
                 }

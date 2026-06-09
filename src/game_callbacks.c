@@ -82,14 +82,16 @@ static void play_block_hit_sound(sdl2_audio_t *audio, int block_type)
  * ========================================================================= */
 
 /*
- * Block collision check: delegates to block_system's pure C geometry.
- * Returns BALL_REGION_NONE/TOP/BOTTOM/LEFT/RIGHT.
+ * Block collision check: delegates to block_system's original-faithful
+ * bbox-vs-triangle classifier (port of CheckRegions in original/ball.c).
+ * Returns a bitmask of BALL_REGION_TOP / BOTTOM / LEFT / RIGHT, or NONE.
+ * The ball bounce switch in ball_system.c handles the single-region and
+ * corner-pair cases the original handled.
  */
 static int ball_cb_check_region(int row, int col, int bx, int by, int bdx, void *ud)
 {
     game_ctx_t *ctx = ud;
-    /* block_system_check_region expects (row, col, bx, by, bdx, block_system_t*) */
-    return block_system_check_region(row, col, bx, by, bdx, ctx->block);
+    return block_system_check_region_bbox(row, col, bx, by, bdx, ctx->block);
 }
 
 /*

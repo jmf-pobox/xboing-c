@@ -646,149 +646,12 @@ void block_system_advance_animations(block_system_t *ctx, int frame)
 }
 
 /* =========================================================================
- * Collision detection
- * ========================================================================= */
-
-int block_system_check_region(int row, int col, int bx, int by, int bdx, void *ud)
-{
-    block_system_t *ctx = (block_system_t *)ud;
-
-    if (ctx == NULL)
-    {
-        return BLOCK_REGION_NONE;
-    }
-    if (row < 0 || row >= MAX_ROW || col < 0 || col >= MAX_COL)
-    {
-        return BLOCK_REGION_NONE;
-    }
-
-    const block_entry_t *bp = &ctx->blocks[row][col];
-
-    /* Only test occupied, non-exploding blocks */
-    if (!bp->occupied || bp->exploding)
-    {
-        return BLOCK_REGION_NONE;
-    }
-
-    /*
-     * Step 1: AABB overlap test.
-     * Ball bounding box: (bx - BALL_WC, by - BALL_HC) to
-     *                    (bx - BALL_WC + BALL_WIDTH, by - BALL_HC + BALL_HEIGHT)
-     * Block bounding box: (bp->x, bp->y) to (bp->x + bp->width, bp->y + bp->height)
-     */
-    int ball_left = bx - BALL_WC;
-    int ball_top = by - BALL_HC;
-    int ball_right = ball_left + BALL_WIDTH;
-    int ball_bottom = ball_top + BALL_HEIGHT;
-
-    if (ball_right <= bp->x || ball_left >= bp->x + bp->width || ball_bottom <= bp->y ||
-        ball_top >= bp->y + bp->height)
-    {
-        return BLOCK_REGION_NONE;
-    }
-
-    /*
-     * Step 2: Determine which triangular quadrant the ball center falls in.
-     *
-     * The block rectangle is divided by its two diagonals into 4 triangles:
-     *
-     *   TL --------- TR        TL = (x, y)
-     *    | \  TOP  / |         TR = (x+w, y)
-     *    |   \ . /   |         BL = (x, y+h)
-     *    | L  >X<  R |         BR = (x+w, y+h)
-     *    |   / . \   |         X  = center
-     *    | / BOTTOM\ |
-     *   BL --------- BR
-     *
-     * Two diagonal cross-products determine the quadrant:
-     *   d1 = w*(py - y) - h*(px - x)      (TL→BR diagonal)
-     *   d2 = h*(x + w - px) - w*(py - y)  (TR→BL diagonal)
-     *
-     * d1 <= 0 && d2 >= 0  →  TOP
-     * d1 >= 0 && d2 <= 0  →  BOTTOM
-     * d1 >= 0 && d2 >= 0  →  LEFT
-     * d1 <= 0 && d2 <= 0  →  RIGHT
-     */
-    int w = bp->width;
-    int h = bp->height;
-    int d1 = w * (by - bp->y) - h * (bx - bp->x);
-    int d2 = h * (bp->x + w - bx) - w * (by - bp->y);
-
-    int region;
-
-    if (d1 <= 0 && d2 >= 0)
-    {
-        region = BLOCK_REGION_TOP;
-    }
-    else if (d1 >= 0 && d2 <= 0)
-    {
-        region = BLOCK_REGION_BOTTOM;
-    }
-    else if (d1 >= 0 && d2 >= 0)
-    {
-        region = BLOCK_REGION_LEFT;
-    }
-    else
-    {
-        region = BLOCK_REGION_RIGHT;
-    }
-
-    /*
-     * Step 3: Adjacency filter.
-     * Suppress the region hit if the neighboring cell in that direction
-     * is occupied AND the ball is in the phantom case (ball center is
-     * already inside this block on the axis being tested).
-     *
-     * The gap case (ball in the inter-block gap, genuinely approaching
-     * the face) must NOT be suppressed.  The distinction:
-     *
-     *   TOP:    phantom when by >= bp->y  (ball center inside block top)
-     *           gap case when by < bp->y  (ball above block top edge — real hit)
-     *   BOTTOM: phantom when by <= bp->y + bp->height
-     *   LEFT:   phantom when bx >= bp->x
-     *   RIGHT:  phantom when bx <= bp->x + bp->width
-     *
-     * Fix for xboing-c-895: the original check suppressed on occupancy alone,
-     * suppressing hits in both the phantom and gap cases and causing 2-row
-     * tunneling.
-     */
-    switch (region)
-    {
-        case BLOCK_REGION_TOP:
-            if (row > 0 && ctx->blocks[row - 1][col].occupied && by >= bp->y)
-            {
-                return BLOCK_REGION_NONE;
-            }
-            break;
-        case BLOCK_REGION_BOTTOM:
-            if (row < MAX_ROW - 1 && ctx->blocks[row + 1][col].occupied && by <= bp->y + bp->height)
-            {
-                return BLOCK_REGION_NONE;
-            }
-            break;
-        case BLOCK_REGION_LEFT:
-            if (col > 0 && ctx->blocks[row][col - 1].occupied && bx >= bp->x)
-            {
-                return BLOCK_REGION_NONE;
-            }
-            break;
-        case BLOCK_REGION_RIGHT:
-            if (col < MAX_COL - 1 && ctx->blocks[row][col + 1].occupied && bx <= bp->x + bp->width)
-            {
-                return BLOCK_REGION_NONE;
-            }
-            break;
-        default:
-            break;
-    }
-
-    (void)bdx; /* Accepted for callback signature compatibility */
-    return region;
-}
-
-/* =========================================================================
- * Bbox-vs-triangle classifier — port of CheckRegions() in
- * original/ball.c:1338-1457.
+ * Collision detection — bbox-vs-triangle classifier
+ *
+ * Port of CheckRegions() in original/ball.c:1338-1457.  Tests the ball's
+ * full BALL_WIDTH x BALL_HEIGHT bounding rectangle against each of the
+ * block's four triangular face regions and returns a bitmask of overlapping
+ * faces, with unconditional-on-neighbour-occupancy adjacency suppression.
  * ========================================================================= */
 
 /*
@@ -866,10 +729,10 @@ static int segments_intersect(int p1x, int p1y, int q1x, int q1y, int p2x, int p
  * Equivalent to XRectInRegion(triangle_region, rect) != RectangleOut.
  *
  * Rectangle convention: half-open [rx, rx+rw) x [ry, ry+rh).  This
- * matches the rest of the module (block_system_check_region's AABB test
- * uses `ball_right <= bp->x` / `ball_left >= bp->x + bp->width` as the
- * disjoint condition).  The inclusive variant would over-report by one
- * pixel on edge-only contact.
+ * matches the half-open block geometry used elsewhere in this module
+ * (e.g. ball_right > bp->x as the overlap predicate, with `right`
+ * being one past the last covered pixel).  The inclusive variant
+ * would over-report by one pixel on edge-only contact.
  *
  * For the corner-in-triangle and edge-vs-edge sub-tests we use the
  * inclusive corner coordinate (rx + rw - 1, ry + rh - 1) so a
@@ -975,13 +838,11 @@ int block_system_check_region_bbox(int row, int col, int bx, int by, int bdx, vo
 
     /* Adjacency suppression — unconditional on neighbour occupancy,
      * matching original/ball.c:1390-1452 (a region is set ONLY if the
-     * neighbour in that direction is absent or empty).  This is the
-     * stricter rule the legacy block_system_check_region relaxed via
-     * its "phantom vs gap" branching; the relaxation is what allowed
-     * seam-tunneling RIGHT hits to fire.  Going back to unconditional
-     * suppression here, paired with the bbox classifier's broader
-     * BOTTOM/TOP recognition, gives the seam case the right answer:
-     * RIGHT gets suppressed AND BOTTOM still fires. */
+     * neighbour in that direction is absent or empty).  Paired with the
+     * bbox classifier's broader BOTTOM/TOP recognition, this gives the
+     * seam case the right answer: RIGHT gets suppressed by the seam
+     * neighbour AND BOTTOM still fires from the bbox dip into the
+     * block's bottom triangle. */
     int region = BLOCK_REGION_NONE;
     if (hit_top && (row == 0 || !ctx->blocks[row - 1][col].occupied))
     {

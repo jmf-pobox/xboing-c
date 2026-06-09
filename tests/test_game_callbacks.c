@@ -12,9 +12,9 @@
  * known grid cell, add a ball in BALL_ACTIVE state positioned directly on
  * the block center.  ball_system_update normalizes (0, 0) velocity to
  * MIN_DX_BALL/MIN_DY_BALL before the ray-march, but since the ball is
- * already overlapping the block, block_system_check_region fires on the
- * first update regardless.  Use ball_index=2 (non-zero) to confirm it's
- * the correct slot that transitions.
+ * already overlapping the block, block_system_check_region_bbox fires on
+ * the first update regardless.  Use ball_index=2 (non-zero) to confirm
+ * it's the correct slot that transitions.
  *
  * Requires: SDL_VIDEODRIVER=dummy, SDL_AUDIODRIVER=dummy
  */

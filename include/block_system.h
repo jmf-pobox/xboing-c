@@ -33,9 +33,10 @@ typedef enum
 } block_system_status_t;
 
 /* =========================================================================
- * Collision region results — aliases for COLLISION_REGION_* in block_types.h.
- * block_system_check_region() can be used directly as the check_region
- * callback for ball_system_t.
+ * Collision region results — bit flags from COLLISION_REGION_* in
+ * block_types.h.  block_system_check_region_bbox() can be used directly as
+ * the check_region callback for ball_system_t; its return value is a bitwise
+ * OR of these flags (e.g. TOP|RIGHT for a corner hit).
  * ========================================================================= */
 
 #define BLOCK_REGION_NONE COLLISION_REGION_NONE
@@ -307,41 +308,19 @@ void block_system_set_random(block_system_t *ctx, int row, int col, int random);
  * ========================================================================= */
 
 /*
- * Check if a ball at center (bx, by) collides with the block at (row, col).
- *
- * Returns BLOCK_REGION_NONE if no collision, or BLOCK_REGION_TOP/BOTTOM/
- * LEFT/RIGHT indicating which face of the block was hit.
- *
- * Algorithm:
- *   1. Bounds check and occupancy/exploding guard.
- *   2. AABB overlap test (ball bounding box vs block bounding box).
- *   3. Diagonal cross-product test: the block rectangle is divided into
- *      4 triangles by its diagonals.  The ball center determines which
- *      triangle it falls in → which face was hit.
- *   4. Adjacency filter: if the neighboring cell in the hit direction is
- *      occupied, suppress the hit (prevents phantom bounces at junctions).
- *
- * ud must be a block_system_t* (cast from void*).
- * bdx is accepted for callback compatibility but not used.
- */
-int block_system_check_region(int row, int col, int bx, int by, int bdx, void *ud);
-
-/*
  * Original-faithful collision classifier.
  *
  * Direct port of CheckRegions() in original/ball.c:1338-1457.  Tests the
- * ball's full BALL_WIDTH x BALL_HEIGHT bounding rectangle (NOT just its
- * center point) against each of the block's four triangular face regions
- * (TOP, BOTTOM, LEFT, RIGHT — the same diagonal-split triangles the
- * legacy block_system_check_region uses).  A region is suppressed when
- * the orthogonal neighbour in that direction is occupied, exactly as the
- * original did at original/ball.c:1390-1452.
+ * ball's full BALL_WIDTH x BALL_HEIGHT bounding rectangle against each of
+ * the block's four triangular face regions (TOP, BOTTOM, LEFT, RIGHT —
+ * the diagonal-split triangles).  A face is suppressed when the orthogonal
+ * neighbour in that direction is occupied, matching original/ball.c:1390-1452.
  *
  * Returns a bitwise OR of BLOCK_REGION_TOP / BOTTOM / LEFT / RIGHT — for
  * example a ball hitting the top-left corner of an isolated block can
  * return BLOCK_REGION_TOP | BLOCK_REGION_LEFT, and the ball_system bounce
- * switch can react to the combined region (reverse both dx and dy) just
- * like original/ball.c:1294-1299.
+ * switch reacts to the combined region (reverse both dx and dy) just like
+ * original/ball.c:1294-1299.
  *
  * Returns BLOCK_REGION_NONE when no face is hit (block empty/exploding,
  * out of bounds, ball bbox disjoint from block, or every overlapping face
@@ -349,14 +328,6 @@ int block_system_check_region(int row, int col, int bx, int by, int bdx, void *u
  *
  * ud must be a block_system_t* (cast from void*).
  * bdx is accepted for callback compatibility but not used.
- *
- * Why this exists alongside block_system_check_region: the legacy
- * implementation tests only the ball's CENTER point against the
- * triangles, which mis-classifies the seam-between-adjacent-blocks case
- * (ball center sits in the gap, classifier reports LEFT/RIGHT, ball's
- * vertical velocity never reverses, ball tunnels through walls).  The
- * bbox-vs-triangle test mirrors the original's semantics and fixes that
- * class of bug.  See xboing-c-83u, xboing-c-qck.
  */
 int block_system_check_region_bbox(int row, int col, int bx, int by, int bdx, void *ud);
 
