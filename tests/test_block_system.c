@@ -242,12 +242,12 @@ static void test_add_out_of_bounds(void **state)
     block_system_destroy(ctx);
 }
 
-/* Note: TC-11..TC-22 (legacy point-in-triangle collision tests) were
- * removed when block_system_check_region was deleted.  The bbox-vs-
- * triangle classifier (block_system_check_region_bbox) is exercised
- * exhaustively in tests/test_block_system_check_region.c (bead
- * xboing-c-83u).  Numbering jumps from TC-10 (out-of-bounds add) to
- * TC-21 (cell_available) below. */
+/* Note: TC-11..TC-20 and TC-28b (legacy point-in-triangle collision
+ * tests) were removed when block_system_check_region was deleted.
+ * The bbox-vs-triangle classifier (block_system_check_region_bbox) is
+ * exercised exhaustively in tests/test_block_system_check_region.c
+ * (bead xboing-c-83u).  Numbering jumps from TC-10 (out-of-bounds add)
+ * to TC-21 (cell_available) below. */
 
 
 /* =========================================================================

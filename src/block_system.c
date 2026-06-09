@@ -729,9 +729,10 @@ static int segments_intersect(int p1x, int p1y, int q1x, int q1y, int p2x, int p
  * Equivalent to XRectInRegion(triangle_region, rect) != RectangleOut.
  *
  * Rectangle convention: half-open [rx, rx+rw) x [ry, ry+rh).  This
- * matches the half-open block geometry the AABB step at the top of
- * block_system_check_region_bbox uses.  The inclusive variant would
- * over-report by one pixel on edge-only contact.
+ * matches the half-open block geometry used elsewhere in this module
+ * (e.g. ball_right > bp->x as the overlap predicate, with `right`
+ * being one past the last covered pixel).  The inclusive variant
+ * would over-report by one pixel on edge-only contact.
  *
  * For the corner-in-triangle and edge-vs-edge sub-tests we use the
  * inclusive corner coordinate (rx + rw - 1, ry + rh - 1) so a
