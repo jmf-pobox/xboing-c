@@ -22,8 +22,12 @@
  *   bp->y = row*32 + (32-20)/2 = row*32 + 6
  * so e.g. block (1, 4) spans pixel x=227..267, y=38..58.
  *
- * Ball is 20 wide x 19 tall, centered at (bx, by); BALL_WC = 10,
- * BALL_HC = 9 — so the bbox is (bx-10, by-9) to (bx+10, by+10).
+ * Ball is BALL_WIDTH=20 wide and BALL_HEIGHT=19 tall, centred at
+ * (bx, by) with BALL_WC=10 and BALL_HC=9.  The bounding rectangle is
+ * the half-open box [bx-10, bx-10+20) x [by-9, by-9+19) — i.e. the
+ * pixels (bx-10, by-9) inclusive through (bx+9, by+9) inclusive.
+ * Block rectangles use the same half-open convention: a block at
+ * (bp->x, bp->y) covers pixels [bp->x, bp->x+40) x [bp->y, bp->y+20).
  */
 
 #include <setjmp.h>
@@ -51,15 +55,20 @@ typedef struct
 static int setup_seam(void **state)
 {
     fixture_t *f = calloc(1, sizeof(*f));
-    f->ctx = block_system_create(55, 32, NULL);
+    assert_non_null(f);
 
-    /* Row 1 has the seam blocks at col 3 and col 4 (both red). */
-    block_system_add(f->ctx, 1, 3, 1 /* RED_BLK */, 0, 0);
-    block_system_add(f->ctx, 1, 4, 1, 0, 0);
+    block_system_status_t st;
+    f->ctx = block_system_create(55, 32, &st);
+    assert_non_null(f->ctx);
+    assert_int_equal(st, BLOCK_SYS_OK);
+
+    /* Row 1 has the seam blocks at col 3 and col 4 (both RED_BLK). */
+    assert_int_equal(block_system_add(f->ctx, 1, 3, RED_BLK, 0, 0), BLOCK_SYS_OK);
+    assert_int_equal(block_system_add(f->ctx, 1, 4, RED_BLK, 0, 0), BLOCK_SYS_OK);
 
     /* Row 0 col 4 is occupied above the right seam block — adjacency
      * suppression target for the TOP face of (1, 4). */
-    block_system_add(f->ctx, 0, 4, 1, 0, 0);
+    assert_int_equal(block_system_add(f->ctx, 0, 4, RED_BLK, 0, 0), BLOCK_SYS_OK);
 
     *state = f;
     return 0;
@@ -315,8 +324,15 @@ static void test_corner_hit_bottom_left_diverges(void **state)
 static int setup_isolated(void **state)
 {
     fixture_t *f = calloc(1, sizeof(*f));
-    f->ctx = block_system_create(55, 32, NULL);
-    block_system_add(f->ctx, 5, 4, 1, 0, 0);
+    assert_non_null(f);
+
+    block_system_status_t st;
+    f->ctx = block_system_create(55, 32, &st);
+    assert_non_null(f->ctx);
+    assert_int_equal(st, BLOCK_SYS_OK);
+
+    assert_int_equal(block_system_add(f->ctx, 5, 4, RED_BLK, 0, 0), BLOCK_SYS_OK);
+
     *state = f;
     return 0;
 }
@@ -358,7 +374,7 @@ static void test_edge_of_grid_no_neighbour_above_for_row_zero(void **state)
 {
     fixture_t *f = *state;
     /* Add a block at row 0 col 4 (no row -1 exists). */
-    block_system_add(f->ctx, 0, 4, 1, 0, 0);
+    assert_int_equal(block_system_add(f->ctx, 0, 4, RED_BLK, 0, 0), BLOCK_SYS_OK);
     /* Ball just above row 0 col 4 (bp->y=6 for row 0).  Center (247, 0),
      * bbox (237..257, -9..10) — TOP face approached from above. */
     int new_result = block_system_check_region_bbox(0, 4, 247, 0, 0, f->ctx);

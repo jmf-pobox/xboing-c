@@ -864,22 +864,33 @@ static int segments_intersect(int p1x, int p1y, int q1x, int q1y, int p2x, int p
  *   (3) any triangle edge crosses any rectangle edge.
  *
  * Equivalent to XRectInRegion(triangle_region, rect) != RectangleOut.
+ *
+ * Rectangle convention: half-open [rx, rx+rw) x [ry, ry+rh).  This
+ * matches the rest of the module (block_system_check_region's AABB test
+ * uses `ball_right <= bp->x` / `ball_left >= bp->x + bp->width` as the
+ * disjoint condition).  The inclusive variant would over-report by one
+ * pixel on edge-only contact.
+ *
+ * For the corner-in-triangle and edge-vs-edge sub-tests we use the
+ * inclusive corner coordinate (rx + rw - 1, ry + rh - 1) so a
+ * geometrically-touching rectangle is treated as overlap iff at least
+ * one of its interior pixels lies in the triangle.
  */
 static int rect_overlaps_triangle(int rx, int ry, int rw, int rh, int v0x, int v0y, int v1x,
                                   int v1y, int v2x, int v2y)
 {
-    int rx2 = rx + rw;
-    int ry2 = ry + rh;
+    int rx2 = rx + rw - 1; /* inclusive right edge */
+    int ry2 = ry + rh - 1; /* inclusive bottom edge */
 
-    /* (1) Triangle vertices inside rect. */
-    if ((v0x >= rx && v0x <= rx2 && v0y >= ry && v0y <= ry2) ||
-        (v1x >= rx && v1x <= rx2 && v1y >= ry && v1y <= ry2) ||
-        (v2x >= rx && v2x <= rx2 && v2y >= ry && v2y <= ry2))
+    /* (1) Triangle vertices inside rect (half-open interpretation). */
+    if ((v0x >= rx && v0x < rx + rw && v0y >= ry && v0y < ry + rh) ||
+        (v1x >= rx && v1x < rx + rw && v1y >= ry && v1y < ry + rh) ||
+        (v2x >= rx && v2x < rx + rw && v2y >= ry && v2y < ry + rh))
     {
         return 1;
     }
 
-    /* (2) Rect corners inside triangle. */
+    /* (2) Rect corners (inclusive) inside triangle. */
     if (point_in_triangle(rx, ry, v0x, v0y, v1x, v1y, v2x, v2y) ||
         point_in_triangle(rx2, ry, v0x, v0y, v1x, v1y, v2x, v2y) ||
         point_in_triangle(rx, ry2, v0x, v0y, v1x, v1y, v2x, v2y) ||
@@ -888,7 +899,7 @@ static int rect_overlaps_triangle(int rx, int ry, int rw, int rh, int v0x, int v
         return 1;
     }
 
-    /* (3) Triangle edges vs rect edges. */
+    /* (3) Triangle edges vs rect edges (inclusive corner coords). */
     const int rect_edges[4][4] = {
         {rx, ry, rx2, ry},   /* top */
         {rx2, ry, rx2, ry2}, /* right */
