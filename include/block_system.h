@@ -327,6 +327,40 @@ void block_system_set_random(block_system_t *ctx, int row, int col, int random);
 int block_system_check_region(int row, int col, int bx, int by, int bdx, void *ud);
 
 /*
+ * Original-faithful collision classifier.
+ *
+ * Direct port of CheckRegions() in original/ball.c:1338-1457.  Tests the
+ * ball's full BALL_WIDTH x BALL_HEIGHT bounding rectangle (NOT just its
+ * center point) against each of the block's four triangular face regions
+ * (TOP, BOTTOM, LEFT, RIGHT — the same diagonal-split triangles the
+ * legacy block_system_check_region uses).  A region is suppressed when
+ * the orthogonal neighbour in that direction is occupied, exactly as the
+ * original did at original/ball.c:1390-1452.
+ *
+ * Returns a bitwise OR of BLOCK_REGION_TOP / BOTTOM / LEFT / RIGHT — for
+ * example a ball hitting the top-left corner of an isolated block can
+ * return BLOCK_REGION_TOP | BLOCK_REGION_LEFT, and the ball_system bounce
+ * switch can react to the combined region (reverse both dx and dy) just
+ * like original/ball.c:1294-1299.
+ *
+ * Returns BLOCK_REGION_NONE when no face is hit (block empty/exploding,
+ * out of bounds, ball bbox disjoint from block, or every overlapping face
+ * was suppressed by adjacency).
+ *
+ * ud must be a block_system_t* (cast from void*).
+ * bdx is accepted for callback compatibility but not used.
+ *
+ * Why this exists alongside block_system_check_region: the legacy
+ * implementation tests only the ball's CENTER point against the
+ * triangles, which mis-classifies the seam-between-adjacent-blocks case
+ * (ball center sits in the gap, classifier reports LEFT/RIGHT, ball's
+ * vertical velocity never reverses, ball tunnels through walls).  The
+ * bbox-vs-triangle test mirrors the original's semantics and fixes that
+ * class of bug.  See xboing-c-83u, xboing-c-qck.
+ */
+int block_system_check_region_bbox(int row, int col, int bx, int by, int bdx, void *ud);
+
+/*
  * Return nonzero if cell (row, col) is available for placement.
  * A cell is available if it is within bounds, unoccupied, and not exploding.
  *

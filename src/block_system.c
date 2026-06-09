@@ -786,6 +786,223 @@ int block_system_check_region(int row, int col, int bx, int by, int bdx, void *u
     return region;
 }
 
+/* =========================================================================
+ * Bbox-vs-triangle classifier — port of CheckRegions() in
+ * original/ball.c:1338-1457.
+ * ========================================================================= */
+
+/*
+ * Point-in-triangle test using the sign-of-cross-product (barycentric)
+ * method.  Returns nonzero iff (px, py) is inside or on the boundary of
+ * the triangle (v0, v1, v2).  Vertex winding is irrelevant; the test
+ * accepts both orientations by allowing the signs to be all <= 0 OR all
+ * >= 0.
+ */
+static int point_in_triangle(int px, int py, int v0x, int v0y, int v1x, int v1y, int v2x, int v2y)
+{
+    long d1 = (long)(px - v1x) * (v0y - v1y) - (long)(v0x - v1x) * (py - v1y);
+    long d2 = (long)(px - v2x) * (v1y - v2y) - (long)(v1x - v2x) * (py - v2y);
+    long d3 = (long)(px - v0x) * (v2y - v0y) - (long)(v2x - v0x) * (py - v0y);
+    int has_neg = (d1 < 0) || (d2 < 0) || (d3 < 0);
+    int has_pos = (d1 > 0) || (d2 > 0) || (d3 > 0);
+    return !(has_neg && has_pos);
+}
+
+/*
+ * Segment (p1q1) intersects segment (p2q2) on the open or closed
+ * interval.  Sufficient for ball-vs-triangle screen-pixel collision.
+ */
+static int seg_orient(int px, int py, int qx, int qy, int rx, int ry)
+{
+    long v = (long)(qy - py) * (rx - qx) - (long)(qx - px) * (ry - qy);
+    if (v > 0)
+        return 1;
+    if (v < 0)
+        return -1;
+    return 0;
+}
+
+static int on_segment(int px, int py, int qx, int qy, int rx, int ry)
+{
+    int min_x = px < rx ? px : rx;
+    int max_x = px > rx ? px : rx;
+    int min_y = py < ry ? py : ry;
+    int max_y = py > ry ? py : ry;
+    return qx >= min_x && qx <= max_x && qy >= min_y && qy <= max_y;
+}
+
+static int segments_intersect(int p1x, int p1y, int q1x, int q1y, int p2x, int p2y, int q2x,
+                              int q2y)
+{
+    int o1 = seg_orient(p1x, p1y, q1x, q1y, p2x, p2y);
+    int o2 = seg_orient(p1x, p1y, q1x, q1y, q2x, q2y);
+    int o3 = seg_orient(p2x, p2y, q2x, q2y, p1x, p1y);
+    int o4 = seg_orient(p2x, p2y, q2x, q2y, q1x, q1y);
+
+    if (o1 != o2 && o3 != o4)
+        return 1;
+
+    /* Collinear-overlap edge cases. */
+    if (o1 == 0 && on_segment(p1x, p1y, p2x, p2y, q1x, q1y))
+        return 1;
+    if (o2 == 0 && on_segment(p1x, p1y, q2x, q2y, q1x, q1y))
+        return 1;
+    if (o3 == 0 && on_segment(p2x, p2y, p1x, p1y, q2x, q2y))
+        return 1;
+    if (o4 == 0 && on_segment(p2x, p2y, q1x, q1y, q2x, q2y))
+        return 1;
+
+    return 0;
+}
+
+/*
+ * Does an axis-aligned rectangle overlap a triangle?
+ *
+ * The 3-condition test:
+ *   (1) any triangle vertex is inside the rectangle, OR
+ *   (2) any rectangle corner is inside the triangle, OR
+ *   (3) any triangle edge crosses any rectangle edge.
+ *
+ * Equivalent to XRectInRegion(triangle_region, rect) != RectangleOut.
+ *
+ * Rectangle convention: half-open [rx, rx+rw) x [ry, ry+rh).  This
+ * matches the rest of the module (block_system_check_region's AABB test
+ * uses `ball_right <= bp->x` / `ball_left >= bp->x + bp->width` as the
+ * disjoint condition).  The inclusive variant would over-report by one
+ * pixel on edge-only contact.
+ *
+ * For the corner-in-triangle and edge-vs-edge sub-tests we use the
+ * inclusive corner coordinate (rx + rw - 1, ry + rh - 1) so a
+ * geometrically-touching rectangle is treated as overlap iff at least
+ * one of its interior pixels lies in the triangle.
+ */
+static int rect_overlaps_triangle(int rx, int ry, int rw, int rh, int v0x, int v0y, int v1x,
+                                  int v1y, int v2x, int v2y)
+{
+    int rx2 = rx + rw - 1; /* inclusive right edge */
+    int ry2 = ry + rh - 1; /* inclusive bottom edge */
+
+    /* (1) Triangle vertices inside rect (half-open interpretation). */
+    if ((v0x >= rx && v0x < rx + rw && v0y >= ry && v0y < ry + rh) ||
+        (v1x >= rx && v1x < rx + rw && v1y >= ry && v1y < ry + rh) ||
+        (v2x >= rx && v2x < rx + rw && v2y >= ry && v2y < ry + rh))
+    {
+        return 1;
+    }
+
+    /* (2) Rect corners (inclusive) inside triangle. */
+    if (point_in_triangle(rx, ry, v0x, v0y, v1x, v1y, v2x, v2y) ||
+        point_in_triangle(rx2, ry, v0x, v0y, v1x, v1y, v2x, v2y) ||
+        point_in_triangle(rx, ry2, v0x, v0y, v1x, v1y, v2x, v2y) ||
+        point_in_triangle(rx2, ry2, v0x, v0y, v1x, v1y, v2x, v2y))
+    {
+        return 1;
+    }
+
+    /* (3) Triangle edges vs rect edges (inclusive corner coords). */
+    const int rect_edges[4][4] = {
+        {rx, ry, rx2, ry},   /* top */
+        {rx2, ry, rx2, ry2}, /* right */
+        {rx2, ry2, rx, ry2}, /* bottom */
+        {rx, ry2, rx, ry},   /* left */
+    };
+    const int tri_edges[3][4] = {
+        {v0x, v0y, v1x, v1y},
+        {v1x, v1y, v2x, v2y},
+        {v2x, v2y, v0x, v0y},
+    };
+    for (int i = 0; i < 3; i++)
+    {
+        for (int j = 0; j < 4; j++)
+        {
+            if (segments_intersect(tri_edges[i][0], tri_edges[i][1], tri_edges[i][2],
+                                   tri_edges[i][3], rect_edges[j][0], rect_edges[j][1],
+                                   rect_edges[j][2], rect_edges[j][3]))
+            {
+                return 1;
+            }
+        }
+    }
+
+    return 0;
+}
+
+int block_system_check_region_bbox(int row, int col, int bx, int by, int bdx, void *ud)
+{
+    (void)bdx;
+    block_system_t *ctx = (block_system_t *)ud;
+
+    if (ctx == NULL)
+    {
+        return BLOCK_REGION_NONE;
+    }
+    if (row < 0 || row >= MAX_ROW || col < 0 || col >= MAX_COL)
+    {
+        return BLOCK_REGION_NONE;
+    }
+
+    const block_entry_t *bp = &ctx->blocks[row][col];
+    if (!bp->occupied || bp->exploding)
+    {
+        return BLOCK_REGION_NONE;
+    }
+
+    /* Ball bounding box.  Mirrors the (x - BALL_WC, y - BALL_HC, BALL_WIDTH,
+     * BALL_HEIGHT) rect that original/ball.c:1387 passes to XRectInRegion. */
+    int rx = bx - BALL_WC;
+    int ry = by - BALL_HC;
+    int rw = BALL_WIDTH;
+    int rh = BALL_HEIGHT;
+
+    /* Triangle vertices.  Each face's triangle is one quadrant of the block,
+     * cut by the two diagonals.  Vertices match
+     * original/blocks.c:2215-2265. */
+    int bx0 = bp->x;
+    int by0 = bp->y;
+    int bx1 = bp->x + bp->width;
+    int by1 = bp->y + bp->height;
+    int cx = bp->x + bp->width / 2;
+    int cy = bp->y + bp->height / 2;
+
+    /* TOP triangle: (bx0, by0), (bx1, by0), (cx, cy) */
+    int hit_top = rect_overlaps_triangle(rx, ry, rw, rh, bx0, by0, bx1, by0, cx, cy);
+    /* BOTTOM triangle: (bx0, by1), (bx1, by1), (cx, cy) */
+    int hit_bottom = rect_overlaps_triangle(rx, ry, rw, rh, bx0, by1, bx1, by1, cx, cy);
+    /* LEFT triangle: (bx0, by0), (bx0, by1), (cx, cy) */
+    int hit_left = rect_overlaps_triangle(rx, ry, rw, rh, bx0, by0, bx0, by1, cx, cy);
+    /* RIGHT triangle: (bx1, by0), (bx1, by1), (cx, cy) */
+    int hit_right = rect_overlaps_triangle(rx, ry, rw, rh, bx1, by0, bx1, by1, cx, cy);
+
+    /* Adjacency suppression — unconditional on neighbour occupancy,
+     * matching original/ball.c:1390-1452 (a region is set ONLY if the
+     * neighbour in that direction is absent or empty).  This is the
+     * stricter rule the legacy block_system_check_region relaxed via
+     * its "phantom vs gap" branching; the relaxation is what allowed
+     * seam-tunneling RIGHT hits to fire.  Going back to unconditional
+     * suppression here, paired with the bbox classifier's broader
+     * BOTTOM/TOP recognition, gives the seam case the right answer:
+     * RIGHT gets suppressed AND BOTTOM still fires. */
+    int region = BLOCK_REGION_NONE;
+    if (hit_top && (row == 0 || !ctx->blocks[row - 1][col].occupied))
+    {
+        region |= BLOCK_REGION_TOP;
+    }
+    if (hit_bottom && (row == MAX_ROW - 1 || !ctx->blocks[row + 1][col].occupied))
+    {
+        region |= BLOCK_REGION_BOTTOM;
+    }
+    if (hit_left && (col == 0 || !ctx->blocks[row][col - 1].occupied))
+    {
+        region |= BLOCK_REGION_LEFT;
+    }
+    if (hit_right && (col == MAX_COL - 1 || !ctx->blocks[row][col + 1].occupied))
+    {
+        region |= BLOCK_REGION_RIGHT;
+    }
+
+    return region;
+}
+
 /* cppcheck-suppress constParameterPointer ; signature must match ball_system.h callback */
 int block_system_cell_available(int row, int col, void *ud)
 {

@@ -73,6 +73,15 @@ target_compile_options(test_parse_util PRIVATE ${XBOING_STRICT_WARNINGS} -Werror
 target_link_libraries(test_parse_util PRIVATE parse_util ${CMOCKA_LIBRARIES})
 add_test(NAME test_parse_util COMMAND test_parse_util)
 
+# Collision classifier comparison tests (bead xboing-c-83u).  Pure C, no SDL2.
+# Runs identical inputs through the legacy point-in-triangle classifier and
+# the new bbox-vs-triangle classifier, asserting both expected outputs to
+# pin the divergence cases that the rewrite fixes.
+add_executable(test_block_check_region test_block_check_region.c)
+target_compile_options(test_block_check_region PRIVATE ${XBOING_STRICT_WARNINGS} -Werror ${CMOCKA_WARNING_FIXUPS})
+target_link_libraries(test_block_check_region PRIVATE block_system ${CMOCKA_LIBRARIES})
+add_test(NAME test_block_check_region COMMAND test_block_check_region)
+
 # Sprite catalog header-only tests (basket 1: block animation frame selection — beads ejn, qe2, ax9, agi)
 # sprite_catalog.h is header-only static inline; depends on block_types.h.
 add_executable(test_sprite_catalog test_sprite_catalog.c)

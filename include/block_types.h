@@ -54,12 +54,17 @@
 
 /* =========================================================================
  * Collision region codes — shared by ball_system and block_system
+ *
+ * Bit-flag layout matches original/include/blocks.h:65-69 so the new
+ * bbox-vs-triangle classifier can return a bitmask of multiple faces
+ * (e.g. TOP|RIGHT for a corner hit, exactly like XRectInRegion returned
+ * a region OR'd into `region |= REGION_X` in original/ball.c:1387-1452).
  * ========================================================================= */
 
 #define COLLISION_REGION_NONE 0
 #define COLLISION_REGION_TOP 1
 #define COLLISION_REGION_BOTTOM 2
-#define COLLISION_REGION_LEFT 3
-#define COLLISION_REGION_RIGHT 4
+#define COLLISION_REGION_LEFT 4
+#define COLLISION_REGION_RIGHT 8
 
 #endif /* BLOCK_TYPES_H */
