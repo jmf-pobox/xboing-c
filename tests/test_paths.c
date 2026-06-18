@@ -417,6 +417,41 @@ static void test_score_personal_custom_xdg(void **state)
     assert_string_equal(buf, "/xdg/data/xboing/personal-scores.dat");
 }
 
+/* TC-24a: Global score — real paths_init() env path honors XBOING_SCORE_FILE.
+ *
+ * Unlike every other test here, this exercises paths_init() (the real
+ * getenv path), not the paths_init_explicit() seam.  It is the regression
+ * guard for the secure_score_file_env() portability shim: the test binary
+ * is never setgid, so the shim must return the env value on every platform
+ * (secure_getenv on glibc, issetugid()-gated getenv on macOS/BSD).  Before
+ * the shim, this file did not even compile on macOS (bare secure_getenv).
+ * The elevated "return NULL" branch cannot be unit-tested without an actual
+ * setgid binary — TC-22 covers the resulting hard-coded fallback path. */
+static void test_score_global_env_real_lookup(void **state)
+{
+    (void)state;
+    char *saved_home = getenv("HOME");
+    char *saved_score = getenv("XBOING_SCORE_FILE");
+    setenv("HOME", "/home/test", 1);
+    setenv("XBOING_SCORE_FILE", "/custom/env/scores.dat", 1);
+
+    paths_config_t cfg;
+    assert_int_equal(paths_init(&cfg), PATHS_OK);
+
+    char buf[PATHS_MAX_PATH];
+    assert_int_equal(paths_score_file_global(&cfg, buf, sizeof(buf)), PATHS_OK);
+    assert_string_equal(buf, "/custom/env/scores.dat");
+
+    if (saved_score != NULL)
+        setenv("XBOING_SCORE_FILE", saved_score, 1);
+    else
+        unsetenv("XBOING_SCORE_FILE");
+    if (saved_home != NULL)
+        setenv("HOME", saved_home, 1);
+    else
+        unsetenv("HOME");
+}
+
 /* =========================================================================
  * Group 5: Save file resolution
  * ========================================================================= */
@@ -862,6 +897,7 @@ int main(void)
         cmocka_unit_test(test_score_global_fhs_default),
         cmocka_unit_test(test_score_personal_xdg_default),
         cmocka_unit_test(test_score_personal_custom_xdg),
+        cmocka_unit_test(test_score_global_env_real_lookup),
         /* Group 5: Save files */
         cmocka_unit_test(test_save_info_xdg_default),
         cmocka_unit_test(test_save_level_xdg_default),

@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h> /* struct stat, stat() */
+#include <unistd.h>   /* issetugid (macOS/BSD secure-env fallback) */
 
 /* --- Internal helpers ----------------------------------------------------- */
 
@@ -107,21 +108,42 @@ static void parse_data_dirs(paths_config_t *cfg, const char *dirs)
 
 /* --- Public API ----------------------------------------------------------- */
 
+/*
+ * AT_SECURE-aware lookup of XBOING_SCORE_FILE.
+ *
+ * XBOING_SCORE_FILE drives the elevated /var/games write path
+ * (highscore_io_insert_global_atomic runs after sys_priv_elevate).
+ * Honoring an attacker-controlled value from a setgid execution context
+ * would let any local user redirect the elevated write to any file the
+ * games group can touch.  We must return NULL under elevated privilege so
+ * the binary falls back to the hard-coded /var/games/xboing/scores.dat.
+ *
+ * A getuid()/getgid() comparison cannot do this: sys_priv_init()
+ * (game_main.c, before game_create) calls setegid(getgid()) at startup,
+ * so by the time paths_init() runs egid already equals rgid even on a
+ * setgid binary — the comparison would read "unprivileged" and honor the
+ * attacker.  secure_getenv (glibc, AT_SECURE) and issetugid() (macOS/BSD)
+ * read an exec-time taint flag that survives that egid drop, so both stay
+ * correct.  The other env vars only affect read paths or the unelevated
+ * personal write, so plain getenv is fine for those.
+ */
+static const char *secure_score_file_env(void)
+{
+#if defined(HAVE_SECURE_GETENV)
+    return secure_getenv("XBOING_SCORE_FILE");
+#elif defined(HAVE_ISSETUGID)
+    return issetugid() ? NULL : getenv("XBOING_SCORE_FILE");
+#else
+#error "No AT_SECURE-equivalent env guard on this platform; refusing to weaken score-file security"
+#endif
+}
+
 paths_status_t paths_init(paths_config_t *cfg)
 {
-    /* XBOING_SCORE_FILE drives the elevated /var/games write path
-     * (highscore_io_insert_global_atomic runs after sys_priv_elevate).
-     * Honoring an attacker-controlled value from a setgid execution
-     * context would let any local user redirect the elevated write to
-     * any file the games group can touch.  secure_getenv returns NULL
-     * under AT_SECURE so the binary falls back to the hard-coded
-     * /var/games/xboing/scores.dat path when invoked via setgid.
-     * The other env vars only affect read paths or the unelevated
-     * personal write, so plain getenv is fine for those. */
     return paths_init_explicit(cfg, getenv("HOME"), getenv("XDG_DATA_HOME"),
                                getenv("XDG_CONFIG_HOME"), getenv("XDG_DATA_DIRS"),
                                getenv("XBOING_LEVELS_DIR"), getenv("XBOING_SOUND_DIR"),
-                               secure_getenv("XBOING_SCORE_FILE"));
+                               secure_score_file_env());
 }
 
 paths_status_t paths_init_explicit(paths_config_t *cfg, const char *home, const char *xdg_data_home,
