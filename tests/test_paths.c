@@ -432,14 +432,27 @@ static void test_score_global_env_real_lookup(void **state)
     (void)state;
     /* getenv() returns a pointer into the environment that a later
      * setenv() may invalidate, so copy the originals before mutating.
-     * cmocka's assert_* longjmp out on failure, so capture the results
-     * and restore (and free) the environment BEFORE asserting — a
-     * failure must not leak the test's HOME/XBOING_SCORE_FILE into the
-     * other tests sharing this process. */
-    char *orig_home = getenv("HOME");
-    char *orig_score = getenv("XBOING_SCORE_FILE");
-    char *saved_home = orig_home != NULL ? strdup(orig_home) : NULL;
-    char *saved_score = orig_score != NULL ? strdup(orig_score) : NULL;
+     * strdup runs before any env mutation, so assert_non_null here is
+     * leak-safe and keeps a strdup() OOM from being mistaken for "var
+     * was unset" (which would wrongly unsetenv a value that was set).
+     * cmocka's assert_* longjmp on failure, so restore (and free) the
+     * environment BEFORE the result asserts — a failure must not leak
+     * the test's HOME/XBOING_SCORE_FILE into other tests in this
+     * process. */
+    const char *orig_home = getenv("HOME");
+    const char *orig_score = getenv("XBOING_SCORE_FILE");
+    char *saved_home = NULL;
+    char *saved_score = NULL;
+    if (orig_home != NULL)
+    {
+        saved_home = strdup(orig_home);
+        assert_non_null(saved_home);
+    }
+    if (orig_score != NULL)
+    {
+        saved_score = strdup(orig_score);
+        assert_non_null(saved_score);
+    }
 
     setenv("HOME", "/home/test", 1);
     setenv("XBOING_SCORE_FILE", "/custom/env/scores.dat", 1);
@@ -450,25 +463,21 @@ static void test_score_global_env_real_lookup(void **state)
     char buf[PATHS_MAX_PATH];
     paths_status_t global_st = paths_score_file_global(&cfg, buf, sizeof(buf));
 
+    int restore_score;
     if (saved_score != NULL)
-    {
-        setenv("XBOING_SCORE_FILE", saved_score, 1);
-        free(saved_score);
-    }
+        restore_score = setenv("XBOING_SCORE_FILE", saved_score, 1);
     else
-    {
-        unsetenv("XBOING_SCORE_FILE");
-    }
+        restore_score = unsetenv("XBOING_SCORE_FILE");
+    int restore_home;
     if (saved_home != NULL)
-    {
-        setenv("HOME", saved_home, 1);
-        free(saved_home);
-    }
+        restore_home = setenv("HOME", saved_home, 1);
     else
-    {
-        unsetenv("HOME");
-    }
+        restore_home = unsetenv("HOME");
+    free(saved_score);
+    free(saved_home);
 
+    assert_int_equal(restore_score, 0);
+    assert_int_equal(restore_home, 0);
     assert_int_equal(init_st, PATHS_OK);
     assert_int_equal(global_st, PATHS_OK);
     assert_string_equal(buf, "/custom/env/scores.dat");
