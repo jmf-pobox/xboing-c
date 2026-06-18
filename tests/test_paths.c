@@ -430,26 +430,48 @@ static void test_score_personal_custom_xdg(void **state)
 static void test_score_global_env_real_lookup(void **state)
 {
     (void)state;
-    char *saved_home = getenv("HOME");
-    char *saved_score = getenv("XBOING_SCORE_FILE");
+    /* getenv() returns a pointer into the environment that a later
+     * setenv() may invalidate, so copy the originals before mutating.
+     * cmocka's assert_* longjmp out on failure, so capture the results
+     * and restore (and free) the environment BEFORE asserting — a
+     * failure must not leak the test's HOME/XBOING_SCORE_FILE into the
+     * other tests sharing this process. */
+    char *orig_home = getenv("HOME");
+    char *orig_score = getenv("XBOING_SCORE_FILE");
+    char *saved_home = orig_home != NULL ? strdup(orig_home) : NULL;
+    char *saved_score = orig_score != NULL ? strdup(orig_score) : NULL;
+
     setenv("HOME", "/home/test", 1);
     setenv("XBOING_SCORE_FILE", "/custom/env/scores.dat", 1);
 
     paths_config_t cfg;
-    assert_int_equal(paths_init(&cfg), PATHS_OK);
+    paths_status_t init_st = paths_init(&cfg);
 
     char buf[PATHS_MAX_PATH];
-    assert_int_equal(paths_score_file_global(&cfg, buf, sizeof(buf)), PATHS_OK);
-    assert_string_equal(buf, "/custom/env/scores.dat");
+    paths_status_t global_st = paths_score_file_global(&cfg, buf, sizeof(buf));
 
     if (saved_score != NULL)
+    {
         setenv("XBOING_SCORE_FILE", saved_score, 1);
+        free(saved_score);
+    }
     else
+    {
         unsetenv("XBOING_SCORE_FILE");
+    }
     if (saved_home != NULL)
+    {
         setenv("HOME", saved_home, 1);
+        free(saved_home);
+    }
     else
+    {
         unsetenv("HOME");
+    }
+
+    assert_int_equal(init_st, PATHS_OK);
+    assert_int_equal(global_st, PATHS_OK);
+    assert_string_equal(buf, "/custom/env/scores.dat");
 }
 
 /* =========================================================================
