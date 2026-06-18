@@ -338,7 +338,7 @@ static void test_game_time_round_trip(void **vstate)
     savegame_system_capture(ctx, &info, NULL);
     /* Allow ±1s for clock-tick boundary between capture and the
      * test's time() call. */
-    assert_in_range(info.game_time, 74UL, 76UL);
+    assert_true(info.game_time >= 74UL && info.game_time <= 76UL);
 
     /* Restore into a fresh state and re-capture; the elapsed value
      * must round-trip cleanly. */
@@ -348,7 +348,7 @@ static void test_game_time_round_trip(void **vstate)
 
     savegame_data_t info2;
     savegame_system_capture(ctx, &info2, NULL);
-    assert_in_range(info2.game_time, info.game_time - 1UL, info.game_time + 1UL);
+    assert_true(info2.game_time >= info.game_time - 1UL && info2.game_time <= info.game_time + 1UL);
 }
 
 /* =========================================================================
