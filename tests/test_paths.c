@@ -454,8 +454,8 @@ static void test_score_global_env_real_lookup(void **state)
         assert_non_null(saved_score);
     }
 
-    setenv("HOME", "/home/test", 1);
-    setenv("XBOING_SCORE_FILE", "/custom/env/scores.dat", 1);
+    int set_home = setenv("HOME", "/home/test", 1);
+    int set_score = setenv("XBOING_SCORE_FILE", "/custom/env/scores.dat", 1);
 
     paths_config_t cfg;
     paths_status_t init_st = paths_init(&cfg);
@@ -476,6 +476,11 @@ static void test_score_global_env_real_lookup(void **state)
     free(saved_score);
     free(saved_home);
 
+    /* Every assert runs after the environment is restored and the
+     * copies freed, so a longjmp out of any failure leaks neither env
+     * state nor memory — including a failure of the mutating setenvs. */
+    assert_int_equal(set_home, 0);
+    assert_int_equal(set_score, 0);
     assert_int_equal(restore_score, 0);
     assert_int_equal(restore_home, 0);
     assert_int_equal(init_st, PATHS_OK);
