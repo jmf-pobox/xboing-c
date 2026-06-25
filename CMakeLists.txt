@@ -43,6 +43,26 @@ if(HAVE_WFORMAT_OVERFLOW_2)
     list(APPEND XBOING_STRICT_WARNINGS -Wformat-overflow=2)
 endif()
 
+# --- Secure environment lookup detection ------------------------------------
+#
+# src/paths.c needs an AT_SECURE-aware getenv to ignore XBOING_SCORE_FILE in a
+# setgid-games context.  glibc has secure_getenv; macOS/BSD have issetugid().
+# Probe both and let paths.c select via XBOING_SECURE_ENV_DEFS (applied to every
+# target that compiles src/paths.c — the paths lib and test_paths).
+include(CheckSymbolExists)
+set(CMAKE_REQUIRED_DEFINITIONS -D_GNU_SOURCE)
+check_symbol_exists(secure_getenv "stdlib.h" HAVE_SECURE_GETENV)
+unset(CMAKE_REQUIRED_DEFINITIONS)
+check_symbol_exists(issetugid "unistd.h" HAVE_ISSETUGID)
+
+set(XBOING_SECURE_ENV_DEFS "")
+if(HAVE_SECURE_GETENV)
+    list(APPEND XBOING_SECURE_ENV_DEFS HAVE_SECURE_GETENV=1)
+endif()
+if(HAVE_ISSETUGID)
+    list(APPEND XBOING_SECURE_ENV_DEFS HAVE_ISSETUGID=1)
+endif()
+
 # --- Install rules ----------------------------------------------------------
 
 install(DIRECTORY levels/
@@ -562,6 +582,7 @@ target_include_directories(paths PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 target_compile_options(paths PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
+target_compile_definitions(paths PRIVATE ${XBOING_SECURE_ENV_DEFS})
 
 # --- sys_priv (setgid-games privilege management) ---------------------------
 add_library(sys_priv STATIC src/sys_priv.c)
