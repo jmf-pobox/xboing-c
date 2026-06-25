@@ -417,6 +417,77 @@ static void test_score_personal_custom_xdg(void **state)
     assert_string_equal(buf, "/xdg/data/xboing/personal-scores.dat");
 }
 
+/* TC-24a: Global score — real paths_init() env path honors XBOING_SCORE_FILE.
+ *
+ * Unlike every other test here, this exercises paths_init() (the real
+ * getenv path), not the paths_init_explicit() seam.  It is the regression
+ * guard for the secure_score_file_env() portability shim: the test binary
+ * is never setgid, so the shim must return the env value on every platform
+ * (secure_getenv on glibc, issetugid()-gated getenv on macOS/BSD).  Before
+ * the shim, this file did not even compile on macOS (bare secure_getenv).
+ * The elevated "return NULL" branch cannot be unit-tested without an actual
+ * setgid binary — TC-22 covers the resulting hard-coded fallback path. */
+static void test_score_global_env_real_lookup(void **state)
+{
+    (void)state;
+    /* getenv() returns a pointer into the environment that a later
+     * setenv() may invalidate, so copy the originals before mutating.
+     * strdup runs before any env mutation, so assert_non_null here is
+     * leak-safe and keeps a strdup() OOM from being mistaken for "var
+     * was unset" (which would wrongly unsetenv a value that was set).
+     * cmocka's assert_* longjmp on failure, so restore (and free) the
+     * environment BEFORE the result asserts — a failure must not leak
+     * the test's HOME/XBOING_SCORE_FILE into other tests in this
+     * process. */
+    const char *orig_home = getenv("HOME");
+    const char *orig_score = getenv("XBOING_SCORE_FILE");
+    char *saved_home = NULL;
+    char *saved_score = NULL;
+    if (orig_home != NULL)
+    {
+        saved_home = strdup(orig_home);
+        assert_non_null(saved_home);
+    }
+    if (orig_score != NULL)
+    {
+        saved_score = strdup(orig_score);
+        assert_non_null(saved_score);
+    }
+
+    int set_home = setenv("HOME", "/home/test", 1);
+    int set_score = setenv("XBOING_SCORE_FILE", "/custom/env/scores.dat", 1);
+
+    paths_config_t cfg;
+    paths_status_t init_st = paths_init(&cfg);
+
+    char buf[PATHS_MAX_PATH];
+    paths_status_t global_st = paths_score_file_global(&cfg, buf, sizeof(buf));
+
+    int restore_score;
+    if (saved_score != NULL)
+        restore_score = setenv("XBOING_SCORE_FILE", saved_score, 1);
+    else
+        restore_score = unsetenv("XBOING_SCORE_FILE");
+    int restore_home;
+    if (saved_home != NULL)
+        restore_home = setenv("HOME", saved_home, 1);
+    else
+        restore_home = unsetenv("HOME");
+    free(saved_score);
+    free(saved_home);
+
+    /* Every assert runs after the environment is restored and the
+     * copies freed, so a longjmp out of any failure leaks neither env
+     * state nor memory — including a failure of the mutating setenvs. */
+    assert_int_equal(set_home, 0);
+    assert_int_equal(set_score, 0);
+    assert_int_equal(restore_score, 0);
+    assert_int_equal(restore_home, 0);
+    assert_int_equal(init_st, PATHS_OK);
+    assert_int_equal(global_st, PATHS_OK);
+    assert_string_equal(buf, "/custom/env/scores.dat");
+}
+
 /* =========================================================================
  * Group 5: Save file resolution
  * ========================================================================= */
@@ -862,6 +933,7 @@ int main(void)
         cmocka_unit_test(test_score_global_fhs_default),
         cmocka_unit_test(test_score_personal_xdg_default),
         cmocka_unit_test(test_score_personal_custom_xdg),
+        cmocka_unit_test(test_score_global_env_real_lookup),
         /* Group 5: Save files */
         cmocka_unit_test(test_save_info_xdg_default),
         cmocka_unit_test(test_save_level_xdg_default),
