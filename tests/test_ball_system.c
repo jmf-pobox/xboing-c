@@ -1465,76 +1465,84 @@ static void test_split_full_shows_message(void **state)
  * ========================================================================= */
 
 /* =========================================================================
- * Group 13: Guide animation rate (basket 6, xboing-c-xny)
+ * Group 13: Guide animation rate (xboing-c-yzk, fixes xboing-c-xny regression)
  *
- * The launch guide oscillator advances only when
- * env->frame % (BALL_FRAME_RATE * 8) == 0 — every 40 frames.
- * Earlier modern code used `* 3` (every 15 frames), 2.67x too fast vs
- * original/ball.c:456.
+ * The launch guide advances every 8 ticks (env->frame % 8 == 0).
+ * At modern 7.5 ms/tick that's 60 ms/step, matching the original's
+ * 40 frames × 1.5 ms/frame = 60 ms/step at original/ball.c:456.
+ *
+ * Earlier modern code composed two gates — an outer BALL_FRAME_RATE
+ * (=5) gate at the call site and an inner % 8 gate inside update_guide
+ * — which only co-fired at LCM(5,8)=40, making the sweep 5x too slow
+ * (xboing-c-yzk).  This test pins the single-gate 8-tick cadence so
+ * the LCM regression cannot recur silently.
  * ========================================================================= */
 
-static void test_guide_advances_only_at_8x_frame_rate(void **state)
+static void test_guide_advances_every_8_ticks(void **state)
 {
     (void)state;
     ball_system_t *ctx = ball_system_create(NULL, NULL, NULL);
     assert_non_null(ctx);
 
-    /* Add a ball at frame 0 and move to BALL_READY.  change_mode(READY)
-     * doesn't set nextFrame, but ball_system_add sets it to
-     * env.frame + BIRTH_FRAME_RATE = 5.  The BALL_READY auto-activate
-     * guard fires at env->frame >= nextFrame, so we need nextFrame
-     * ahead of our test range.  Transition through the create animation
-     * naturally to reach READY with a proper nextFrame. */
+    /* Add a ball at frame 0 and move to BALL_READY.  ball_system_add
+     * sets nextFrame = env.frame + BIRTH_FRAME_RATE.  Run the create
+     * animation (BIRTH_SLIDES * BIRTH_FRAME_RATE = 40 frames) to reach
+     * BALL_READY with nextFrame well above our test window. */
     ball_system_env_t env = make_env(0);
     int idx = ball_system_add(ctx, &env, 247, 522, 0, 0, NULL);
     assert_int_not_equal(idx, -1);
 
-    /* Run create animation to completion (BIRTH_SLIDES=8 * BIRTH_FRAME_RATE=5
-     * = 40 frames), reaching BALL_READY with nextFrame = 40 + 3000 = 3040. */
     for (int f = 1; f <= 50; f++)
     {
         env.frame = f;
         ball_system_update(ctx, &env);
     }
 
-    /* Capture initial guide state. */
+    /* Advance to base (a multiple of 8) so g0 reflects the state at a
+     * boundary tick.  The subsequent hold/advance windows are anchored
+     * relative to that boundary. */
+    int base = 80; /* multiple of 8, well below nextFrame ~3040 */
+    env.frame = base;
+    ball_system_update(ctx, &env);
     ball_system_guide_info_t g0 = ball_system_get_guide_info(ctx);
-    int base = 80; /* multiple of 40, well below nextFrame ~3040 */
 
-    /* Drive frames base+1..base+39: outer modulus fires at multiples of
-     * BALL_FRAME_RATE.  None of those are multiples of
-     * BALL_FRAME_RATE * 8 = 40 (since base=80 is itself a multiple of
-     * 40), so guide.pos must NOT change. */
-    for (int f = 1; f < 40; f++)
+    /* Frames base+1..base+7 must hold the guide position. */
+    for (int f = 1; f < 8; f++)
     {
         env.frame = base + f;
         ball_system_update(ctx, &env);
         ball_system_guide_info_t g = ball_system_get_guide_info(ctx);
         if (g.pos != g0.pos)
         {
-            fail_msg("guide.pos changed at frame %d (expected change only at multiples of 40)",
+            fail_msg("guide.pos changed at frame %d (expected hold; advance only every 8 ticks)",
                      env.frame);
         }
     }
 
-    /* Frame base+40 IS a multiple of 40 — guide.pos should change. */
-    env.frame = base + 40;
+    /* Frame base+8 IS a multiple of 8 — guide.pos must advance. */
+    env.frame = base + 8;
     ball_system_update(ctx, &env);
-    ball_system_guide_info_t g40 = ball_system_get_guide_info(ctx);
-    assert_int_not_equal(g40.pos, g0.pos);
+    ball_system_guide_info_t g8 = ball_system_get_guide_info(ctx);
+    assert_int_not_equal(g8.pos, g0.pos);
 
-    /* Frames base+41..base+79 must hold the new value. */
-    for (int f = 41; f < 80; f++)
+    /* Frames base+9..base+15 must hold the new value. */
+    for (int f = 9; f < 16; f++)
     {
         env.frame = base + f;
         ball_system_update(ctx, &env);
         ball_system_guide_info_t g = ball_system_get_guide_info(ctx);
-        if (g.pos != g40.pos)
+        if (g.pos != g8.pos)
         {
-            fail_msg("guide.pos changed at frame %d (expected hold between multiples of 40)",
+            fail_msg("guide.pos changed at frame %d (expected hold between 8-tick boundaries)",
                      env.frame);
         }
     }
+
+    /* Frame base+16 is the next 8-tick boundary — must advance again. */
+    env.frame = base + 16;
+    ball_system_update(ctx, &env);
+    ball_system_guide_info_t g16 = ball_system_get_guide_info(ctx);
+    assert_int_not_equal(g16.pos, g8.pos);
 
     ball_system_destroy(ctx);
 }
@@ -1910,8 +1918,8 @@ int main(void)
         cmocka_unit_test(test_split_teleports_ball),
         cmocka_unit_test(test_split_adds_ball),
         cmocka_unit_test(test_split_full_shows_message),
-        /* Group 13: Guide animation rate (basket 6, xboing-c-xny) */
-        cmocka_unit_test(test_guide_advances_only_at_8x_frame_rate),
+        /* Group 13: Guide animation rate (xboing-c-yzk) */
+        cmocka_unit_test(test_guide_advances_every_8_ticks),
 
         /* Group 14: Savegame v2 accessors */
         cmocka_unit_test(test_get_velocity_default_zero),
