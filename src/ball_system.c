@@ -352,8 +352,10 @@ void ball_system_update(ball_system_t *ctx, const ball_system_env_t *env)
 
     ctx->last_update_frame = env->frame;
 
-    /* Update guide animation once per tick (not per-ball) */
-    if (ball_system_is_ball_waiting(ctx) && (env->frame % BALL_FRAME_RATE) == 0)
+    /* Update guide animation once per tick (not per-ball). The step
+     * cadence lives inside update_guide(); composing a second gate here
+     * would shift it to LCM(N, 8), making the sweep 5× too slow. */
+    if (ball_system_is_ball_waiting(ctx))
     {
         update_guide(ctx, env);
     }
@@ -958,19 +960,9 @@ static void randomise_velocity(ball_system_t *ctx, const ball_system_env_t *env,
 
 static void update_guide(ball_system_t *ctx, const ball_system_env_t *env)
 {
-    /*
-     * Animate guide direction indicator.
-     * Original (ball.c:456) steps every 40 frames, but during
-     * MODE_BALL_WAIT the original main loop runs at FAST_SPEED
-     * (sleepSync 5 → 1.5 ms/frame), so 40 × 1.5 ms ≈ 60 ms per step.
-     * Modern ball_system_update is called once per game tick at
-     * default speed 5 (sdl2_loop 7.5 ms/tick), so the equivalent
-     * wall-clock cadence is 60 ms / 7.5 ms = 8 ticks per step.
-     * The previous `BALL_FRAME_RATE * 8 = 40` was 5× too slow
-     * because it treated modern ticks as if they had the original's
-     * 1.5 ms wall time.
-     */
-
+    /* Original ball.c:456 advances every 40 × 1.5 ms = 60 ms.
+     * Modern ticks are 7.5 ms, so 8 ticks = 60 ms matches the
+     * original sweep cadence (~1.2 s for a full 0↔10 round trip). */
     if ((env->frame % 8) == 0)
     {
         ctx->guide_pos += ctx->guide_inc;

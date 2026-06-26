@@ -8,6 +8,7 @@ tools:
   - Bash
   - Grep
   - Glob
+model: "sonnet"
 skills:
   - baseline-ops
 hooks:

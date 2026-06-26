@@ -6,6 +6,7 @@ tools:
   - Grep
   - Glob
   - WebFetch
+model: "sonnet"
 skills:
   - baseline-ops
 ---
