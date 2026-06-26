@@ -1498,7 +1498,12 @@ static void test_guide_advances_every_8_ticks(void **state)
         ball_system_update(ctx, &env);
     }
 
+    /* Advance to base (a multiple of 8) so g0 reflects the state at a
+     * boundary tick.  The subsequent hold/advance windows are anchored
+     * relative to that boundary. */
     int base = 80; /* multiple of 8, well below nextFrame ~3040 */
+    env.frame = base;
+    ball_system_update(ctx, &env);
     ball_system_guide_info_t g0 = ball_system_get_guide_info(ctx);
 
     /* Frames base+1..base+7 must hold the guide position. */
@@ -1913,7 +1918,7 @@ int main(void)
         cmocka_unit_test(test_split_teleports_ball),
         cmocka_unit_test(test_split_adds_ball),
         cmocka_unit_test(test_split_full_shows_message),
-        /* Group 13: Guide animation rate (basket 6, xboing-c-xny) */
+        /* Group 13: Guide animation rate (xboing-c-yzk) */
         cmocka_unit_test(test_guide_advances_every_8_ticks),
 
         /* Group 14: Savegame v2 accessors */
