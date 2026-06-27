@@ -264,9 +264,10 @@ static void test_normalize_speed_level5(void **state)
 }
 
 /* Pins the per-level alpha values from the SPEED_ALPHA table (ADR-045).
- * Each pair is (input direction, expected magnitude band).  Inputs are
- * normalized to a 3-4-5 right triangle so direction is well-defined and
- * the rounding error is symmetric. */
+ * Uses a fixed (3, -4) input direction so the normalized output is
+ * well-defined and the rounding error stays symmetric (the 3-4-5
+ * triangle keeps both components away from the MIN_DX/DY clamp at
+ * all reasonable alphas). */
 static void test_normalize_speed_table_per_level(void **state)
 {
     (void)state;
@@ -283,11 +284,12 @@ static void test_normalize_speed_table_per_level(void **state)
         int dx = 3, dy = -4;
         ball_math_normalize_speed(&dx, &dy, level);
         float actual = (float)sqrt((double)(dx * dx + dy * dy));
-        /* Tolerance of 1.5 pixels: integer rounding of dx and dy can each
-         * shift the magnitude by up to 1, and the table values themselves
-         * are stored to 2 decimals. */
-        float lo = expected[level] - 1.5f;
-        float hi = expected[level] + 1.5f;
+        /* Tolerance of 1.0 pixel: each component is rounded via
+         * (int)(x ± 0.5), so per-component error is at most 0.5; the
+         * combined magnitude error stays under ~0.7 in the worst case.
+         * 1.0 gives a small safety margin without weakening the pin. */
+        float lo = expected[level] - 1.0f;
+        float hi = expected[level] + 1.0f;
         if (actual < lo || actual > hi)
         {
             fail_msg("warp %d: expected ~%.2f, got %.2f (dx=%d dy=%d)",

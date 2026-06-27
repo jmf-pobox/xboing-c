@@ -8,7 +8,10 @@
  * Scans a sound directory for .wav files at creation time, caches them
  * as Mix_Chunk objects in a hash map for O(1) lookup by name (e.g., "boing").
  *
- * Supports concurrent playback on multiple channels via Mix_PlayChannel(-1).
+ * Supports concurrent playback by reserving a free channel via
+ * Mix_GroupAvailable, setting its volume, and starting the play on
+ * that explicit channel — so per-call volume is deterministic from
+ * the first sample.
  * Master volume is a global setting; per-call volume is supported via
  * sdl2_audio_play_at_percent() and matches the original's Sun backend
  * (original/audio/SUNaudio.c:243).  The LINUXaudio.c shim that ships in
