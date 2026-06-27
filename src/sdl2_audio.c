@@ -475,8 +475,11 @@ sdl2_audio_status_t sdl2_audio_play_at_percent(sdl2_audio_t *ctx, const char *na
      * the Sun backend's setNewVolume() which scaled by the system's
      * maxVolume rather than an absolute device max.  At percent=100
      * a per-call play is exactly as loud as sdl2_audio_play(); at
-     * percent=50 it is half-master; etc. */
-    int sdl_vol = ctx->volume * percent / 100;
+     * percent=50 it is half-master; etc.  Round (rather than truncate
+     * toward zero) so a low master volume isn't silenced by small
+     * percent values — e.g. ctx->volume=1 + percent=50 stays audible.
+     * Matches the rounding pattern in percent_to_sdl(). */
+    int sdl_vol = (ctx->volume * percent + 50) / 100;
 
     /* Reserve a free channel first, set its volume, then start the play
      * on that explicit channel.  Setting the volume after Mix_PlayChannel
