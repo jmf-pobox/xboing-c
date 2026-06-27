@@ -82,6 +82,11 @@ static void test_every_block_sound_name_resolves(void **state)
         {
             continue;
         }
+        /* Free up channels between plays — at the default 8 channels
+         * this loop hits ~14 plays and would otherwise exhaust the
+         * pool, returning SDL2A_ERR_PLAY_FAILED on the overflow even
+         * though the name resolves correctly. */
+        sdl2_audio_halt(audio);
         sdl2_audio_status_t st = sdl2_audio_play(audio, name);
         if (st != SDL2A_OK)
         {
@@ -135,7 +140,10 @@ static void test_log_records_zero_errors_for_valid_names(void **state)
     {
         const char *name = block_sound_name(t);
         if (name)
+        {
+            sdl2_audio_halt(audio); /* see note above on channel pool */
             (void)sdl2_audio_play(audio, name);
+        }
     }
     assert_int_equal(sdl2_audio_log_error_count(audio), 0);
 }

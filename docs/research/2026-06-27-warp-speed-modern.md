@@ -156,104 +156,67 @@ at speed 5 the same crossing takes 0.40 s.
 
 ---
 
-## 5. The 5× Slower Tick Problem
+## 5. Original timing — corrected
 
-### Original timing (from original/misc.c:102-108, original/main.c:115-140)
+This section's earlier draft (preserved in git history) hypothesised
+that modern was 5× slower than the original because the `* 300`
+multiplier in `original/misc.c:107` made the original 5× faster per
+frame at each speed. **That was wrong.** The error was misreading the
+`ms` argument to `sleepSync`. The full path:
 
-`sleepSync(display, ms)` calls `usleep(ms * 300)`.  
-`ms = speed = userDelay * (10 - N)`. At `userDelay = 1` (default):
+1. `SetGameSpeed(FAST_SPEED)` at `original/main.c:1897` sets
+   `speed = FAST_SPEED * userDelay = 5 * 1 = 5`.
+2. `SetUserSpeed(delay)` at `original/main.c:132-141` then sets
+   `speed = 5 * (10 - speedLevel)` for each warp keypress.
+3. Main loop calls `sleepSync(display, speed)` at
+   `original/main.c:1876-1877`, which calls `usleep(speed * 300)`.
 
-| Speed N | sleep (µs) | frames/sec |
-|---------|------------|------------|
-| 1       | 9 × 300 = 2700 | 370    |
-| 5       | 5 × 300 = 1500 | 667    |
-| 9       | 1 × 300 = 300  | 3333   |
+So `sleep_us = 1500 * (10 - speedLevel)`:
 
-### Comparison at speed 5 (default)
+| Speed N | sleep (µs) | nominal frames/sec |
+|---------|------------|--------------------|
+| 1       | 13,500     | 74                 |
+| 5       | 7,500      | 133                |
+| 9       | 1,500      | 667                |
 
-| System  | Period/frame | Rate       |
-|---------|-------------|------------|
-| Original | 1500 µs    | 667 fps    |
-| Modern   | 7500 µs    | 133 fps    |
+These numbers match the modern tick interval exactly. The modern port
+is **character-for-character correct** at every speed level.
 
-Modern is **5× slower** at speed 5. The tick interval formula
-(`SDL2L_TICK_UNIT_US = 1500`) is matched to the original's speed-5
-sleep (1500 µs), but the multiplier `(10 - speed)` means:
+## 6. Why speed 1 still feels "glacial" on modern hardware
 
-- Speed 5: `1500 * 5 = 7500 µs` (original was `1500 * 1 = 1500 µs`)
+Because the formula was tuned against 1990s X11 hardware that hid its
+non-linearity at the extremes:
 
-The `SDL2L_TICK_UNIT_US` constant was named for the original speed-9
-floor (300 µs × 5 ≈ 1500 µs is not quite right either; the original
-speed-9 sleep is 300 µs, not 1500 µs). The net effect: at every speed
-level, the modern tick rate is 5× slower than the original's frame rate.
+- On a Sun SPARCstation, the per-frame X11 work (XSync RTT,
+  `XCopyArea` blits, event polling) ate 8–15 ms of CPU regardless of
+  the requested `usleep`. At speed 9 the nominal 1.5 ms sleep was
+  dwarfed by ~10 ms of work; actual frame rate plateaued near ~85 fps.
+- At speed 1 the 13.5 ms sleep added to the ~10 ms work, giving
+  ~43 fps. The full 81× nominal span (`N / (10-N)`) collapsed to
+  roughly 2× in real-world wall-clock.
 
-Ball velocity per tick (`ball_math_normalize_speed`) is identical in
-both systems (same formula, same constants). So:
+Modern SDL2's fixed-timestep accumulator honors the sleep to the
+microsecond and rendering is sub-millisecond. The formula's true 81×
+range is now exposed. Speed 1 becomes 3.56 s vertical crossing
+(unplayable); speed 9 becomes 0.044 s (untrackable). The "glacial"
+report is correct, but the cause is hardware-floor compression no
+longer hiding the formula, not a tick-rate divergence between modern
+and original.
 
-```text
-modern px/sec = original px/sec / 5   (at same speed level)
-```
-
-### Speed 1 specifically
-
-| System   | px/sec | crossing (580 px) |
-|----------|--------|-------------------|
-| Original | 814    | 0.71 s            |
-| Modern   | 163    | 3.56 s            |
-
-Modern speed 1 is **5× slower** than original speed 1 in wall-clock.
-The "glacial" report is correct and quantified.
-
----
-
-## 6. Tick-Rate Scaling Direction
-
-Both modern and original: **higher number = faster**. No sign flip.
-
-Original: speed N → sleep = `(10-N) * 300 µs` → faster at N=9.  
-Modern: speed N → tick = `1500 * (10-N) µs` → faster at N=9.
-
-Both scale the same direction. The problem is the 5× base offset.
-
-The modern formula produces tick intervals that are uniformly 5× the
-original's at every level:
-
-```text
-modern_tick_us(N)    = 1500 * (10-N)
-original_sleep_us(N) =  300 * (10-N)
-
-ratio = 1500/300 = 5  (constant across all N)
-```
-
-This is because `SDL2L_TICK_UNIT_US = 1500` where it should be `300` to
-match original frame rate. The comment in `include/sdl2_loop.h:17-21`
-documents the modern values (`Warp 5 = 7500 µs = ~133 ticks/sec`)
-without comparing to the original.
+See `docs/research/2026-06-27-warp-speed-original.md` for the
+ground-truth original-side analysis (jck) and `docs/DESIGN.md`
+ADR-045 for the deliberate-deviation fix.
 
 ---
 
-## 7. Root Cause Summary
+## 7. Conclusion
 
-There are three compounding factors. All three contribute. Root cause is
-(b) — the 5× base offset is the dominant and universal factor.
-
-**(a) Normalization formula — NOT the root cause at speed 1.**
-`alpha = 2.20 * speed_level` is identical to the original. The formula
-is correct. At speed 1, alpha = 2.20 px/tick in both systems.
-
-**(b) Tick base rate — root cause.**
-`SDL2L_TICK_UNIT_US = 1500` produces a 5× slower tick rate than the
-original at every speed level. Fix: change to `SDL2L_TICK_UNIT_US = 300`
-OR apply `5×` to `alpha` inside `ball_math_normalize_speed` as a
-compensation factor. The former is cleaner — it brings the loop rate
-back to the original's base.
-
-**(c) Compound at speed 1.**
-Speed 1 is additionally penalized by a 5× longer tick (13500 vs 7500 µs
-at speed 5), while speed 1 also gets 5× lower pixel velocity per tick
-(2.20 vs 11.00). Both combine multiplicatively: speed 1 is
-`(11.0/2.2) × (7500/13500) = 5 × 0.56 = 2.8×` slower in px/sec than
-speed 5. This is the "glacial" experience.
+The modern port reproduces the original formula exactly. The bug is
+not in the modern code; it is that the original formula assumed a
+hardware floor that no longer exists. The fix is a deliberate
+deviation: replace the computed alpha with a tuned lookup table that
+compresses the 1↔9 span back into a playable range
+(`SPEED_ALPHA[]` in `src/ball_math.c`).
 
 ---
 

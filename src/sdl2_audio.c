@@ -430,11 +430,10 @@ sdl2_audio_status_t sdl2_audio_play(sdl2_audio_t *ctx, const char *name)
     {
         SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "sdl2_audio: Mix_PlayChannel('%s'): %s", name,
                     Mix_GetError());
+        log_append(ctx, name, SDL2A_ERR_PLAY_FAILED);
+        return SDL2A_ERR_PLAY_FAILED;
     }
-    else
-    {
-        Mix_Volume(channel, ctx->volume);
-    }
+    Mix_Volume(channel, ctx->volume);
 
     log_append(ctx, name, SDL2A_OK);
     return SDL2A_OK;
@@ -479,11 +478,10 @@ sdl2_audio_status_t sdl2_audio_play_at_percent(sdl2_audio_t *ctx, const char *na
     {
         SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "sdl2_audio: Mix_PlayChannel('%s'): %s", name,
                     Mix_GetError());
+        log_append(ctx, name, SDL2A_ERR_PLAY_FAILED);
+        return SDL2A_ERR_PLAY_FAILED;
     }
-    else
-    {
-        Mix_Volume(channel, sdl_vol);
-    }
+    Mix_Volume(channel, sdl_vol);
 
     log_append(ctx, name, SDL2A_OK);
     return SDL2A_OK;
@@ -735,6 +733,8 @@ const char *sdl2_audio_status_string(sdl2_audio_status_t status)
             return "key exceeds maximum length";
         case SDL2A_ERR_SCAN_FAILED:
             return "directory scan failed";
+        case SDL2A_ERR_PLAY_FAILED:
+            return "Mix_PlayChannel failed";
     }
     return "unknown status";
 }
