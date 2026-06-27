@@ -117,11 +117,13 @@ void sdl2_audio_destroy(sdl2_audio_t *ctx);
 sdl2_audio_status_t sdl2_audio_play(sdl2_audio_t *ctx, const char *name);
 
 /*
- * Play a cached sound at a per-call volume (0-100 percent of master).
- * Matches the original's Sun backend semantics (original/audio/SUNaudio.c:243
- * `playSoundFile(filename, volume)` mapped 0-100 to `audio_set_play_gain`).
- * Values outside 0-100 are clamped.  Setting percent == 100 is equivalent
- * to sdl2_audio_play(). */
+ * Play a cached sound at a per-call volume, expressed as a percentage
+ * of the current master volume (0 = silent, 100 = master).  Matches
+ * the original's Sun backend (original/audio/SUNaudio.c:243
+ * `playSoundFile(filename, volume)` mapped 0-100 to
+ * `audio_set_play_gain`, where 100 was the configured ceiling).
+ * Values outside 0-100 are clamped.  At percent == 100 the result is
+ * identical to sdl2_audio_play(). */
 sdl2_audio_status_t sdl2_audio_play_at_percent(sdl2_audio_t *ctx, const char *name, int percent);
 
 /*

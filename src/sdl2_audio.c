@@ -421,8 +421,8 @@ sdl2_audio_status_t sdl2_audio_play(sdl2_audio_t *ctx, const char *name)
         return SDL2A_ERR_NOT_FOUND;
     }
 
-    /* -1 = first available channel, 0 = no looping.  Set channel
-     * volume explicitly to MIX_MAX_VOLUME after the play so a prior
+    /* -1 = first available channel, 0 = no looping.  Reset channel
+     * volume to the configured master after the play so a prior
      * sdl2_audio_play_at_percent() call on the same channel does not
      * leak attenuation into this play. */
     int channel = Mix_PlayChannel(-1, e->chunk, 0);
@@ -433,7 +433,7 @@ sdl2_audio_status_t sdl2_audio_play(sdl2_audio_t *ctx, const char *name)
     }
     else
     {
-        Mix_Volume(channel, MIX_MAX_VOLUME);
+        Mix_Volume(channel, ctx->volume);
     }
 
     log_append(ctx, name, SDL2A_OK);
@@ -463,7 +463,12 @@ sdl2_audio_status_t sdl2_audio_play_at_percent(sdl2_audio_t *ctx, const char *na
         percent = 0;
     if (percent > 100)
         percent = 100;
-    int sdl_vol = MIX_MAX_VOLUME * percent / 100;
+    /* Percent is relative to the configured master volume — matches
+     * the Sun backend's setNewVolume() which scaled by the system's
+     * maxVolume rather than an absolute device max.  At percent=100
+     * a per-call play is exactly as loud as sdl2_audio_play(); at
+     * percent=50 it is half-master; etc. */
+    int sdl_vol = ctx->volume * percent / 100;
 
     /* Use per-channel volume rather than Mix_VolumeChunk so concurrent
      * playback of the same chunk on different channels keeps independent
