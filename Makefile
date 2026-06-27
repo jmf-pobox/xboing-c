@@ -117,6 +117,13 @@ deb: ## Build a Debian package via dpkg-buildpackage (.deb lands in ../).
 	dpkg-buildpackage -us -uc -b
 	echo
 	echo "Built: $$(ls -1 ../xboing_*.deb 2>/dev/null | tail -1)"
+	# Wipe dpkg-buildpackage intermediates now that the .deb is in ../.
+	# Same set distclean removes; runs only when the build succeeds
+	# (make stops on the first failing line, so a failed build leaves
+	# obj-*/ in place for debugging).
+	rm -rf obj-*/ debian/.debhelper debian/files debian/*.substvars \
+	       debian/*.log debian/debhelper-build-stamp \
+	       debian/xboing debian/xboing-dbgsym
 
 deb-lint: deb ## Build .deb + run lintian on it (Debian Policy compliance).
 	lintian ../xboing_*.deb
