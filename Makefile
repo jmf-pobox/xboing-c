@@ -14,6 +14,13 @@ ASAN_BUILD_DIR ?= build-asan
 JOBS           ?= $(shell nproc 2>/dev/null || echo 4)
 PREFIX         ?= /usr/local
 
+# Files dpkg-buildpackage drops into the source tree.  Both `deb` (after a
+# successful build) and `distclean` (unconditional wipe) remove this set —
+# keep the list here so the two callers cannot drift.
+DPKG_INTERMEDIATES := obj-*/ debian/.debhelper debian/files debian/*.substvars \
+                      debian/*.log debian/debhelper-build-stamp \
+                      debian/xboing debian/xboing-dbgsym
+
 # Run quietly under cmake's own progress reporting.
 .SILENT:
 
@@ -118,12 +125,9 @@ deb: ## Build a Debian package via dpkg-buildpackage (.deb lands in ../).
 	echo
 	echo "Built: $$(ls -1 ../xboing_*.deb 2>/dev/null | tail -1)"
 	# Wipe dpkg-buildpackage intermediates now that the .deb is in ../.
-	# Same set distclean removes; runs only when the build succeeds
-	# (make stops on the first failing line, so a failed build leaves
-	# obj-*/ in place for debugging).
-	rm -rf obj-*/ debian/.debhelper debian/files debian/*.substvars \
-	       debian/*.log debian/debhelper-build-stamp \
-	       debian/xboing debian/xboing-dbgsym
+	# Runs only on successful builds — make stops on the first failing
+	# line, so a failed build leaves obj-*/ in place for debugging.
+	rm -rf $(DPKG_INTERMEDIATES)
 
 deb-lint: deb ## Build .deb + run lintian on it (Debian Policy compliance).
 	lintian ../xboing_*.deb
@@ -244,9 +248,7 @@ clean: ## Remove the debug build dir.
 
 distclean: ## Remove all build artifacts (debug, asan, debian, in-source pollution).
 	rm -rf $(BUILD_DIR) $(ASAN_BUILD_DIR) build-install build-coverage
-	rm -rf obj-*/ debian/.debhelper debian/files debian/*.substvars \
-	       debian/*.log debian/debhelper-build-stamp \
-	       debian/xboing debian/xboing-dbgsym
+	rm -rf $(DPKG_INTERMEDIATES)
 	rm -rf CMakeCache.txt CMakeFiles cmake_install.cmake
 
 # --- Quality gates (mirror CI exactly) -------------------------------------
