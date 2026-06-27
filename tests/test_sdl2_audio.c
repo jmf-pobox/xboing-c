@@ -375,6 +375,7 @@ static void test_status_strings_all_valid(void **state)
         SDL2A_ERR_CACHE_FULL,
         SDL2A_ERR_KEY_TOO_LONG,
         SDL2A_ERR_SCAN_FAILED,
+        SDL2A_ERR_PLAY_FAILED,
     };
     for (size_t i = 0; i < sizeof(codes) / sizeof(codes[0]); i++)
     {
