@@ -15,9 +15,9 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 # Extract every quoted literal passed as the second argument to
-# sdl2_audio_play.  Skip call sites in src/sdl2_audio.c (the
-# implementation itself) and in src/block_sound.c (covered by
-# block_sound_name).
+# sdl2_audio_play OR sdl2_audio_play_at_percent.  Skip call sites in
+# src/sdl2_audio.c (the implementation itself) and in src/block_sound.c
+# (covered by block_sound_name).
 #
 # Limitation: single-line `sdl2_audio_play(ctx, "X")` only.  A call
 # split across lines (e.g. `sdl2_audio_play(ctx,\n  "X")`) will not

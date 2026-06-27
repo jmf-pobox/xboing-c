@@ -421,15 +421,19 @@ sdl2_audio_status_t sdl2_audio_play(sdl2_audio_t *ctx, const char *name)
         return SDL2A_ERR_NOT_FOUND;
     }
 
-    /* Reset chunk volume to full so any prior per-call attenuation
-     * from sdl2_audio_play_at_percent() doesn't leak into this play. */
-    Mix_VolumeChunk(e->chunk, MIX_MAX_VOLUME);
-
-    /* -1 = first available channel, 0 = no looping */
-    if (Mix_PlayChannel(-1, e->chunk, 0) == -1)
+    /* -1 = first available channel, 0 = no looping.  Set channel
+     * volume explicitly to MIX_MAX_VOLUME after the play so a prior
+     * sdl2_audio_play_at_percent() call on the same channel does not
+     * leak attenuation into this play. */
+    int channel = Mix_PlayChannel(-1, e->chunk, 0);
+    if (channel == -1)
     {
         SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "sdl2_audio: Mix_PlayChannel('%s'): %s", name,
                     Mix_GetError());
+    }
+    else
+    {
+        Mix_Volume(channel, MIX_MAX_VOLUME);
     }
 
     log_append(ctx, name, SDL2A_OK);
@@ -459,14 +463,21 @@ sdl2_audio_status_t sdl2_audio_play_at_percent(sdl2_audio_t *ctx, const char *na
         percent = 0;
     if (percent > 100)
         percent = 100;
-    int chunk_vol = MIX_MAX_VOLUME * percent / 100;
+    int sdl_vol = MIX_MAX_VOLUME * percent / 100;
 
-    Mix_VolumeChunk(e->chunk, chunk_vol);
-
-    if (Mix_PlayChannel(-1, e->chunk, 0) == -1)
+    /* Use per-channel volume rather than Mix_VolumeChunk so concurrent
+     * playback of the same chunk on different channels keeps independent
+     * volumes (chunk-level volume is shared state across channels and
+     * can change an in-flight tone's volume mid-play). */
+    int channel = Mix_PlayChannel(-1, e->chunk, 0);
+    if (channel == -1)
     {
         SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "sdl2_audio: Mix_PlayChannel('%s'): %s", name,
                     Mix_GetError());
+    }
+    else
+    {
+        Mix_Volume(channel, sdl_vol);
     }
 
     log_append(ctx, name, SDL2A_OK);
