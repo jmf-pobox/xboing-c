@@ -448,10 +448,10 @@ static void test_log_wraps_at_capacity(void **state)
     sdl2_audio_log_clear(ctx);
 
     /* Fill exactly to capacity with successful plays.  Halt the
-     * channel pool between plays so the Mix_PlayChannel(-1, ...)
-     * channel allocator always has a slot; otherwise tight loops
-     * exhaust the default 8-channel pool and the overflow plays
-     * return SDL2A_ERR_PLAY_FAILED. */
+     * channel pool between plays so the channel allocator always
+     * has a slot; otherwise tight loops exhaust the configured pool
+     * (16 channels under sdl2_audio_config_defaults()) and the
+     * overflow plays return SDL2A_ERR_PLAY_FAILED. */
     for (int i = 0; i < SDL2A_LOG_CAPACITY; i++)
     {
         sdl2_audio_halt(ctx);

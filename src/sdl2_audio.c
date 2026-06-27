@@ -421,19 +421,28 @@ sdl2_audio_status_t sdl2_audio_play(sdl2_audio_t *ctx, const char *name)
         return SDL2A_ERR_NOT_FOUND;
     }
 
-    /* -1 = first available channel, 0 = no looping.  Reset channel
-     * volume to the configured master after the play so a prior
-     * sdl2_audio_play_at_percent() call on the same channel does not
-     * leak attenuation into this play. */
-    int channel = Mix_PlayChannel(-1, e->chunk, 0);
+    /* Reserve an available channel first, set its volume, then start
+     * playback on that explicit channel.  If we used the more common
+     * Mix_PlayChannel(-1, ...) here, SDL_mixer would start the play
+     * using the channel's current volume — which could be a stale
+     * per-call attenuation left by a prior sdl2_audio_play_at_percent()
+     * — and only switch to ctx->volume after the play started, giving
+     * an audible volume jump on the first samples. */
+    int channel = Mix_GroupAvailable(-1);
     if (channel == -1)
+    {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "sdl2_audio: no free channel for '%s'", name);
+        log_append(ctx, name, SDL2A_ERR_PLAY_FAILED);
+        return SDL2A_ERR_PLAY_FAILED;
+    }
+    Mix_Volume(channel, ctx->volume);
+    if (Mix_PlayChannel(channel, e->chunk, 0) == -1)
     {
         SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "sdl2_audio: Mix_PlayChannel('%s'): %s", name,
                     Mix_GetError());
         log_append(ctx, name, SDL2A_ERR_PLAY_FAILED);
         return SDL2A_ERR_PLAY_FAILED;
     }
-    Mix_Volume(channel, ctx->volume);
 
     log_append(ctx, name, SDL2A_OK);
     return SDL2A_OK;
@@ -469,19 +478,27 @@ sdl2_audio_status_t sdl2_audio_play_at_percent(sdl2_audio_t *ctx, const char *na
      * percent=50 it is half-master; etc. */
     int sdl_vol = ctx->volume * percent / 100;
 
-    /* Use per-channel volume rather than Mix_VolumeChunk so concurrent
-     * playback of the same chunk on different channels keeps independent
-     * volumes (chunk-level volume is shared state across channels and
-     * can change an in-flight tone's volume mid-play). */
-    int channel = Mix_PlayChannel(-1, e->chunk, 0);
+    /* Reserve a free channel first, set its volume, then start the play
+     * on that explicit channel.  Setting the volume after Mix_PlayChannel
+     * would let the first samples come out at the recycled channel's
+     * prior volume before switching to sdl_vol.  Using per-channel volume
+     * (rather than Mix_VolumeChunk) keeps concurrent plays of the same
+     * chunk on different channels independent. */
+    int channel = Mix_GroupAvailable(-1);
     if (channel == -1)
+    {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "sdl2_audio: no free channel for '%s'", name);
+        log_append(ctx, name, SDL2A_ERR_PLAY_FAILED);
+        return SDL2A_ERR_PLAY_FAILED;
+    }
+    Mix_Volume(channel, sdl_vol);
+    if (Mix_PlayChannel(channel, e->chunk, 0) == -1)
     {
         SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "sdl2_audio: Mix_PlayChannel('%s'): %s", name,
                     Mix_GetError());
         log_append(ctx, name, SDL2A_ERR_PLAY_FAILED);
         return SDL2A_ERR_PLAY_FAILED;
     }
-    Mix_Volume(channel, sdl_vol);
 
     log_append(ctx, name, SDL2A_OK);
     return SDL2A_OK;
