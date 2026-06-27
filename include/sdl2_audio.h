@@ -8,8 +8,15 @@
  * Scans a sound directory for .wav files at creation time, caches them
  * as Mix_Chunk objects in a hash map for O(1) lookup by name (e.g., "boing").
  *
- * Supports concurrent playback on multiple channels via Mix_PlayChannel(-1).
- * Volume is a global setting (legacy per-call volume was always ignored).
+ * Supports concurrent playback by reserving a free channel via
+ * Mix_GroupAvailable, setting its volume, and starting the play on
+ * that explicit channel — so per-call volume is deterministic from
+ * the first sample.
+ * Master volume is a global setting; per-call volume is supported via
+ * sdl2_audio_play_at_percent() and matches the original's Sun backend
+ * (original/audio/SUNaudio.c:243).  The LINUXaudio.c shim that ships in
+ * original/ as a port-aid drops the per-call volume — not the 1996
+ * behavior on Justin's Sun/SGI workstations.
  *
  * Opaque context pattern: no globals, fully testable.
  * See ADR-010 in docs/DESIGN.md for design rationale.
@@ -52,7 +59,8 @@ typedef enum
     SDL2A_ERR_LOAD_FAILED,
     SDL2A_ERR_CACHE_FULL,
     SDL2A_ERR_KEY_TOO_LONG,
-    SDL2A_ERR_SCAN_FAILED
+    SDL2A_ERR_SCAN_FAILED,
+    SDL2A_ERR_PLAY_FAILED
 } sdl2_audio_status_t;
 
 /*
@@ -106,11 +114,26 @@ sdl2_audio_t *sdl2_audio_create(const sdl2_audio_config_t *config, sdl2_audio_st
 void sdl2_audio_destroy(sdl2_audio_t *ctx);
 
 /*
- * Play a cached sound by name (e.g., "boing").  Picks the first available
- * channel automatically.  Returns SDL2A_ERR_NOT_FOUND if the name is not
- * in the cache.  Fire-and-forget — the channel plays to completion.
- */
+ * Play a cached sound by name (e.g., "boing").  Reserves the first
+ * available SDL_mixer channel, sets its volume to the configured
+ * master, then starts playback so the first sample is at the intended
+ * volume (avoids the volume-jump that would happen if a recycled
+ * channel still carried a per-call attenuation from
+ * sdl2_audio_play_at_percent).  Returns SDL2A_ERR_NOT_FOUND if the
+ * name is not in the cache, or SDL2A_ERR_PLAY_FAILED if no channel
+ * is available or Mix_PlayChannel rejects the play.
+ * Fire-and-forget — the channel plays to completion. */
 sdl2_audio_status_t sdl2_audio_play(sdl2_audio_t *ctx, const char *name);
+
+/*
+ * Play a cached sound at a per-call volume, expressed as a percentage
+ * of the current master volume (0 = silent, 100 = master).  Matches
+ * the original's Sun backend (original/audio/SUNaudio.c:243
+ * `playSoundFile(filename, volume)` mapped 0-100 to
+ * `audio_set_play_gain`, where 100 was the configured ceiling).
+ * Values outside 0-100 are clamped.  At percent == 100 the result is
+ * identical to sdl2_audio_play(). */
+sdl2_audio_status_t sdl2_audio_play_at_percent(sdl2_audio_t *ctx, const char *name, int percent);
 
 /*
  * Set the master volume (0 = silent, MIX_MAX_VOLUME = full).
