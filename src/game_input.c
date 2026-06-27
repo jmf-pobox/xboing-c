@@ -165,8 +165,12 @@ void game_input_global(game_ctx_t *ctx)
             {
                 sdl2_loop_set_speed(ctx->loop, s);
                 message_system_set(ctx->message, warp_message(s), 1, frame);
+                /* Per-key volume reproduces original/main.c:741-806
+                 * handleSpeedKeys — playSoundFile("tone", s*10).  On
+                 * Sun this scaled audio_set_play_gain; see
+                 * original/audio/SUNaudio.c:243. */
                 if (ctx->audio)
-                    sdl2_audio_play(ctx->audio, "tone");
+                    sdl2_audio_play_at_percent(ctx->audio, "tone", s * 10);
                 break;
             }
         }

@@ -9,7 +9,11 @@
  * as Mix_Chunk objects in a hash map for O(1) lookup by name (e.g., "boing").
  *
  * Supports concurrent playback on multiple channels via Mix_PlayChannel(-1).
- * Volume is a global setting (legacy per-call volume was always ignored).
+ * Master volume is a global setting; per-call volume is supported via
+ * sdl2_audio_play_at_percent() and matches the original's Sun backend
+ * (original/audio/SUNaudio.c:243).  The LINUXaudio.c shim that ships in
+ * original/ as a port-aid drops the per-call volume — not the 1996
+ * behavior on Justin's Sun/SGI workstations.
  *
  * Opaque context pattern: no globals, fully testable.
  * See ADR-010 in docs/DESIGN.md for design rationale.
@@ -111,6 +115,14 @@ void sdl2_audio_destroy(sdl2_audio_t *ctx);
  * in the cache.  Fire-and-forget — the channel plays to completion.
  */
 sdl2_audio_status_t sdl2_audio_play(sdl2_audio_t *ctx, const char *name);
+
+/*
+ * Play a cached sound at a per-call volume (0-100 percent of master).
+ * Matches the original's Sun backend semantics (original/audio/SUNaudio.c:243
+ * `playSoundFile(filename, volume)` mapped 0-100 to `audio_set_play_gain`).
+ * Values outside 0-100 are clamped.  Setting percent == 100 is equivalent
+ * to sdl2_audio_play(). */
+sdl2_audio_status_t sdl2_audio_play_at_percent(sdl2_audio_t *ctx, const char *name, int percent);
 
 /*
  * Set the master volume (0 = silent, MIX_MAX_VOLUME = full).

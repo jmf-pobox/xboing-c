@@ -421,7 +421,48 @@ sdl2_audio_status_t sdl2_audio_play(sdl2_audio_t *ctx, const char *name)
         return SDL2A_ERR_NOT_FOUND;
     }
 
+    /* Reset chunk volume to full so any prior per-call attenuation
+     * from sdl2_audio_play_at_percent() doesn't leak into this play. */
+    Mix_VolumeChunk(e->chunk, MIX_MAX_VOLUME);
+
     /* -1 = first available channel, 0 = no looping */
+    if (Mix_PlayChannel(-1, e->chunk, 0) == -1)
+    {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "sdl2_audio: Mix_PlayChannel('%s'): %s", name,
+                    Mix_GetError());
+    }
+
+    log_append(ctx, name, SDL2A_OK);
+    return SDL2A_OK;
+}
+
+sdl2_audio_status_t sdl2_audio_play_at_percent(sdl2_audio_t *ctx, const char *name, int percent)
+{
+    if (ctx == NULL || name == NULL)
+    {
+        return SDL2A_ERR_NULL_ARG;
+    }
+    if (ctx->muted)
+    {
+        log_append(ctx, name, SDL2A_OK);
+        return SDL2A_OK;
+    }
+
+    const struct sdl2_audio_entry *e = find_entry(ctx->entries, name);
+    if (e == NULL)
+    {
+        log_append(ctx, name, SDL2A_ERR_NOT_FOUND);
+        return SDL2A_ERR_NOT_FOUND;
+    }
+
+    if (percent < 0)
+        percent = 0;
+    if (percent > 100)
+        percent = 100;
+    int chunk_vol = MIX_MAX_VOLUME * percent / 100;
+
+    Mix_VolumeChunk(e->chunk, chunk_vol);
+
     if (Mix_PlayChannel(-1, e->chunk, 0) == -1)
     {
         SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "sdl2_audio: Mix_PlayChannel('%s'): %s", name,

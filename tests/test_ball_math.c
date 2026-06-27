@@ -245,7 +245,8 @@ static void test_paddle_bounce_min_dy(void **state)
 
 /* -------------------------------------------------------------------------
  * Group 5: ball_math_normalize_speed — velocity clamping
- * Source: ball.c UpdateABall() lines 1305-1333
+ * Source: ball.c UpdateABall() lines 1305-1333 (velocity baseline) +
+ * ADR-045 (warp speed table deviation from 1996 formula).
  * ------------------------------------------------------------------------- */
 
 /* TC-13: Normalization at speed level 5 scales to expected magnitude. */
@@ -256,10 +257,43 @@ static void test_normalize_speed_level5(void **state)
 
     ball_math_normalize_speed(&dx, &dy, 5);
 
-    /* Speed should be approximately:
-     * sqrt(14^2 + 14^2) / 9.0 * 5 = 19.799/9*5 = ~11.0 */
+    /* Speed level 5 alpha is unchanged at 11.0 (matches original); see
+     * ADR-045.  Allow a small rounding band around the float magnitude. */
     float actual = (float)sqrt((double)(dx * dx + dy * dy));
-    assert_true(actual > 5.0f && actual < 20.0f);
+    assert_true(actual > 10.0f && actual < 12.0f);
+}
+
+/* Pins the per-level alpha values from the SPEED_ALPHA table (ADR-045).
+ * Each pair is (input direction, expected magnitude band).  Inputs are
+ * normalized to a 3-4-5 right triangle so direction is well-defined and
+ * the rounding error is symmetric. */
+static void test_normalize_speed_table_per_level(void **state)
+{
+    (void)state;
+    /* Expected magnitude per warp level (alpha from ADR-045's table).
+     * Index 0 is unused. */
+    const float expected[10] = {
+        0.0f,
+        9.55f, 10.19f, 10.70f, 11.00f, 11.00f,
+        10.56f, 9.51f, 7.61f, 4.56f,
+    };
+
+    for (int level = 1; level <= 9; level++)
+    {
+        int dx = 3, dy = -4;
+        ball_math_normalize_speed(&dx, &dy, level);
+        float actual = (float)sqrt((double)(dx * dx + dy * dy));
+        /* Tolerance of 1.5 pixels: integer rounding of dx and dy can each
+         * shift the magnitude by up to 1, and the table values themselves
+         * are stored to 2 decimals. */
+        float lo = expected[level] - 1.5f;
+        float hi = expected[level] + 1.5f;
+        if (actual < lo || actual > hi)
+        {
+            fail_msg("warp %d: expected ~%.2f, got %.2f (dx=%d dy=%d)",
+                     level, (double)expected[level], (double)actual, dx, dy);
+        }
+    }
 }
 
 /* TC-14: Zero velocity gets clamped to minimums. */
@@ -329,6 +363,7 @@ int main(void)
         cmocka_unit_test(test_paddle_bounce_right),
         cmocka_unit_test(test_paddle_bounce_min_dy),
         cmocka_unit_test(test_normalize_speed_level5),
+        cmocka_unit_test(test_normalize_speed_table_per_level),
         cmocka_unit_test(test_normalize_speed_zero_velocity),
         cmocka_unit_test(test_x_to_col),
         cmocka_unit_test(test_y_to_row),

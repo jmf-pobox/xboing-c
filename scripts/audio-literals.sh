@@ -24,7 +24,7 @@ cd "$(dirname "$0")/.."
 # match.  No existing call site is split this way; if clang-format
 # ever wraps a long line, audio-literals-check would silently miss
 # the literal — fail loudly here would require -z + multiline pattern.
-grep -rho 'sdl2_audio_play([^,]*,[[:space:]]*"[^"]*"' \
+grep -Erho 'sdl2_audio_play(_at_percent)?\([^,]*,[[:space:]]*"[^"]*"' \
     --include='*.c' \
     --exclude=sdl2_audio.c \
     --exclude=block_sound.c \
