@@ -569,8 +569,11 @@ static void test_play_at_percent_does_not_mutate_master(void **state)
     sdl2_audio_t *ctx = (sdl2_audio_t *)*state;
     sdl2_audio_set_volume_percent(ctx, 80);
     int before = sdl2_audio_get_volume_percent(ctx);
-    sdl2_audio_play_at_percent(ctx, "boing", 10);
-    sdl2_audio_play_at_percent(ctx, "boing", 90);
+    /* Assert each play succeeds — otherwise the no-mutation check
+     * would still pass even if Mix_PlayChannel never ran (e.g. a
+     * channel-pool exhaustion), weakening the regression signal. */
+    assert_int_equal(sdl2_audio_play_at_percent(ctx, "boing", 10), SDL2A_OK);
+    assert_int_equal(sdl2_audio_play_at_percent(ctx, "boing", 90), SDL2A_OK);
     int after = sdl2_audio_get_volume_percent(ctx);
     assert_int_equal(before, after);
 }
