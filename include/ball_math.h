@@ -57,11 +57,17 @@ void ball_math_paddle_bounce(int vx, int vy, int hit_pos, int pad_size, int padd
                              int *new_dy);
 
 /*
- * Normalize ball speed to match the given speed level.
+ * Normalize ball speed to match the given warp speed level (1..9).
  *
- * Scales dx and dy so the ball's total speed magnitude matches:
- *   target = sqrt(MAX_X_VEL^2 + MAX_Y_VEL^2) / 9.0 * speed_level
+ * Scales dx and dy so the ball's total speed magnitude matches an
+ * entry in a tuned per-level lookup table (SPEED_ALPHA[] in
+ * ball_math.c).  The table deliberately deviates from the original
+ * 1996 formula `target = sqrt(MAX_X_VEL^2 + MAX_Y_VEL^2) / 9.0 * N`
+ * because the original was tuned to 1990s X11 hardware-floor
+ * compression that no longer hides the formula's 81x dynamic range
+ * on modern hardware.  See ADR-045 in docs/DESIGN.md.
  *
+ * Speed levels outside 1..9 are treated as the default (level 5).
  * Ensures neither dx nor dy is zero (minimum MIN_DX_BALL / MIN_DY_BALL).
  */
 void ball_math_normalize_speed(int *dx, int *dy, int speed_level);

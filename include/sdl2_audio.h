@@ -111,10 +111,15 @@ sdl2_audio_t *sdl2_audio_create(const sdl2_audio_config_t *config, sdl2_audio_st
 void sdl2_audio_destroy(sdl2_audio_t *ctx);
 
 /*
- * Play a cached sound by name (e.g., "boing").  Picks the first available
- * channel automatically.  Returns SDL2A_ERR_NOT_FOUND if the name is not
- * in the cache.  Fire-and-forget — the channel plays to completion.
- */
+ * Play a cached sound by name (e.g., "boing").  Reserves the first
+ * available SDL_mixer channel, sets its volume to the configured
+ * master, then starts playback so the first sample is at the intended
+ * volume (avoids the volume-jump that would happen if a recycled
+ * channel still carried a per-call attenuation from
+ * sdl2_audio_play_at_percent).  Returns SDL2A_ERR_NOT_FOUND if the
+ * name is not in the cache, or SDL2A_ERR_PLAY_FAILED if no channel
+ * is available or Mix_PlayChannel rejects the play.
+ * Fire-and-forget — the channel plays to completion. */
 sdl2_audio_status_t sdl2_audio_play(sdl2_audio_t *ctx, const char *name);
 
 /*

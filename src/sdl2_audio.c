@@ -751,7 +751,7 @@ const char *sdl2_audio_status_string(sdl2_audio_status_t status)
         case SDL2A_ERR_SCAN_FAILED:
             return "directory scan failed";
         case SDL2A_ERR_PLAY_FAILED:
-            return "Mix_PlayChannel failed";
+            return "playback failed (no free channel or Mix_PlayChannel error)";
     }
     return "unknown status";
 }
