@@ -66,6 +66,17 @@ class Xboing < Formula
   # scores broken with no install-time signal.  This mirrors the symlink
   # and not-a-regular-file refusals in debian/xboing.postinst.
   def post_install
+    # /Users/Shared is macOS-only.  On Homebrew-on-Linux the binary
+    # resolves the FHS /var/games path (XBOING_GLOBAL_SCORE_DIR is not
+    # APPLE there), which an unprivileged brew install cannot provision —
+    # that is the apt package's job.  Skip rather than create a bogus
+    # /Users/Shared tree, and tell the user where global scores live.
+    unless OS.mac?
+      opoo "xboing: shared high scores use /var/games on Linux; install the " \
+           "system package to provision it. Skipping macOS shared-store setup."
+      return
+    end
+
     odie "#{SHARED_DIR} is a symlink; remove it and reinstall." if File.symlink?(SHARED_DIR)
     if File.exist?(SHARED_DIR) && !File.directory?(SHARED_DIR)
       odie "#{SHARED_DIR} exists but is not a directory; remove it and reinstall."
