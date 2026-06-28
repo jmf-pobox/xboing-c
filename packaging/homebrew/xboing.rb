@@ -14,15 +14,15 @@
 # location), sticky + world-writable rather than 2755 root:games.  See
 # ADR-046.
 #
-# Release wiring (url/sha256) is finalized when the first vX.Y tag is
-# pushed: `brew create https://github.com/jmf-pobox/xboing-c/archive/\
-# refs/tags/v2.4.tar.gz` computes the sha256.  Until then this formula is
-# installable from source via `brew install --HEAD ./packaging/homebrew/xboing.rb`.
+# HEAD-only until the first vX.Y release is tagged: install with
+#   brew install --HEAD ./packaging/homebrew/xboing.rb
+# There is intentionally no `url`/`sha256` yet — a placeholder tarball + a
+# zero checksum would make the stable `brew install` path fail every time.
+# When a release exists, add `url` + `sha256` for the tarball (`brew create
+# <tarball-url>` computes the checksum) to enable the stable install path.
 class Xboing < Formula
   desc "Classic breakout-style arcade game (1993, modernized for SDL2)"
   homepage "https://github.com/jmf-pobox/xboing-c"
-  url "https://github.com/jmf-pobox/xboing-c/archive/refs/tags/v2.4.tar.gz"
-  sha256 "0000000000000000000000000000000000000000000000000000000000000000" # set at release tag
   license "MIT"
   head "https://github.com/jmf-pobox/xboing-c.git", branch: "master"
 
@@ -85,21 +85,29 @@ class Xboing < Formula
 
   # Create a shared file with exclusive, no-follow semantics so a race in
   # the world-writable directory cannot redirect the write through a
-  # planted symlink or into another user's file.  An already-present path
-  # must be a plain regular file (odie otherwise).  The mode is forced to
-  # world-writable AFTER creation because the open mode is masked by the
-  # installing user's umask — every local user must be able to update the
-  # shared table.
+  # planted symlink or into another user's file.  The mode is forced to
+  # world-writable AFTER creation (the open mode is masked by the
+  # installing user's umask) — every local user must be able to update the
+  # shared table.  The freshly-created inode is unshared, so that chmod is
+  # safe.
+  #
+  # If the file already exists (normal on reinstall), it must be a plain,
+  # UNSHARED regular file: lstat (no symlink follow) and reject anything
+  # that is not a regular file or that has extra hard links — a planted
+  # hardlink would otherwise let a chmod amplify to an unrelated inode.
+  # The existing file keeps its mode; it was created 0666 by a prior
+  # install, and re-chmod here would reintroduce the hardlink/TOCTOU risk.
   def seed_shared_file(path, contents)
     File.open(path, File::WRONLY | File::CREAT | File::EXCL | File::NOFOLLOW, 0666) do |f|
       f.write(contents)
     end
     chmod(0666, path)
   rescue Errno::EEXIST
-    if File.symlink?(path) || !File.file?(path)
-      odie "#{path} exists but is not a regular file; remove it and reinstall."
-    end
-    chmod(0666, path)
+    st = File.lstat(path)
+    return if st.file? && st.nlink == 1
+
+    odie "#{path} is not a plain unshared regular file (symlink, hardlink, " \
+         "or special file); remove it and reinstall."
   end
 
   test do
