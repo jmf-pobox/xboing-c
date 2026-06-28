@@ -2867,9 +2867,15 @@ established by the AT_SECURE work (PR #150):
    alongside the existing `XBOING_SECURE_ENV_DEFS`.
 2. **`src/paths.c` consumes an opaque macro.**
    `paths_score_file_global` builds `XBOING_GLOBAL_SCORE_DIR
-   "/scores.dat"`. No `#ifdef __APPLE__`. A `#ifndef … #error` guard
-   fails the build loudly if CMake did not supply the value — mirroring
-   the AT_SECURE `#error`, never silently guessing a path.
+   "/scores.dat"`. No `#ifdef __APPLE__`. A `#ifndef` fallback defines
+   the FHS Linux path when CMake does not supply the value, matching the
+   `XBOING_DATA_DIR` convention in `xboing_paths.h`. (An earlier draft
+   used `#error` here, but that broke the standalone `cppcheck` pass —
+   cppcheck receives no `-D`, so the bare macro adjacent to the
+   `"/scores.dat"` literal became a syntax error. The fallback keeps the
+   translation unit parseable without CMake; the production build always
+   overrides the value per-OS, and `test_paths` TC-22/TC-22b guard the
+   resolved path.)
 3. **No privilege-layer change.** `sys_priv_elevate`/`sys_priv_drop`
    are already no-ops on a non-setgid binary (egid == rgid, so
    `setegid` is inert — `src/sys_priv.c`). The macOS brew binary is

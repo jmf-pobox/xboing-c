@@ -18,9 +18,13 @@
 
 /* Shared (cross-user) high-score directory.  CMake selects the OS-specific
  * value (/var/games/xboing on Linux/BSD, /Users/Shared/xboing on macOS) so
- * this file stays OS-agnostic.  Fail loudly rather than guess a default. */
+ * this file stays OS-agnostic.  The fallback default mirrors the
+ * XBOING_DATA_DIR convention in xboing_paths.h: it keeps the translation
+ * unit compilable without CMake (and parseable by cppcheck, which gets no
+ * -D), and the FHS path is the correct conservative default — CMake always
+ * overrides it per-OS. */
 #ifndef XBOING_GLOBAL_SCORE_DIR
-#error "XBOING_GLOBAL_SCORE_DIR not defined; CMake must select the shared score directory"
+#define XBOING_GLOBAL_SCORE_DIR "/var/games/xboing"
 #endif
 
 /* --- Internal helpers ----------------------------------------------------- */
