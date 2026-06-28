@@ -58,7 +58,9 @@ target_include_directories(test_paths PRIVATE
     ${CMAKE_SOURCE_DIR}/include
 )
 target_compile_options(test_paths PRIVATE ${XBOING_STRICT_WARNINGS} -Werror ${CMOCKA_WARNING_FIXUPS})
-target_compile_definitions(test_paths PRIVATE ${XBOING_SECURE_ENV_DEFS})
+target_compile_definitions(test_paths PRIVATE
+    ${XBOING_SECURE_ENV_DEFS}
+    XBOING_GLOBAL_SCORE_DIR="${XBOING_GLOBAL_SCORE_DIR}")
 target_link_libraries(test_paths PRIVATE ${CMOCKA_LIBRARIES})
 
 # Block-type → sound-name mapping tests (bead xboing-c-cfy, Component 3a).
