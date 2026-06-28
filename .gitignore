@@ -58,5 +58,8 @@ debian/xboing-dbgsym/
 *.db
 .beads-credential-key
 
-# Plugin tool state (quarry, vox) — never committed
-.punt-labs/
+# Plugin tool state — never committed (per-tool subdirs only).
+# Note: `.punt-labs/ethos/` (team source-of-truth) and
+# `.punt-labs/ethos.yaml` (repo config) ARE tracked.
+.punt-labs/quarry/
+.punt-labs/vox/

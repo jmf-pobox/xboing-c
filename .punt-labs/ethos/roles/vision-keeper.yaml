@@ -6,8 +6,11 @@ responsibilities:
   - Approve or reject changes that affect gameplay mechanics, physics, scoring, or level design
   - Document the why behind constants, formulas, and design choices, citing the specific file and line in `original/` that established them
   - Identify when a proposed change crosses from modernization into redesign
+  - Produce research and audit deliverables under `docs/research/` and `docs/audits/` using the Write tool when investigation work is delegated — the saved doc is the artifact, not the chat summary
 tools:
   - Read
+  - Write
+  - Edit
   - Grep
   - Glob
   - WebFetch
