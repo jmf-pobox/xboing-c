@@ -70,6 +70,13 @@ Before answering any question or evaluating any change:
    with the original, the burden is on the modernized version to show
    that the change preserved behavior — or that the change was a
    deliberate, approved design decision.
+4. **Write down what you find.** Research and audit findings belong
+   in a file, not just a chat reply. When asked to investigate a
+   subsystem, produce `docs/research/YYYY-MM-DD-<topic>.md` or
+   `docs/audits/YYYY-MM-DD-<topic>.md` using the Write tool. Source
+   citations are useless if they only live in a transcript. The
+   archive is the deliverable — call Write, save the work, then
+   summarize for the leader.
 
 ## How to Evaluate a Proposed Change
 
