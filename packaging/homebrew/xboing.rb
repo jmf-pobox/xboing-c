@@ -86,22 +86,23 @@ class Xboing < Formula
   # Create a shared file with exclusive, no-follow semantics so a race in
   # the world-writable directory cannot redirect the write through a
   # planted symlink or into another user's file.  The mode is forced to
-  # world-writable AFTER creation (the open mode is masked by the
-  # installing user's umask) — every local user must be able to update the
-  # shared table.  The freshly-created inode is unshared, so that chmod is
-  # safe.
+  # world-writable via the open FILE DESCRIPTOR (fchmod), never a path —
+  # the open mode is masked by the installing user's umask, and a
+  # path-based chmod in a sticky world-writable dir is a TOCTOU target.
+  # Operating on the descriptor we just exclusively created closes that
+  # race entirely.
   #
   # If the file already exists (normal on reinstall), it must be a plain,
   # UNSHARED regular file: lstat (no symlink follow) and reject anything
   # that is not a regular file or that has extra hard links — a planted
-  # hardlink would otherwise let a chmod amplify to an unrelated inode.
-  # The existing file keeps its mode; it was created 0666 by a prior
-  # install, and re-chmod here would reintroduce the hardlink/TOCTOU risk.
+  # hardlink would otherwise alias an unrelated inode.  The existing file
+  # keeps its mode (it was created 0666 by a prior install); re-chmod here
+  # would reintroduce the path-based TOCTOU.
   def seed_shared_file(path, contents)
     File.open(path, File::WRONLY | File::CREAT | File::EXCL | File::NOFOLLOW, 0666) do |f|
       f.write(contents)
+      f.chmod(0666)
     end
-    chmod(0666, path)
   rescue Errno::EEXIST
     st = File.lstat(path)
     return if st.file? && st.nlink == 1
