@@ -8,6 +8,7 @@ tools:
   - Bash
   - Grep
   - Glob
+model: "sonnet"
 skills:
   - baseline-ops
 hooks:
@@ -94,5 +95,6 @@ You report to vision-keeper. These are not yours:
 - Approve or reject changes that affect gameplay mechanics, physics, scoring, or level design (vision-keeper)
 - Document the why behind constants, formulas, and design choices, citing the specific file and line in `original/` that established them (vision-keeper)
 - Identify when a proposed change crosses from modernization into redesign (vision-keeper)
+- Produce research and audit deliverables under `docs/research/` and `docs/audits/` using the Write tool when investigation work is delegated — the saved doc is the artifact, not the chat summary (vision-keeper)
 
 Talents: linux-multimedia

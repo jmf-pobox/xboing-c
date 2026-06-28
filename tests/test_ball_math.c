@@ -245,7 +245,8 @@ static void test_paddle_bounce_min_dy(void **state)
 
 /* -------------------------------------------------------------------------
  * Group 5: ball_math_normalize_speed — velocity clamping
- * Source: ball.c UpdateABall() lines 1305-1333
+ * Source: ball.c UpdateABall() lines 1305-1333 (velocity baseline) +
+ * ADR-045 (warp speed table deviation from 1996 formula).
  * ------------------------------------------------------------------------- */
 
 /* TC-13: Normalization at speed level 5 scales to expected magnitude. */
@@ -256,10 +257,45 @@ static void test_normalize_speed_level5(void **state)
 
     ball_math_normalize_speed(&dx, &dy, 5);
 
-    /* Speed should be approximately:
-     * sqrt(14^2 + 14^2) / 9.0 * 5 = 19.799/9*5 = ~11.0 */
+    /* Speed level 5 alpha is unchanged at 11.0 (matches original); see
+     * ADR-045.  Allow a small rounding band around the float magnitude. */
     float actual = (float)sqrt((double)(dx * dx + dy * dy));
-    assert_true(actual > 5.0f && actual < 20.0f);
+    assert_true(actual > 10.0f && actual < 12.0f);
+}
+
+/* Pins the per-level alpha values from the SPEED_ALPHA table (ADR-045).
+ * Uses a fixed (3, -4) input direction so the normalized output is
+ * well-defined and the rounding error stays symmetric (the 3-4-5
+ * triangle keeps both components away from the MIN_DX/DY clamp at
+ * all reasonable alphas). */
+static void test_normalize_speed_table_per_level(void **state)
+{
+    (void)state;
+    /* Expected magnitude per warp level (alpha from ADR-045's table).
+     * Index 0 is unused. */
+    const float expected[10] = {
+        0.0f,
+        9.55f, 10.19f, 10.70f, 11.00f, 11.00f,
+        10.56f, 9.51f, 7.61f, 4.56f,
+    };
+
+    for (int level = 1; level <= 9; level++)
+    {
+        int dx = 3, dy = -4;
+        ball_math_normalize_speed(&dx, &dy, level);
+        float actual = (float)sqrt((double)(dx * dx + dy * dy));
+        /* Tolerance of 1.0 pixel: each component is rounded via
+         * (int)(x ± 0.5), so per-component error is at most 0.5; the
+         * combined magnitude error stays under ~0.7 in the worst case.
+         * 1.0 gives a small safety margin without weakening the pin. */
+        float lo = expected[level] - 1.0f;
+        float hi = expected[level] + 1.0f;
+        if (actual < lo || actual > hi)
+        {
+            fail_msg("warp %d: expected ~%.2f, got %.2f (dx=%d dy=%d)",
+                     level, (double)expected[level], (double)actual, dx, dy);
+        }
+    }
 }
 
 /* TC-14: Zero velocity gets clamped to minimums. */
@@ -329,6 +365,7 @@ int main(void)
         cmocka_unit_test(test_paddle_bounce_right),
         cmocka_unit_test(test_paddle_bounce_min_dy),
         cmocka_unit_test(test_normalize_speed_level5),
+        cmocka_unit_test(test_normalize_speed_table_per_level),
         cmocka_unit_test(test_normalize_speed_zero_velocity),
         cmocka_unit_test(test_x_to_col),
         cmocka_unit_test(test_y_to_row),

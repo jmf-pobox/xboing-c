@@ -421,11 +421,86 @@ sdl2_audio_status_t sdl2_audio_play(sdl2_audio_t *ctx, const char *name)
         return SDL2A_ERR_NOT_FOUND;
     }
 
-    /* -1 = first available channel, 0 = no looping */
-    if (Mix_PlayChannel(-1, e->chunk, 0) == -1)
+    /* Reserve an available channel first, set its volume, then start
+     * playback on that explicit channel.  If we used the more common
+     * Mix_PlayChannel(-1, ...) here, SDL_mixer would start the play
+     * using the channel's current volume — which could be a stale
+     * per-call attenuation left by a prior sdl2_audio_play_at_percent()
+     * — and only switch to ctx->volume after the play started, giving
+     * an audible volume jump on the first samples. */
+    int channel = Mix_GroupAvailable(-1);
+    if (channel == -1)
+    {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "sdl2_audio: no free channel for '%s'", name);
+        log_append(ctx, name, SDL2A_ERR_PLAY_FAILED);
+        return SDL2A_ERR_PLAY_FAILED;
+    }
+    Mix_Volume(channel, ctx->volume);
+    if (Mix_PlayChannel(channel, e->chunk, 0) == -1)
     {
         SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "sdl2_audio: Mix_PlayChannel('%s'): %s", name,
                     Mix_GetError());
+        log_append(ctx, name, SDL2A_ERR_PLAY_FAILED);
+        return SDL2A_ERR_PLAY_FAILED;
+    }
+
+    log_append(ctx, name, SDL2A_OK);
+    return SDL2A_OK;
+}
+
+sdl2_audio_status_t sdl2_audio_play_at_percent(sdl2_audio_t *ctx, const char *name, int percent)
+{
+    if (ctx == NULL || name == NULL)
+    {
+        return SDL2A_ERR_NULL_ARG;
+    }
+    if (ctx->muted)
+    {
+        log_append(ctx, name, SDL2A_OK);
+        return SDL2A_OK;
+    }
+
+    const struct sdl2_audio_entry *e = find_entry(ctx->entries, name);
+    if (e == NULL)
+    {
+        log_append(ctx, name, SDL2A_ERR_NOT_FOUND);
+        return SDL2A_ERR_NOT_FOUND;
+    }
+
+    if (percent < 0)
+        percent = 0;
+    if (percent > 100)
+        percent = 100;
+    /* Percent is relative to the configured master volume — matches
+     * the Sun backend's setNewVolume() which scaled by the system's
+     * maxVolume rather than an absolute device max.  At percent=100
+     * a per-call play is exactly as loud as sdl2_audio_play(); at
+     * percent=50 it is half-master; etc.  Round (rather than truncate
+     * toward zero) so a low master volume isn't silenced by small
+     * percent values — e.g. ctx->volume=1 + percent=50 stays audible.
+     * Matches the rounding pattern in percent_to_sdl(). */
+    int sdl_vol = (ctx->volume * percent + 50) / 100;
+
+    /* Reserve a free channel first, set its volume, then start the play
+     * on that explicit channel.  Setting the volume after Mix_PlayChannel
+     * would let the first samples come out at the recycled channel's
+     * prior volume before switching to sdl_vol.  Using per-channel volume
+     * (rather than Mix_VolumeChunk) keeps concurrent plays of the same
+     * chunk on different channels independent. */
+    int channel = Mix_GroupAvailable(-1);
+    if (channel == -1)
+    {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "sdl2_audio: no free channel for '%s'", name);
+        log_append(ctx, name, SDL2A_ERR_PLAY_FAILED);
+        return SDL2A_ERR_PLAY_FAILED;
+    }
+    Mix_Volume(channel, sdl_vol);
+    if (Mix_PlayChannel(channel, e->chunk, 0) == -1)
+    {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "sdl2_audio: Mix_PlayChannel('%s'): %s", name,
+                    Mix_GetError());
+        log_append(ctx, name, SDL2A_ERR_PLAY_FAILED);
+        return SDL2A_ERR_PLAY_FAILED;
     }
 
     log_append(ctx, name, SDL2A_OK);
@@ -678,6 +753,8 @@ const char *sdl2_audio_status_string(sdl2_audio_status_t status)
             return "key exceeds maximum length";
         case SDL2A_ERR_SCAN_FAILED:
             return "directory scan failed";
+        case SDL2A_ERR_PLAY_FAILED:
+            return "playback failed (no free channel or Mix_PlayChannel error)";
     }
     return "unknown status";
 }

@@ -150,23 +150,37 @@ void ball_math_paddle_bounce(int vx, int vy, int hit_pos, int pad_size, int padd
         *new_dy = -MIN_DY_BALL;
 }
 
+/* Per-tick velocity magnitude in pixels at each warp speed level.
+ * Deliberately deviates from the original's `2.2 * speed_level` formula
+ * (which produces an 81x px/sec span across 1..9, unplayable on modern
+ * hardware that no longer hides the formula's non-linearity).  This
+ * table anchors speed 5 to the original's 1467 px/sec and applies a
+ * +20% geometric curve to compress the 1..9 span to 4.3x.  See ADR-045
+ * in docs/DESIGN.md. */
+static const float SPEED_ALPHA[10] = {
+    0.0f,   /* unused */
+    9.55f,  /* 1 → 707 px/sec */
+    10.19f, /* 2 → 849 px/sec */
+    10.70f, /* 3 → 1019 px/sec */
+    11.00f, /* 4 → 1223 px/sec */
+    11.00f, /* 5 → 1467 px/sec (matches original) */
+    10.56f, /* 6 → 1761 px/sec */
+    9.51f,  /* 7 → 2113 px/sec */
+    7.61f,  /* 8 → 2535 px/sec */
+    4.56f,  /* 9 → 3042 px/sec */
+};
+
 void ball_math_normalize_speed(int *dx, int *dy, int speed_level)
 {
-    /*
-     * Normalize ball speed to match the given speed level.
-     * Replica of ball.c UpdateABall() lines 1305-1333.
-     */
-
     float Vx, Vy, Vs, alpha, beta;
 
     Vx = (float)*dx;
     Vy = (float)*dy;
     Vs = (float)sqrt((double)(Vx * Vx + Vy * Vy));
 
-    alpha = (float)sqrt(
-        (double)((float)MAX_X_VEL * (float)MAX_X_VEL + (float)MAX_Y_VEL * (float)MAX_Y_VEL));
-    alpha /= 9.0f; /* number of speed levels */
-    alpha *= (float)speed_level;
+    if (speed_level < 1 || speed_level > 9)
+        speed_level = 5;
+    alpha = SPEED_ALPHA[speed_level];
 
     if (Vs == 0.0f)
         Vs = 1.0f;

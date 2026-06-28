@@ -2705,6 +2705,129 @@ Alternatives considered:
   load (was previously before), so a failed load no longer drifts the
   background cycle out of step with the level number.
 
+## ADR-045: Warp speed velocity table — deviation from 1996 formula
+
+**Status:** Accepted (2026-06-27)
+**Bead:** xboing-c-tks
+
+**Context.** The original's per-tick velocity formula
+(`alpha = sqrt(MAX_X² + MAX_Y²) / 9 × speed_level ≈ 2.2 × N` px/tick at
+`original/ball.c:1168-1196`) and tick interval scaling
+(`usleep(1500 × (10-N))` µs at `original/misc.c:107` after `userDelay`
+multiplication) combine to a `N / (10-N)` pixels-per-second curve. Total
+range from speed 1 to speed 9: **81×**.
+
+The modern port reproduces this formula character-for-character
+(`src/ball_math.c:153-193` and `src/sdl2_loop.c:45-47`). The two
+research notes that established equivalence:
+
+- `docs/research/2026-06-27-warp-speed-original.md`
+- `docs/research/2026-06-27-warp-speed-modern.md`
+
+On 1990s X11 hardware, per-frame work (XSync RTT, `XCopyArea`, event
+polling) ate 8–15 ms regardless of `usleep`. That work floor compressed
+the high-end speeds: speed 9's nominal 1.5 ms sleep was dwarfed by
+~10 ms of real work, so the actual frame rate plateaued. The 81× nominal
+range collapsed to roughly 2× in real-world feel — every level was
+playable.
+
+Modern SDL2's fixed-timestep accumulator honors the sleep to the
+microsecond, and rendering is sub-millisecond. The formula's true 81×
+span is now exposed. Empirically (user playtest 2026-06-27):
+
+- Speed 1 (3.56 s vertical crossing): glacial, unplayable.
+- Speed 5 (0.40 s): matches original feel.
+- Speed 9 (0.044 s): too fast to track.
+
+The original ran more accurately on 1996 hardware than the modern port
+runs it on 2026 hardware. The formula was tuned implicitly against the
+hardware floor that no longer exists.
+
+**Decision.**
+
+Replace `ball_math_normalize_speed`'s computed `alpha` with a 9-entry
+lookup table tuned to a +20% geometric pixels-per-second curve anchored
+at speed 5 = original's 1,467 px/s. This is "Candidate B" from the
+2026-06-27 design discussion.
+
+```c
+/* Pixels per tick at each warp speed, deliberately deviating from the
+ * original's 2.2*N formula.  The tick interval scaling
+ * (1500*(10-N) µs) is unchanged, so px/sec follows a +20% geometric
+ * curve anchored at speed 5 = original's 1467 px/s.  See ADR-045. */
+static const float SPEED_ALPHA[10] = {
+    0.0f,    /* unused */
+    9.55f,   /* 1 → 707 px/sec */
+    10.19f,  /* 2 → 849 px/sec */
+    10.70f,  /* 3 → 1019 px/sec */
+    11.00f,  /* 4 → 1223 px/sec */
+    11.00f,  /* 5 → 1467 px/sec (matches original) */
+    10.56f,  /* 6 → 1761 px/sec */
+    9.51f,   /* 7 → 2113 px/sec */
+    7.61f,   /* 8 → 2535 px/sec */
+    4.56f,   /* 9 → 3042 px/sec */
+};
+```
+
+Speed 5 alpha equals the original's `2.2 × 5 = 11.0`. The 1→9 pixels-
+per-second span is **4.3×** (vs original's 81×). All alpha values stay
+inside `[MIN_DXY_BALL × sqrt(2) ≈ 2.83, MAX_X_VEL ≈ 14]` so neither the
+MIN clamp nor the implicit MAX ray-march budget changes.
+
+**Alternatives considered.**
+
+- **Status quo (close bead as won't-fix).** Rejected: user playtest
+  confirmed extremes are unplayable on modern hardware. "Authentic
+  formula" is not the same as "authentic feel" when the hardware floor
+  the formula was tuned against no longer exists.
+- **Mild compression (+50% geometric, "Candidate C").** Speed 1 = 2.0 s
+  crossing (still slow), speed 9 = 0.078 s (still very fast). Less
+  deviation from original but doesn't solve the user's reported pain at
+  the extremes.
+- **Stronger compression (+30% geometric, "Candidate A").** Speed 1 =
+  1.13 s, speed 9 = 0.139 s, 1↔9 span 8.1×. Closer to the original's
+  intent but still pushes the extremes into the marginal range. Held in
+  reserve if Candidate B feels too compressed in playtest.
+- **Change tick rate curve instead of velocity.** Rejected: tick rate
+  drives every other clock in the engine (launch guide, block
+  animations, sparkle, eyedude). Rescaling it ripples through every
+  per-tick subsystem and risks re-breaking the launch guide cadence
+  (ADR-013, PR #152). Velocity table is the isolated, reversible
+  surface.
+- **Raise `MAX_X_VEL` / `MAX_Y_VEL` and recompute everything.**
+  Rejected: changes the per-tick collision ray-march budget and would
+  invalidate ADR-016 (block collision) and the launch-guide vector
+  tables. Out of scope for a calibration fix.
+- **Fixed 60 fps tick + new velocity scale.** Rejected: speed 5 anchor
+  at 1,467 px/s requires `alpha = 24.5` at 60 fps, exceeding `MAX_X_VEL`
+  and changing collision step counts.
+
+**Consequences.**
+
+- `src/ball_math.c::ball_math_normalize_speed` reads `SPEED_ALPHA[N]`
+  instead of computing from `MAX_X_VEL` / `MAX_Y_VEL`. The
+  `sqrtf(MAX² + MAX²) / 9 * N` line disappears; the rest of the
+  normalization (rounding, MIN clamps) is unchanged.
+- `MAX_X_VEL`, `MAX_Y_VEL`, `MIN_DX_BALL`, `MIN_DY_BALL` remain at
+  their original values (14, 14, 2, 2). Per-axis components after
+  normalization still fit the ray-march budget at the new alpha range.
+- Tick interval (`SDL2L_TICK_UNIT_US = 1500`) is unchanged. All other
+  per-tick clocks (launch guide `% 8`, attract-mode multipliers, block
+  animation cadence) are unaffected.
+- `tests/test_ball_math.c` characterization tests that pin the old
+  formula's output need updating. Update the expected per-speed alpha
+  to read the new table; do not pin numeric formulas.
+- Save files do not encode velocity directly (per ADR-038 the savegame
+  records `dx`, `dy`, `state` — not `alpha`), so this is a
+  forward-compatible change. A v1 save loaded after this change gets
+  re-normalized to the new table on the first post-load tick.
+- **Verification** is by user playtest. Speed 5 must still match the
+  observed original behavior. Speeds 1–4 should feel measurably slower
+  than speed 5 but playable. Speeds 6–9 should feel measurably faster
+  than speed 5 but trackable.
+- Reversible: if playtest reveals the +20% curve is wrong, replacing
+  the `SPEED_ALPHA[]` values is a one-line change.
+
 ## ADR-046: macOS shared high-score path via `/Users/Shared`
 
 **Status:** Accepted (2026-06-28)

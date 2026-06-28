@@ -375,6 +375,7 @@ static void test_status_strings_all_valid(void **state)
         SDL2A_ERR_CACHE_FULL,
         SDL2A_ERR_KEY_TOO_LONG,
         SDL2A_ERR_SCAN_FAILED,
+        SDL2A_ERR_PLAY_FAILED,
     };
     for (size_t i = 0; i < sizeof(codes) / sizeof(codes[0]); i++)
     {
@@ -446,9 +447,14 @@ static void test_log_wraps_at_capacity(void **state)
     sdl2_audio_t *ctx = (sdl2_audio_t *)*state;
     sdl2_audio_log_clear(ctx);
 
-    /* Fill exactly to capacity with successful plays. */
+    /* Fill exactly to capacity with successful plays.  Halt the
+     * channel pool between plays so the channel allocator always
+     * has a slot; otherwise tight loops exhaust the configured pool
+     * (16 channels under sdl2_audio_config_defaults()) and the
+     * overflow plays return SDL2A_ERR_PLAY_FAILED. */
     for (int i = 0; i < SDL2A_LOG_CAPACITY; i++)
     {
+        sdl2_audio_halt(ctx);
         (void)sdl2_audio_play(ctx, "boing");
     }
     assert_int_equal(sdl2_audio_log_error_count(ctx), 0);
@@ -460,6 +466,7 @@ static void test_log_wraps_at_capacity(void **state)
     /* Overflow by 5 — older entries are discarded. */
     for (int i = 0; i < 5; i++)
     {
+        sdl2_audio_halt(ctx);
         (void)sdl2_audio_play(ctx, "paddle");
     }
     n = sdl2_audio_log_snapshot(ctx, entries, SDL2A_LOG_CAPACITY);
@@ -487,9 +494,11 @@ static void test_log_error_count_accurate_after_wrap(void **state)
     }
     assert_int_equal(sdl2_audio_log_error_count(ctx), SDL2A_LOG_CAPACITY);
 
-    /* Overwrite every error slot with a successful play. */
+    /* Overwrite every error slot with a successful play.  Halt the
+     * channel pool between plays so the allocator always has a slot. */
     for (int i = 0; i < SDL2A_LOG_CAPACITY; i++)
     {
+        sdl2_audio_halt(ctx);
         (void)sdl2_audio_play(ctx, "boing");
     }
     /* Live window is now all successes; error count must be 0. */
@@ -519,6 +528,88 @@ static void test_log_null_safety(void **state)
     assert_int_equal(sdl2_audio_log_snapshot(NULL, entries, 4), 0);
     assert_int_equal(sdl2_audio_log_error_count(NULL), 0);
     sdl2_audio_log_clear(NULL); /* must not crash */
+}
+
+/* =========================================================================
+ * Group N: Per-call volume (sdl2_audio_play_at_percent)
+ * ========================================================================= */
+
+static void test_play_at_percent_null_ctx(void **state)
+{
+    (void)state;
+    sdl2_audio_status_t st = sdl2_audio_play_at_percent(NULL, "boing", 50);
+    assert_int_equal(st, SDL2A_ERR_NULL_ARG);
+}
+
+static void test_play_at_percent_null_name(void **state)
+{
+    sdl2_audio_t *ctx = (sdl2_audio_t *)*state;
+    sdl2_audio_status_t st = sdl2_audio_play_at_percent(ctx, NULL, 50);
+    assert_int_equal(st, SDL2A_ERR_NULL_ARG);
+}
+
+static void test_play_at_percent_not_found(void **state)
+{
+    sdl2_audio_t *ctx = (sdl2_audio_t *)*state;
+    sdl2_audio_status_t st = sdl2_audio_play_at_percent(ctx, "nonexistent_sound_xyz", 50);
+    assert_int_equal(st, SDL2A_ERR_NOT_FOUND);
+}
+
+static void test_play_at_percent_known_sound(void **state)
+{
+    sdl2_audio_t *ctx = (sdl2_audio_t *)*state;
+    sdl2_audio_status_t st = sdl2_audio_play_at_percent(ctx, "boing", 50);
+    assert_int_equal(st, SDL2A_OK);
+}
+
+/* Per-call volume must not mutate the master volume — the contract is
+ * "percent of master" not "set master." */
+static void test_play_at_percent_does_not_mutate_master(void **state)
+{
+    sdl2_audio_t *ctx = (sdl2_audio_t *)*state;
+    sdl2_audio_set_volume_percent(ctx, 80);
+    int before = sdl2_audio_get_volume_percent(ctx);
+    /* Assert each play succeeds — otherwise the no-mutation check
+     * would still pass even if Mix_PlayChannel never ran (e.g. a
+     * channel-pool exhaustion), weakening the regression signal. */
+    assert_int_equal(sdl2_audio_play_at_percent(ctx, "boing", 10), SDL2A_OK);
+    assert_int_equal(sdl2_audio_play_at_percent(ctx, "boing", 90), SDL2A_OK);
+    int after = sdl2_audio_get_volume_percent(ctx);
+    assert_int_equal(before, after);
+}
+
+/* Out-of-range percent values must clamp without error. */
+static void test_play_at_percent_clamps_negative(void **state)
+{
+    sdl2_audio_t *ctx = (sdl2_audio_t *)*state;
+    sdl2_audio_status_t st = sdl2_audio_play_at_percent(ctx, "boing", -25);
+    assert_int_equal(st, SDL2A_OK);
+}
+
+static void test_play_at_percent_clamps_over_max(void **state)
+{
+    sdl2_audio_t *ctx = (sdl2_audio_t *)*state;
+    sdl2_audio_status_t st = sdl2_audio_play_at_percent(ctx, "boing", 150);
+    assert_int_equal(st, SDL2A_OK);
+}
+
+/* Zero percent is silent but still a successful play. */
+static void test_play_at_percent_zero(void **state)
+{
+    sdl2_audio_t *ctx = (sdl2_audio_t *)*state;
+    sdl2_audio_status_t st = sdl2_audio_play_at_percent(ctx, "boing", 0);
+    assert_int_equal(st, SDL2A_OK);
+}
+
+/* When muted, sdl2_audio_play_at_percent returns OK and logs a no-op,
+ * matching sdl2_audio_play's behavior. */
+static void test_play_at_percent_muted_returns_ok(void **state)
+{
+    sdl2_audio_t *ctx = (sdl2_audio_t *)*state;
+    sdl2_audio_set_muted(ctx, true);
+    sdl2_audio_status_t st = sdl2_audio_play_at_percent(ctx, "boing", 50);
+    assert_int_equal(st, SDL2A_OK);
+    sdl2_audio_set_muted(ctx, false);
 }
 
 /* =========================================================================
@@ -592,6 +683,26 @@ int main(void)
         cmocka_unit_test(test_volume_down_null),
     };
 
+    const struct CMUnitTest play_at_percent_tests[] = {
+        cmocka_unit_test(test_play_at_percent_null_ctx),
+        cmocka_unit_test_setup_teardown(test_play_at_percent_null_name, setup_audio_ctx,
+                                        teardown_audio_ctx),
+        cmocka_unit_test_setup_teardown(test_play_at_percent_not_found, setup_audio_ctx,
+                                        teardown_audio_ctx),
+        cmocka_unit_test_setup_teardown(test_play_at_percent_known_sound, setup_audio_ctx,
+                                        teardown_audio_ctx),
+        cmocka_unit_test_setup_teardown(test_play_at_percent_does_not_mutate_master,
+                                        setup_audio_ctx, teardown_audio_ctx),
+        cmocka_unit_test_setup_teardown(test_play_at_percent_clamps_negative, setup_audio_ctx,
+                                        teardown_audio_ctx),
+        cmocka_unit_test_setup_teardown(test_play_at_percent_clamps_over_max, setup_audio_ctx,
+                                        teardown_audio_ctx),
+        cmocka_unit_test_setup_teardown(test_play_at_percent_zero, setup_audio_ctx,
+                                        teardown_audio_ctx),
+        cmocka_unit_test_setup_teardown(test_play_at_percent_muted_returns_ok, setup_audio_ctx,
+                                        teardown_audio_ctx),
+    };
+
     const struct CMUnitTest status_tests[] = {
         cmocka_unit_test(test_status_strings_all_valid),
         cmocka_unit_test(test_status_string_unknown),
@@ -622,6 +733,8 @@ int main(void)
     failed += cmocka_run_group_tests_name("volume control", volume_tests, group_setup_sdl,
                                           group_teardown_sdl);
     failed += cmocka_run_group_tests_name("volume percentage", volume_percent_tests,
+                                          group_setup_sdl, group_teardown_sdl);
+    failed += cmocka_run_group_tests_name("play at percent", play_at_percent_tests,
                                           group_setup_sdl, group_teardown_sdl);
     failed += cmocka_run_group_tests_name("status strings", status_tests, NULL, NULL);
     failed += cmocka_run_group_tests_name("call log", log_tests, group_setup_sdl,
