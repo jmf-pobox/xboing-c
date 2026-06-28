@@ -58,27 +58,48 @@ class Xboing < Formula
   # global scores file itself, so a fresh install must seed it or the
   # first player to rank #1 silently loses their score (and the table
   # renders empty on next launch).  Equivalent to debian/xboing.postinst.
+  #
+  # /Users/Shared is world-writable and sticky, so a local user can
+  # pre-plant a symlink or a non-regular file at any of these paths to
+  # hijack or block the shared store.  Every refusal is loud (odie) — a
+  # silent skip would let `brew install` succeed while leaving global
+  # scores broken with no install-time signal.  This mirrors the symlink
+  # and not-a-regular-file refusals in debian/xboing.postinst.
   def post_install
-    scores = "#{SHARED_DIR}/scores.dat"
-    lock = "#{SHARED_DIR}/scores.dat.lock"
-
-    # Refuse to follow a symlink at any leaf — defense in depth, since
-    # /Users/Shared is world-writable and a local user could pre-plant one.
-    return if File.symlink?(SHARED_DIR) || File.symlink?(scores) || File.symlink?(lock)
+    odie "#{SHARED_DIR} is a symlink; remove it and reinstall." if File.symlink?(SHARED_DIR)
+    if File.exist?(SHARED_DIR) && !File.directory?(SHARED_DIR)
+      odie "#{SHARED_DIR} exists but is not a directory; remove it and reinstall."
+    end
 
     mkdir_p(SHARED_DIR) unless File.directory?(SHARED_DIR)
     # Sticky (1777): every user can create/update the shared file, but
     # only the owner of an entry can delete it.  No games group on macOS.
     chmod(01777, SHARED_DIR)
 
-    File.write(scores, SCORES_SEED) unless File.exist?(scores)
-    chmod(0666, scores)
+    seed_shared_file("#{SHARED_DIR}/scores.dat", SCORES_SEED)
+    # The lock self-creates at runtime under the world-writable dir, but
+    # pre-seeding matches the apt deployment and avoids a first-run
+    # permission surprise under a restrictive umask.
+    seed_shared_file("#{SHARED_DIR}/scores.dat.lock", "")
+  end
 
-    # On macOS the world-writable dir lets the running process create the
-    # lock at runtime, but pre-seeding it matches the apt deployment and
-    # avoids a first-run permission surprise under a restrictive umask.
-    File.write(lock, "") unless File.exist?(lock)
-    chmod(0666, lock)
+  # Create a shared file with exclusive, no-follow semantics so a race in
+  # the world-writable directory cannot redirect the write through a
+  # planted symlink or into another user's file.  An already-present path
+  # must be a plain regular file (odie otherwise).  The mode is forced to
+  # world-writable AFTER creation because the open mode is masked by the
+  # installing user's umask — every local user must be able to update the
+  # shared table.
+  def seed_shared_file(path, contents)
+    File.open(path, File::WRONLY | File::CREAT | File::EXCL | File::NOFOLLOW, 0666) do |f|
+      f.write(contents)
+    end
+    chmod(0666, path)
+  rescue Errno::EEXIST
+    if File.symlink?(path) || !File.file?(path)
+      odie "#{path} exists but is not a regular file; remove it and reinstall."
+    end
+    chmod(0666, path)
   end
 
   test do
