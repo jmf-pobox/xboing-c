@@ -81,6 +81,15 @@ if(NOT DEFINED XBOING_GLOBAL_SCORE_DIR)
     endif()
 endif()
 
+# Validate the resolved value (a packager override could be empty or
+# relative).  src/paths.c builds "<dir>/scores.dat" and test_paths TC-22b
+# asserts an absolute path, so reject anything that is not.
+if(NOT XBOING_GLOBAL_SCORE_DIR MATCHES "^/")
+    message(FATAL_ERROR
+        "XBOING_GLOBAL_SCORE_DIR must be a non-empty absolute path "
+        "(got: '${XBOING_GLOBAL_SCORE_DIR}')")
+endif()
+
 # --- Install rules ----------------------------------------------------------
 
 install(DIRECTORY levels/

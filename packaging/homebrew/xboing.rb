@@ -121,14 +121,9 @@ class Xboing < Formula
   # Seed one shared file.  Exclusive, no-follow creation means a race in
   # the world-writable dir cannot redirect the write through a planted
   # symlink or into another user's file; the mode is set via the
-  # descriptor (fchmod), never a re-resolved path.
-  #
-  # An already-present path (normal on reinstall) must be a plain,
-  # UNSHARED, install-owned regular file: a symlink raises ELOOP and is
-  # refused; lstat then rejects non-regular files, extra hard links
-  # (nlink != 1, which would alias an unrelated inode), and any file a
-  # local user pre-created (uid != euid).  The existing file keeps its
-  # mode; re-chmod here would reintroduce a path-based TOCTOU.
+  # descriptor (fchmod), never a re-resolved path.  An already-present
+  # path (normal on reinstall) is validated and its mode re-enforced by
+  # enforce_existing_shared_file, also descriptor-based.
   def seed_shared_file(path, contents, mode)
     File.open(path, File::WRONLY | File::CREAT | File::EXCL | File::NOFOLLOW, mode) do |f|
       f.write(contents)
@@ -137,10 +132,27 @@ class Xboing < Formula
   rescue Errno::ELOOP
     odie "#{path} is a symlink; remove it and reinstall."
   rescue Errno::EEXIST
-    st = File.lstat(path)
-    return if st.file? && st.nlink == 1 && st.uid == Process.euid
+    enforce_existing_shared_file(path, mode)
+  end
 
-    odie "#{path} is not a plain, unshared, install-owned regular file; remove it and reinstall."
+  # Validate and normalize an existing shared file entirely through a
+  # NOFOLLOW descriptor — no pathname is re-resolved, so there is no
+  # check-to-chmod TOCTOU.  It must be a plain, UNSHARED, install-owned
+  # regular file: a symlink leaf raises ELOOP; fstat then rejects
+  # non-regular files, extra hard links (nlink != 1, which would alias an
+  # unrelated inode), and any file a local user pre-created (uid != euid).
+  # The mode is re-enforced via fchmod so a prior install that wrote the
+  # wrong mode (e.g. under a restrictive umask) self-heals.
+  def enforce_existing_shared_file(path, mode)
+    File.open(path, File::RDONLY | File::NOFOLLOW) do |f|
+      st = f.stat
+      if !st.file? || st.nlink != 1 || st.uid != Process.euid
+        odie "#{path} is not a plain, unshared, install-owned regular file; remove it and reinstall."
+      end
+      f.chmod(mode)
+    end
+  rescue Errno::ELOOP
+    odie "#{path} is a symlink; remove it and reinstall."
   end
 
   test do
