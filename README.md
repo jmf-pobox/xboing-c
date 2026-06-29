@@ -1,6 +1,8 @@
 # XBoing
 
-An SDL2 port of XBoing 2.4, the X11 breakout/blockout arcade game written by Justin C. Kibell between 1993 and 1997. All 80 original levels, 30 block types, power-ups, multiball, and the built-in level editor are preserved. Current release: **0.9**.
+XBoing is a fast, colorful breakout-style arcade game. Bounce the proton ball off your paddle to smash every block on the level — through 80 stages of bombs, teleports, sticky paddles, power-ups, and up-to-five-ball mayhem. Clear them all, chase a high score, and build your own levels with the editor that ships in the box.
+
+A faithful SDL2 port of Justin C. Kibell's 1996 X11 original (XBoing 2.4). Current release: **0.9**.
 
 ![XBoing gameplay](screenshots/gameplay.gif)
 
