@@ -2827,3 +2827,132 @@ MIN clamp nor the implicit MAX ray-march budget changes.
   than speed 5 but trackable.
 - Reversible: if playtest reveals the +20% curve is wrong, replacing
   the `SPEED_ALPHA[]` values is a one-line change.
+
+## ADR-046: macOS shared high-score path via `/Users/Shared`
+
+**Status:** Accepted (2026-06-28)
+**Context:** `feat/macos-shared-scores` — porting the cross-user
+"global" high-score table to a macOS (Homebrew) install.
+
+ADR-041 restored the original's multi-user global score table on Linux:
+a setgid-`games` binary writes a single shared file at
+`/var/games/xboing/scores.dat` (FHS 11.5), with the per-write egid swap
+in `src/sys_priv.c` and the locked atomic insert in
+`highscore_io_insert_global_atomic`. That deployment model does not
+exist on macOS:
+
+- There is no `games` group/user by default, and no FHS `/var/games`.
+- Homebrew installs run **unprivileged** — a formula cannot `setgid`,
+  cannot `chown root`, and must not require `sudo`. The setgid integrity
+  mechanism is simply unavailable.
+- The macOS-sanctioned location for files shared across local users is
+  `/Users/Shared` (sticky, world-accessible).
+
+The path literal was hard-coded in `paths_score_file_global`
+(`src/paths.c`), so a macOS build wrote (or failed to write) to a
+Linux-only path that never exists on a Mac. The bug surfaced as
+"words of wisdom" (`master_text`) being unreachable on a single-user
+Mac dev build, because `master_text` is written only by the global
+insert (ADR-041 §6) and the global insert had nowhere to land.
+
+**Decision:** Select the shared directory at **build time** and keep
+`src/paths.c` free of any OS conditional, reusing the exact pattern
+established by the AT_SECURE work (PR #150):
+
+1. **CMake is the single source of the OS difference.**
+   `CMakeLists.txt` sets `XBOING_GLOBAL_SCORE_DIR` —
+   `/Users/Shared/xboing` under `if(APPLE)`, `/var/games/xboing`
+   otherwise — and passes it as a compile definition to every target
+   that compiles `src/paths.c` (the `paths` library and `test_paths`),
+   alongside the existing `XBOING_SECURE_ENV_DEFS`. The per-OS default
+   is gated behind `if(NOT DEFINED ...)` so a packager or sysadmin can
+   override it at configure time (`cmake -DXBOING_GLOBAL_SCORE_DIR=...`).
+2. **`src/paths.c` consumes an opaque macro.**
+   `paths_score_file_global` builds `XBOING_GLOBAL_SCORE_DIR
+   "/scores.dat"`. No `#ifdef __APPLE__`. A `#ifndef` fallback defines
+   the FHS Linux path when CMake does not supply the value, matching the
+   `XBOING_DATA_DIR` convention in `xboing_paths.h`. (An earlier draft
+   used `#error` here, but that broke the standalone `cppcheck` pass —
+   cppcheck receives no `-D`, so the bare macro adjacent to the
+   `"/scores.dat"` literal became a syntax error. The fallback keeps the
+   translation unit parseable without CMake; the production build always
+   overrides the value per-OS, and `test_paths` TC-22/TC-22b guard the
+   resolved path.)
+3. **No privilege-layer change.** `sys_priv_elevate`/`sys_priv_drop`
+   are already no-ops on a non-setgid binary (egid == rgid, so
+   `setegid` is inert — `src/sys_priv.c`). The macOS brew binary is
+   non-setgid, so `submit_score`'s elevate → write → drop sequence
+   works unchanged; on Linux it still swaps to egid=games for the
+   write. The integrity mechanism was always optional by construction.
+4. **Directory provisioning stays in packaging, not C.** End users
+   install via `.deb` or Homebrew — never the Makefile — so the seed
+   step belongs in each package's install script, symmetric across
+   channels. Linux: `debian/xboing.postinst` (unchanged) creates
+   `/var/games/xboing` 2755 root:games and seeds `scores.dat` +
+   `scores.dat.lock`. macOS: `packaging/homebrew/xboing.rb`'s
+   `post_install` creates `/Users/Shared/xboing` sticky (1777), seeds a
+   world-writable (0666) `scores.dat` with the JSON skeleton, and seeds
+   an empty world-readable (0644) `scores.dat.lock`. The lock is
+   pre-seeded (not left to runtime creation) so a local user cannot
+   pre-plant it as a FIFO in the world-writable dir — `O_NOFOLLOW` does
+   not reject FIFOs, and the runtime's `O_RDONLY` lock open would block
+   forever. 0644 suffices because the runtime only opens the lock
+   `O_RDONLY` for `flock`. The C core never `mkdir`s or creates the
+   shared scores file
+   (`write_table_inplace` has no `O_CREAT` — ADR-041); an unprovisioned
+   path degrades to the ADR-041 dev-mode behavior (global write fails,
+   logged to stderr, game continues). The seed file is mandatory, not
+   optional: without it the first global write opens a nonexistent file
+   and fails, leaving the shared table empty (the failure that the
+   missing brew formula caused before this ADR).
+5. **Test asserts the macro, not a literal.** `test_paths.c` TC-22
+   compares against `XBOING_GLOBAL_SCORE_DIR "/scores.dat"` (correct on
+   every platform and a guard that `paths.c` consumes the macro). TC-22b
+   asserts the macro is a non-empty absolute path — catching an empty
+   misconfiguration that TC-22 alone would miss (both sides would
+   collapse to `/scores.dat`).
+
+This is "configuration over conditionals": the only place that names an
+operating system is `CMakeLists.txt`. `grep` for `__APPLE__`/`__linux__`
+across `src/` and `include/` still returns zero hits after this change.
+
+**Alternatives considered:**
+
+- **`#ifdef __APPLE__` in `paths.c`.** Rejected: spreads OS knowledge
+  into the C core and breaks the codebase's zero-OS-ifdef discipline.
+  The path is a deployment policy, not a code-path difference.
+- **`$(brew --prefix)/var/xboing`.** Rejected as the *shared* store:
+  the brew prefix (`/opt/homebrew` or `/usr/local`) is owned by the
+  installing admin user, so other accounts cannot write — single-admin,
+  not multi-user. `/Users/Shared` is the only no-privilege multi-user
+  location.
+- **Apple Game Center / GameKit leaderboards.** Deferred: requires a
+  signed `.app` bundle and network, and the maintainer intends a
+  custom cross-OS scoreboard rather than a proprietary per-platform
+  service. Out of scope for the brew CLI install.
+- **A privileged `.pkg` installer that creates a `_xboing` group.**
+  Rejected: reintroduces the setgid footprint Homebrew exists to avoid,
+  for a single shared file.
+
+**Consequences:**
+
+- **Weaker integrity on macOS than Linux.** `/Users/Shared/xboing/scores.dat`
+  is world-writable, so a local user can hand-edit or delete it. The
+  Linux setgid model confined writes to the binary via group ownership;
+  there is no no-privilege equivalent on macOS. Accepted for the brew
+  channel; a future custom scoreboard (server-side dedup) is the real
+  fix. The AT_SECURE guard on `XBOING_SCORE_FILE` still holds: a
+  non-setgid brew binary is untainted (`issetugid() == 0`) so the env
+  override behaves normally — no regression versus today.
+- **Words of wisdom still requires a writable shared table.** This ADR
+  makes the shared table *reachable* on macOS (once the dir exists) but
+  does not change ADR-041 §6 — `master_text` remains global-only. The
+  separate single-user fallback (personal table carries `master_text`
+  when no shared table is configured) is tracked independently.
+- **Dev runs need the directory.** `./build/xboing` on a Mac will not
+  write global scores until `/Users/Shared/xboing` exists and is
+  writable; before the brew formula lands, create it manually for
+  testing (`mkdir -p /Users/Shared/xboing && chmod 1777
+  /Users/Shared/xboing`).
+- **Linux is byte-for-byte unchanged** at runtime: `XBOING_GLOBAL_SCORE_DIR`
+  evaluates to the same `/var/games/xboing` string the literal used.
