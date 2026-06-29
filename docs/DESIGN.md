@@ -2830,7 +2830,17 @@ MIN clamp nor the implicit MAX ray-march budget changes.
 
 ## ADR-046: macOS shared high-score path via `/Users/Shared`
 
-**Status:** Accepted (2026-06-28)
+**Status:** Superseded by ADR-047 (2026-06-28)
+
+> Superseded: the `/Users/Shared` machine board never shipped. Live
+> `brew install --HEAD` testing showed Homebrew sandboxes `post_install`
+> and denies writes outside its prefix (`EPERM` on `/Users/Shared`), so the
+> formula cannot provision the shared store. Macs are also effectively
+> single-user, making a cross-user board pointless. The macOS code from this
+> ADR (PR #156) was reverted; see ADR-047. **The original text below is
+> retained for historical context only — do not follow its instructions**
+> (e.g. creating `/Users/Shared` directories); they no longer apply.
+
 **Context:** `feat/macos-shared-scores` — porting the cross-user
 "global" high-score table to a macOS (Homebrew) install.
 
@@ -2956,3 +2966,128 @@ across `src/` and `include/` still returns zero hits after this change.
   /Users/Shared/xboing`).
 - **Linux is byte-for-byte unchanged** at runtime: `XBOING_GLOBAL_SCORE_DIR`
   evaluates to the same `/var/games/xboing` string the literal used.
+
+## ADR-047: Machine leaderboard is Debian-only; macOS shared board dropped
+
+**Status:** Accepted (2026-06-28)
+**Context:** `chore/drop-macos-shared-scores` — fallout from ADR-046's
+failed macOS shared board, plus a clearer model of the high-score tiers.
+
+High scores have three distinct tiers, which had been conflated:
+
+- **Personal** — a per-user table, single-writer, no cross-user dedup, no
+  boing-master text. Lives under the user's XDG data dir
+  (`personal-scores.dat`). Ships on every platform.
+- **Machine** — a cross-user table shared by all accounts on one box, with
+  per-uid dedup and `master_text`. This is the original 1996 game's
+  "global" board (ADR-041).
+- **Global** — a cross-machine table behind a network service. Does not
+  exist yet.
+
+ADR-046 tried to bring the **machine** tier to macOS via a world-writable
+`/Users/Shared/xboing` seeded by the Homebrew formula's `post_install`.
+That is unworkable: Homebrew sandboxes `post_install` and refuses writes
+outside its prefix (`EPERM`), so the formula cannot provision the store.
+And a cross-user board on a single-user Mac ranks the user against
+themselves — the same dead end the personal table already is.
+
+**Decision:**
+
+1. **The machine leaderboard ships on the Ubuntu `.deb` channel only** —
+   setgid `games` + `/var/games/xboing` + `flock`, exactly as ADR-041
+   describes. That code is unchanged.
+2. **macOS, Homebrew (macOS *and* Linux/WSL), and any unprivileged install
+   get the personal high score only.** No local shared board.
+3. **Cross-machine standings are deferred to a future global API
+   leaderboard** (ADR-048), which is the right answer for every non-`.deb`
+   platform.
+4. **The macOS `/Users/Shared` work (PR #156) is reverted** — the
+   OS-selected `XBOING_GLOBAL_SCORE_DIR` macro and its CMake/test
+   machinery are removed; `paths_score_file_global` returns the
+   hardcoded FHS `/var/games/xboing/scores.dat` literal again.
+5. **The Homebrew formula is build + install only** — no `post_install`,
+   no shared-state provisioning.
+
+**Consequences:**
+
+- On macOS the binary still compiles the `/var/games` global path, which
+  does not exist there, so a global-score write fails silently to stderr
+  while personal scores work — the pre-ADR-046 behavior. ADR-048's provider
+  interface is what later makes the machine board cleanly *absent* on
+  non-`.deb` platforms rather than vestigial.
+- Homebrew is macOS + Linux/WSL only; there is no native-Windows Homebrew,
+  so no Windows machine-board case arises from this channel.
+- `xboing-3n1` (a silent global-write failure surfaced during this work)
+  remains a real Debian-channel issue and folds into the ADR-048 work.
+
+## ADR-048: Leaderboard provider interface (proposed)
+
+**Status:** Proposed (2026-06-28)
+**Context:** ADR-047 leaves the machine board Debian-only and defers
+cross-machine standings. A future service needs a clean seam, and the
+existing machine board (ADR-041) should slot behind the same seam.
+
+**Decision (direction, not yet implemented):** introduce a leaderboard
+provider abstraction with a small vtable and multiple backends, selected
+by a single factory. The machine board and the future global board become
+two *instances* of one interface; the personal high score stays a separate
+store (different semantics).
+
+```c
+/* include/leaderboard.h (sketch) */
+typedef struct leaderboard leaderboard_t;        /* opaque */
+
+typedef struct {
+    unsigned long score, level, game_time, timestamp;
+    char name[HIGHSCORE_NAME_LEN];
+    const char *master_text;     /* applied only at rank 0; NULL otherwise */
+} leaderboard_entry_t;
+
+typedef struct {                 /* dedup key differs by backend */
+    unsigned long local_uid;     /* file backends: per-uid dedup (getuid) */
+    const char   *account_token; /* api backend: authenticated identity */
+} leaderboard_identity_t;
+
+typedef enum {
+    LB_OK, LB_NOT_RANKED, LB_UNAVAILABLE, LB_VERSION, LB_IO_ERR
+} leaderboard_status_t;
+
+typedef struct {
+    const char *name;            /* "posix", "api" */
+    leaderboard_status_t (*submit)(leaderboard_t *, const leaderboard_entry_t *,
+                                   const leaderboard_identity_t *, int *out_rank);
+    leaderboard_status_t (*load)(leaderboard_t *, highscore_table_t *out);
+    void (*destroy)(leaderboard_t *);
+} leaderboard_ops_t;
+
+leaderboard_t *leaderboard_open(const leaderboard_config_t *cfg);
+```
+
+Backends:
+
+- **`file/posix-setgid`** — the Debian machine board; reuses
+  `highscore_io_*` (table format, `flock`, dedup, atomic in-place write)
+  and `sys_priv` (egid swap). Dedup by `getuid()`.
+- **`api`** — the future cross-machine global board; HTTP submit/load,
+  identity is an account token with an authenticated submit. This is where
+  forgery is actually solved (server-side ranking); the local file board
+  stays best-effort.
+- The **personal** high score is NOT a provider — it keeps its own simpler
+  XDG store.
+
+The factory may return *no machine board* (e.g. unprivileged installs), so
+`submit_score` and the high-score screen must tolerate a tier being absent.
+
+**Alternatives considered:**
+
+- **Game Center (macOS).** Deferred, App-Store/`.app`-only. GameKit is an
+  Objective-C, async, UI-presenting framework requiring a signed bundle +
+  entitlement; it would be a separate provider whose *display* uses Apple's
+  native overlay and which drops `master_text`. It rides on a future
+  decision to ship a macOS `.app`; out of scope for Homebrew.
+
+**Consequences:**
+
+- Not implemented in this change — tracked as a forward bead. The current
+  Debian machine board keeps working through `highscore_io_*` until it is
+  refactored behind this interface.

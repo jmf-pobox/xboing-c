@@ -374,16 +374,12 @@ static void test_score_global_legacy_override(void **state)
     assert_string_equal(buf, "/custom/scores.dat");
 }
 
-/* TC-22: Global score — defaults to the build-time shared directory when no
- * env-var override is set.  The directory is OS-selected in CMake via
- * XBOING_GLOBAL_SCORE_DIR (/var/games/xboing on Linux/BSD per FHS 11.5,
- * /Users/Shared/xboing on macOS — see ADR-046), so the test asserts against
- * the same macro rather than a hardcoded literal: that keeps it correct on
- * every platform AND guards that paths.c actually consumes the macro.
- * On Linux the .deb postinst creates the dir root:games 2755 and seeds
- * scores.dat root:games 0664; on macOS the brew formula creates it sticky
- * 1777 with a world-writable scores.dat. */
-static void test_score_global_compiled_default(void **state)
+/* TC-22: Global score — defaults to /var/games/xboing/scores.dat (FHS 11.5)
+ * when no env-var override is set.  The .deb postinst creates this
+ * directory as root:games 2755 (NOT group-writable so games-group
+ * members cannot replace files inside it) and pre-seeds both
+ * scores.dat and scores.dat.lock as root:games 0664. */
+static void test_score_global_fhs_default(void **state)
 {
     (void)state;
     paths_config_t cfg;
@@ -392,20 +388,7 @@ static void test_score_global_compiled_default(void **state)
     char buf[PATHS_MAX_PATH];
     paths_status_t st = paths_score_file_global(&cfg, buf, sizeof(buf));
     assert_int_equal(st, PATHS_OK);
-    assert_string_equal(buf, XBOING_GLOBAL_SCORE_DIR "/scores.dat");
-}
-
-/* TC-22b: The build-time shared score directory must be a non-empty absolute
- * path.  TC-22 compares paths_score_file_global against the same macro, so a
- * misconfigured (empty) XBOING_GLOBAL_SCORE_DIR would slip past it — both
- * sides would collapse to "/scores.dat".  This guards the CMake OS-selector
- * wiring directly: it must always yield an absolute system path. */
-static void test_score_global_dir_is_absolute(void **state)
-{
-    (void)state;
-    const char *dir = XBOING_GLOBAL_SCORE_DIR;
-    assert_true(dir[0] == '/');
-    assert_true(strlen(dir) > 1);
+    assert_string_equal(buf, "/var/games/xboing/scores.dat");
 }
 
 /* TC-23: Personal score — defaults to XDG on fresh install (no legacy file). */
@@ -947,8 +930,7 @@ int main(void)
         cmocka_unit_test(test_sound_null_name),
         /* Group 4: Score files */
         cmocka_unit_test(test_score_global_legacy_override),
-        cmocka_unit_test(test_score_global_compiled_default),
-        cmocka_unit_test(test_score_global_dir_is_absolute),
+        cmocka_unit_test(test_score_global_fhs_default),
         cmocka_unit_test(test_score_personal_xdg_default),
         cmocka_unit_test(test_score_personal_custom_xdg),
         cmocka_unit_test(test_score_global_env_real_lookup),
