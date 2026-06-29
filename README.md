@@ -30,7 +30,7 @@ Run `xboing`. Clear every block on a level without letting the ball fall past yo
 - **Move the paddle** — move the mouse, or the arrow keys
 - **Launch the ball** — `Space`, or click a mouse button
 - **Fire bullets** — `K`, or click a mouse button
-- **Pause** `p`, **tilt the board** `t`, **quit** `q`
+- **Pause / tilt / quit** — `p` / `t` / `q`
 
 The full key map, the level editor, scoring, and every command-line option are in the manual:
 
@@ -81,8 +81,8 @@ For deeper detail:
 Development build:
 
 ```bash
-sudo apt install cmake pkg-config libsdl2-dev libsdl2-image-dev \
-    libsdl2-mixer-dev libsdl2-ttf-dev libcmocka-dev
+sudo apt install build-essential cmake pkg-config libsdl2-dev \
+    libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev libcmocka-dev
 cmake --preset debug
 cmake --build build
 ctest --test-dir build --output-on-failure
