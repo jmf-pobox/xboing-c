@@ -290,7 +290,6 @@ int keys_system_update(keys_system_t *ctx, int frame)
 
     ctx->current_frame = frame;
     ctx->blink_active = 0;
-    ctx->blink_active = 0;
 
     switch (ctx->state)
     {

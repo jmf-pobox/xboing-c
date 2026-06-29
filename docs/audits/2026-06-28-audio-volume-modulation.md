@@ -247,7 +247,7 @@ to `sdl2_audio_play_at_percent`.
 
 ### warp
 
-- volume 50 — REVERSE_BLK hit (block volume)
+- volume 99 — REVERSE_BLK hit (block volume)
   - `original/blocks.c:818`
 - volume 50 — key-edit screen finishes
   - `original/keysedit.c:257`
@@ -266,14 +266,14 @@ to `sdl2_audio_play_at_percent`.
 
 ### wzzz
 
-- volume 50 — PAD_EXPAND_BLK hit (block volume)
+- volume 99 — PAD_EXPAND_BLK hit (block volume)
   - `original/blocks.c:826`
 - volume 50 — editor: expand-paddle block placed
   - `original/editor.c:653`
 
 ### wzzz2
 
-- volume 50 — PAD_SHRINK_BLK hit (block volume)
+- volume 99 — PAD_SHRINK_BLK hit (block volume)
   - `original/blocks.c:822`
 - volume 50 — editor: shrink-paddle block placed
   - `original/editor.c:734`
