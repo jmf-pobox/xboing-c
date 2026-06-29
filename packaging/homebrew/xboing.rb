@@ -59,12 +59,12 @@ class Xboing < Formula
   # first player to rank #1 silently loses their score (and the table
   # renders empty on next launch).  Equivalent to debian/xboing.postinst.
   #
-  # /Users/Shared is world-writable and sticky, so a local user can
-  # pre-plant a symlink or a non-regular file at any of these paths to
-  # hijack or block the shared store.  Every refusal is loud (odie) — a
-  # silent skip would let `brew install` succeed while leaving global
-  # scores broken with no install-time signal.  This mirrors the symlink
-  # and not-a-regular-file refusals in debian/xboing.postinst.
+  # /Users/Shared is world-writable and sticky, so a local user can race
+  # or pre-plant filesystem state at any of these paths to hijack or block
+  # the shared store.  Every operation therefore works on a NOFOLLOW file
+  # descriptor (never a re-resolved pathname), verifies ownership, and
+  # fails loudly (odie) on anything unexpected — a silent skip would let
+  # `brew install` succeed while leaving global scores broken.
   def post_install
     # /Users/Shared is macOS-only.  On Homebrew-on-Linux the binary
     # resolves the FHS /var/games path (XBOING_GLOBAL_SCORE_DIR is not
@@ -77,16 +77,7 @@ class Xboing < Formula
       return
     end
 
-    odie "#{SHARED_DIR} is a symlink; remove it and reinstall." if File.symlink?(SHARED_DIR)
-    if File.exist?(SHARED_DIR) && !File.directory?(SHARED_DIR)
-      odie "#{SHARED_DIR} exists but is not a directory; remove it and reinstall."
-    end
-
-    mkdir_p(SHARED_DIR) unless File.directory?(SHARED_DIR)
-    # Sticky (1777): every user can create/update the shared file, but
-    # only the owner of an entry can delete it.  No games group on macOS.
-    chmod(01777, SHARED_DIR)
-
+    provision_shared_dir
     seed_shared_file("#{SHARED_DIR}/scores.dat", SCORES_SEED)
     # The lock self-creates at runtime under the world-writable dir, but
     # pre-seeding matches the apt deployment and avoids a first-run
@@ -94,32 +85,50 @@ class Xboing < Formula
     seed_shared_file("#{SHARED_DIR}/scores.dat.lock", "")
   end
 
-  # Create a shared file with exclusive, no-follow semantics so a race in
-  # the world-writable directory cannot redirect the write through a
-  # planted symlink or into another user's file.  The mode is forced to
-  # world-writable via the open FILE DESCRIPTOR (fchmod), never a path —
-  # the open mode is masked by the installing user's umask, and a
-  # path-based chmod in a sticky world-writable dir is a TOCTOU target.
-  # Operating on the descriptor we just exclusively created closes that
-  # race entirely.
+  # Create (if absent) and lock down the shared directory.  All checks and
+  # the chmod run against a NOFOLLOW descriptor, so a swap of the leaf for
+  # a symlink between check and chmod cannot redirect the chmod onto
+  # another inode.  The directory must be a real directory owned by the
+  # installing user; a symlink leaf raises ELOOP and is refused.
+  def provision_shared_dir
+    present = File.symlink?(SHARED_DIR) || File.exist?(SHARED_DIR)
+    mkdir_p(SHARED_DIR) unless present
+    File.open(SHARED_DIR, File::RDONLY | File::NOFOLLOW) do |d|
+      st = d.stat
+      if !st.directory? || st.uid != Process.euid
+        odie "#{SHARED_DIR} is not a directory owned by this install; remove it and reinstall."
+      end
+      # Sticky (1777): every user can create/update the shared file, but
+      # only the owner of an entry can delete it.  No games group on macOS.
+      d.chmod(01777)
+    end
+  rescue Errno::ELOOP
+    odie "#{SHARED_DIR} is a symlink; remove it and reinstall."
+  end
+
+  # Seed one shared file.  Exclusive, no-follow creation means a race in
+  # the world-writable dir cannot redirect the write through a planted
+  # symlink or into another user's file; the mode is set via the
+  # descriptor (fchmod), never a re-resolved path.
   #
-  # If the file already exists (normal on reinstall), it must be a plain,
-  # UNSHARED regular file: lstat (no symlink follow) and reject anything
-  # that is not a regular file or that has extra hard links — a planted
-  # hardlink would otherwise alias an unrelated inode.  The existing file
-  # keeps its mode (it was created 0666 by a prior install); re-chmod here
-  # would reintroduce the path-based TOCTOU.
+  # An already-present path (normal on reinstall) must be a plain,
+  # UNSHARED, install-owned regular file: a symlink raises ELOOP and is
+  # refused; lstat then rejects non-regular files, extra hard links
+  # (nlink != 1, which would alias an unrelated inode), and any file a
+  # local user pre-created (uid != euid).  The existing file keeps its
+  # mode; re-chmod here would reintroduce a path-based TOCTOU.
   def seed_shared_file(path, contents)
     File.open(path, File::WRONLY | File::CREAT | File::EXCL | File::NOFOLLOW, 0666) do |f|
       f.write(contents)
       f.chmod(0666)
     end
+  rescue Errno::ELOOP
+    odie "#{path} is a symlink; remove it and reinstall."
   rescue Errno::EEXIST
     st = File.lstat(path)
-    return if st.file? && st.nlink == 1
+    return if st.file? && st.nlink == 1 && st.uid == Process.euid
 
-    odie "#{path} is not a plain unshared regular file (symlink, hardlink, " \
-         "or special file); remove it and reinstall."
+    odie "#{path} is not a plain, unshared, install-owned regular file; remove it and reinstall."
   end
 
   test do
