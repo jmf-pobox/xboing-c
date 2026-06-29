@@ -123,7 +123,10 @@ add_test(NAME test_sys_priv COMMAND test_sys_priv)
 if(TARGET xboing)
     add_test(NAME test_scores_no_var_games_leak COMMAND $<TARGET_FILE:xboing> -scores)
     set_tests_properties(test_scores_no_var_games_leak PROPERTIES
-        ENVIRONMENT "XDG_DATA_HOME=${CMAKE_CURRENT_BINARY_DIR}/scores-test-home;SDL_VIDEODRIVER=dummy;SDL_AUDIODRIVER=dummy"
+        # XBOING_SCORE_FILE= clears any inherited value: print_scores treats an
+        # empty string as "no global board" (xboing_score_file[0]=='\0'), keeping
+        # the test hermetic regardless of the developer/CI environment.
+        ENVIRONMENT "XDG_DATA_HOME=${CMAKE_CURRENT_BINARY_DIR}/scores-test-home;SDL_VIDEODRIVER=dummy;SDL_AUDIODRIVER=dummy;XBOING_SCORE_FILE="
         PASS_REGULAR_EXPRESSION "[Pp]ersonal"
         FAIL_REGULAR_EXPRESSION "/var/games")
 endif()
