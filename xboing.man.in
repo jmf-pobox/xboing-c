@@ -119,8 +119,11 @@ Audio is controlled separately by
 .BR -sound / -nosound .
 .TP
 .BI -maxvol " <0-100>"
-Maximum volume as a percentage. Default 80. 0 silences output; other sounds
-scale against this ceiling.
+Maximum volume as a percentage (default 80); other sounds scale against
+this ceiling. A value of 0 is treated as "unset" (the default applies); it
+does not mute \(em use
+.B -nosound
+to silence audio.
 .TP
 .B -help ", " -usage
 Print the option summary and exit.
