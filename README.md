@@ -6,8 +6,8 @@ across 80 levels of bombs, teleports, sticky paddles, and power-ups.
 Juggle up to five balls at once, chase the high score, and design your
 own levels in the built-in editor.
 
-A faithful SDL2 port of Justin C. Kibell's 1996 X11 original
-(XBoing 2.4). Current release: **0.9**.
+A faithful SDL2 port of Justin C. Kibell's X11 original, XBoing 2.4
+(released 1996). Current release: **0.9**.
 
 ![XBoing gameplay](screenshots/gameplay.gif)
 
