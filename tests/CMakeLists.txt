@@ -116,6 +116,21 @@ add_test(NAME test_paths COMMAND test_paths)
 set_tests_properties(test_paths PROPERTIES WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 add_test(NAME test_sys_priv COMMAND test_sys_priv)
 
+# Regression guard for the -scores fix: on a non-setgid build (no shared
+# board) `xboing -scores` must print the personal table and must NOT
+# reference the Debian /var/games path. The test process is never setgid
+# and sets no XBOING_SCORE_FILE, so the global branch is skipped.
+if(TARGET xboing)
+    add_test(NAME test_scores_no_var_games_leak COMMAND $<TARGET_FILE:xboing> -scores)
+    set_tests_properties(test_scores_no_var_games_leak PROPERTIES
+        # XBOING_SCORE_FILE= clears any inherited value: print_scores treats an
+        # empty string as "no global board" (xboing_score_file[0]=='\0'), keeping
+        # the test hermetic regardless of the developer/CI environment.
+        ENVIRONMENT "XDG_DATA_HOME=${CMAKE_CURRENT_BINARY_DIR}/scores-test-home;SDL_VIDEODRIVER=dummy;SDL_AUDIODRIVER=dummy;XBOING_SCORE_FILE="
+        PASS_REGULAR_EXPRESSION "[Pp]ersonal"
+        FAIL_REGULAR_EXPRESSION "/var/games")
+endif()
+
 # Legacy characterization tests (test_save_load, test_state_machine) moved to
 # original/ — they include X11 headers for legacy struct definitions.
 

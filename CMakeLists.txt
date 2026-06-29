@@ -2,6 +2,11 @@ cmake_minimum_required(VERSION 3.16)
 project(xboing VERSION 0.9 LANGUAGES C)
 include(GNUInstallDirs)
 
+# Release date shown in the man page .TH header.  A fixed ISO date (not a
+# wall-clock value) so builds stay reproducible and mandoc can parse it.
+# Bump on each release.
+set(XBOING_MAN_DATE "2026-06-29")
+
 # Export compile_commands.json for clang-tidy
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -98,9 +103,12 @@ install(DIRECTORY assets/images/
 install(FILES original/docs/problems.doc
     DESTINATION "${CMAKE_INSTALL_DATADIR}/xboing/docs")
 
-install(FILES xboing.man
-    DESTINATION "${CMAKE_INSTALL_MANDIR}/man6"
-    RENAME xboing.6)
+# Generate the man page from xboing.man.in so @PROJECT_VERSION@ / @MAN_DATE@
+# are substituted from project(VERSION) and XBOING_MAN_DATE (single source).
+set(MAN_DATE "${XBOING_MAN_DATE}")
+configure_file(xboing.man.in "${CMAKE_CURRENT_BINARY_DIR}/xboing.6" @ONLY)
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/xboing.6"
+    DESTINATION "${CMAKE_INSTALL_MANDIR}/man6")
 
 install(FILES packaging/xboing.desktop
     DESTINATION "${CMAKE_INSTALL_DATADIR}/applications")
@@ -617,8 +625,11 @@ if(SDL2_FOUND AND SDL2_IMAGE_FOUND AND SDL2_MIXER_FOUND AND SDL2_TTF_FOUND)
     # 'cmake --install --prefix /usr/local' sees /usr/local/share/xboing,
     # 'dpkg-buildpackage' sees /usr/share/xboing, and any custom prefix
     # picks up the corresponding GNUInstallDirs DATADIR.
+    # XBOING_VERSION is driven from project(VERSION) so the -version output
+    # never drifts from the package version (single source of truth).
     target_compile_definitions(xboing PRIVATE
-        XBOING_DATA_DIR="${CMAKE_INSTALL_FULL_DATADIR}/xboing")
+        XBOING_DATA_DIR="${CMAKE_INSTALL_FULL_DATADIR}/xboing"
+        XBOING_VERSION="${PROJECT_VERSION}")
     target_link_libraries(xboing PRIVATE
         # SDL2 platform
         sdl2_renderer

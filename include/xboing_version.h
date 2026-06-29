@@ -1,13 +1,17 @@
 /*
  * xboing_version.h -- Version string for the SDL2 modernization.
  *
- * Keep XBOING_VERSION in sync with project(VERSION ...) in CMakeLists.txt
- * and the top entry in debian/changelog.  When bumping, update all three.
+ * XBOING_VERSION is supplied by CMake from project(VERSION ...) via a
+ * compile definition (the single source of truth, alongside
+ * debian/changelog).  The fallback below only applies to a non-CMake
+ * build of this translation unit.
  */
 
 #ifndef XBOING_VERSION_H
 #define XBOING_VERSION_H
 
-#define XBOING_VERSION "2.4"
+#ifndef XBOING_VERSION
+#define XBOING_VERSION "0.0-dev"
+#endif
 
 #endif /* XBOING_VERSION_H */

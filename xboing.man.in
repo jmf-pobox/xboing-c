@@ -1,0 +1,326 @@
+.\" XBoing - a breakout/blockout arcade game
+.\"
+.\" Copyright (c) 1993-1996 Justin C. Kibell (original game)
+.\" Copyright (c) 2025-2026 Jim Freeman and contributors (SDL2 modernization)
+.\"
+.\" MIT License; see the LICENSE section below and the project LICENSE file.
+.\"
+.\" This man page is generated from xboing.man.in by CMake; @PROJECT_VERSION@
+.\" and @MAN_DATE@ are substituted from project(VERSION) and XBOING_MAN_DATE.
+.\"
+.TH XBOING 6 "@MAN_DATE@" "xboing @PROJECT_VERSION@" "Games Manual"
+.SH NAME
+xboing \- classic breakout/blockout arcade game (SDL2)
+.SH SYNOPSIS
+.B xboing
+.RI [ options ]
+.RS 4
+.nf
+-speed <1-9>        Game speed (1=slowest, 9=fastest, default 5)
+-startlevel <1-80>  Start at the given level (default 1)
+-keys               Use keyboard control (default: mouse)
+-nickname <name>    Set high-score nickname
+-debug              Enable debug mode
+-grab               Confine the mouse pointer to the window
+-load               On startup, load the saved game (skips the attract cycle)
+-sound              Enable sound (default)
+-nosound            Disable all audio
+-nosfx              Disable visual special effects (screen shake, etc.)
+-maxvol <0-100>     Maximum volume percentage (default 80)
+-help, -usage       Show the option summary and exit
+-version            Show the version and exit
+-setup              Show the resolved configuration paths and exit
+-scores             Show high scores (personal, plus global) and exit
+.fi
+.RE
+.SH DESCRIPTION
+XBoing is a blockout game: you control a paddle at the bottom of the arena
+and bounce a proton ball to destroy the blocks above without letting the
+ball fall past the paddle.
+.PP
+Each block carries a different point value; the more you destroy, the
+higher your score. The arena is filled with blocks and special objects,
+and the paddle moves left and right along the bottom much like pinball.
+.PP
+This is a faithful SDL2 modernization of the original 1993-1996 X11 game by
+Justin C. Kibell. All 80 levels, the ball physics, the 30+ block types,
+power-ups, multiball, and the built-in level editor are preserved.
+Project home: https://github.com/jmf-pobox/xboing-c
+.SH BLOCK TYPES
+The blocks exhibit different behaviour. The bomb block when hit explodes
+all blocks around it (you score the points for the blocks it destroys); an
+adjacent bomb chains. The solid wall brick will not explode unless next to
+a bomb. The ammunition block gives you four bullets; an unlimited-ammo
+block grants endless bullets for that level.
+.PP
+Random blocks change colour, and therefore points, periodically. A pirate
+(death) symbol kills your ball if touched \(em shoot it three times to
+destroy it. The walls-off block lets the ball pass through the left and
+right walls and wrap to the opposite side. The extra-time block adds 20
+seconds to the level clock.
+.PP
+The reverse block reverses the paddle controls (hit another to cancel;
+reset each ball). The teleport block moves the ball elsewhere on the level.
+The sticky-paddle block catches the ball until you fire. Some blocks drop
+down the screen (their score decreases as they fall). A roaming dude wanders
+the arena and is worth a few hundred points. The machine-gun block lets you
+shoot much faster (using bullets faster too).
+.PP
+Extra-ball, shrink-paddle and grow-paddle symbols affect the paddle/ball
+when hit. Bonus coins appear throughout play and are awarded when the level
+completes; x2/x4 coins multiply scoring until the next ball death. A little
+eye dude occasionally walks across the top row (if clear) and is worth
+10000 points if hit. Collect more than 10 bonuses in a level to trigger
+killer mode \(em the ball turns red and ploughs through all non-solid
+blocks.
+.PP
+The bonus screen tallies the level: 500 points per unused bullet, 3000 per
+bonus coin, a 50000-point SUPER BONUS for more than 8 bonuses, and an extra
+ball every 100000 points. Press Space to skip the bonus animation (points
+still count). A level timer counts down; finishing in time awards 100
+points per second remaining. The ball auto-launches after about five
+seconds unless you press Space, and the board auto-tilts if the ball loops
+without hitting the paddle.
+.SH OPTIONS
+.TP
+.BI -speed " <1-9>"
+Game speed, 1 (slowest) to 9 (fastest). Default 5. Also changeable in-game
+with the number keys.
+.TP
+.BI -startlevel " <1-80>"
+Start at the given level. Default 1. Note that the high-score "level" is
+the number of levels completed, not the level reached.
+.TP
+.B -keys
+Use the keyboard for paddle control instead of the mouse. Default: mouse.
+.TP
+.BI -nickname " <name>"
+Use the given nickname in the high-score table instead of your account
+name (max 20 characters).
+.TP
+.B -debug
+Enable debug mode.
+.TP
+.B -grab
+Confine the mouse pointer to the game window.
+.TP
+.B -load
+On startup, load the previously saved game and skip the attract cycle.
+.TP
+.B -sound
+Enable audio. This is the default.
+.TP
+.B -nosound
+Disable all audio (music and sound effects).
+.TP
+.B -nosfx
+Disable the visual special effects (screen shake, fade, blind, etc.).
+Audio is controlled separately by
+.BR -sound / -nosound .
+.TP
+.BI -maxvol " <0-100>"
+Maximum volume as a percentage (default 80); other sounds scale against
+this ceiling. A value of 0 is ignored: it neither overrides the configured
+volume nor mutes audio. Use
+.B -nosound
+to silence audio.
+.TP
+.B -help ", " -usage
+Print the option summary and exit.
+.TP
+.B -version
+Print the version and exit.
+.TP
+.B -setup
+Print the resolved level, sound, and score paths and exit. Useful for
+diagnosing an installation.
+.TP
+.B -scores
+Print high scores to standard output and exit: your personal table always,
+and the global ("roll of honour") table where one exists (the Debian setgid
+install, or when XBOING_SCORE_FILE is set).
+.SH GAME CONTROL
+Move the paddle with the mouse; any mouse button launches the ball and
+fires bullets. Press
+.B g
+to switch between mouse and keyboard control (or start with
+.BR -keys ).
+.PP
+During a game:
+.RS 4
+.nf
+Space    Launch the ball       K        Shoot bullet
+Left, J  Paddle left           Right, L Paddle right
+p        Pause / resume        t        Tilt the board
+d        Kill the current ball
+z        Save the game         x        Load the saved game
+Escape   Abort the current game
+.fi
+.RE
+.PP
+At the intro / attract screens:
+.RS 4
+.nf
+h        Global high scores (roll of honour)
+Shift+H  Personal high scores
+s        Toggle visual special effects
+w        Set the starting level
+c        Cycle the attract screens
+1-9      Set game speed (9 = fastest)
+.fi
+.RE
+.PP
+Any time:
+.RS 4
+.nf
+a        Toggle audio on/off
++ / -    Raise / lower the maximum volume
+i        Toggle fullscreen
+g        Switch mouse / keyboard control
+e        Open the level editor (from a game or the attract screens)
+q        Quit
+.fi
+.RE
+.SH SAVE/LOAD GAME
+XBoing supports a one-slot save. Every five completed levels you may save
+once; the ability to save is indicated by a highlighted "Save" in the
+specials area below the arena. Press the save key to write the saved game
+(overwriting any previous save). Press the load key during a normal game to
+resume from the save.
+.PP
+The saved game is stored under your data directory (see FILES). On load the
+ball resumes mid-flight from the saved position.
+.SH LEVEL EDITOR
+Press
+.B e
+\(em from the intro/attract screens or during a game \(em to open the
+built-in level editor. Click a
+block type in the tool bar, then draw into the level: the left mouse button
+draws, the middle button erases (hold and drag for continuous draw/erase),
+and the right button reports a block's point value. You can play-test the
+level (infinite lives, never ends) and flip or scroll the board. Editor
+keys:
+.RS 4
+.nf
+q  Exit editor
+p  Start/end play test
+r  Redraw the level
+s  Save the level
+l  Load the level
+c  Clear the level
+t  Change the time bonus
+n  Change the level name
+v  Flip vertically       V  Scroll one block vertically
+h  Flip horizontally     H  Scroll one block horizontally
+.fi
+.RE
+.SH SCORING
+Each block has a point value; some (such as the counter block) carry
+several. Hitting the paddle with the ball earns 10 points. Completing level
+.I n
+in time awards a level bonus of
+.IR n " x 100"
+points. Representative block values:
+.RS 4
+.nf
+red    100      blue    110     green   120
+yellow 140      tan     130     purple  150
+bomb    50      wall      0     roamer  400
+drop  row x 100 specials 100    ammo   50 + bullets
+counter 200 (per number)
+.fi
+.RE
+.SH HIGH SCORES
+XBoing keeps a per-user
+.B personal
+high-score table on every platform, under your data directory (see FILES).
+.PP
+A shared, cross-user
+.B global
+high-score table (the "roll of honour", with per-user de-duplication and
+the Boing Master's words of wisdom) is provided only by the Debian package,
+which installs setgid
+.B games
+and stores the table under
+.IR /var/games/xboing/ .
+Unprivileged installs (for example via Homebrew, or a build run from the
+source tree) have no shared table; there
+.B -scores
+prints only your personal scores (it does not reference the Debian
+.I /var/games
+path), and the in-game global high-score screen shows an empty board. If
+you achieve the top global score you are prompted for a short message
+displayed under the Boing Master's name.
+.SH ENVIRONMENT
+Paths are resolved using the XDG Base Directory specification, with
+optional overrides:
+.TP
+.B XBOING_LEVELS_DIR
+Directory containing the level files (overrides the installed location).
+.TP
+.B XBOING_SOUND_DIR
+Directory containing the sound files (overrides the installed location).
+.TP
+.B XBOING_SCORE_FILE
+Path to the global high-score file (override for tests or administration).
+.TP
+.B XDG_DATA_HOME
+Per-user data directory for personal scores and saved games
+(default ~/.local/share).
+.TP
+.B XDG_DATA_DIRS
+System data directories searched for installed levels and sounds.
+.PP
+The override variables take precedence over the compiled-in and XDG
+locations.
+.SH FILES
+.TP
+.I ~/.local/share/xboing/personal-scores.dat
+Per-user personal high-score table ($XDG_DATA_HOME/xboing/).
+.TP
+.I ~/.local/share/xboing/
+Saved games and other per-user data.
+.TP
+.I /var/games/xboing/scores.dat
+Shared global high-score table (Debian package only; setgid
+.BR games ).
+.TP
+.IR <datadir>/xboing/levels/ ", " <datadir>/xboing/sounds/
+Installed level and sound data (for example
+.IR /usr/share/xboing/ ", " /opt/homebrew/share/xboing/ ).
+.SH NOTES
+The original XBoing was written by Justin C. Kibell between 1993 and 1996
+to learn Xlib, using the XPM library for pixmap graphics; version 2.4 was
+released in 1996 and distributed via ftp.x.org. This package is the SDL2
+modernization: the X11/Xlib graphics, audio, and event handling have been
+replaced with SDL2, so the original X11-only options
+.RB ( -display ", " -sync ", " -usedefcmap ", " -noicon )
+no longer exist, and audio now uses SDL2 rather than the original's
+machine-specific drivers.
+.SH LICENSE
+XBoing is distributed under the MIT License.
+.PP
+Copyright (c) 1993-1996 Justin C. Kibell (original game).
+.br
+Copyright (c) 2025-2026 Jim Freeman and contributors (SDL2 modernization).
+.PP
+Permission is hereby granted, free of charge, to any person obtaining a
+copy of this software and associated documentation files (the "Software"),
+to deal in the Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, sublicense,
+and/or sell copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to including the above copyright
+notice and this permission notice in all copies.
+.PP
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND. IN NO EVENT
+SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY
+ARISING FROM THE USE OF THE SOFTWARE.
+.SH AUTHOR
+Original game by Justin C. Kibell (1993-1996). SDL2 modernization
+maintained by Jim Freeman and contributors.
+.SH BUGS
+Report bugs at https://github.com/jmf-pobox/xboing-c/issues, including the
+version (xboing -version) and your operating system.
+.SH SEE ALSO
+The project README and docs/ directory at
+https://github.com/jmf-pobox/xboing-c

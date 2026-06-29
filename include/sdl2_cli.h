@@ -61,8 +61,8 @@ typedef struct
     bool sfx;        /* true = SFX on (default), false = off */
 
     /* Audio options */
-    bool sound;     /* false = no sound (default), true = enable */
-    int max_volume; /* 0-100, default 0 (system default) */
+    bool sound;     /* true = sound on (default), false = silence (see ADR-049) */
+    int max_volume; /* 0-100, default 80; 0 = no override (keep config value) */
 
     /* Player options */
     char nickname[SDL2C_MAX_NICKNAME_LEN + 1]; /* "" = use real name */
