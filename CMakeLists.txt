@@ -63,35 +63,6 @@ if(HAVE_ISSETUGID)
     list(APPEND XBOING_SECURE_ENV_DEFS HAVE_ISSETUGID=1)
 endif()
 
-# --- Shared high-score directory (OS path convention) -----------------------
-#
-# The cross-user "global" high-score table lives at a system path that differs
-# by OS.  Linux/BSD follow FHS 11.5 (/var/games/<game>, setgid-games install).
-# macOS has no setgid-games convention and Homebrew installs unprivileged, so
-# the macOS shared store is /Users/Shared/<game> (the system's sanctioned
-# cross-user location).  The value is selected HERE so src/paths.c carries no
-# OS #ifdef — same discipline as the AT_SECURE detection above.  See ADR-046.
-# Honor a packager/sysadmin override (cmake -DXBOING_GLOBAL_SCORE_DIR=...);
-# fall back to the per-OS default only when none is supplied.
-if(NOT DEFINED XBOING_GLOBAL_SCORE_DIR)
-    if(APPLE)
-        set(XBOING_GLOBAL_SCORE_DIR "/Users/Shared/xboing")
-    else()
-        set(XBOING_GLOBAL_SCORE_DIR "/var/games/xboing")
-    endif()
-endif()
-
-# Validate the resolved value (a packager override could be empty,
-# relative, or the bare root).  src/paths.c builds "<dir>/scores.dat" and
-# test_paths TC-22b asserts an absolute path longer than "/", so require a
-# leading slash followed by at least one more character — this rejects "",
-# relative paths, and "/" (which would compile "//scores.dat").
-if(NOT XBOING_GLOBAL_SCORE_DIR MATCHES "^/.+")
-    message(FATAL_ERROR
-        "XBOING_GLOBAL_SCORE_DIR must be an absolute path below root "
-        "(got: '${XBOING_GLOBAL_SCORE_DIR}')")
-endif()
-
 # --- Install rules ----------------------------------------------------------
 
 install(DIRECTORY levels/
@@ -611,9 +582,7 @@ target_include_directories(paths PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 target_compile_options(paths PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
-target_compile_definitions(paths PRIVATE
-    ${XBOING_SECURE_ENV_DEFS}
-    XBOING_GLOBAL_SCORE_DIR="${XBOING_GLOBAL_SCORE_DIR}")
+target_compile_definitions(paths PRIVATE ${XBOING_SECURE_ENV_DEFS})
 
 # --- sys_priv (setgid-games privilege management) ---------------------------
 add_library(sys_priv STATIC src/sys_priv.c)

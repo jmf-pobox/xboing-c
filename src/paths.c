@@ -16,17 +16,6 @@
 #include <sys/stat.h> /* struct stat, stat() */
 #include <unistd.h>   /* issetugid (macOS/BSD secure-env fallback) */
 
-/* Shared (cross-user) high-score directory.  CMake selects the OS-specific
- * value (/var/games/xboing on Linux/BSD, /Users/Shared/xboing on macOS) so
- * this file stays OS-agnostic.  The fallback default mirrors the
- * XBOING_DATA_DIR convention in xboing_paths.h: it keeps the translation
- * unit compilable without CMake (and parseable by cppcheck, which gets no
- * -D), and the FHS path is the correct conservative default — CMake always
- * overrides it per-OS. */
-#ifndef XBOING_GLOBAL_SCORE_DIR
-#define XBOING_GLOBAL_SCORE_DIR "/var/games/xboing"
-#endif
-
 /* --- Internal helpers ----------------------------------------------------- */
 
 /*
@@ -327,21 +316,13 @@ paths_status_t paths_score_file_global(const paths_config_t *cfg, char *buf, siz
         return PATHS_OK;
     }
 
-    /* Shared cross-user game state lives under an OS-specific directory,
-     * selected at build time via XBOING_GLOBAL_SCORE_DIR (set in CMake):
-     *
-     *   Linux/BSD: /var/games/xboing (FHS 11.5).  The .deb postinst creates
-     *     this as root:games 2755 and seeds scores.dat root:games 0664; the
-     *     binary is setgid games so submit_score writes land here without
-     *     the file being world-writable.
-     *   macOS:     /Users/Shared/xboing.  Homebrew installs unprivileged and
-     *     cannot setgid, so the brew formula creates this sticky (1777) and
-     *     the seeded scores.dat is world-writable — weaker integrity, the
-     *     only multi-user option without privilege escalation (see ADR-046).
-     *
-     * sys_priv_elevate/drop wrap the write either way: a no-op on the
-     * non-setgid macOS binary, an egid swap on the Linux setgid binary. */
-    if (safe_copy(buf, bufsize, XBOING_GLOBAL_SCORE_DIR "/scores.dat") != 0)
+    /* FHS 11.5: shared game state lives under /var/games/<game>/.
+     * The .deb postinst creates this directory as root:games 2755 and
+     * seeds scores.dat as root:games 0664.  The xboing binary is
+     * installed setgid games so writes by submit_score (via
+     * highscore_io_insert_global_atomic) land here without the file
+     * being world-writable. */
+    if (safe_copy(buf, bufsize, "/var/games/xboing/scores.dat") != 0)
         return PATHS_TRUNCATED;
     return PATHS_OK;
 }
