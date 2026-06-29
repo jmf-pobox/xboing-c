@@ -28,7 +28,8 @@ Prefer a Debian package or a source build? See [Building](#building).
 Run `xboing`. Clear every block on a level without letting the ball fall past your paddle.
 
 - **Move the paddle** — move the mouse, or the arrow keys
-- **Launch the ball / fire** — `Space`, or any mouse button
+- **Launch the ball** — `Space`, or click a mouse button
+- **Fire bullets** — `K`, or click a mouse button
 - **Pause** `p`, **tilt the board** `t`, **quit** `q`
 
 The full key map, the level editor, scoring, and every command-line option are in the manual:
