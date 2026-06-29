@@ -84,12 +84,17 @@ class Xboing < Formula
     end
 
     provision_shared_dir
-    # Only scores.dat must be pre-seeded: write_table_inplace opens it
-    # without O_CREAT (ADR-041), so a missing file makes the first global
-    # write fail.  The lock file is NOT pre-seeded — the world-writable
-    # (1777) shared dir lets the game create it at runtime via O_CREAT, so
-    # pre-creating a world-writable lock here would be needless exposure.
-    seed_shared_file("#{SHARED_DIR}/scores.dat", SCORES_SEED)
+    # scores.dat: 0666 — write_table_inplace opens it O_WRONLY (no O_CREAT,
+    # ADR-041), so it must pre-exist and every user must be able to write it.
+    seed_shared_file("#{SHARED_DIR}/scores.dat", SCORES_SEED, 0666)
+    # scores.dat.lock: 0644 — the lock MUST be pre-seeded as a regular file.
+    # If left absent, the first runtime writer creates it in the sticky
+    # world-writable dir, where a local user could pre-plant it as a FIFO;
+    # O_NOFOLLOW does not reject FIFOs and the runtime's O_RDONLY open would
+    # block forever, hanging every global score submission. The runtime only
+    # ever opens the lock O_RDONLY for flock, so 0644 (world-readable, not
+    # world-writable) suffices.  Mirrors debian/xboing.postinst.
+    seed_shared_file("#{SHARED_DIR}/scores.dat.lock", "", 0644)
   end
 
   # Create (if absent) and lock down the shared directory.  All checks and
@@ -124,10 +129,10 @@ class Xboing < Formula
   # (nlink != 1, which would alias an unrelated inode), and any file a
   # local user pre-created (uid != euid).  The existing file keeps its
   # mode; re-chmod here would reintroduce a path-based TOCTOU.
-  def seed_shared_file(path, contents)
-    File.open(path, File::WRONLY | File::CREAT | File::EXCL | File::NOFOLLOW, 0666) do |f|
+  def seed_shared_file(path, contents, mode)
+    File.open(path, File::WRONLY | File::CREAT | File::EXCL | File::NOFOLLOW, mode) do |f|
       f.write(contents)
-      f.chmod(0666)
+      f.chmod(mode)
     end
   rescue Errno::ELOOP
     odie "#{path} is a symlink; remove it and reinstall."

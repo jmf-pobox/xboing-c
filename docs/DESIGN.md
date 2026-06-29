@@ -2890,9 +2890,15 @@ established by the AT_SECURE work (PR #150):
    channels. Linux: `debian/xboing.postinst` (unchanged) creates
    `/var/games/xboing` 2755 root:games and seeds `scores.dat` +
    `scores.dat.lock`. macOS: `packaging/homebrew/xboing.rb`'s
-   `post_install` creates `/Users/Shared/xboing` sticky (1777) and
-   seeds a world-writable `scores.dat` (+ lock) with the same JSON
-   skeleton. The C core never `mkdir`s or creates the shared file
+   `post_install` creates `/Users/Shared/xboing` sticky (1777), seeds a
+   world-writable (0666) `scores.dat` with the JSON skeleton, and seeds
+   an empty world-readable (0644) `scores.dat.lock`. The lock is
+   pre-seeded (not left to runtime creation) so a local user cannot
+   pre-plant it as a FIFO in the world-writable dir — `O_NOFOLLOW` does
+   not reject FIFOs, and the runtime's `O_RDONLY` lock open would block
+   forever. 0644 suffices because the runtime only opens the lock
+   `O_RDONLY` for `flock`. The C core never `mkdir`s or creates the
+   shared scores file
    (`write_table_inplace` has no `O_CREAT` — ADR-041); an unprovisioned
    path degrades to the ADR-041 dev-mode behavior (global write fails,
    logged to stderr, game continues). The seed file is mandatory, not
