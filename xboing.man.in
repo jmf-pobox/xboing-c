@@ -141,33 +141,44 @@ and the global ("roll of honour") table where one exists (the Debian setgid
 install, or when XBOING_SCORE_FILE is set).
 .SH GAME CONTROL
 Move the paddle with the mouse; any mouse button launches the ball and
-fires bullets. Pass
-.B -keys
-to use the keyboard instead. The keyboard controls are:
+fires bullets. Press
+.B g
+to switch between mouse and keyboard control (or start with
+.BR -keys ).
+.PP
+During a game:
 .RS 4
 .nf
-Space    Launch ball / start
-Left, J  Paddle left
-Right, L Paddle right
-K        Shoot bullet
-p        Pause
-t        Tilt the board
+Space    Launch the ball       K        Shoot bullet
+Left, J  Paddle left           Right, L Paddle right
+p        Pause / resume        t        Tilt the board
 d        Kill the current ball
-z        Save the current game
-x        Load the saved game
-i        Toggle fullscreen
-a        Toggle audio on/off
+z        Save the game         x        Load the saved game
+Escape   Abort the current game
+.fi
+.RE
+.PP
+At the intro / attract screens:
+.RS 4
+.nf
+h        Global high scores (roll of honour)
+Shift+H  Personal high scores
 s        Toggle visual special effects
-+        Increase maximum volume
--        Decrease maximum volume
-1-9      Set game speed (9 = fastest)
-c        Cycle the intro/attract screens
-h        View the global high scores (roll of honour)
-Shift+H  View your personal high scores
 w        Set the starting level
-e        Open the level editor
+c        Cycle the attract screens
+1-9      Set game speed (9 = fastest)
+.fi
+.RE
+.PP
+Any time:
+.RS 4
+.nf
+a        Toggle audio on/off
++ / -    Raise / lower the maximum volume
+i        Toggle fullscreen
+g        Switch mouse / keyboard control
+e        Open the level editor (from a game or the attract screens)
 q        Quit
-Escape   End the current game, return to the intro
 .fi
 .RE
 .SH SAVE/LOAD GAME
@@ -182,7 +193,8 @@ ball resumes mid-flight from the saved position.
 .SH LEVEL EDITOR
 Press
 .B e
-at the intro/attract screen to open the built-in level editor. Click a
+\(em from the intro/attract screens or during a game \(em to open the
+built-in level editor. Click a
 block type in the tool bar, then draw into the level: the left mouse button
 draws, the middle button erases (hold and drag for continuous draw/erase),
 and the right button reports a block's point value. You can play-test the

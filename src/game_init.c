@@ -21,6 +21,7 @@
 #include "game_rules.h"
 
 #include <dirent.h> /* opendir/closedir for asset-dir readability check */
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
