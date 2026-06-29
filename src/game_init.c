@@ -21,6 +21,7 @@
 #include "game_rules.h"
 
 #include <dirent.h> /* opendir/closedir for asset-dir readability check */
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -58,6 +59,7 @@
 #include "sdl2_texture.h"
 #include "sfx_system.h"
 #include "special_system.h"
+#include "sys_priv.h"
 #include "xboing_paths.h"
 #include "xboing_version.h"
 
@@ -114,18 +116,19 @@ static void print_usage(FILE *out)
                  "  -grab               Grab pointer to window\n"
                  "  -load               On startup, autoload the saved game (skips\n"
                  "                      attract cycle); used by visual-capture scripts\n"
+                 "  -nosfx              Disable visual special effects (e.g. screen "
+                 "shake)\n"
                  "\n"
                  "Audio options:\n"
                  "  -sound              Enable sound (default)\n"
                  "  -nosound            Disable all audio\n"
-                 "  -nosfx              Disable sound effects (keep music)\n"
                  "  -maxvol <0-100>     Maximum volume\n"
                  "\n"
                  "Information (these print and exit):\n"
                  "  -help, -usage       Show this help\n"
                  "  -version            Show version\n"
                  "  -setup              Show resolved configuration paths\n"
-                 "  -scores             Show the global high-score table\n");
+                 "  -scores             Show high scores (personal + global)\n");
 }
 
 static void print_setup_info(const paths_config_t *cfg)
@@ -156,30 +159,24 @@ static void print_setup_info(const paths_config_t *cfg)
         printf("  User data dir         = %s\n", buf);
 }
 
-static void print_scores(const paths_config_t *cfg)
+/* Read and print one high-score table.  Returns false when the file could
+ * not be opened — missing OR unreadable (highscore_io_read returns
+ * HIGHSCORE_IO_ERR_OPEN for any fopen failure) — so the caller can word
+ * that case; a read/parse error is reported here and returns true. */
+static bool print_one_score_table(const char *label, const char *path)
 {
-    char path[PATHS_MAX_PATH];
-    if (paths_score_file_global(cfg, path, sizeof(path)) != PATHS_OK)
-    {
-        fprintf(stderr, "xboing -scores: cannot resolve global score file path\n");
-        return;
-    }
-
     highscore_table_t table;
     highscore_io_init_table(&table);
     highscore_io_result_t r = highscore_io_read(path, &table);
     if (r == HIGHSCORE_IO_ERR_OPEN)
-    {
-        printf("No scores recorded yet (%s does not exist).\n", path);
-        return;
-    }
+        return false;
     if (r != HIGHSCORE_IO_OK)
     {
         fprintf(stderr, "xboing -scores: failed to read %s (code %d)\n", path, (int)r);
-        return;
+        return true;
     }
 
-    printf("High scores from %s:\n\n", path);
+    printf("%s (%s):\n\n", label, path);
     if (table.master_name[0])
         printf("  Master: %s — \"%s\"\n\n", table.master_name, table.master_text);
     int shown = 0;
@@ -193,6 +190,36 @@ static void print_scores(const paths_config_t *cfg)
     }
     if (shown == 0)
         printf("  (no scored entries)\n");
+    printf("\n");
+    return true;
+}
+
+static void print_scores(const paths_config_t *cfg)
+{
+    char path[PATHS_MAX_PATH];
+
+    /* Personal table exists on every platform. */
+    if (paths_score_file_personal(cfg, path, sizeof(path)) != PATHS_OK)
+        fprintf(stderr, "xboing -scores: cannot resolve the personal score file path\n");
+    else if (!print_one_score_table("Personal high scores", path))
+        printf("No personal scores to show: could not open %s "
+               "(none recorded yet, or it is unreadable).\n\n",
+               path);
+
+    /* The shared/global ("roll of honour") table exists only on the setgid
+     * Debian install or when an explicit XBOING_SCORE_FILE is configured.
+     * On unprivileged installs (Homebrew, dev builds) there is no shared
+     * board, so do not reference the FHS /var/games path that can never
+     * apply there. */
+    if (sys_priv_is_setgid() || cfg->xboing_score_file[0] != '\0')
+    {
+        if (paths_score_file_global(cfg, path, sizeof(path)) != PATHS_OK)
+            fprintf(stderr, "xboing -scores: cannot resolve the global score file path\n");
+        else if (!print_one_score_table("Global high scores", path))
+            printf("No global scores to show: could not open %s "
+                   "(none recorded yet, or it is unreadable).\n",
+                   path);
+    }
 }
 
 /* =========================================================================
@@ -547,6 +574,11 @@ game_ctx_t *game_create(int argc, char *argv[])
             fprintf(stderr, "game_create: sfx system creation failed\n");
             goto fail;
         }
+        /* The visual special-effects system defaults on, so -nosfx
+         * (config.sfx == false) must disable it here at startup;
+         * otherwise the flag is parsed but never applied. */
+        if (!ctx->config.sfx)
+            sfx_system_set_enabled(ctx->sfx, 0);
     }
 
     /* EyeDude system (callbacks wired by game_callbacks.c) */

@@ -3091,3 +3091,39 @@ The factory may return *no machine board* (e.g. unprivileged installs), so
 - Not implemented in this change — tracked as a forward bead. The current
   Debian machine board keeps working through `highscore_io_*` until it is
   refactored behind this interface.
+
+## ADR-049: Sound on by default (deviation from the original)
+
+**Status:** Accepted (2026-06-29)
+**Context:** `docs/manpage-sdl2-rewrite` — surfaced while auditing the man
+page against the original game.
+
+The original game defaults audio **OFF** (`original/stubs_x11_xboing.c:376`:
+`int noSound = 1;`), requiring `-sound` to enable it; the 1996 man page
+documents "The default is OFF." The SDL2 port defaults audio **ON**
+(`src/sdl2_cli.c`: `cfg.sound = true;`). This is a behavior deviation from
+the original that had never been recorded.
+
+**Decision:** Keep the modern default **ON**, and name the constraint per
+the project's "preserve original behavior first — deviate only when forced,
+and name the constraint" rule.
+
+The original's OFF default was an artifact of 1990s Unix audio: sound
+hardware was frequently absent, misconfigured, or required machine-specific
+drivers (the original shipped HP/SUN/NetAudio/Soundblaster/RPLAY/DEC
+backends), so silence-by-default avoided errors on the common case. SDL2
+removes that constraint — it abstracts a working audio device on every
+target platform — so the modern, expected behavior is audio on out of the
+box. `-nosound` remains for users who want silence. (`-nosfx` is
+unrelated — it disables the *visual* special-effects system, not audio.)
+
+**Consequences:**
+
+- `man xboing` documents the default as ON (the man page was rewritten in
+  the same change).
+- A player on a headless/no-audio host still runs fine: SDL2 audio-init
+  failure is non-fatal; this changes the *default intent*, not error
+  handling.
+- If bit-exact original parity is ever a goal, this is the one intentional
+  input-default divergence to revisit; it is isolated to the single
+  `cfg.sound` initializer.
