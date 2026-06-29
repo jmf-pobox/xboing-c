@@ -127,8 +127,7 @@ static void print_usage(FILE *out)
                  "  -help, -usage       Show this help\n"
                  "  -version            Show version\n"
                  "  -setup              Show resolved configuration paths\n"
-                 "  -scores             Show high scores (personal, and global "
-                 "if present)\n");
+                 "  -scores             Show high scores (personal + global)\n");
 }
 
 static void print_setup_info(const paths_config_t *cfg)
@@ -202,7 +201,7 @@ static void print_scores(const paths_config_t *cfg)
     if (paths_score_file_personal(cfg, path, sizeof(path)) != PATHS_OK)
         fprintf(stderr, "xboing -scores: cannot resolve the personal score file path\n");
     else if (!print_one_score_table("Personal high scores", path))
-        printf("No personal scores recorded yet.\n\n");
+        printf("No personal scores recorded yet (could not open %s).\n\n", path);
 
     /* The shared/global ("roll of honour") table exists only on the setgid
      * Debian install or when an explicit XBOING_SCORE_FILE is configured.
