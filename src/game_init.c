@@ -158,9 +158,10 @@ static void print_setup_info(const paths_config_t *cfg)
         printf("  User data dir         = %s\n", buf);
 }
 
-/* Read and print one high-score table.  Returns false only when the file
- * does not exist (so the caller can word that case); a read/parse error is
- * reported here and returns true. */
+/* Read and print one high-score table.  Returns false when the file could
+ * not be opened — missing OR unreadable (highscore_io_read returns
+ * HIGHSCORE_IO_ERR_OPEN for any fopen failure) — so the caller can word
+ * that case; a read/parse error is reported here and returns true. */
 static bool print_one_score_table(const char *label, const char *path)
 {
     highscore_table_t table;
@@ -197,11 +198,10 @@ static void print_scores(const paths_config_t *cfg)
     char path[PATHS_MAX_PATH];
 
     /* Personal table exists on every platform. */
-    if (paths_score_file_personal(cfg, path, sizeof(path)) == PATHS_OK)
-    {
-        if (!print_one_score_table("Personal high scores", path))
-            printf("No personal scores recorded yet.\n\n");
-    }
+    if (paths_score_file_personal(cfg, path, sizeof(path)) != PATHS_OK)
+        fprintf(stderr, "xboing -scores: cannot resolve the personal score file path\n");
+    else if (!print_one_score_table("Personal high scores", path))
+        printf("No personal scores recorded yet.\n\n");
 
     /* The shared/global ("roll of honour") table exists only on the setgid
      * Debian install or when an explicit XBOING_SCORE_FILE is configured.
@@ -210,11 +210,10 @@ static void print_scores(const paths_config_t *cfg)
      * apply there. */
     if (sys_priv_is_setgid() || cfg->xboing_score_file[0] != '\0')
     {
-        if (paths_score_file_global(cfg, path, sizeof(path)) == PATHS_OK)
-        {
-            if (!print_one_score_table("Global high scores", path))
-                printf("No global scores recorded yet (%s does not exist).\n", path);
-        }
+        if (paths_score_file_global(cfg, path, sizeof(path)) != PATHS_OK)
+            fprintf(stderr, "xboing -scores: cannot resolve the global score file path\n");
+        else if (!print_one_score_table("Global high scores", path))
+            printf("No global scores recorded yet (could not open %s).\n", path);
     }
 }
 
