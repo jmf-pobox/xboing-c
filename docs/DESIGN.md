@@ -2864,7 +2864,9 @@ established by the AT_SECURE work (PR #150):
    `/Users/Shared/xboing` under `if(APPLE)`, `/var/games/xboing`
    otherwise — and passes it as a compile definition to every target
    that compiles `src/paths.c` (the `paths` library and `test_paths`),
-   alongside the existing `XBOING_SECURE_ENV_DEFS`.
+   alongside the existing `XBOING_SECURE_ENV_DEFS`. The per-OS default
+   is gated behind `if(NOT DEFINED ...)` so a packager or sysadmin can
+   override it at configure time (`cmake -DXBOING_GLOBAL_SCORE_DIR=...`).
 2. **`src/paths.c` consumes an opaque macro.**
    `paths_score_file_global` builds `XBOING_GLOBAL_SCORE_DIR
    "/scores.dat"`. No `#ifdef __APPLE__`. A `#ifndef` fallback defines

@@ -71,10 +71,14 @@ endif()
 # the macOS shared store is /Users/Shared/<game> (the system's sanctioned
 # cross-user location).  The value is selected HERE so src/paths.c carries no
 # OS #ifdef — same discipline as the AT_SECURE detection above.  See ADR-046.
-if(APPLE)
-    set(XBOING_GLOBAL_SCORE_DIR "/Users/Shared/xboing")
-else()
-    set(XBOING_GLOBAL_SCORE_DIR "/var/games/xboing")
+# Honor a packager/sysadmin override (cmake -DXBOING_GLOBAL_SCORE_DIR=...);
+# fall back to the per-OS default only when none is supplied.
+if(NOT DEFINED XBOING_GLOBAL_SCORE_DIR)
+    if(APPLE)
+        set(XBOING_GLOBAL_SCORE_DIR "/Users/Shared/xboing")
+    else()
+        set(XBOING_GLOBAL_SCORE_DIR "/var/games/xboing")
+    endif()
 endif()
 
 # --- Install rules ----------------------------------------------------------
