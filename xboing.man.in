@@ -120,8 +120,8 @@ Audio is controlled separately by
 .TP
 .BI -maxvol " <0-100>"
 Maximum volume as a percentage (default 80); other sounds scale against
-this ceiling. A value of 0 is treated as "unset" (the default applies); it
-does not mute \(em use
+this ceiling. A value of 0 is ignored: it neither overrides the configured
+volume nor mutes audio. Use
 .B -nosound
 to silence audio.
 .TP

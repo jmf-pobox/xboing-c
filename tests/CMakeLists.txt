@@ -121,7 +121,7 @@ add_test(NAME test_sys_priv COMMAND test_sys_priv)
 # reference the Debian /var/games path. The test process is never setgid
 # and sets no XBOING_SCORE_FILE, so the global branch is skipped.
 if(TARGET xboing)
-    add_test(NAME test_scores_no_var_games_leak COMMAND xboing -scores)
+    add_test(NAME test_scores_no_var_games_leak COMMAND $<TARGET_FILE:xboing> -scores)
     set_tests_properties(test_scores_no_var_games_leak PROPERTIES
         ENVIRONMENT "XDG_DATA_HOME=${CMAKE_CURRENT_BINARY_DIR}/scores-test-home;SDL_VIDEODRIVER=dummy;SDL_AUDIODRIVER=dummy"
         PASS_REGULAR_EXPRESSION "[Pp]ersonal"
