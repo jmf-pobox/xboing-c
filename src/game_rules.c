@@ -157,7 +157,7 @@ static void try_spawn_bonus(game_ctx_t *ctx, int frame)
             }
         }
         if (ctx->audio)
-            sdl2_audio_play(ctx->audio, "bomb");
+            sdl2_audio_play_at_percent(ctx->audio, "bomb", 50);
     }
     else
     {
@@ -197,7 +197,7 @@ void game_rules_next_level(game_ctx_t *ctx)
         fprintf(stderr, "xboing: cannot advance past level %d (no readable file for %s)\n",
                 ctx->level_number, filename);
         if (ctx->audio)
-            sdl2_audio_play(ctx->audio, "game_over");
+            sdl2_audio_play_at_percent(ctx->audio, "game_over", 99);
         message_system_set(ctx->message, "- Level data missing -", 0,
                            (int)sdl2_state_frame(ctx->state));
         sdl2_state_transition(ctx->state, SDL2ST_HIGHSCORE);
@@ -220,7 +220,7 @@ void game_rules_next_level(game_ctx_t *ctx)
         fprintf(stderr, "xboing: failed to parse level file %s; ending game on level %d\n",
                 level_path, ctx->level_number);
         if (ctx->audio)
-            sdl2_audio_play(ctx->audio, "game_over");
+            sdl2_audio_play_at_percent(ctx->audio, "game_over", 99);
         message_system_set(ctx->message, "- Level data corrupt -", 0,
                            (int)sdl2_state_frame(ctx->state));
         sdl2_state_transition(ctx->state, SDL2ST_HIGHSCORE);
@@ -295,7 +295,7 @@ void game_rules_ball_died(game_ctx_t *ctx)
          * mode's on_enter uses it to distinguish real game-over from
          * attract-cycle entry, and clears it itself after submitting. */
         if (ctx->audio)
-            sdl2_audio_play(ctx->audio, "game_over");
+            sdl2_audio_play_at_percent(ctx->audio, "game_over", 99);
         message_system_set(ctx->message, "GAME OVER", 0, 0);
 
         sdl2_state_transition(ctx->state, SDL2ST_HIGHSCORE);
@@ -306,7 +306,7 @@ void game_rules_ball_died(game_ctx_t *ctx)
      * Clear reverse here: matches original/level.c:492 — SetReverseOff()
      * inside DeadBall, before ResetBallStart. */
     if (ctx->audio)
-        sdl2_audio_play(ctx->audio, "balllost");
+        sdl2_audio_play_at_percent(ctx->audio, "balllost", 99);
 
     /* Grant +2 ammo as consolation — original/ball.c:1803-1805.
      * Skip when unlimited is active: MAXAMMO_BLK sets ammo to GUN_MAX_AMMO+1
@@ -334,7 +334,7 @@ void game_rules_check(game_ctx_t *ctx)
     {
         special_system_turn_off(ctx->special);
         if (ctx->audio)
-            sdl2_audio_play(ctx->audio, "applause");
+            sdl2_audio_play_at_percent(ctx->audio, "applause", 70);
         sdl2_state_transition(ctx->state, SDL2ST_BONUS);
         return;
     }

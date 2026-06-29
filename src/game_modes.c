@@ -162,7 +162,7 @@ static void start_new_game(game_ctx_t *ctx)
     ball_system_reset_start(ctx->ball, &env);
 
     if (ctx->audio)
-        sdl2_audio_play(ctx->audio, "buzzer");
+        sdl2_audio_play_at_percent(ctx->audio, "buzzer", 70);
 }
 
 static void mode_game_enter(sdl2_state_mode_t mode, void *ud)
@@ -393,7 +393,7 @@ static void mode_presents_update(sdl2_state_mode_t mode, void *ud)
 
         presents_sound_t snd = presents_system_get_sound(ctx->presents);
         if (snd.name && ctx->audio)
-            sdl2_audio_play(ctx->audio, snd.name);
+            sdl2_audio_play_at_percent(ctx->audio, snd.name, snd.volume);
     }
 
     /* Space skips presents */
@@ -444,7 +444,7 @@ static void mode_intro_update(sdl2_state_mode_t mode, void *ud)
 
         intro_sound_t snd = intro_system_get_sound(ctx->intro);
         if (snd.name && ctx->audio)
-            sdl2_audio_play(ctx->audio, snd.name);
+            sdl2_audio_play_at_percent(ctx->audio, snd.name, snd.volume);
     }
 
     attract_random_display(ctx, intro_system_get_state(ctx->intro) == INTRO_STATE_EXPLODE);
@@ -511,7 +511,7 @@ static void mode_instruct_update(sdl2_state_mode_t mode, void *ud)
 
         intro_sound_t snd = intro_system_get_sound(ctx->intro);
         if (snd.name && ctx->audio)
-            sdl2_audio_play(ctx->audio, snd.name);
+            sdl2_audio_play_at_percent(ctx->audio, snd.name, snd.volume);
     }
 
     attract_random_display(ctx, intro_system_get_state(ctx->intro) == INTRO_STATE_EXPLODE);
@@ -567,7 +567,7 @@ static void mode_demo_update(sdl2_state_mode_t mode, void *ud)
 
         demo_sound_t snd = demo_system_get_sound(ctx->demo);
         if (snd.name && ctx->audio)
-            sdl2_audio_play(ctx->audio, snd.name);
+            sdl2_audio_play_at_percent(ctx->audio, snd.name, snd.volume);
     }
 
     attract_random_display(ctx, demo_system_get_state(ctx->demo) == DEMO_STATE_SPARKLE);
@@ -607,7 +607,7 @@ static void mode_preview_update(sdl2_state_mode_t mode, void *ud)
 
         demo_sound_t snd = demo_system_get_sound(ctx->demo);
         if (snd.name && ctx->audio)
-            sdl2_audio_play(ctx->audio, snd.name);
+            sdl2_audio_play_at_percent(ctx->audio, snd.name, snd.volume);
     }
 
     attract_random_display(ctx, demo_system_get_state(ctx->demo) == DEMO_STATE_WAIT);
@@ -664,6 +664,13 @@ static void mode_keys_update(sdl2_state_mode_t mode, void *ud)
         attract_frame_counter++;
         sfx_system_update_glow(ctx->sfx, attract_frame_counter);
         keys_system_update(ctx->keys, attract_frame_counter);
+
+        /* Original keys.c:300 plays boing@50 on attract-cycle navigation;
+         * keys_system stores it in get_sound() and we relay here,
+         * matching the presents/intro/instruct/demo/preview pattern. */
+        keys_sound_t ksnd = keys_system_get_sound(ctx->keys);
+        if (ksnd.name && ctx->audio)
+            sdl2_audio_play_at_percent(ctx->audio, ksnd.name, ksnd.volume);
     }
 
     attract_random_display(ctx, keys_system_get_state(ctx->keys) == KEYS_STATE_SPARKLE);
@@ -724,6 +731,13 @@ static void mode_keysedit_update(sdl2_state_mode_t mode, void *ud)
         attract_frame_counter++;
         sfx_system_update_glow(ctx->sfx, attract_frame_counter);
         keys_system_update(ctx->keys, attract_frame_counter);
+
+        /* Original keysedit.c:257 plays warp@50 on attract-cycle exit;
+         * keys_system stores it in get_sound() and we relay here,
+         * matching the presents/intro/instruct/demo/preview pattern. */
+        keys_sound_t ksnd = keys_system_get_sound(ctx->keys);
+        if (ksnd.name && ctx->audio)
+            sdl2_audio_play_at_percent(ctx->audio, ksnd.name, ksnd.volume);
     }
 
     attract_random_display(ctx, keys_system_get_state(ctx->keys) == KEYS_STATE_SPARKLE);
@@ -969,6 +983,19 @@ static int submit_score(game_ctx_t *ctx, unsigned long score, unsigned long game
                     global_path, (int)gres);
         }
     }
+
+    /* Original level.c:437 plays youagod@99 only when the player lands
+     * at rank 1 of the GLOBAL table (the "boing master" event in
+     * original/highscore.c:622-640).  Personal rank 1 does not qualify
+     * — that would fire on every new personal best, which is far
+     * broader than the original.  Gate on global_ok so the sound
+     * doesn't fire on stale in-memory ranks when the global insert
+     * was skipped (path resolve failure, elevate failure, I/O error)
+     * — those paths leave hs_global at its pre-game snapshot, which
+     * could spuriously satisfy the rank check. */
+    if (ctx->audio && global_ok && highscore_io_get_ranking(&ctx->hs_global, score) == 1)
+        sdl2_audio_play_at_percent(ctx->audio, "youagod", 99);
+
     return global_ok;
 }
 
@@ -1116,6 +1143,13 @@ static void mode_highscore_update(sdl2_state_mode_t mode, void *ud)
         attract_frame_counter++;
         sfx_system_update_glow(ctx->sfx, attract_frame_counter);
         highscore_system_update(ctx->highscore_display, attract_frame_counter);
+
+        /* Original highscore.c:492 plays gate@50 on attract-cycle exit;
+         * highscore_system stores it in get_sound() and we relay here,
+         * matching the presents/intro/instruct/demo/preview pattern. */
+        highscore_sound_t hsnd = highscore_system_get_sound(ctx->highscore_display);
+        if (hsnd.name && ctx->audio)
+            sdl2_audio_play_at_percent(ctx->audio, hsnd.name, hsnd.volume);
     }
 
     attract_random_display(ctx, highscore_system_get_state(ctx->highscore_display) ==
@@ -1160,7 +1194,7 @@ static void mode_dialogue_update(sdl2_state_mode_t mode, void *ud)
      * event processing before this tick runs. */
     dialogue_sound_t snd = dialogue_system_get_sound(ctx->dialogue);
     if (snd.name && ctx->audio)
-        sdl2_audio_play(ctx->audio, snd.name);
+        sdl2_audio_play_at_percent(ctx->audio, snd.name, snd.volume);
 
     dialogue_system_update(ctx->dialogue);
 

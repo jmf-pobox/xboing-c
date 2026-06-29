@@ -111,8 +111,8 @@ typedef struct
     /* Save should be enabled (every SAVE_LEVEL levels) */
     void (*on_save_triggered)(void *ud);
 
-    /* Sound effect requested */
-    void (*on_sound)(const char *name, void *ud);
+    /* Sound effect requested at per-call volume (0-100 percent of master). */
+    void (*on_sound)(const char *name, int volume, void *ud);
 
     /* Bonus sequence is complete; next_level is the level to start */
     void (*on_finished)(int next_level, void *ud);

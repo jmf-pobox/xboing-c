@@ -1,11 +1,13 @@
 /*
  * test_block_sound.c — exhaustive table test for the block-type →
- * sound-name mapping.  Pure function, no audio context needed.
+ * (sound name, volume) mapping.  Pure function, no audio context needed.
  *
  * Spec: docs/specs/2026-06-03-sfx-testability.md (Component 3a).
  * Peer review B2: every block type defined in block_types.h gets an
- * explicit assertion.  A vacuous `(void)block_sound_name(t)` loop
+ * explicit assertion.  A vacuous `(void)block_sound_lookup(t)` loop
  * would let a NULL-returning regression pass.
+ *
+ * Volume column added by docs/audits/2026-06-28-audio-volume-modulation.md.
  */
 
 #include <setjmp.h>
@@ -22,58 +24,65 @@
  * exhaustive table below and the switch in src/block_sound.c. */
 _Static_assert(MAX_BLOCKS == 30,
                "MAX_BLOCKS changed — audit test_block_sound_exhaustive() and "
-               "block_sound_name() to cover the new type(s).");
+               "block_sound_lookup() to cover the new type(s).");
+
+static void assert_sound(int block_type, const char *name, int volume)
+{
+    block_sound_t s = block_sound_lookup(block_type);
+    assert_string_equal(s.name, name);
+    assert_int_equal(s.volume, volume);
+}
 
 static void test_block_sound_exhaustive(void **state)
 {
     (void)state;
-    /* Asserts the current block-type → sound-name mapping for every
+    /* Asserts the current block-type → (name, volume) mapping for every
      * type defined in block_types.h.  Regressions on these entries
-     * (renames, deletions, wrong names) fail here.  Additions are
-     * caught at compile time by the _Static_assert above. */
-    assert_string_equal(block_sound_name(BOMB_BLK), "bomb");
-    assert_string_equal(block_sound_name(BULLET_BLK), "ammo");
-    assert_string_equal(block_sound_name(MAXAMMO_BLK), "ammo");
-    assert_string_equal(block_sound_name(RED_BLK), "touch");
-    assert_string_equal(block_sound_name(GREEN_BLK), "touch");
-    assert_string_equal(block_sound_name(BLUE_BLK), "touch");
-    assert_string_equal(block_sound_name(TAN_BLK), "touch");
-    assert_string_equal(block_sound_name(PURPLE_BLK), "touch");
-    assert_string_equal(block_sound_name(YELLOW_BLK), "touch");
-    assert_string_equal(block_sound_name(COUNTER_BLK), "touch");
-    assert_string_equal(block_sound_name(RANDOM_BLK), "touch");
-    assert_string_equal(block_sound_name(DROP_BLK), "touch");
-    assert_string_equal(block_sound_name(ROAMER_BLK), "ouch");
-    assert_string_equal(block_sound_name(EXTRABALL_BLK), "ddloo");
-    assert_string_equal(block_sound_name(MGUN_BLK), "mgun");
-    assert_string_equal(block_sound_name(WALLOFF_BLK), "wallsoff");
-    assert_string_equal(block_sound_name(BONUSX2_BLK), "gate");
-    assert_string_equal(block_sound_name(BONUSX4_BLK), "gate");
-    assert_string_equal(block_sound_name(BONUS_BLK), "gate");
-    assert_string_equal(block_sound_name(REVERSE_BLK), "warp");
-    assert_string_equal(block_sound_name(PAD_SHRINK_BLK), "wzzz2");
-    assert_string_equal(block_sound_name(PAD_EXPAND_BLK), "wzzz");
-    assert_string_equal(block_sound_name(MULTIBALL_BLK), "spring");
-    assert_string_equal(block_sound_name(TIMER_BLK), "bonus");
-    assert_string_equal(block_sound_name(STICKY_BLK), "sticky");
-    assert_string_equal(block_sound_name(DEATH_BLK), "evillaugh");
-    assert_string_equal(block_sound_name(BLACK_BLK), "metal");
-    assert_string_equal(block_sound_name(HYPERSPACE_BLK), "hypspc");
+     * (renames, deletions, wrong names, wrong volumes) fail here.
+     * Additions are caught at compile time by the _Static_assert above. */
+    assert_sound(BOMB_BLK, "bomb", 50);
+    assert_sound(BULLET_BLK, "ammo", 30);
+    assert_sound(MAXAMMO_BLK, "ammo", 70);
+    assert_sound(RED_BLK, "touch", 99);
+    assert_sound(GREEN_BLK, "touch", 99);
+    assert_sound(BLUE_BLK, "touch", 99);
+    assert_sound(TAN_BLK, "touch", 99);
+    assert_sound(PURPLE_BLK, "touch", 99);
+    assert_sound(YELLOW_BLK, "touch", 99);
+    assert_sound(COUNTER_BLK, "touch", 99);
+    assert_sound(RANDOM_BLK, "touch", 99);
+    assert_sound(DROP_BLK, "touch", 99);
+    assert_sound(ROAMER_BLK, "ouch", 99);
+    assert_sound(EXTRABALL_BLK, "ddloo", 99);
+    assert_sound(MGUN_BLK, "mgun", 99);
+    assert_sound(WALLOFF_BLK, "wallsoff", 99);
+    assert_sound(BONUSX2_BLK, "gate", 99);
+    assert_sound(BONUSX4_BLK, "gate", 99);
+    assert_sound(BONUS_BLK, "gate", 99);
+    assert_sound(REVERSE_BLK, "warp", 99);
+    assert_sound(PAD_SHRINK_BLK, "wzzz2", 99);
+    assert_sound(PAD_EXPAND_BLK, "wzzz", 99);
+    assert_sound(MULTIBALL_BLK, "spring", 80);
+    assert_sound(TIMER_BLK, "bonus", 50);
+    assert_sound(STICKY_BLK, "sticky", 90);
+    assert_sound(DEATH_BLK, "evillaugh", 99);
+    assert_sound(BLACK_BLK, "metal", 99);
+    assert_sound(HYPERSPACE_BLK, "hypspc", 99);
     /* Explicitly silent — see comments in src/block_sound.c. */
-    assert_null(block_sound_name(DYNAMITE_BLK));
-    assert_null(block_sound_name(BLACKHIT_BLK));
+    assert_null(block_sound_lookup(DYNAMITE_BLK).name);
+    assert_null(block_sound_lookup(BLACKHIT_BLK).name);
 }
 
 static void test_block_sound_sentinels_and_invalid(void **state)
 {
     (void)state;
     /* Sentinels: not destructible blocks. */
-    assert_null(block_sound_name(NONE_BLK));
-    assert_null(block_sound_name(KILL_BLK));
+    assert_null(block_sound_lookup(NONE_BLK).name);
+    assert_null(block_sound_lookup(KILL_BLK).name);
     /* Out-of-range values: defensively silent, not crash. */
-    assert_null(block_sound_name(-99));
-    assert_null(block_sound_name(MAX_BLOCKS));
-    assert_null(block_sound_name(9999));
+    assert_null(block_sound_lookup(-99).name);
+    assert_null(block_sound_lookup(MAX_BLOCKS).name);
+    assert_null(block_sound_lookup(9999).name);
 }
 
 int main(void)

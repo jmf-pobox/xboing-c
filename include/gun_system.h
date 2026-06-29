@@ -97,8 +97,8 @@ typedef struct
     /* Report bullet killed the eyedude. */
     void (*on_eyedude_hit)(void *ud);
 
-    /* Sound playback. */
-    void (*on_sound)(const char *name, void *ud);
+    /* Sound playback at per-call volume (0-100 percent of master). */
+    void (*on_sound)(const char *name, int volume, void *ud);
 
     /*
      * Ball-waiting query: returns nonzero if ball is waiting on paddle.

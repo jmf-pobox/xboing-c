@@ -202,7 +202,7 @@ void game_input_global(game_ctx_t *ctx)
         sdl2_loop_set_speed(ctx->loop, SDL2L_DEFAULT_SPEED);
         sdl2_state_transition(ctx->state, SDL2ST_HIGHSCORE);
         if (ctx->audio)
-            sdl2_audio_play(ctx->audio, "toggle");
+            sdl2_audio_play_at_percent(ctx->audio, "toggle", 50);
     }
 
     /* +/-: volume up/down — original/main.c:822 */
@@ -237,7 +237,7 @@ void game_input_global(game_ctx_t *ctx)
         message_system_set(ctx->message, ctx->config.use_keys ? "Control: Keys" : "Control: Mouse",
                            1, frame);
         if (ctx->audio)
-            sdl2_audio_play(ctx->audio, "toggle");
+            sdl2_audio_play_at_percent(ctx->audio, "toggle", 50);
     }
 
     /* --- Gameplay keys (GAME mode only) --- */

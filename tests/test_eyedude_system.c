@@ -51,8 +51,9 @@ static void on_score(unsigned long pts, void *ud)
     g_score_added += pts;
 }
 
-static void on_sound(const char *name, void *ud)
+static void on_sound(const char *name, int volume, void *ud)
 {
+    (void)volume;
     (void)ud;
     g_sound_count++;
     if (name)

@@ -45,11 +45,11 @@ static int get_rand(const eyedude_system_t *ctx)
     return rand();
 }
 
-static void fire_sound(const eyedude_system_t *ctx, const char *name)
+static void fire_sound(const eyedude_system_t *ctx, const char *name, int volume)
 {
     if (ctx->callbacks.on_sound)
     {
-        ctx->callbacks.on_sound(name, ctx->user_data);
+        ctx->callbacks.on_sound(name, volume, ctx->user_data);
     }
 }
 
@@ -184,7 +184,7 @@ static void do_reset(eyedude_system_t *ctx, int play_w)
     ctx->oldy = ctx->y;
 
     ctx->state = EYEDUDE_STATE_WALK;
-    fire_sound(ctx, "hithere");
+    fire_sound(ctx, "hithere", 100);
 }
 
 static void do_walk(eyedude_system_t *ctx, int frame, int play_w)
@@ -257,7 +257,7 @@ static void do_die(eyedude_system_t *ctx)
         ctx->callbacks.on_score(EYEDUDE_HIT_BONUS, ctx->user_data);
     }
 
-    fire_sound(ctx, "supbons");
+    fire_sound(ctx, "supbons", 80);
 }
 
 /* =========================================================================

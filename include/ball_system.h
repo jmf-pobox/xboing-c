@@ -108,8 +108,10 @@ typedef struct
      */
     int (*cell_available)(int row, int col, void *ud);
 
-    /* Audio playback: play the named sound effect. */
-    void (*on_sound)(const char *name, void *ud);
+    /* Audio playback: play the named sound effect at a per-call volume
+     * (0-100 percent of master).  Volumes from
+     * docs/audits/2026-06-28-audio-volume-modulation.md. */
+    void (*on_sound)(const char *name, int volume, void *ud);
 
     /* Score addition: add points to the player's score. */
     void (*on_score)(unsigned long points, void *ud);

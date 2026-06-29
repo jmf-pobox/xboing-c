@@ -252,14 +252,25 @@ void highscore_system_begin(highscore_system_t *ctx, highscore_type_t type, int 
 
 int highscore_system_update(highscore_system_t *ctx, int frame)
 {
-    if (!ctx || ctx->finished)
+    if (!ctx)
+    {
+        return 0;
+    }
+
+    /* Clear the one-shot sound register before the finished gate.
+     * Otherwise sub-tick iterations after do_finish would see the
+     * stale "gate" set on the finishing tick and the relay in
+     * mode_highscore_update would re-play it ATTRACT_FRAME_MULTIPLIER
+     * times.  Bead xboing-c-4z4. */
+    ctx->sound.name = NULL;
+    ctx->sound.volume = 0;
+
+    if (ctx->finished)
     {
         return 0;
     }
 
     ctx->current_frame = frame;
-    ctx->sound.name = NULL;
-    ctx->sound.volume = 0;
     ctx->title_sparkle_active = 0;
     ctx->title_sparkle_clear = 0;
 

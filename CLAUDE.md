@@ -48,6 +48,7 @@ XBoing is a classic X11 breakout/blockout game (1993-1996, Justin C. Kibell) mod
 
 ## Operating Principles
 
+- **Ship the result, not the process.** PRs squash on merge — nobody reads the PR body after merge, and there is no commit-history forensics to protect. Group every change that serves the goal in front of you into the current PR. No "out of scope," no "follow-up bead," no "separate PR for cleanliness." If the audit found 5 problems, fix all 5 in this PR.
 - **`make` is the source of truth.** `make check` runs the full local CI parity.
 - **Dogfood before shipping.** Build, install, run the user journey. Don't add stabilizing flags.
 - **Don't defer obvious work.** A one-line fix you can do now does not belong in a follow-up.

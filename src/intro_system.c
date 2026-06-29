@@ -308,14 +308,25 @@ void intro_system_begin(intro_system_t *ctx, intro_screen_mode_t mode, int frame
 
 int intro_system_update(intro_system_t *ctx, int frame)
 {
-    if (!ctx || ctx->finished)
+    if (!ctx)
+    {
+        return 0;
+    }
+
+    /* Clear the one-shot sound register before the finished gate.
+     * Otherwise sub-tick iterations after do_finish would see the
+     * stale "whoosh"/"shark" set on the finishing tick and the relay
+     * in mode_intro_update / mode_instruct_update would re-play it
+     * ATTRACT_FRAME_MULTIPLIER times.  Bead xboing-c-4z4. */
+    ctx->sound.name = NULL;
+    ctx->sound.volume = 0;
+
+    if (ctx->finished)
     {
         return 0;
     }
 
     ctx->current_frame = frame;
-    ctx->sound.name = NULL;
-    ctx->sound.volume = 0;
     ctx->blink_active = 0;
 
     intro_state_t prev = ctx->state;

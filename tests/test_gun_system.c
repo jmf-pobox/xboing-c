@@ -132,8 +132,9 @@ static void stub_on_eyedude_hit(void *ud)
     s->eyedude_hit_count++;
 }
 
-static void stub_on_sound(const char *name, void *ud)
+static void stub_on_sound(const char *name, int volume, void *ud)
 {
+    (void)volume;
     stub_state_t *s = ud;
     s->sound_count++;
     strncpy(s->last_sound, name, sizeof(s->last_sound) - 1);
