@@ -988,9 +988,12 @@ static int submit_score(game_ctx_t *ctx, unsigned long score, unsigned long game
      * at rank 1 of the GLOBAL table (the "boing master" event in
      * original/highscore.c:622-640).  Personal rank 1 does not qualify
      * — that would fire on every new personal best, which is far
-     * broader than the original.  highscore_io_get_ranking returns
-     * 1-based rank (1 = top), or -1 if unranked. */
-    if (ctx->audio && highscore_io_get_ranking(&ctx->hs_global, score) == 1)
+     * broader than the original.  Gate on global_ok so the sound
+     * doesn't fire on stale in-memory ranks when the global insert
+     * was skipped (path resolve failure, elevate failure, I/O error)
+     * — those paths leave hs_global at its pre-game snapshot, which
+     * could spuriously satisfy the rank check. */
+    if (ctx->audio && global_ok && highscore_io_get_ranking(&ctx->hs_global, score) == 1)
         sdl2_audio_play_at_percent(ctx->audio, "youagod", 99);
 
     return global_ok;
