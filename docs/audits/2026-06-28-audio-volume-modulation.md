@@ -304,14 +304,14 @@ Note: `ball_system.c` also calls `on_sound("paddle", ...)` at line 545 but that 
 
 ### src/game_callbacks.c
 
-- line 77 — `play_block_hit_sound` → `block_sound_name(block_type)` — block hit, sound name varies by type
+- line 77 — `play_block_hit_sound` → `block_sound_lookup(block_type)` — block hit, sound name + volume vary by type
 - line 324 — `ball_cb_on_sound(name, ...)` — relay from ball_system (boing, ball2ball)
 - line 364 — "paddle" — ball hits paddle (BALL_EVT_PADDLE_HIT)
 - line 518 — `gun_cb_on_sound(name, ...)` — relay from gun_system (shoot, ballshot, shotgun, click)
 - line 666 — `bonus_cb_on_sound(name, ...)` — relay from bonus_system (Doh1–4, supbons, bonus, key, applause)
 - line 779 — `sfx_cb_on_sound(name, ...)` — relay from sfx_system (sfx_system never calls this in current code)
 - line 821 — `eyedude_cb_on_sound(name, ...)` — relay from eyedude_system (hithere, supbons)
-- line 882 — `editor_cb_on_sound(name, volume, ...)` — relay from editor_system; **volume is received but discarded** (evillaugh, bonus, wzzz, wzzz2, sticky)
+- line 882 — `editor_cb_on_sound(name, volume, ...)` — relay from editor_system; volume is forwarded to `sdl2_audio_play_at_percent` (evillaugh, bonus, wzzz, wzzz2, sticky)
 
 ### src/game_input.c
 
@@ -344,8 +344,8 @@ Note: `ball_system.c` also calls `on_sound("paddle", ...)` at line 545 but that 
 | Modern call site | Sound | Recommended % | Original cite(s) | Notes |
 |---|---|---|---|---|
 | `src/game_callbacks.c:77` (BOMB_BLK) | `bomb` | 50 | `original/blocks.c:772` | BOMB_BLK hit |
-| `src/game_callbacks.c:77` (BULLET_BLK) | `ammo` | 30 | `original/blocks.c:776` | BULLET_BLK hit — **blocked**: block_sound_name collapses BULLET_BLK and MAXAMMO_BLK; see §5 |
-| `src/game_callbacks.c:77` (MAXAMMO_BLK) | `ammo` | 70 | `original/blocks.c:780` | MAXAMMO_BLK hit — **blocked**: same collapse issue |
+| `src/game_callbacks.c:77` (BULLET_BLK) | `ammo` | 30 | `original/blocks.c:776` | BULLET_BLK hit — resolved by `block_sound_lookup` returning `(name, volume)` |
+| `src/game_callbacks.c:77` (MAXAMMO_BLK) | `ammo` | 70 | `original/blocks.c:780` | MAXAMMO_BLK hit — resolved by same lookup |
 | `src/game_callbacks.c:77` (RED/GREEN/BLUE/TAN/PURPLE/YELLOW/COUNTER/RANDOM/DROP) | `touch` | 99 | `original/blocks.c:792` | normal color block hit |
 | `src/game_callbacks.c:77` (ROAMER_BLK) | `ouch` | 99 | `original/blocks.c:796` | roamer block hit |
 | `src/game_callbacks.c:77` (EXTRABALL_BLK) | `ddloo` | 99 | `original/blocks.c:800` | extra ball pickup |
@@ -440,32 +440,35 @@ These rules are read directly from the 1996 source. I did not invent them.
 
 ### Sounds in `original/` not called via `sdl2_audio_play` in the modern port
 
-These events are not currently implemented in the modern code and have no call site:
+These events were not implemented in the modern code at audit time.
+The migration in this PR resolved the first two; the third remains
+unresolved (no original call site found).
 
-| Sound | Volume | Original cite | Missing event |
+| Sound | Volume | Original cite | Status |
 |---|---|---|---|
-| `gate` | 50 | `original/highscore.c:492` | Highscore screen exit to preview — no sound emitted in modern highscore mode |
-| `youagod` | 99 | `original/level.c:437` | New rank-1 highscore — modern port doesn't detect this case |
-| `weeek` | — | not in `playSoundFile` grep results | No original call site found; file exists in sounds/ but was never wired |
+| `gate` | 50 | `original/highscore.c:492` | Resolved — relayed via `highscore_system_get_sound()` in `mode_highscore_update` |
+| `youagod` | 99 | `original/level.c:437` | Resolved — fires in `submit_score` when global rank-1 detected |
+| `weeek` | — | not in `playSoundFile` grep results | Out of scope; no original call site found, sounds/ file unwired |
 
-### BULLET_BLK vs MAXAMMO_BLK volume collapse
+### BULLET_BLK vs MAXAMMO_BLK volume collapse — resolved
 
-`src/block_sound.c:14-15` maps both `BULLET_BLK` and `MAXAMMO_BLK` to the
-string "ammo". The original uses volume 30 for BULLET_BLK and 70 for MAXAMMO_BLK
-(`original/blocks.c:776,780`). A single `sdl2_audio_play_at_percent(audio, "ammo", X)`
-call cannot reproduce both. Fix options for jdc:
+Originally `src/block_sound.c` mapped both `BULLET_BLK` and `MAXAMMO_BLK`
+to the string "ammo", and a single `sdl2_audio_play_at_percent(audio,
+"ammo", X)` call could not reproduce the original's two volumes (30 vs 70
+per `original/blocks.c:776,780`). The migration extended
+`block_sound_name` to `block_sound_lookup` returning `block_sound_t
+{name, volume}` so the table carries both per-type. `src/game_callbacks.c`
+`play_block_hit_sound` now reads the pair and calls
+`sdl2_audio_play_at_percent` with the correct volume per block type.
 
-1. Extend `block_sound_name` to return a `(name, volume)` pair (preferred — single source of truth).
-2. Add a parallel `block_sound_volume(int block_type)` function alongside `block_sound_name`.
-Either approach requires a change to `src/block_sound.c` and `src/game_callbacks.c:73-78`
-before the ammo rows in the mapping table can be mechanically migrated.
+### editor_cb_on_sound — resolved
 
-### editor_cb_on_sound already receives volume
-
-`src/game_callbacks.c:877-883` discards the `volume` parameter. The editor_system
-already passes the correct original volumes (`src/editor_system.c:238,377,387,435,446,468,520,573,636`).
-Migration for these 5 sounds is just removing the `(void)volume` and calling
-`sdl2_audio_play_at_percent(ctx->audio, name, (unsigned int)volume)` instead.
+`src/game_callbacks.c::editor_cb_on_sound` previously received the volume
+parameter and discarded it via `(void)volume`. The migration removed
+the discard and the callback now calls
+`sdl2_audio_play_at_percent(ctx->audio, name, volume)`, forwarding the
+volume that `editor_system` was already passing
+(`src/editor_system.c:238,377,387,435,446,468,520,573,636`).
 
 ### Sounds called by modern code that are in sounds/ (all present)
 

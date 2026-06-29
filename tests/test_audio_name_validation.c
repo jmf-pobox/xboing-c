@@ -65,11 +65,12 @@ static int teardown_audio(void **state)
 }
 
 /* =========================================================================
- * Every name returned by block_sound_name resolves in the cache.
+ * Every name returned by block_sound_lookup resolves in the cache.
  *
  * This is the test that would have caught the broken "hyperspace"
- * literal: block_sound_name(HYPERSPACE_BLK) used to return that name,
- * sdl2_audio_play would return SDL2A_ERR_NOT_FOUND, this assert fails.
+ * literal: block_sound_lookup(HYPERSPACE_BLK).name used to return that
+ * name, sdl2_audio_play would return SDL2A_ERR_NOT_FOUND, this assert
+ * fails.
  * ========================================================================= */
 
 static void test_every_block_sound_name_resolves(void **state)
