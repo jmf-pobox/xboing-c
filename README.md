@@ -91,7 +91,7 @@ ctest --test-dir build --output-on-failure
 
 The presets need CMake 3.21 or newer; on older CMake, configure with `cmake -B build -DCMAKE_BUILD_TYPE=Debug` instead.
 
-Sanitizer build — the primary safety net during modernization of a 20-year-old C codebase:
+Sanitizer build — the primary safety net during modernization of a 1990s-era C codebase:
 
 ```bash
 cmake --preset asan
