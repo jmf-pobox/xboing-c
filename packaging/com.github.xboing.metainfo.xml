@@ -55,6 +55,13 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="0.9" date="2026-06-28">
+      <description>
+        <p>First numbered release of the SDL2 modernization (pre-1.0).
+        All 80 original levels, 30 block types, power-ups, multiball, and
+        the built-in level editor are preserved.</p>
+      </description>
+    </release>
     <release version="2.4" date="1996-01-01">
       <description>
         <p>Original release by Justin C. Kibell. Features 80 levels,

@@ -1,3 +1,12 @@
+xboing (0.9-1) unstable; urgency=medium
+
+  * Re-version the SDL2 modernization to 0.9 (pre-1.0). The "2.4" of the
+    entries below is the original 1993-1996 Xlib game's version, kept as
+    heritage; this is the first numbered release of the modern port and
+    matches the v0.9 git tag and the Homebrew formula.
+
+ -- Justin Freeman <jmf@pobox.com>  Sun, 28 Jun 2026 21:00:00 +0000
+
 xboing (2.4-2) unstable; urgency=medium
 
   * Rename the installed binary to /usr/games/xboing (was xboing_sdl2

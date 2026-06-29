@@ -61,6 +61,14 @@ target_compile_options(test_paths PRIVATE ${XBOING_STRICT_WARNINGS} -Werror ${CM
 target_compile_definitions(test_paths PRIVATE ${XBOING_SECURE_ENV_DEFS})
 target_link_libraries(test_paths PRIVATE ${CMOCKA_LIBRARIES})
 
+# setgid privilege helper tests — links sys_priv.c directly.
+add_executable(test_sys_priv test_sys_priv.c ${CMAKE_SOURCE_DIR}/src/sys_priv.c)
+target_include_directories(test_sys_priv PRIVATE
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_compile_options(test_sys_priv PRIVATE ${XBOING_STRICT_WARNINGS} -Werror ${CMOCKA_WARNING_FIXUPS})
+target_link_libraries(test_sys_priv PRIVATE ${CMOCKA_LIBRARIES})
+
 # Block-type → sound-name mapping tests (bead xboing-c-cfy, Component 3a).
 # Pure C, no SDL2.  Exhaustive per peer review B2.
 add_executable(test_block_sound test_block_sound.c)
@@ -106,6 +114,7 @@ target_link_libraries(test_game_render_geometry PRIVATE ${CMOCKA_LIBRARIES})
 add_test(NAME test_game_render_geometry COMMAND test_game_render_geometry)
 add_test(NAME test_paths COMMAND test_paths)
 set_tests_properties(test_paths PROPERTIES WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+add_test(NAME test_sys_priv COMMAND test_sys_priv)
 
 # Legacy characterization tests (test_save_load, test_state_machine) moved to
 # original/ — they include X11 headers for legacy struct definitions.

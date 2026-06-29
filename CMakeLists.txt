@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(xboing VERSION 2.4 LANGUAGES C)
+project(xboing VERSION 0.9 LANGUAGES C)
 include(GNUInstallDirs)
 
 # Export compile_commands.json for clang-tidy
