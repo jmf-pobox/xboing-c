@@ -58,6 +58,7 @@
 #include "sdl2_texture.h"
 #include "sfx_system.h"
 #include "special_system.h"
+#include "sys_priv.h"
 #include "xboing_paths.h"
 #include "xboing_version.h"
 
@@ -125,7 +126,8 @@ static void print_usage(FILE *out)
                  "  -help, -usage       Show this help\n"
                  "  -version            Show version\n"
                  "  -setup              Show resolved configuration paths\n"
-                 "  -scores             Show the global high-score table\n");
+                 "  -scores             Show high scores (personal, and global "
+                 "if present)\n");
 }
 
 static void print_setup_info(const paths_config_t *cfg)
@@ -156,30 +158,23 @@ static void print_setup_info(const paths_config_t *cfg)
         printf("  User data dir         = %s\n", buf);
 }
 
-static void print_scores(const paths_config_t *cfg)
+/* Read and print one high-score table.  Returns false only when the file
+ * does not exist (so the caller can word that case); a read/parse error is
+ * reported here and returns true. */
+static bool print_one_score_table(const char *label, const char *path)
 {
-    char path[PATHS_MAX_PATH];
-    if (paths_score_file_global(cfg, path, sizeof(path)) != PATHS_OK)
-    {
-        fprintf(stderr, "xboing -scores: cannot resolve global score file path\n");
-        return;
-    }
-
     highscore_table_t table;
     highscore_io_init_table(&table);
     highscore_io_result_t r = highscore_io_read(path, &table);
     if (r == HIGHSCORE_IO_ERR_OPEN)
-    {
-        printf("No scores recorded yet (%s does not exist).\n", path);
-        return;
-    }
+        return false;
     if (r != HIGHSCORE_IO_OK)
     {
         fprintf(stderr, "xboing -scores: failed to read %s (code %d)\n", path, (int)r);
-        return;
+        return true;
     }
 
-    printf("High scores from %s:\n\n", path);
+    printf("%s (%s):\n\n", label, path);
     if (table.master_name[0])
         printf("  Master: %s — \"%s\"\n\n", table.master_name, table.master_text);
     int shown = 0;
@@ -193,6 +188,34 @@ static void print_scores(const paths_config_t *cfg)
     }
     if (shown == 0)
         printf("  (no scored entries)\n");
+    printf("\n");
+    return true;
+}
+
+static void print_scores(const paths_config_t *cfg)
+{
+    char path[PATHS_MAX_PATH];
+
+    /* Personal table exists on every platform. */
+    if (paths_score_file_personal(cfg, path, sizeof(path)) == PATHS_OK)
+    {
+        if (!print_one_score_table("Personal high scores", path))
+            printf("No personal scores recorded yet.\n\n");
+    }
+
+    /* The shared/global ("roll of honour") table exists only on the setgid
+     * Debian install or when an explicit XBOING_SCORE_FILE is configured.
+     * On unprivileged installs (Homebrew, dev builds) there is no shared
+     * board, so do not reference the FHS /var/games path that can never
+     * apply there. */
+    if (sys_priv_is_setgid() || cfg->xboing_score_file[0] != '\0')
+    {
+        if (paths_score_file_global(cfg, path, sizeof(path)) == PATHS_OK)
+        {
+            if (!print_one_score_table("Global high scores", path))
+                printf("No global scores recorded yet (%s does not exist).\n", path);
+        }
+    }
 }
 
 /* =========================================================================
