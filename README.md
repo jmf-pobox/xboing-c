@@ -1,8 +1,13 @@
 # XBoing
 
-XBoing is a fast, colorful breakout-style arcade game. Bounce the proton ball off your paddle to smash every block on the level — through 80 stages of bombs, teleports, sticky paddles, power-ups, and up-to-five-ball mayhem. Clear them all, chase a high score, and build your own levels with the editor that ships in the box.
+XBoing is a fast, colorful breakout arcade game. Bounce a proton ball
+off your paddle to smash every block on the screen, then do it again
+across 80 levels of bombs, teleports, sticky paddles, and power-ups.
+Juggle up to five balls at once, chase the high score, and design your
+own levels in the built-in editor.
 
-A faithful SDL2 port of Justin C. Kibell's 1996 X11 original (XBoing 2.4). Current release: **0.9**.
+A faithful SDL2 port of Justin C. Kibell's 1996 X11 original
+(XBoing 2.4). Current release: **0.9**.
 
 ![XBoing gameplay](screenshots/gameplay.gif)
 
