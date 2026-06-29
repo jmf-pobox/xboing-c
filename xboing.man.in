@@ -25,7 +25,7 @@ xboing \- classic breakout/blockout arcade game (SDL2)
 -load               On startup, load the saved game (skips the attract cycle)
 -sound              Enable sound (default)
 -nosound            Disable all audio
--nosfx              Disable sound effects (keep music)
+-nosfx              Disable visual special effects (screen shake, etc.)
 -maxvol <0-100>     Maximum volume percentage (default 80)
 -help, -usage       Show the option summary and exit
 -version            Show the version and exit
@@ -114,7 +114,9 @@ Enable audio. This is the default.
 Disable all audio (music and sound effects).
 .TP
 .B -nosfx
-Disable sound effects while keeping music.
+Disable the visual special effects (screen shake, fade, blind, etc.).
+Audio is controlled separately by
+.BR -sound / -nosound .
 .TP
 .BI -maxvol " <0-100>"
 Maximum volume as a percentage. Default 80. 0 silences output; other sounds
@@ -152,7 +154,7 @@ z        Save the current game
 x        Load the saved game
 i        Toggle fullscreen
 a        Toggle audio on/off
-s        Toggle sound effects on/off
+s        Toggle visual special effects
 +        Increase maximum volume
 -        Decrease maximum volume
 1-9      Set game speed (9 = fastest)

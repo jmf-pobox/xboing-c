@@ -115,11 +115,12 @@ static void print_usage(FILE *out)
                  "  -grab               Grab pointer to window\n"
                  "  -load               On startup, autoload the saved game (skips\n"
                  "                      attract cycle); used by visual-capture scripts\n"
+                 "  -nosfx              Disable visual special effects (e.g. screen "
+                 "shake)\n"
                  "\n"
                  "Audio options:\n"
                  "  -sound              Enable sound (default)\n"
                  "  -nosound            Disable all audio\n"
-                 "  -nosfx              Disable sound effects (keep music)\n"
                  "  -maxvol <0-100>     Maximum volume\n"
                  "\n"
                  "Information (these print and exit):\n"
@@ -569,6 +570,11 @@ game_ctx_t *game_create(int argc, char *argv[])
             fprintf(stderr, "game_create: sfx system creation failed\n");
             goto fail;
         }
+        /* The visual special-effects system defaults on, so -nosfx
+         * (config.sfx == false) must disable it here at startup;
+         * otherwise the flag is parsed but never applied. */
+        if (!ctx->config.sfx)
+            sfx_system_set_enabled(ctx->sfx, 0);
     }
 
     /* EyeDude system (callbacks wired by game_callbacks.c) */
