@@ -49,7 +49,13 @@ class Xboing < Formula
   JSON
 
   def install
-    system "cmake", "-S", ".", "-B", "build", *std_cmake_args
+    args = std_cmake_args
+    # Pin the compiled-in shared-score path to the exact directory
+    # post_install provisions, so the binary and the seeded store cannot
+    # drift.  macOS only — on Linux the binary must keep its FHS default
+    # (/var/games), which this formula does not provision.
+    args << "-DXBOING_GLOBAL_SCORE_DIR=#{SHARED_DIR}" if OS.mac?
+    system "cmake", "-S", ".", "-B", "build", *args
     system "cmake", "--build", "build"
     system "cmake", "--install", "build"
   end
@@ -78,11 +84,12 @@ class Xboing < Formula
     end
 
     provision_shared_dir
+    # Only scores.dat must be pre-seeded: write_table_inplace opens it
+    # without O_CREAT (ADR-041), so a missing file makes the first global
+    # write fail.  The lock file is NOT pre-seeded — the world-writable
+    # (1777) shared dir lets the game create it at runtime via O_CREAT, so
+    # pre-creating a world-writable lock here would be needless exposure.
     seed_shared_file("#{SHARED_DIR}/scores.dat", SCORES_SEED)
-    # The lock self-creates at runtime under the world-writable dir, but
-    # pre-seeding matches the apt deployment and avoids a first-run
-    # permission surprise under a restrictive umask.
-    seed_shared_file("#{SHARED_DIR}/scores.dat.lock", "")
   end
 
   # Create (if absent) and lock down the shared directory.  All checks and
