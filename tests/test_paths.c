@@ -383,7 +383,7 @@ static void test_score_global_legacy_override(void **state)
  * On Linux the .deb postinst creates the dir root:games 2755 and seeds
  * scores.dat root:games 0664; on macOS the brew formula creates it sticky
  * 1777 with a world-writable scores.dat. */
-static void test_score_global_fhs_default(void **state)
+static void test_score_global_compiled_default(void **state)
 {
     (void)state;
     paths_config_t cfg;
@@ -947,7 +947,7 @@ int main(void)
         cmocka_unit_test(test_sound_null_name),
         /* Group 4: Score files */
         cmocka_unit_test(test_score_global_legacy_override),
-        cmocka_unit_test(test_score_global_fhs_default),
+        cmocka_unit_test(test_score_global_compiled_default),
         cmocka_unit_test(test_score_global_dir_is_absolute),
         cmocka_unit_test(test_score_personal_xdg_default),
         cmocka_unit_test(test_score_personal_custom_xdg),

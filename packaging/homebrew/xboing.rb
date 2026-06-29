@@ -103,8 +103,17 @@ class Xboing < Formula
   # another inode.  The directory must be a real directory owned by the
   # installing user; a symlink leaf raises ELOOP and is refused.
   def provision_shared_dir
-    present = File.symlink?(SHARED_DIR) || File.exist?(SHARED_DIR)
-    mkdir_p(SHARED_DIR) unless present
+    # Dir.mkdir (mkdir(2)) never follows a symlink at the final component:
+    # if SHARED_DIR already exists as anything — including a symlink a
+    # local user race-planted in the world-writable /Users/Shared — it
+    # raises EEXIST instead of creating a tree at the symlink target.  The
+    # existing entry is then validated through the NOFOLLOW descriptor
+    # below, so there is no check-then-create race.
+    begin
+      Dir.mkdir(SHARED_DIR, 01777)
+    rescue Errno::EEXIST
+      nil # already present; validated/normalized via the descriptor below
+    end
     File.open(SHARED_DIR, File::RDONLY | File::NOFOLLOW) do |d|
       st = d.stat
       if !st.directory? || st.uid != Process.euid
