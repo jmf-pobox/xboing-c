@@ -4,38 +4,27 @@ An SDL2 port of XBoing 2.4, the X11 breakout/blockout arcade game written by Jus
 
 ![XBoing gameplay](screenshots/gameplay.gif)
 
-## Install and play
+## Install
 
-### macOS / Linux — Homebrew
+XBoing installs with [Homebrew](https://brew.sh) on macOS and Linux:
 
 ```bash
 brew install jmf-pobox/xboing/xboing
 ```
 
-If Homebrew asks you to trust the tap first, run `brew trust --formula
-jmf-pobox/xboing/xboing` and install again. Add `--HEAD` to build the
-latest code from `master` instead of the tagged release.
+If Homebrew asks you to trust the tap, run `brew trust --formula jmf-pobox/xboing/xboing` and install again.
 
-### Debian / Ubuntu — .deb from source
+Prefer a Debian package or a source build? See [Building](#building).
 
-The Debian package additionally provides a shared, cross-user "machine"
-high-score table (setgid `games`, under `/var/games/xboing`), which the
-Homebrew build does not — see [docs/DESIGN.md](docs/DESIGN.md) ADR-047.
+## How to play
 
-```bash
-sudo apt install build-essential devscripts debhelper cmake \
-    libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev libcmocka-dev
-dpkg-buildpackage -us -uc -b
-sudo dpkg -i ../xboing_*.deb
-```
+Run `xboing`. Clear every block on a level without letting the ball fall past your paddle.
 
-Run the game:
+- **Move the paddle** — move the mouse, or the arrow keys
+- **Launch the ball / fire** — `Space`, or any mouse button
+- **Pause** `p`, **tilt the board** `t`, **quit** `q`
 
-```bash
-xboing
-```
-
-Basic controls: `Space` launches the ball, `Left` and `Right` move the paddle, the mouse also steers. Full keyboard reference, editor controls, and command-line options:
+The full key map, the level editor, scoring, and every command-line option are in the manual:
 
 ```bash
 man xboing
@@ -79,7 +68,7 @@ For deeper detail:
 - [`docs/INTEGRATION_ROADMAP.md`](docs/INTEGRATION_ROADMAP.md) — phase-by-phase port plan.
 - [`docs/DESIGN.md`](docs/DESIGN.md) — architecture decision records.
 
-## Building and contributing
+## Building
 
 Development build:
 
@@ -101,6 +90,19 @@ ctest --test-dir build-asan --output-on-failure
 ```
 
 The `Makefile` wraps these: `make build`, `make test`, and `make check` (all CI gates). Run `make help` for the full target list.
+
+### Debian package
+
+On Debian or Ubuntu, build and install a native `.deb`:
+
+```bash
+sudo apt install build-essential devscripts debhelper cmake \
+    libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev libcmocka-dev
+dpkg-buildpackage -us -uc -b
+sudo dpkg -i ../xboing_*.deb
+```
+
+The package installs setgid `games`, which enables a shared, system-wide high-score table under `/var/games/xboing` (see [ADR-047](docs/DESIGN.md)) — something the Homebrew build does not provide.
 
 ### Source layout
 
