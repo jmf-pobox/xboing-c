@@ -617,8 +617,11 @@ if(SDL2_FOUND AND SDL2_IMAGE_FOUND AND SDL2_MIXER_FOUND AND SDL2_TTF_FOUND)
     # 'cmake --install --prefix /usr/local' sees /usr/local/share/xboing,
     # 'dpkg-buildpackage' sees /usr/share/xboing, and any custom prefix
     # picks up the corresponding GNUInstallDirs DATADIR.
+    # XBOING_VERSION is driven from project(VERSION) so the -version output
+    # never drifts from the package version (single source of truth).
     target_compile_definitions(xboing PRIVATE
-        XBOING_DATA_DIR="${CMAKE_INSTALL_FULL_DATADIR}/xboing")
+        XBOING_DATA_DIR="${CMAKE_INSTALL_FULL_DATADIR}/xboing"
+        XBOING_VERSION="${PROJECT_VERSION}")
     target_link_libraries(xboing PRIVATE
         # SDL2 platform
         sdl2_renderer
