@@ -80,13 +80,15 @@ For deeper detail:
 Development build:
 
 ```bash
-sudo apt install cmake libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev \
-    libsdl2-ttf-dev libcmocka-dev
+sudo apt install cmake pkg-config libsdl2-dev libsdl2-image-dev \
+    libsdl2-mixer-dev libsdl2-ttf-dev libcmocka-dev
 cmake --preset debug
 cmake --build build
 ctest --test-dir build --output-on-failure
 ./build/xboing
 ```
+
+The presets need CMake 3.21 or newer; on older CMake, configure with `cmake -B build -DCMAKE_BUILD_TYPE=Debug` instead.
 
 Sanitizer build — the primary safety net during modernization of a 20-year-old C codebase:
 
@@ -103,7 +105,7 @@ The `Makefile` wraps these: `make build`, `make test`, and `make check` (all CI 
 On Debian or Ubuntu, build and install a native `.deb`:
 
 ```bash
-sudo apt install build-essential devscripts debhelper cmake \
+sudo apt install build-essential devscripts debhelper cmake pkg-config \
     libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev libcmocka-dev
 dpkg-buildpackage -us -uc -b
 sudo dpkg -i ../xboing_*.deb
