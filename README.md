@@ -1,46 +1,38 @@
 # XBoing
 
-An SDL2 port of XBoing 2.4, the X11 breakout/blockout arcade game written by Justin C. Kibell between 1993 and 1997. All 80 original levels, 30 block types, power-ups, multiball, and the built-in level editor are preserved.
+XBoing is a fast, colorful breakout arcade game. Bounce a proton ball
+off your paddle to smash every block on the screen, then do it again
+across 80 levels of bombs, teleports, sticky paddles, and power-ups.
+Juggle up to five balls at once, chase the high score, and design your
+own levels in the built-in editor.
+
+A faithful SDL2 port of Justin C. Kibell's X11 original, XBoing 2.4
+(released 1996). Current release: **0.9**.
 
 ![XBoing gameplay](screenshots/gameplay.gif)
 
-## Install and play
+## Install
 
-### macOS / Linux — Homebrew
-
-```bash
-brew tap jmf-pobox/xboing
-brew install xboing
-```
-
-This installs the game and per-user high scores (under
-`~/.local/share/xboing/`). To build the latest unreleased code from
-`master` instead of the tagged release, add `--HEAD`:
+XBoing installs with [Homebrew](https://brew.sh) on macOS and Linux:
 
 ```bash
-brew install --HEAD jmf-pobox/xboing/xboing
+brew install jmf-pobox/xboing/xboing
 ```
 
-### Debian / Ubuntu — .deb from source
+If Homebrew asks you to trust the tap, run `brew trust --formula jmf-pobox/xboing/xboing` and install again.
 
-The Debian package additionally provides a shared, cross-user "machine"
-high-score table (setgid `games`, under `/var/games/xboing`), which the
-Homebrew build does not — see [docs/DESIGN.md](docs/DESIGN.md) ADR-047.
+Prefer a Debian package or a source build? See [Building](#building).
 
-```bash
-sudo apt install build-essential devscripts debhelper cmake \
-    libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev libcmocka-dev
-dpkg-buildpackage -us -uc -b
-sudo dpkg -i ../xboing_*.deb
-```
+## How to play
 
-Run the game:
+Run `xboing`. Clear every block on a level without letting the ball fall past your paddle.
 
-```bash
-xboing
-```
+- **Move the paddle** — move the mouse, or the arrow keys
+- **Launch the ball** — `Space`, or click a mouse button
+- **Fire bullets** — `K`, or click a mouse button
+- **Pause / tilt / quit** — `p` / `t` / `q`
 
-Basic controls: `Space` launches the ball, `Left` and `Right` move the paddle, the mouse also steers. Full keyboard reference, editor controls, and command-line options:
+The full key map, the level editor, scoring, and every command-line option are in the manual:
 
 ```bash
 man xboing
@@ -75,7 +67,7 @@ This is an incremental modernization, not a rewrite. The 1996 Xlib sources stay 
 | Paths | compile-time `#define`s | XDG Base Directory spec |
 | Fonts | XLFD bitmap fonts | bundled TTF via SDL2_ttf |
 
-**Status**: nearly complete, in the polish phase. All six phases of the [integration roadmap](docs/INTEGRATION_ROADMAP.md) are done; remaining work is tracked in [beads](https://github.com/steveyegge/beads).
+**Status**: release 0.9, in the polish phase. All six phases of the [integration roadmap](docs/INTEGRATION_ROADMAP.md) are done; remaining work is tracked in [beads](https://github.com/steveyegge/beads).
 
 For deeper detail:
 
@@ -84,33 +76,49 @@ For deeper detail:
 - [`docs/INTEGRATION_ROADMAP.md`](docs/INTEGRATION_ROADMAP.md) — phase-by-phase port plan.
 - [`docs/DESIGN.md`](docs/DESIGN.md) — architecture decision records.
 
-## Building and contributing
+## Building
 
 Development build:
 
 ```bash
-sudo apt install cmake libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev \
-    libsdl2-ttf-dev libcmocka-dev
-cmake -B build -DCMAKE_BUILD_TYPE=Debug
+sudo apt install build-essential cmake pkg-config libsdl2-dev \
+    libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev libcmocka-dev
+cmake --preset debug
 cmake --build build
 ctest --test-dir build --output-on-failure
 ./build/xboing
 ```
 
-Sanitizer build — the primary safety net during modernization of a 20-year-old C codebase:
+The presets need CMake 3.21 or newer; on older CMake, configure with `cmake -B build -DCMAKE_BUILD_TYPE=Debug` instead.
+
+Sanitizer build — the primary safety net during modernization of a 1990s-era C codebase:
 
 ```bash
-cmake -B build-asan -DCMAKE_BUILD_TYPE=Debug \
-    -DCMAKE_C_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer"
+cmake --preset asan
 cmake --build build-asan
 ctest --test-dir build-asan --output-on-failure
 ```
+
+The `Makefile` wraps these: `make build`, `make test`, and `make check` (all CI gates). Run `make help` for the full target list.
+
+### Debian package
+
+On Debian or Ubuntu, build and install a native `.deb`:
+
+```bash
+sudo apt install build-essential devscripts debhelper cmake pkg-config \
+    libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev libcmocka-dev
+dpkg-buildpackage -us -uc -b
+sudo dpkg -i ../xboing_*.deb
+```
+
+The package installs setgid `games`, which enables a shared, system-wide high-score table under `/var/games/xboing` (see [ADR-047](docs/DESIGN.md)) — something the Homebrew build does not provide.
 
 ### Source layout
 
 | Directory | Contents |
 |-----------|----------|
-| `src/`, `include/` | Modernized SDL2 implementation: 35 static libraries plus integration glue |
+| `src/`, `include/` | Modernized SDL2 implementation: 38 static libraries plus integration glue |
 | `tests/` | CMocka unit, integration, fuzz, and replay tests |
 | `levels/` | 80 level data files, unchanged from 1996 |
 | `sounds/`, `assets/` | Audio assets, fonts, and converted PNG sprites |

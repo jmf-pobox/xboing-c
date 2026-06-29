@@ -1,7 +1,7 @@
 .\" XBoing - a breakout/blockout arcade game
 .\"
-.\" Copyright (c) 1993-1996 Justin C. Kibell (original game)
-.\" Copyright (c) 2025-2026 Jim Freeman and contributors (SDL2 modernization)
+.\" Copyright (c) 1993-1997 Justin C. Kibell (original game)
+.\" Copyright (c) 2025-2026 J Freeman and contributors (SDL2 modernization)
 .\"
 .\" MIT License; see the LICENSE section below and the project LICENSE file.
 .\"
@@ -42,7 +42,7 @@ Each block carries a different point value; the more you destroy, the
 higher your score. The arena is filled with blocks and special objects,
 and the paddle moves left and right along the bottom much like pinball.
 .PP
-This is a faithful SDL2 modernization of the original 1993-1996 X11 game by
+This is a faithful SDL2 modernization of the original 1993-1997 X11 game by
 Justin C. Kibell. All 80 levels, the ball physics, the 30+ block types,
 power-ups, multiball, and the built-in level editor are preserved.
 Project home: https://github.com/jmf-pobox/xboing-c
@@ -289,7 +289,7 @@ Shared global high-score table (Debian package only; setgid
 Installed level and sound data (for example
 .IR /usr/share/xboing/ ", " /opt/homebrew/share/xboing/ ).
 .SH NOTES
-The original XBoing was written by Justin C. Kibell between 1993 and 1996
+The original XBoing was written by Justin C. Kibell between 1993 and 1997
 to learn Xlib, using the XPM library for pixmap graphics; version 2.4 was
 released in 1996 and distributed via ftp.x.org. This package is the SDL2
 modernization: the X11/Xlib graphics, audio, and event handling have been
@@ -300,9 +300,9 @@ machine-specific drivers.
 .SH LICENSE
 XBoing is distributed under the MIT License.
 .PP
-Copyright (c) 1993-1996 Justin C. Kibell (original game).
+Copyright (c) 1993-1997 Justin C. Kibell (original game).
 .br
-Copyright (c) 2025-2026 Jim Freeman and contributors (SDL2 modernization).
+Copyright (c) 2025-2026 J Freeman and contributors (SDL2 modernization).
 .PP
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -316,8 +316,8 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND. IN NO EVENT
 SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY
 ARISING FROM THE USE OF THE SOFTWARE.
 .SH AUTHOR
-Original game by Justin C. Kibell (1993-1996). SDL2 modernization
-maintained by Jim Freeman and contributors.
+Original game by Justin C. Kibell (1993-1997). SDL2 modernization
+maintained by J Freeman and contributors.
 .SH BUGS
 Report bugs at https://github.com/jmf-pobox/xboing-c/issues, including the
 version (xboing -version) and your operating system.
