@@ -13,10 +13,12 @@
 # are a future API leaderboard (ADR-048).  Homebrew sandboxes post_install
 # and cannot provision shared state outside its prefix anyway.
 #
-# HEAD-only until the first vX.Y release is tagged: install with
-#   brew install --HEAD <tap>/xboing
-# When a release exists, add `url` + `sha256` for the tarball (`brew create
-# <tarball-url>` computes the checksum) to enable the stable install path.
+# Distribution requires a Homebrew tap — modern Homebrew refuses to install
+# a loose formula file. Until a tap repo and a tagged release exist, test
+# via a local tap: `brew tap-new <user>/<tap>`, copy this file into its
+# Formula/, then `brew install --HEAD <user>/<tap>/xboing`. When a release
+# is tagged, add `url` + `sha256` (`brew create <tarball-url>` computes the
+# checksum) to enable the stable `brew install` path.
 class Xboing < Formula
   desc "Classic breakout-style arcade game (1993, modernized for SDL2)"
   homepage "https://github.com/jmf-pobox/xboing-c"

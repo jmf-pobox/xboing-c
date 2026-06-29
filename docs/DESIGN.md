@@ -2837,8 +2837,9 @@ MIN clamp nor the implicit MAX ray-march budget changes.
 > and denies writes outside its prefix (`EPERM` on `/Users/Shared`), so the
 > formula cannot provision the shared store. Macs are also effectively
 > single-user, making a cross-user board pointless. The macOS code from this
-> ADR (PR #156) was reverted; see ADR-047. The original text is kept below
-> for history.
+> ADR (PR #156) was reverted; see ADR-047. **The original text below is
+> retained for historical context only — do not follow its instructions**
+> (e.g. creating `/Users/Shared` directories); they no longer apply.
 
 **Context:** `feat/macos-shared-scores` — porting the cross-user
 "global" high-score table to a macOS (Homebrew) install.
