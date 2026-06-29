@@ -28,4 +28,11 @@ int sys_priv_elevate(void);
  * errno set.  Call after each global-file operation completes. */
 int sys_priv_drop(void);
 
+/* Nonzero if the binary started setgid — i.e. the egid saved at
+ * sys_priv_init differs from the real gid (the Debian setgid-games
+ * deployment).  Lets callers skip the elevated global-write path
+ * entirely on unprivileged installs (Homebrew, dev builds), where there
+ * is no shared /var/games board.  Returns 0 if init has not run. */
+int sys_priv_is_setgid(void);
+
 #endif

@@ -64,3 +64,8 @@ int sys_priv_drop(void)
     }
     return rc;
 }
+
+int sys_priv_is_setgid(void)
+{
+    return g_initialized && g_games_gid_saved != getgid();
+}

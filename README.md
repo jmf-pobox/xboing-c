@@ -6,7 +6,26 @@ An SDL2 port of XBoing 2.4, the X11 breakout/blockout arcade game written by Jus
 
 ## Install and play
 
-No release packages exist yet. Build a Debian package from source:
+### macOS / Linux — Homebrew
+
+```bash
+brew tap jmf-pobox/xboing
+brew install xboing
+```
+
+This installs the game and per-user high scores (under
+`~/.local/share/xboing/`). To build the latest unreleased code from
+`master` instead of the tagged release, add `--HEAD`:
+
+```bash
+brew install --HEAD jmf-pobox/xboing/xboing
+```
+
+### Debian / Ubuntu — .deb from source
+
+The Debian package additionally provides a shared, cross-user "machine"
+high-score table (setgid `games`, under `/var/games/xboing`), which the
+Homebrew build does not — see [docs/DESIGN.md](docs/DESIGN.md) ADR-047.
 
 ```bash
 sudo apt install build-essential devscripts debhelper cmake \

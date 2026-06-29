@@ -945,6 +945,17 @@ static int submit_score(game_ctx_t *ctx, unsigned long score, unsigned long game
     {
         return 0;
     }
+
+    /* The global (machine) leaderboard exists only on the setgid Debian
+     * deployment, or when an explicit XBOING_SCORE_FILE path is configured
+     * (tests / sysadmin).  On an unprivileged install — Homebrew, dev
+     * builds — there is no shared /var/games board, so skip it rather than
+     * fail an open on a nonexistent directory and emit stderr noise on
+     * every ranking.  Personal scores were already written above. */
+    if (!sys_priv_is_setgid() && ctx->paths.xboing_score_file[0] == '\0')
+    {
+        return 0;
+    }
     char global_path[PATHS_MAX_PATH];
     if (paths_score_file_global(&ctx->paths, global_path, sizeof(global_path)) != PATHS_OK)
     {
