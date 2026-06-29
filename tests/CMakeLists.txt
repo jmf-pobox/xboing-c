@@ -124,7 +124,7 @@ if(TARGET xboing)
     add_test(NAME test_scores_no_var_games_leak COMMAND xboing -scores)
     set_tests_properties(test_scores_no_var_games_leak PROPERTIES
         ENVIRONMENT "XDG_DATA_HOME=${CMAKE_CURRENT_BINARY_DIR}/scores-test-home;SDL_VIDEODRIVER=dummy;SDL_AUDIODRIVER=dummy"
-        PASS_REGULAR_EXPRESSION "personal"
+        PASS_REGULAR_EXPRESSION "[Pp]ersonal"
         FAIL_REGULAR_EXPRESSION "/var/games")
 endif()
 

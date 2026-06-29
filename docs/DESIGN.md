@@ -3114,7 +3114,8 @@ drivers (the original shipped HP/SUN/NetAudio/Soundblaster/RPLAY/DEC
 backends), so silence-by-default avoided errors on the common case. SDL2
 removes that constraint — it abstracts a working audio device on every
 target platform — so the modern, expected behavior is audio on out of the
-box. `-nosound` (and `-nosfx`) remain for users who want silence.
+box. `-nosound` remains for users who want silence. (`-nosfx` is
+unrelated — it disables the *visual* special-effects system, not audio.)
 
 **Consequences:**
 
