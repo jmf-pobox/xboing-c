@@ -1,6 +1,6 @@
 # XBoing
 
-An SDL2 port of XBoing 2.4, the X11 breakout/blockout arcade game written by Justin C. Kibell between 1993 and 1997. All 80 original levels, 30 block types, power-ups, multiball, and the built-in level editor are preserved.
+An SDL2 port of XBoing 2.4, the X11 breakout/blockout arcade game written by Justin C. Kibell between 1993 and 1997. All 80 original levels, 30 block types, power-ups, multiball, and the built-in level editor are preserved. Current release: **0.9**.
 
 ![XBoing gameplay](screenshots/gameplay.gif)
 
@@ -9,17 +9,12 @@ An SDL2 port of XBoing 2.4, the X11 breakout/blockout arcade game written by Jus
 ### macOS / Linux — Homebrew
 
 ```bash
-brew tap jmf-pobox/xboing
-brew install xboing
+brew install jmf-pobox/xboing/xboing
 ```
 
-This installs the game and per-user high scores (under
-`~/.local/share/xboing/`). To build the latest unreleased code from
-`master` instead of the tagged release, add `--HEAD`:
-
-```bash
-brew install --HEAD jmf-pobox/xboing/xboing
-```
+If Homebrew asks you to trust the tap first, run `brew trust --formula
+jmf-pobox/xboing/xboing` and install again. Add `--HEAD` to build the
+latest code from `master` instead of the tagged release.
 
 ### Debian / Ubuntu — .deb from source
 
@@ -75,7 +70,7 @@ This is an incremental modernization, not a rewrite. The 1996 Xlib sources stay 
 | Paths | compile-time `#define`s | XDG Base Directory spec |
 | Fonts | XLFD bitmap fonts | bundled TTF via SDL2_ttf |
 
-**Status**: nearly complete, in the polish phase. All six phases of the [integration roadmap](docs/INTEGRATION_ROADMAP.md) are done; remaining work is tracked in [beads](https://github.com/steveyegge/beads).
+**Status**: release 0.9, in the polish phase. All six phases of the [integration roadmap](docs/INTEGRATION_ROADMAP.md) are done; remaining work is tracked in [beads](https://github.com/steveyegge/beads).
 
 For deeper detail:
 
@@ -91,7 +86,7 @@ Development build:
 ```bash
 sudo apt install cmake libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev \
     libsdl2-ttf-dev libcmocka-dev
-cmake -B build -DCMAKE_BUILD_TYPE=Debug
+cmake --preset debug
 cmake --build build
 ctest --test-dir build --output-on-failure
 ./build/xboing
@@ -100,17 +95,18 @@ ctest --test-dir build --output-on-failure
 Sanitizer build — the primary safety net during modernization of a 20-year-old C codebase:
 
 ```bash
-cmake -B build-asan -DCMAKE_BUILD_TYPE=Debug \
-    -DCMAKE_C_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer"
+cmake --preset asan
 cmake --build build-asan
 ctest --test-dir build-asan --output-on-failure
 ```
+
+The `Makefile` wraps these: `make build`, `make test`, and `make check` (all CI gates). Run `make help` for the full target list.
 
 ### Source layout
 
 | Directory | Contents |
 |-----------|----------|
-| `src/`, `include/` | Modernized SDL2 implementation: 35 static libraries plus integration glue |
+| `src/`, `include/` | Modernized SDL2 implementation: 38 static libraries plus integration glue |
 | `tests/` | CMocka unit, integration, fuzz, and replay tests |
 | `levels/` | 80 level data files, unchanged from 1996 |
 | `sounds/`, `assets/` | Audio assets, fonts, and converted PNG sprites |

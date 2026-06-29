@@ -1,8 +1,8 @@
 # Integration Layer Roadmap
 
-Wiring 35 static libraries (12 game systems, 7 UI sequencers, 4 persistence
-modules, 11 SDL2 platform modules, 1 shared arithmetic library) into a
-playable SDL2 game binary.
+Wiring 38 static libraries (12 game systems, 7 UI sequencers, 5 persistence
+modules, 11 SDL2 platform modules, 1 privilege module, 2 shared utility
+libraries) into a playable SDL2 game binary.
 
 ## File Structure
 
