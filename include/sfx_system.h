@@ -132,8 +132,8 @@ typedef struct
     /* Move the play window to (x, y) — used by SHAKE and reset */
     void (*on_move_window)(int x, int y, void *ud);
 
-    /* Sound effect requested */
-    void (*on_sound)(const char *name, void *ud);
+    /* Sound effect requested at per-call volume (0-100 percent of master). */
+    void (*on_sound)(const char *name, int volume, void *ud);
 } sfx_system_callbacks_t;
 
 /* =========================================================================

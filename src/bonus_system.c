@@ -82,11 +82,11 @@ static void set_bonus_wait(bonus_system_t *ctx, bonus_state_t next, int target_f
     ctx->state = BONUS_STATE_WAIT;
 }
 
-static void fire_sound(const bonus_system_t *ctx, const char *name)
+static void fire_sound(const bonus_system_t *ctx, const char *name, int volume)
 {
     if (ctx->callbacks.on_sound)
     {
-        ctx->callbacks.on_sound(name, ctx->user_data);
+        ctx->callbacks.on_sound(name, volume, ctx->user_data);
     }
 }
 
@@ -251,7 +251,7 @@ static void do_bonuses(bonus_system_t *ctx, int frame)
     {
         /* Timer ran out — coins are voided.  Original plays "Doh4"
          * (bonus.c:292). */
-        fire_sound(ctx, "Doh4");
+        fire_sound(ctx, "Doh4", 80);
         set_bonus_wait(ctx, BONUS_STATE_LEVEL, frame + BONUS_LINE_DELAY);
         ctx->first_time = 1;
         return;
@@ -261,7 +261,7 @@ static void do_bonuses(bonus_system_t *ctx, int frame)
     {
         /* No coins collected.  Original plays "Doh1"
          * (bonus.c:315). */
-        fire_sound(ctx, "Doh1");
+        fire_sound(ctx, "Doh1", 80);
         set_bonus_wait(ctx, BONUS_STATE_LEVEL, frame + BONUS_LINE_DELAY);
         ctx->first_time = 1;
         return;
@@ -270,7 +270,7 @@ static void do_bonuses(bonus_system_t *ctx, int frame)
     if (ctx->coin_count > BONUS_MAX_COINS && ctx->first_time)
     {
         /* Super bonus — one-shot display (bonus.c:334). */
-        fire_sound(ctx, "supbons");
+        fire_sound(ctx, "supbons", 80);
         ctx->display_score += BONUS_SUPER_SCORE;
         ctx->coin_count = 0;
         set_bonus_wait(ctx, BONUS_STATE_LEVEL, frame + BONUS_LINE_DELAY);
@@ -285,7 +285,7 @@ static void do_bonuses(bonus_system_t *ctx, int frame)
     {
         ctx->coin_count--;
         ctx->display_score += BONUS_COIN_SCORE;
-        fire_sound(ctx, "bonus");
+        fire_sound(ctx, "bonus", 50);
 
         if (ctx->coin_count == 0)
         {
@@ -314,7 +314,7 @@ static void do_level(bonus_system_t *ctx, int frame)
     else
     {
         /* No level bonus — timer ran out (bonus.c:421). */
-        fire_sound(ctx, "Doh2");
+        fire_sound(ctx, "Doh2", 80);
     }
     set_bonus_wait(ctx, BONUS_STATE_BULLET, frame + BONUS_LINE_DELAY);
 }
@@ -329,7 +329,7 @@ static void do_bullets(bonus_system_t *ctx, int frame)
         {
             /* No bullets — skip animation.  Original plays "Doh3"
              * (bonus.c:450). */
-            fire_sound(ctx, "Doh3");
+            fire_sound(ctx, "Doh3", 80);
             set_bonus_wait(ctx, BONUS_STATE_TIME, frame + BONUS_LINE_DELAY);
             ctx->first_time = 1;
             return;
@@ -343,7 +343,7 @@ static void do_bullets(bonus_system_t *ctx, int frame)
     {
         ctx->env.bullet_count--;
         ctx->display_score += BONUS_BULLET_SCORE;
-        fire_sound(ctx, "key");
+        fire_sound(ctx, "key", 50);
 
         if (ctx->callbacks.on_bullet_consumed)
         {
@@ -372,7 +372,7 @@ static void do_time_bonus(bonus_system_t *ctx, int frame)
     else
     {
         /* No time bonus — timer ran out (bonus.c:520). */
-        fire_sound(ctx, "Doh4");
+        fire_sound(ctx, "Doh4", 80);
     }
     set_bonus_wait(ctx, BONUS_STATE_HSCORE, frame + BONUS_LINE_DELAY);
 }
@@ -384,7 +384,7 @@ static void do_highscore(bonus_system_t *ctx, int frame)
 
 static void do_end_text(bonus_system_t *ctx, int frame)
 {
-    fire_sound(ctx, "applause");
+    fire_sound(ctx, "applause", 80);
     /* Double delay before finish */
     set_bonus_wait(ctx, BONUS_STATE_FINISH, frame + BONUS_LINE_DELAY * 2);
 }

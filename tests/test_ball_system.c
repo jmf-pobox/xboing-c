@@ -68,8 +68,9 @@ typedef struct
     char last_message[128];
 } test_cb_log_t;
 
-static void cb_on_sound(const char *name, void *ud)
+static void cb_on_sound(const char *name, int volume, void *ud)
 {
+    (void)volume;
     test_cb_log_t *log = (test_cb_log_t *)ud;
     log->sound_count++;
     strncpy(log->last_sound, name, sizeof(log->last_sound) - 1);
@@ -972,8 +973,14 @@ static void test_paddle_hit_bounces_upward(void **state)
     /* The ball should not be dying — it hit the paddle */
     assert_int_not_equal(ball_system_get_state(ctx, 0), BALL_DIE);
 
-    /* Paddle sound should have played */
-    assert_true(log.sound_count > 0);
+    /* Paddle hit fires the BALL_EVT_PADDLE_HIT event (sound is emitted
+     * downstream by the event handler in game_callbacks, not by the
+     * ball_system's on_sound path which would double-play it). */
+    int saw_paddle = 0;
+    for (int i = 0; i < log.event_count; i++)
+        if (log.events[i] == BALL_EVT_PADDLE_HIT)
+            saw_paddle = 1;
+    assert_true(saw_paddle);
 
     ball_system_destroy(ctx);
 }
@@ -1303,9 +1310,18 @@ static void test_ball_to_ball_collision_sound(void **state)
     env.frame = 100;
     ball_system_update(ctx, &env);
 
-    /* ball2ball fires after paddle sound, so it should be the last sound.
-     * At least 2 sounds: "paddle" + "ball2ball". */
-    assert_true(log.sound_count >= 2);
+    /* Two distinct events must fire on this tick:
+     *   1. paddle hit       → BALL_EVT_PADDLE_HIT (event path, not on_sound)
+     *   2. ball-to-ball     → on_sound("ball2ball")
+     * The audit's "every original emission has a modern equivalent"
+     * invariant lives or dies on both paths still firing together
+     * after the duplicate-paddle removal.  Test both. */
+    int saw_paddle = 0;
+    for (int i = 0; i < log.event_count; i++)
+        if (log.events[i] == BALL_EVT_PADDLE_HIT)
+            saw_paddle = 1;
+    assert_true(saw_paddle);
+    assert_int_equal(log.sound_count, 1);
     assert_string_equal(log.last_sound, "ball2ball");
 
     ball_system_destroy(ctx);

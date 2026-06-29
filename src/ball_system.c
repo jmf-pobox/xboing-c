@@ -487,7 +487,7 @@ static void update_a_ball(ball_system_t *ctx, const ball_system_env_t *env, int 
         b->dx = abs(b->dx);
         if (ctx->callbacks.on_sound != NULL)
         {
-            ctx->callbacks.on_sound("boing", ctx->user_data);
+            ctx->callbacks.on_sound("boing", 10, ctx->user_data);
         }
     }
     else if (env->no_walls != 0 && b->ballx < BALL_WC)
@@ -507,7 +507,7 @@ static void update_a_ball(ball_system_t *ctx, const ball_system_env_t *env, int 
         b->dx = -(abs(b->dx));
         if (ctx->callbacks.on_sound != NULL)
         {
-            ctx->callbacks.on_sound("boing", ctx->user_data);
+            ctx->callbacks.on_sound("boing", 10, ctx->user_data);
         }
     }
     else if (env->no_walls != 0 && b->ballx > (env->play_width - BALL_WC))
@@ -527,7 +527,7 @@ static void update_a_ball(ball_system_t *ctx, const ball_system_env_t *env, int 
         b->dy = abs(b->dy);
         if (ctx->callbacks.on_sound != NULL)
         {
-            ctx->callbacks.on_sound("boing", ctx->user_data);
+            ctx->callbacks.on_sound("boing", 10, ctx->user_data);
         }
     }
 
@@ -537,13 +537,12 @@ static void update_a_ball(ball_system_t *ctx, const ball_system_env_t *env, int 
 
         if (ball_hit_paddle(env, b, &hit_pos, &hx, &hy))
         {
-            /* Paddle hit — ball.c:1093-1157 */
+            /* Paddle hit — ball.c:1093-1157.  Paddle sound is emitted
+             * by the BALL_EVT_PADDLE_HIT handler downstream; emitting
+             * here too would double-play it (the previous on_sound call
+             * was a duplicate). */
             b->lastPaddleHitFrame = env->frame + PADDLE_BALL_FRAME_TILT;
 
-            if (ctx->callbacks.on_sound != NULL)
-            {
-                ctx->callbacks.on_sound("paddle", ctx->user_data);
-            }
             if (ctx->callbacks.on_score != NULL)
             {
                 ctx->callbacks.on_score(PADDLE_HIT_SCORE, ctx->user_data);
@@ -754,7 +753,7 @@ static void update_a_ball(ball_system_t *ctx, const ball_system_env_t *env, int 
 
                     if (ctx->callbacks.on_sound != NULL)
                     {
-                        ctx->callbacks.on_sound("ball2ball", ctx->user_data);
+                        ctx->callbacks.on_sound("ball2ball", 90, ctx->user_data);
                     }
                 }
             }

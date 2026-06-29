@@ -67,14 +67,16 @@ sdl2_state_mode_t game_callbacks_attract_next(sdl2_state_mode_t current)
     return SDL2ST_NONE;
 }
 
-/* Block-hit sound: delegates the type→name mapping to the pure
- * block_sound module (testable without an audio context).  Silent
- * for types that map to NULL (intermediate hits, sentinels, gaps). */
+/* Block-hit sound: delegates the type→(name, volume) mapping to the pure
+ * block_sound module (testable without an audio context).  Silent for
+ * types that map to NULL (intermediate hits, sentinels, gaps).  Per-call
+ * volume matches the original's playSoundFile(name, volume) per
+ * docs/audits/2026-06-28-audio-volume-modulation.md. */
 static void play_block_hit_sound(sdl2_audio_t *audio, int block_type)
 {
-    const char *name = block_sound_name(block_type);
-    if (audio && name)
-        sdl2_audio_play(audio, name);
+    block_sound_t s = block_sound_lookup(block_type);
+    if (audio && s.name)
+        sdl2_audio_play_at_percent(audio, s.name, s.volume);
 }
 
 /* =========================================================================
@@ -317,11 +319,11 @@ static int ball_cb_cell_available(int row, int col, void *ud)
 /*
  * Sound playback: delegates to sdl2_audio.
  */
-static void ball_cb_on_sound(const char *name, void *ud)
+static void ball_cb_on_sound(const char *name, int volume, void *ud)
 {
     game_ctx_t *ctx = ud;
     if (ctx->audio)
-        sdl2_audio_play(ctx->audio, name);
+        sdl2_audio_play_at_percent(ctx->audio, name, volume);
 }
 
 /*
@@ -361,7 +363,7 @@ static void ball_cb_on_event(ball_system_event_t event, int ball_index, void *ud
 
         case BALL_EVT_PADDLE_HIT:
             if (ctx->audio)
-                sdl2_audio_play(ctx->audio, "paddle");
+                sdl2_audio_play_at_percent(ctx->audio, "paddle", 50);
             break;
 
         default:
@@ -511,11 +513,11 @@ static void gun_cb_on_eyedude_hit(void *ud)
     eyedude_system_set_state(ctx->eyedude, EYEDUDE_STATE_DIE);
 }
 
-static void gun_cb_on_sound(const char *name, void *ud)
+static void gun_cb_on_sound(const char *name, int volume, void *ud)
 {
     game_ctx_t *ctx = ud;
     if (ctx->audio)
-        sdl2_audio_play(ctx->audio, name);
+        sdl2_audio_play_at_percent(ctx->audio, name, volume);
 }
 
 static int gun_cb_is_ball_waiting(void *ud)
@@ -659,11 +661,11 @@ static void bonus_cb_on_save_triggered(void *ud)
     (void)savegame_system_autosave((game_ctx_t *)ud);
 }
 
-static void bonus_cb_on_sound(const char *name, void *ud)
+static void bonus_cb_on_sound(const char *name, int volume, void *ud)
 {
     game_ctx_t *ctx = ud;
     if (ctx->audio)
-        sdl2_audio_play(ctx->audio, name);
+        sdl2_audio_play_at_percent(ctx->audio, name, volume);
 }
 
 static void bonus_cb_on_finished(int next_level, void *ud)
@@ -749,6 +751,10 @@ static void highscore_cb_on_finished(highscore_type_t type, void *ud)
 {
     (void)type;
     game_ctx_t *ctx = ud;
+    /* Sound (gate@50, original/highscore.c:492) is stored in
+     * highscore_system's sound struct and relayed by
+     * mode_highscore_update — matches the keys/presents/intro/etc.
+     * relay pattern.  Callback only handles the state transition. */
     sdl2_state_transition(ctx->state, game_callbacks_attract_next(SDL2ST_HIGHSCORE));
 }
 
@@ -772,11 +778,11 @@ static void sfx_cb_on_move_window(int x, int y, void *ud)
     /* Shake offset is applied during rendering via sfx_system_get_shake_pos() */
 }
 
-static void sfx_cb_on_sound(const char *name, void *ud)
+static void sfx_cb_on_sound(const char *name, int volume, void *ud)
 {
     game_ctx_t *ctx = ud;
     if (ctx->audio)
-        sdl2_audio_play(ctx->audio, name);
+        sdl2_audio_play_at_percent(ctx->audio, name, volume);
 }
 
 sfx_system_callbacks_t game_callbacks_sfx(void)
@@ -814,11 +820,11 @@ static void eyedude_cb_on_score(unsigned long points, void *ud)
     score_system_add(ctx->score, points, &senv);
 }
 
-static void eyedude_cb_on_sound(const char *name, void *ud)
+static void eyedude_cb_on_sound(const char *name, int volume, void *ud)
 {
     game_ctx_t *ctx = ud;
     if (ctx->audio)
-        sdl2_audio_play(ctx->audio, name);
+        sdl2_audio_play_at_percent(ctx->audio, name, volume);
 }
 
 static void eyedude_cb_on_message(const char *msg, void *ud)
@@ -876,10 +882,9 @@ static int editor_cb_query_cell(int row, int col, editor_cell_t *cell, void *ud)
 
 static void editor_cb_on_sound(const char *name, int volume, void *ud)
 {
-    (void)volume;
     game_ctx_t *ctx = ud;
     if (ctx->audio)
-        sdl2_audio_play(ctx->audio, name);
+        sdl2_audio_play_at_percent(ctx->audio, name, volume);
 }
 
 static void editor_cb_on_message(const char *message, int sticky, void *ud)

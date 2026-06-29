@@ -81,8 +81,8 @@ typedef struct
     /* Score bonus awarded */
     void (*on_score)(unsigned long points, void *ud);
 
-    /* Sound effect requested */
-    void (*on_sound)(const char *name, void *ud);
+    /* Sound effect requested at per-call volume (0-100 percent of master). */
+    void (*on_sound)(const char *name, int volume, void *ud);
 
     /* Message display */
     void (*on_message)(const char *msg, void *ud);

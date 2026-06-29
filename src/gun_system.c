@@ -89,7 +89,7 @@ static void add_tink(gun_system_t *ctx, int xpos, int frame)
 
             if (ctx->callbacks.on_sound)
             {
-                ctx->callbacks.on_sound("shoot", ctx->user_data);
+                ctx->callbacks.on_sound("shoot", 80, ctx->user_data);
             }
             return;
         }
@@ -179,7 +179,7 @@ static void update_bullets(gun_system_t *ctx, const gun_system_env_t *env)
 
                 if (ctx->callbacks.on_sound)
                 {
-                    ctx->callbacks.on_sound("ballshot", ctx->user_data);
+                    ctx->callbacks.on_sound("ballshot", 50, ctx->user_data);
                 }
                 continue;
             }
@@ -334,7 +334,7 @@ int gun_system_shoot(gun_system_t *ctx, const gun_system_env_t *env)
 
             if (ctx->callbacks.on_sound)
             {
-                ctx->callbacks.on_sound("shotgun", ctx->user_data);
+                ctx->callbacks.on_sound("shotgun", 50, ctx->user_data);
             }
             return 1;
         }
@@ -344,7 +344,7 @@ int gun_system_shoot(gun_system_t *ctx, const gun_system_env_t *env)
         /* No ammo — click sound */
         if (ctx->callbacks.on_sound)
         {
-            ctx->callbacks.on_sound("click", ctx->user_data);
+            ctx->callbacks.on_sound("click", 99, ctx->user_data);
         }
     }
 

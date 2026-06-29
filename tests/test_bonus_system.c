@@ -102,8 +102,9 @@ static void on_save_triggered(void *ud)
     g_save_triggered = 1;
 }
 
-static void on_sound(const char *name, void *ud)
+static void on_sound(const char *name, int volume, void *ud)
 {
+    (void)volume;
     (void)ud;
     g_sound_count++;
     if (name)
