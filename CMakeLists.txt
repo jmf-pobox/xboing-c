@@ -81,12 +81,14 @@ if(NOT DEFINED XBOING_GLOBAL_SCORE_DIR)
     endif()
 endif()
 
-# Validate the resolved value (a packager override could be empty or
-# relative).  src/paths.c builds "<dir>/scores.dat" and test_paths TC-22b
-# asserts an absolute path, so reject anything that is not.
-if(NOT XBOING_GLOBAL_SCORE_DIR MATCHES "^/")
+# Validate the resolved value (a packager override could be empty,
+# relative, or the bare root).  src/paths.c builds "<dir>/scores.dat" and
+# test_paths TC-22b asserts an absolute path longer than "/", so require a
+# leading slash followed by at least one more character — this rejects "",
+# relative paths, and "/" (which would compile "//scores.dat").
+if(NOT XBOING_GLOBAL_SCORE_DIR MATCHES "^/.+")
     message(FATAL_ERROR
-        "XBOING_GLOBAL_SCORE_DIR must be a non-empty absolute path "
+        "XBOING_GLOBAL_SCORE_DIR must be an absolute path below root "
         "(got: '${XBOING_GLOBAL_SCORE_DIR}')")
 endif()
 

@@ -114,7 +114,11 @@ class Xboing < Formula
     rescue Errno::EEXIST
       nil # already present; validated/normalized via the descriptor below
     end
-    File.open(SHARED_DIR, File::RDONLY | File::NOFOLLOW) do |d|
+    # O_NONBLOCK matters: O_NOFOLLOW rejects a symlink leaf but NOT a FIFO,
+    # device, or socket, and a blocking O_RDONLY open of a pre-planted FIFO
+    # would hang the install before fstat could reject it.  NONBLOCK returns
+    # immediately so the stat check below can refuse a non-directory.
+    File.open(SHARED_DIR, File::RDONLY | File::NOFOLLOW | File::NONBLOCK) do |d|
       st = d.stat
       if !st.directory? || st.uid != Process.euid
         odie "#{SHARED_DIR} is not a directory owned by this install; remove it and reinstall."
@@ -145,15 +149,18 @@ class Xboing < Formula
   end
 
   # Validate and normalize an existing shared file entirely through a
-  # NOFOLLOW descriptor — no pathname is re-resolved, so there is no
-  # check-to-chmod TOCTOU.  It must be a plain, UNSHARED, install-owned
-  # regular file: a symlink leaf raises ELOOP; fstat then rejects
-  # non-regular files, extra hard links (nlink != 1, which would alias an
-  # unrelated inode), and any file a local user pre-created (uid != euid).
+  # NOFOLLOW + NONBLOCK descriptor — no pathname is re-resolved, so there
+  # is no check-to-chmod TOCTOU.  NONBLOCK is required because O_NOFOLLOW
+  # rejects only symlinks: a FIFO/device pre-planted in the world-writable
+  # dir would block a plain O_RDONLY open before fstat could reject it.
+  # The entry must be a plain, UNSHARED, install-owned regular file: fstat
+  # rejects non-regular files (FIFO/device/dir), extra hard links
+  # (nlink != 1, which would alias an unrelated inode), and any file a
+  # local user pre-created (uid != euid); a symlink leaf raises ELOOP.
   # The mode is re-enforced via fchmod so a prior install that wrote the
   # wrong mode (e.g. under a restrictive umask) self-heals.
   def enforce_existing_shared_file(path, mode)
-    File.open(path, File::RDONLY | File::NOFOLLOW) do |f|
+    File.open(path, File::RDONLY | File::NOFOLLOW | File::NONBLOCK) do |f|
       st = f.stat
       if !st.file? || st.nlink != 1 || st.uid != Process.euid
         odie "#{path} is not a plain, unshared, install-owned regular file; remove it and reinstall."
