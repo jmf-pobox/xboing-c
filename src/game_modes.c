@@ -757,6 +757,26 @@ static void mode_keysedit_update(sdl2_state_mode_t mode, void *ud)
  * MODE_BONUS — bonus tally sequence between levels
  * ========================================================================= */
 
+/* Re-read the shared global high-score table from disk into ctx->hs_global
+ * so another user's recent insert is visible before we rank or prompt
+ * against it.  Swap-on-OK only: highscore_io_read zeroes its destination on
+ * failure, so a transient read error must not wipe the in-memory cache.
+ * No-op when no global board exists (unprivileged installs — Homebrew, dev
+ * builds), where hs_global stays at its zero-initialised default. */
+static void refresh_hs_global(game_ctx_t *ctx)
+{
+    if (!sys_priv_global_board_active(ctx->paths.xboing_score_file))
+        return;
+
+    char global_path[PATHS_MAX_PATH];
+    if (paths_score_file_global(&ctx->paths, global_path, sizeof(global_path)) != PATHS_OK)
+        return;
+
+    highscore_table_t fresh;
+    if (highscore_io_read(global_path, &fresh) == HIGHSCORE_IO_OK)
+        ctx->hs_global = fresh;
+}
+
 static void mode_bonus_enter(sdl2_state_mode_t mode, void *ud)
 {
     (void)mode;
@@ -770,22 +790,25 @@ static void mode_bonus_enter(sdl2_state_mode_t mode, void *ud)
 
     unsigned long score_val = score_system_get(ctx->score);
     /* DoHighScore on the bonus screen — original/bonus.c:528-579 calls
-     * GetHighScoreRanking which reads GLOBAL (highscore.c:622-640).
-     * Re-read from disk first so other users' recent inserts are
-     * visible (matches the wisdom-prompt path in mode_highscore_enter).
-     * Read into a stack-local then swap on OK — highscore_io_read
-     * zeroes the destination on EOPEN/EREAD/EVERSION, so the in-memory
-     * cache must not be the destination on a transient read failure. */
+     * GetHighScoreRanking, which reads GLOBAL (highscore.c:622-640).
+     * Rank against the board the player will actually be placed on so the
+     * interstitial can't promise a rank the final standings won't honour:
+     *   - global board active (setgid / override) -> GLOBAL, re-read from
+     *     disk so other users' recent inserts show (original behaviour);
+     *   - otherwise (Homebrew, dev builds, no /var/games) -> PERSONAL, the
+     *     only board that exists and the one game-over displays.
+     * predict_rank uses insert semantics (ties land behind), so the shown
+     * rank equals the placement highscore_io_insert will produce. */
+    int rank;
+    if (sys_priv_global_board_active(ctx->paths.xboing_score_file))
     {
-        char global_path[PATHS_MAX_PATH];
-        if (paths_score_file_global(&ctx->paths, global_path, sizeof(global_path)) == PATHS_OK)
-        {
-            highscore_table_t fresh;
-            if (highscore_io_read(global_path, &fresh) == HIGHSCORE_IO_OK)
-                ctx->hs_global = fresh;
-        }
+        refresh_hs_global(ctx);
+        rank = highscore_io_predict_rank(&ctx->hs_global, score_val);
     }
-    int rank = highscore_io_get_ranking(&ctx->hs_global, score_val);
+    else
+    {
+        rank = highscore_io_predict_rank(&ctx->hs_personal, score_val);
+    }
 
     bonus_system_env_t env = {
         .score = score_val,
@@ -952,7 +975,7 @@ static int submit_score(game_ctx_t *ctx, unsigned long score, unsigned long game
      * builds — there is no shared /var/games board, so skip it rather than
      * fail an open on a nonexistent directory and emit stderr noise on
      * every ranking.  Personal scores were already written above. */
-    if (!sys_priv_is_setgid() && ctx->paths.xboing_score_file[0] == '\0')
+    if (!sys_priv_global_board_active(ctx->paths.xboing_score_file))
     {
         return 0;
     }
@@ -1065,29 +1088,25 @@ static void mode_highscore_enter(sdl2_state_mode_t mode, void *ud)
 
             /* Boing-master prompt — original gates on global rank
              * (highscore.c:622-640 reads GLOBAL inside GetHighScoreRanking,
-             * called from level.c:434 before either insert).  Re-read
-             * from disk so another user's recent insert is visible.
-             * Swap-on-OK so a transient read failure can't wipe the
-             * in-memory cache (highscore_io_read zeroes its destination
-             * on EOPEN/EREAD/EVERSION). */
-            {
-                char global_path[PATHS_MAX_PATH];
-                if (paths_score_file_global(&ctx->paths, global_path, sizeof(global_path)) ==
-                    PATHS_OK)
-                {
-                    highscore_table_t fresh;
-                    if (highscore_io_read(global_path, &fresh) == HIGHSCORE_IO_OK)
-                        ctx->hs_global = fresh;
-                }
-            }
+             * called from level.c:434 before either insert).  Re-read from
+             * disk first so another user's recent insert is visible. */
+            refresh_hs_global(ctx);
 
-            /* Use dedup-aware helper: prompts only when the locked
-             * insert will land us at rank 0, not when our existing
-             * higher score would block insertion.  Restored sessions
-             * skip the prompt entirely — submit_score will refuse
-             * the global write anyway, so there's no master text to
-             * collect. */
-            if (!ctx->savegame_restored_session &&
+            /* Only prompt for boing-master "words of wisdom" when there is
+             * a global board to store them on.  On unprivileged installs
+             * (no /var/games) hs_global is empty, so would_be_global_master
+             * would say "yes" for any score — but submit_score has no board
+             * to write the text to, so the wisdom would be collected and
+             * silently discarded.  Gate the whole prompt on the same
+             * global-board check submit_score uses.
+             *
+             * Otherwise use the dedup-aware helper: prompt only when the
+             * locked insert will land us at rank 0, not when our existing
+             * higher score would block insertion.  Restored sessions skip
+             * the prompt entirely — submit_score refuses the global write
+             * anyway, so there's no master text to collect. */
+            if (sys_priv_global_board_active(ctx->paths.xboing_score_file) &&
+                !ctx->savegame_restored_session &&
                 highscore_io_would_be_global_master(&ctx->hs_global, final_score,
                                                     (unsigned long)getuid()) &&
                 sdl2_state_push_dialogue(ctx->state) == SDL2ST_OK)

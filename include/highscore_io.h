@@ -141,10 +141,25 @@ highscore_io_result_t highscore_io_insert(highscore_table_t *table, unsigned lon
                                           unsigned long timestamp, const char *name);
 
 /*
- * Return the rank (1-based) that the given score would achieve in
- * the table, or -1 if it would not place.
+ * Current standing (1-based) of the given score in the table, or -1 if
+ * it does not place.  Uses ">=" so a score tied with an entry shares the
+ * rank ahead of it — the right semantic for "where do I stand right now,
+ * including my own already-inserted entry" (e.g. the post-insert master
+ * check).  For "where would I land if inserted now", use
+ * highscore_io_predict_rank instead — that is the function the display
+ * paths should use so the shown rank matches the actual placement.
  */
 int highscore_io_get_ranking(const highscore_table_t *table, unsigned long score);
+
+/*
+ * Rank (1-based) the score WOULD receive if inserted now, or -1 if it
+ * would not place.  Uses insertion semantics (">" — a tie does NOT
+ * displace, so the new score lands behind an equal entry).  This is the
+ * exact slot highscore_io_insert / highscore_io_insert_global_atomic
+ * choose, so a placement prediction computed here can never disagree
+ * with where the score actually ends up.
+ */
+int highscore_io_predict_rank(const highscore_table_t *table, unsigned long score);
 
 /*
  * Would this (score, user_id) land at rank 0 after the per-uid dedup

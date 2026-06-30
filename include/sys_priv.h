@@ -14,6 +14,7 @@
 #ifndef SYS_PRIV_H
 #define SYS_PRIV_H
 
+#include <stdbool.h>
 #include <sys/types.h>
 
 /* Call once from main() before any file I/O.  Saves the original
@@ -34,5 +35,14 @@ int sys_priv_drop(void);
  * entirely on unprivileged installs (Homebrew, dev builds), where there
  * is no shared /var/games board.  Returns 0 if init has not run. */
 int sys_priv_is_setgid(void);
+
+/* True when a shared global high-score board exists for this process:
+ * either the binary is setgid games (the Debian /var/games deployment)
+ * or an explicit score-file override is configured (score_file_override
+ * is a non-empty string, e.g. $XBOING_SCORE_FILE — used by tests and
+ * administration).  Single source of truth for the gate that decides
+ * whether the global board is read, written, and ranked against; pass
+ * cfg->xboing_score_file (NULL is treated as "no override"). */
+bool sys_priv_global_board_active(const char *score_file_override);
 
 #endif

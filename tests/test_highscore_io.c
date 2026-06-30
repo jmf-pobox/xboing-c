@@ -188,6 +188,78 @@ static void test_insert_shifts_down(void **state)
 }
 
 /* =========================================================================
+ * Group 3b: predict_rank — placement prediction (insert semantics)
+ * ========================================================================= */
+
+static void test_predict_rank_empty(void **state)
+{
+    (void)state;
+    highscore_table_t t;
+    highscore_io_init_table(&t);
+    /* Any positive score takes the top slot of an empty board. */
+    assert_int_equal(highscore_io_predict_rank(&t, 5000), 1);
+    /* A zero score does not place (insert refuses it too). */
+    assert_int_equal(highscore_io_predict_rank(&t, 0), -1);
+}
+
+static void test_predict_rank_middle(void **state)
+{
+    (void)state;
+    highscore_table_t t = make_populated_table();
+    assert_int_equal(highscore_io_predict_rank(&t, 42000), 3);
+}
+
+static void test_predict_rank_tie_lands_behind(void **state)
+{
+    (void)state;
+    highscore_table_t t = make_populated_table();
+    /* A score tied with entry[0] (50000) does NOT displace it — predict
+     * says rank 2 (behind), matching the insert.  get_ranking, by
+     * contrast, reports current standing and ties ahead (rank 1).  This
+     * difference is exactly the bonus-interstitial-vs-placement bug, so
+     * pin both semantics here. */
+    assert_int_equal(highscore_io_predict_rank(&t, 50000), 2);
+    assert_int_equal(highscore_io_get_ranking(&t, 50000), 1);
+}
+
+static void test_predict_rank_full_table_too_low(void **state)
+{
+    (void)state;
+    highscore_table_t t = make_populated_table();
+    for (int i = 5; i < HIGHSCORE_NUM_ENTRIES; i++)
+    {
+        t.entries[i].score = (unsigned long)(25000 - (i - 5) * 1000);
+    }
+    assert_int_equal(highscore_io_predict_rank(&t, 100), -1);
+}
+
+/* The whole point of predict_rank: the predicted rank must equal where
+ * highscore_io_insert actually puts the score, for every score.  This
+ * guards against the two ever drifting apart again. */
+static void test_predict_rank_matches_insert(void **state)
+{
+    (void)state;
+    const unsigned long scores[] = {60000, 50000, 47000, 42000, 30000, 25000, 1, 0};
+    for (size_t k = 0; k < sizeof(scores) / sizeof(scores[0]); k++)
+    {
+        highscore_table_t t = make_populated_table();
+        int predicted = highscore_io_predict_rank(&t, scores[k]);
+        highscore_io_result_t r =
+            highscore_io_insert(&t, scores[k], 1, 1, 1700000002UL, "Predicted");
+        if (predicted < 0)
+        {
+            assert_int_equal(r, HIGHSCORE_IO_ERR_NOT_RANKED);
+        }
+        else
+        {
+            assert_int_equal(r, HIGHSCORE_IO_OK);
+            assert_int_equal((int)t.entries[predicted - 1].score, (int)scores[k]);
+            assert_string_equal(t.entries[predicted - 1].name, "Predicted");
+        }
+    }
+}
+
+/* =========================================================================
  * Group 4: Write and read round-trip
  * ========================================================================= */
 
@@ -685,6 +757,11 @@ int main(void)
         cmocka_unit_test(test_ranking_middle),
         cmocka_unit_test(test_ranking_not_placed),
         cmocka_unit_test(test_insert_shifts_down),
+        cmocka_unit_test(test_predict_rank_empty),
+        cmocka_unit_test(test_predict_rank_middle),
+        cmocka_unit_test(test_predict_rank_tie_lands_behind),
+        cmocka_unit_test(test_predict_rank_full_table_too_low),
+        cmocka_unit_test(test_predict_rank_matches_insert),
         /* Group 4: Write and read round-trip */
         cmocka_unit_test_setup_teardown(test_write_read_roundtrip, setup_tmpfile, teardown_tmpfile),
         cmocka_unit_test_setup_teardown(test_roundtrip_empty_table, setup_tmpfile,
