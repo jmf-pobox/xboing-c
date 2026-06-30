@@ -822,6 +822,11 @@ static void mode_bonus_enter(sdl2_state_mode_t mode, void *ud)
     {
         rank = highscore_io_predict_rank(&ctx->hs_personal, projected_score);
     }
+    /* bonus_system_env_t.highscore_rank uses 0 = unranked (bonus_system.h);
+     * predict_rank returns -1 for "would not place", so clamp to the
+     * env's contract.  The renderer treats both as "Keep on trying!". */
+    if (rank < 0)
+        rank = 0;
 
     bonus_system_env_t env = {
         .score = score_val,

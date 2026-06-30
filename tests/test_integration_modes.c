@@ -5,8 +5,11 @@
  * N frames to verify no crashes, memory errors, or undefined behavior.
  * ASan catches any issues during the ticking.
  *
- * This is a robustness test, not a correctness test.  We don't verify
- * that modes do the right thing — only that they don't crash.
+ * This is primarily a robustness (no-crash) suite — most tests only
+ * verify that a mode's enter/update don't crash, not that they do the
+ * right thing.  A small set of focused correctness regressions is mixed
+ * in (e.g. the bonus-interstitial rank tests at the end), each clearly
+ * marked.
  *
  * Modes tested:
  *   PRESENTS, INTRO, INSTRUCT, DEMO, PREVIEW, KEYS, KEYSEDIT,
