@@ -7,7 +7,7 @@ Juggle up to five balls at once, chase the high score, and design your
 own levels in the built-in editor.
 
 A faithful SDL2 port of Justin C. Kibell's X11 original, XBoing 2.4
-(released 1996). Current release: **1.0**.
+(released 1996). Current release: **1.0.1**.
 
 ![XBoing gameplay](screenshots/gameplay.gif)
 
@@ -67,7 +67,7 @@ This is an incremental modernization, not a rewrite. The 1996 Xlib sources stay 
 | Paths | compile-time `#define`s | XDG Base Directory spec |
 | Fonts | XLFD bitmap fonts | bundled TTF via SDL2_ttf |
 
-**Status**: release 1.0. All six phases of the [integration roadmap](docs/INTEGRATION_ROADMAP.md) are done; remaining work is tracked in [beads](https://github.com/steveyegge/beads).
+**Status**: release 1.0.1. All six phases of the [integration roadmap](docs/INTEGRATION_ROADMAP.md) are done; remaining work is tracked in [beads](https://github.com/steveyegge/beads).
 
 For deeper detail:
 

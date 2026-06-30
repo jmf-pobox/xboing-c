@@ -1,3 +1,14 @@
+xboing (1.0.1-1) unstable; urgency=medium
+
+  * Fix the between-level bonus interstitial reporting the wrong high-score
+    rank (e.g. "1st" when the player finished 2nd). It now predicts
+    placement against the board the player competes on (personal when no
+    global board exists) using the same slot logic as the actual insert.
+    Also stop prompting for boing-master "words of wisdom" on installs with
+    no global board, where the text was silently discarded. (ADR-050.)
+
+ -- J Freeman <jmf@pobox.com>  Tue, 30 Jun 2026 11:35:15 -0700
+
 xboing (1.0-1) unstable; urgency=medium
 
   * First stable release of the SDL2 modernization (1.0). Includes the
