@@ -887,19 +887,16 @@ highscore_io_insert_global_atomic(const char *path, unsigned long score, unsigne
         memcpy(table.entries, kept, sizeof(table.entries));
     }
 
-    /* Standard rank insert.  Use strict > — original/highscore.c:743
-     * uses `score > ntohl(highScores[i].score)`; ties do NOT displace.
-     * (The display-side highscore_io_get_ranking uses >= because
-     * original/highscore.c:633 does too — different semantic.) */
-    int rank = -1;
-    for (int i = 0; i < HIGHSCORE_NUM_ENTRIES; i++)
-    {
-        if (score > table.entries[i].score)
-        {
-            rank = i;
-            break;
-        }
-    }
+    /* Standard rank insert via the shared predictor (strict > —
+     * original/highscore.c:743; ties do NOT displace).  Same slot scan as
+     * the personal insert and the display-side prediction.  Note the
+     * per-uid dedup above runs BEFORE this scan, so a prediction made
+     * against the pre-dedup table (e.g. the bonus interstitial) can still
+     * differ from the slot chosen here for a user who already holds an
+     * entry — the scan agrees; the dedup is the extra global-only step.
+     * (highscore_io_get_ranking keeps >= for current-standing queries —
+     * original/highscore.c:633 — a deliberately different semantic.) */
+    int rank = highscore_io_predict_rank(&table, score) - 1;
     if (rank < 0)
     {
         flock(lock_fd, LOCK_UN);
@@ -960,19 +957,10 @@ highscore_io_result_t highscore_io_insert(highscore_table_t *table, unsigned lon
         return HIGHSCORE_IO_ERR_NULL;
     }
 
-    /* Find the insertion rank.  Use strict > — original/highscore.c:777
-     * uses `score > ntohl(highScores[i].score)` for the personal insert,
-     * so ties do not displace. */
-    int rank = -1;
-    for (int i = 0; i < HIGHSCORE_NUM_ENTRIES; i++)
-    {
-        if (score > table->entries[i].score)
-        {
-            rank = i;
-            break;
-        }
-    }
-
+    /* Find the insertion slot via the shared predictor so the displayed
+     * placement prediction and the real insert never diverge.  predict_rank
+     * is 1-based (or -1); convert to a 0-based slot index. */
+    int rank = highscore_io_predict_rank(table, score) - 1;
     if (rank < 0)
     {
         return HIGHSCORE_IO_ERR_NOT_RANKED;
@@ -1004,6 +992,27 @@ highscore_io_result_t highscore_io_insert(highscore_table_t *table, unsigned lon
     }
 
     return HIGHSCORE_IO_OK;
+}
+
+int highscore_io_predict_rank(const highscore_table_t *table, unsigned long score)
+{
+    if (!table)
+    {
+        return -1;
+    }
+
+    /* Strict > matches the insert slot scan (original/highscore.c:777):
+     * a tie does not displace, so an equal score lands behind the entry.
+     * highscore_io_insert calls this, guaranteeing the two agree. */
+    for (int i = 0; i < HIGHSCORE_NUM_ENTRIES; i++)
+    {
+        if (score > table->entries[i].score)
+        {
+            return i + 1; /* 1-based rank */
+        }
+    }
+
+    return -1;
 }
 
 int highscore_io_get_ranking(const highscore_table_t *table, unsigned long score)

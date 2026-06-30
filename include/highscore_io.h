@@ -141,10 +141,30 @@ highscore_io_result_t highscore_io_insert(highscore_table_t *table, unsigned lon
                                           unsigned long timestamp, const char *name);
 
 /*
- * Return the rank (1-based) that the given score would achieve in
- * the table, or -1 if it would not place.
+ * Current standing (1-based) of the given score in the table, or -1 if
+ * it does not place.  Uses ">=" so a score tied with an entry shares the
+ * rank ahead of it — the right semantic for "where do I stand right now,
+ * including my own already-inserted entry" (e.g. the post-insert master
+ * check).  For "where would I land if inserted now", use
+ * highscore_io_predict_rank instead — that is the function the display
+ * paths should use so the shown rank matches the actual placement.
  */
 int highscore_io_get_ranking(const highscore_table_t *table, unsigned long score);
+
+/*
+ * Rank (1-based) the score WOULD receive if inserted now, or -1 if it
+ * would not place.  Uses insertion semantics (">" — a tie does NOT
+ * displace, so the new score lands behind an equal entry): the same slot
+ * scan highscore_io_insert and highscore_io_insert_global_atomic use, so
+ * when the insert is accepted the score lands exactly at this rank.
+ *
+ * Caveat: this models slot selection only, NOT the per-uid dedup that
+ * highscore_io_insert_global_atomic applies first.  On the global board a
+ * user who already holds a higher (or equal) entry may be rejected
+ * (NOT_RANKED) even though predict_rank would otherwise place the score.
+ * For the boing-master question use highscore_io_would_be_global_master.
+ */
+int highscore_io_predict_rank(const highscore_table_t *table, unsigned long score);
 
 /*
  * Would this (score, user_id) land at rank 0 after the per-uid dedup

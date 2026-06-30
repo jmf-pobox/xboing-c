@@ -69,3 +69,8 @@ int sys_priv_is_setgid(void)
 {
     return g_initialized && g_games_gid_saved != getgid();
 }
+
+bool sys_priv_global_board_active(const char *score_file_override)
+{
+    return sys_priv_is_setgid() || (score_file_override != NULL && score_file_override[0] != '\0');
+}

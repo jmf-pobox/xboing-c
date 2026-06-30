@@ -5,8 +5,11 @@
  * N frames to verify no crashes, memory errors, or undefined behavior.
  * ASan catches any issues during the ticking.
  *
- * This is a robustness test, not a correctness test.  We don't verify
- * that modes do the right thing — only that they don't crash.
+ * This is primarily a robustness (no-crash) suite — most tests only
+ * verify that a mode's enter/update don't crash, not that they do the
+ * right thing.  A small set of focused correctness regressions is mixed
+ * in (e.g. the bonus-interstitial rank tests at the end), each clearly
+ * marked.
  *
  * Modes tested:
  *   PRESENTS, INTRO, INSTRUCT, DEMO, PREVIEW, KEYS, KEYSEDIT,
@@ -28,8 +31,12 @@
 
 #include <cmocka.h>
 
+#include "bonus_system.h"
 #include "game_context.h"
 #include "game_init.h"
+#include "gun_system.h"
+#include "highscore_io.h"
+#include "score_system.h"
 #include "sdl2_input.h"
 #include "sdl2_state.h"
 
@@ -157,6 +164,69 @@ static void test_mode_game(void **vstate)
     enter_and_tick(f->ctx, SDL2ST_GAME);
 }
 
+/* =========================================================================
+ * Bonus interstitial rank — correctness (not just no-crash)
+ *
+ * The test process is never setgid and sets no XBOING_SCORE_FILE, so the
+ * global board is inactive and the interstitial must rank against the
+ * PERSONAL board — the one the player is actually placed on at game over.
+ * ========================================================================= */
+
+/* Replace the personal board with a single top entry of the given score. */
+static void seed_personal_top(game_ctx_t *ctx, unsigned long top_score)
+{
+    highscore_io_init_table(&ctx->hs_personal);
+    ctx->hs_personal.entries[0].score = top_score;
+    snprintf(ctx->hs_personal.entries[0].name, HIGHSCORE_NAME_LEN, "Prior Best");
+}
+
+/* Set the running score and zero every bonus input so the projected
+ * (post-bonus) score the interstitial ranks equals the running score —
+ * bonus_system_compute_total returns 0 when the timer and bullet count are
+ * both zero.  Keeps these table-selection assertions independent of the
+ * bonus arithmetic. */
+static void set_score_no_bonus(game_ctx_t *ctx, unsigned long score)
+{
+    ctx->time_remaining = 0;
+    ctx->bonus_count = 0;
+    gun_system_set_ammo(ctx->gun, 0);
+    score_system_set(ctx->score, score);
+}
+
+/* Regression for "interstitial said #1, game over said #2": with a higher
+ * prior personal score, the bonus screen must report rank 2, not the
+ * spurious 1 that ranking against an empty global board produced. */
+static void test_bonus_rank_uses_personal_board(void **vstate)
+{
+    test_fixture_t *f = (test_fixture_t *)*vstate;
+    game_ctx_t *ctx = f->ctx;
+
+    seed_personal_top(ctx, 100000);
+    ctx->level_number = 3;
+    set_score_no_bonus(ctx, 5000);
+
+    sdl2_state_status_t st = sdl2_state_transition(ctx->state, SDL2ST_BONUS);
+    assert_int_equal(st, SDL2ST_OK);
+    assert_int_equal(bonus_system_get_highscore_rank(ctx->bonus), 2);
+}
+
+/* A score tied with the board's top entry predicts placement BEHIND it
+ * (insert semantics), so the interstitial never over-promises "1st" for a
+ * tie that will land the player 2nd. */
+static void test_bonus_rank_tie_lands_behind(void **vstate)
+{
+    test_fixture_t *f = (test_fixture_t *)*vstate;
+    game_ctx_t *ctx = f->ctx;
+
+    seed_personal_top(ctx, 5000);
+    ctx->level_number = 2;
+    set_score_no_bonus(ctx, 5000);
+
+    sdl2_state_status_t st = sdl2_state_transition(ctx->state, SDL2ST_BONUS);
+    assert_int_equal(st, SDL2ST_OK);
+    assert_int_equal(bonus_system_get_highscore_rank(ctx->bonus), 2);
+}
+
 static void test_mode_pause(void **vstate)
 {
     test_fixture_t *f = (test_fixture_t *)*vstate;
@@ -242,6 +312,8 @@ int main(void)
         cmocka_unit_test_setup_teardown(test_mode_highscore, setup, teardown),
         cmocka_unit_test_setup_teardown(test_mode_bonus, setup, teardown),
         cmocka_unit_test_setup_teardown(test_mode_game, setup, teardown),
+        cmocka_unit_test_setup_teardown(test_bonus_rank_uses_personal_board, setup, teardown),
+        cmocka_unit_test_setup_teardown(test_bonus_rank_tie_lands_behind, setup, teardown),
         cmocka_unit_test_setup_teardown(test_mode_pause, setup, teardown),
         cmocka_unit_test_setup_teardown(test_mode_edit, setup, teardown),
         cmocka_unit_test_setup_teardown(test_mode_dialogue_push_pop, setup, teardown),

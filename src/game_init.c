@@ -211,7 +211,7 @@ static void print_scores(const paths_config_t *cfg)
      * On unprivileged installs (Homebrew, dev builds) there is no shared
      * board, so do not reference the FHS /var/games path that can never
      * apply there. */
-    if (sys_priv_is_setgid() || cfg->xboing_score_file[0] != '\0')
+    if (sys_priv_global_board_active(cfg->xboing_score_file))
     {
         if (paths_score_file_global(cfg, path, sizeof(path)) != PATHS_OK)
             fprintf(stderr, "xboing -scores: cannot resolve the global score file path\n");

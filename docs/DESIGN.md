@@ -3127,3 +3127,65 @@ unrelated — it disables the *visual* special-effects system, not audio.)
 - If bit-exact original parity is ever a goal, this is the one intentional
   input-default divergence to revisit; it is isolated to the single
   `cfg.sound` initializer.
+
+## ADR-050: Bonus interstitial predicts placement on the board the player competes on
+
+**Status:** Accepted (2026-06-30)
+**Context:** `fix/bonus-rank-placement-prediction` — a player on the
+Homebrew/macOS build saw the between-level bonus screen say "You are ranked
+1st", then finished at #2.
+
+Two defects combined:
+
+1. **Wrong table.** The interstitial ranked against the **global** table
+   (`mode_bonus_enter`), but the player is placed on, and shown, the
+   **personal** table at game over. On an unprivileged install (Homebrew,
+   dev builds) there is no `/var/games` board, so the global table is
+   zero-initialised and `highscore_io_get_ranking` returned rank 1 for any
+   score (`score >= 0` against empty entries) — "1st" for everyone.
+2. **Display/insert tie-break split.** The display rank used `>=` (ties rank
+   ahead) while insertion used `>` (ties don't displace), so even within one
+   table an exact tie could show 1st then place 2nd.
+
+**Decision:**
+
+- The interstitial ranks against the board the player will actually be
+  placed on: the **global** table when a global board is active (setgid
+  deployment or `XBOING_SCORE_FILE` override — original behaviour, preserved),
+  otherwise the **personal** table. The single gate
+  `sys_priv_global_board_active()` decides this and replaces three
+  copy-pasted `sys_priv_is_setgid() || override` checks.
+- The displayed rank is computed by `highscore_io_predict_rank()`, which uses
+  the same strict-`>` slot scan as `highscore_io_insert` /
+  `highscore_io_insert_global_atomic` — both inserts now call it — so the
+  predicted rank and the real placement are computed by one function and
+  cannot diverge. `highscore_io_get_ranking()` (`>=`) is kept for
+  current-standing queries (the post-insert "boing master" sound check),
+  with its distinct semantic documented.
+- Same-root cleanup: the "words of wisdom" boing-master prompt is now gated
+  on `sys_priv_global_board_active()` too. Previously, on an unprivileged
+  install `would_be_global_master` returned true against the empty global
+  table, so the prompt fired and the collected text was silently discarded
+  (there is no global board to store it on).
+
+**Why deviate from the original (always-global bonus rank).** The original
+was multi-user Unix and always shipped a populated global highscore file, so
+"global rank on the bonus screen" was meaningful and the empty-table case
+never arose. The modern unprivileged deployment has no global board, so
+ranking the player against the board they actually compete on (personal) is
+the faithful intent, not a regression.
+
+**Consequences:**
+
+- On setgid installs, behaviour is unchanged (global rank, global prompt).
+- The bonus rank now reflects the player's standing against the board they
+  compete on, at the post-bonus score of that level — no more empty-global
+  "always 1st". It is a snapshot, not a promise: later levels raise the
+  score (so the rank can only improve), and on setgid installs the global
+  per-uid dedup or a post-game table switch can still move the final
+  placement. The fix removes the systematic over-promise, not every
+  possible difference.
+- Guarded by unit tests (`predict_rank` incl. a predict-equals-insert
+  divergence guard; `sys_priv_global_board_active`) and an integration test
+  that seeds a higher personal score and asserts the interstitial reports
+  rank 2, not 1.
