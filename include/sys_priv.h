@@ -42,7 +42,12 @@ int sys_priv_is_setgid(void);
  * is a non-empty string, e.g. $XBOING_SCORE_FILE — used by tests and
  * administration).  Single source of truth for the gate that decides
  * whether the global board is read, written, and ranked against; pass
- * cfg->xboing_score_file (NULL is treated as "no override"). */
+ * cfg->xboing_score_file (NULL is treated as "no override").
+ *
+ * The setgid half delegates to sys_priv_is_setgid(), which reports false
+ * until sys_priv_init() has run — so before init only the override branch
+ * can make this true.  All real callers run after sys_priv_init(); pre-init
+ * callers (e.g. tests) get override-only behaviour. */
 bool sys_priv_global_board_active(const char *score_file_override);
 
 #endif
