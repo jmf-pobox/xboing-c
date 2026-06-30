@@ -789,6 +789,8 @@ static void mode_bonus_enter(sdl2_state_mode_t mode, void *ud)
         sdl2_cursor_set(ctx->cursor, SDL2CUR_POINT);
 
     unsigned long score_val = score_system_get(ctx->score);
+    int ammo = gun_system_get_ammo(ctx->gun);
+
     /* DoHighScore on the bonus screen — original/bonus.c:528-579 calls
      * GetHighScoreRanking, which reads GLOBAL (highscore.c:622-640).
      * Rank against the board the player will actually be placed on so the
@@ -797,17 +799,25 @@ static void mode_bonus_enter(sdl2_state_mode_t mode, void *ud)
      *     disk so other users' recent inserts show (original behaviour);
      *   - otherwise (Homebrew, dev builds, no /var/games) -> PERSONAL, the
      *     only board that exists and the one game-over displays.
+     * Predict against the score the player will hold once THIS screen's
+     * bonus is committed: bonus_system_begin adds the bonus total to the
+     * score immediately (via on_score_add), so ranking the pre-bonus score
+     * would mislabel the standing whenever the bonus crosses a rank
+     * boundary.  env.score stays pre-bonus so the tally still counts up.
      * predict_rank uses insert semantics (ties land behind), so the shown
      * rank equals the placement highscore_io_insert will produce. */
+    unsigned long projected_score =
+        score_val + bonus_system_compute_total(ctx->bonus_count, ctx->level_number,
+                                               ctx->start_level, ctx->time_remaining, ammo);
     int rank;
     if (sys_priv_global_board_active(ctx->paths.xboing_score_file))
     {
         refresh_hs_global(ctx);
-        rank = highscore_io_predict_rank(&ctx->hs_global, score_val);
+        rank = highscore_io_predict_rank(&ctx->hs_global, projected_score);
     }
     else
     {
-        rank = highscore_io_predict_rank(&ctx->hs_personal, score_val);
+        rank = highscore_io_predict_rank(&ctx->hs_personal, projected_score);
     }
 
     bonus_system_env_t env = {
@@ -815,7 +825,7 @@ static void mode_bonus_enter(sdl2_state_mode_t mode, void *ud)
         .level = ctx->level_number,
         .starting_level = ctx->start_level,
         .time_bonus_secs = ctx->time_remaining,
-        .bullet_count = gun_system_get_ammo(ctx->gun),
+        .bullet_count = ammo,
         .highscore_rank = rank,
     };
 

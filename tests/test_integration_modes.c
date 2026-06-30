@@ -31,6 +31,7 @@
 #include "bonus_system.h"
 #include "game_context.h"
 #include "game_init.h"
+#include "gun_system.h"
 #include "highscore_io.h"
 #include "score_system.h"
 #include "sdl2_input.h"
@@ -176,6 +177,19 @@ static void seed_personal_top(game_ctx_t *ctx, unsigned long top_score)
     snprintf(ctx->hs_personal.entries[0].name, HIGHSCORE_NAME_LEN, "Prior Best");
 }
 
+/* Set the running score and zero every bonus input so the projected
+ * (post-bonus) score the interstitial ranks equals the running score —
+ * bonus_system_compute_total returns 0 when the timer and bullet count are
+ * both zero.  Keeps these table-selection assertions independent of the
+ * bonus arithmetic. */
+static void set_score_no_bonus(game_ctx_t *ctx, unsigned long score)
+{
+    ctx->time_remaining = 0;
+    ctx->bonus_count = 0;
+    gun_system_set_ammo(ctx->gun, 0);
+    score_system_set(ctx->score, score);
+}
+
 /* Regression for "interstitial said #1, game over said #2": with a higher
  * prior personal score, the bonus screen must report rank 2, not the
  * spurious 1 that ranking against an empty global board produced. */
@@ -185,8 +199,8 @@ static void test_bonus_rank_uses_personal_board(void **vstate)
     game_ctx_t *ctx = f->ctx;
 
     seed_personal_top(ctx, 100000);
-    score_system_set(ctx->score, 5000);
     ctx->level_number = 3;
+    set_score_no_bonus(ctx, 5000);
 
     sdl2_state_status_t st = sdl2_state_transition(ctx->state, SDL2ST_BONUS);
     assert_int_equal(st, SDL2ST_OK);
@@ -202,8 +216,8 @@ static void test_bonus_rank_tie_lands_behind(void **vstate)
     game_ctx_t *ctx = f->ctx;
 
     seed_personal_top(ctx, 5000);
-    score_system_set(ctx->score, 5000);
     ctx->level_number = 2;
+    set_score_no_bonus(ctx, 5000);
 
     sdl2_state_status_t st = sdl2_state_transition(ctx->state, SDL2ST_BONUS);
     assert_int_equal(st, SDL2ST_OK);

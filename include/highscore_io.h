@@ -154,10 +154,15 @@ int highscore_io_get_ranking(const highscore_table_t *table, unsigned long score
 /*
  * Rank (1-based) the score WOULD receive if inserted now, or -1 if it
  * would not place.  Uses insertion semantics (">" — a tie does NOT
- * displace, so the new score lands behind an equal entry).  This is the
- * exact slot highscore_io_insert / highscore_io_insert_global_atomic
- * choose, so a placement prediction computed here can never disagree
- * with where the score actually ends up.
+ * displace, so the new score lands behind an equal entry): the same slot
+ * scan highscore_io_insert and highscore_io_insert_global_atomic use, so
+ * when the insert is accepted the score lands exactly at this rank.
+ *
+ * Caveat: this models slot selection only, NOT the per-uid dedup that
+ * highscore_io_insert_global_atomic applies first.  On the global board a
+ * user who already holds a higher (or equal) entry may be rejected
+ * (NOT_RANKED) even though predict_rank would otherwise place the score.
+ * For the boing-master question use highscore_io_would_be_global_master.
  */
 int highscore_io_predict_rank(const highscore_table_t *table, unsigned long score);
 
