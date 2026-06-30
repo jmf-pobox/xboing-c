@@ -246,7 +246,9 @@ static void test_predict_rank_matches_insert(void **state)
         int predicted = highscore_io_predict_rank(&t, scores[k]);
         highscore_io_result_t r =
             highscore_io_insert(&t, scores[k], 1, 1, 1700000002UL, "Predicted");
-        if (predicted < 0)
+        /* predict_rank returns a 1-based rank or -1; <= 0 means "would not
+         * place" (and keeps the indexing below provably in-bounds). */
+        if (predicted <= 0)
         {
             assert_int_equal(r, HIGHSCORE_IO_ERR_NOT_RANKED);
         }
