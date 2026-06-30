@@ -888,8 +888,12 @@ highscore_io_insert_global_atomic(const char *path, unsigned long score, unsigne
     }
 
     /* Standard rank insert via the shared predictor (strict > —
-     * original/highscore.c:743; ties do NOT displace).  Same scan as the
-     * personal insert and the display-side prediction, so all three agree.
+     * original/highscore.c:743; ties do NOT displace).  Same slot scan as
+     * the personal insert and the display-side prediction.  Note the
+     * per-uid dedup above runs BEFORE this scan, so a prediction made
+     * against the pre-dedup table (e.g. the bonus interstitial) can still
+     * differ from the slot chosen here for a user who already holds an
+     * entry — the scan agrees; the dedup is the extra global-only step.
      * (highscore_io_get_ranking keeps >= for current-standing queries —
      * original/highscore.c:633 — a deliberately different semantic.) */
     int rank = highscore_io_predict_rank(&table, score) - 1;

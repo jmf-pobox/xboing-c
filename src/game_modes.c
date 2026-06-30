@@ -804,8 +804,11 @@ static void mode_bonus_enter(sdl2_state_mode_t mode, void *ud)
      * score immediately (via on_score_add), so ranking the pre-bonus score
      * would mislabel the standing whenever the bonus crosses a rank
      * boundary.  env.score stays pre-bonus so the tally still counts up.
-     * predict_rank uses insert semantics (ties land behind), so the shown
-     * rank equals the placement highscore_io_insert will produce. */
+     * predict_rank uses insert semantics (ties land behind).  For the
+     * personal board this equals the placement highscore_io_insert
+     * produces; for the global board it does not model the per-uid dedup
+     * insert_global_atomic applies first, so a player who already holds a
+     * better/equal global entry may place differently than shown. */
     unsigned long projected_score =
         score_val + bonus_system_compute_total(ctx->bonus_count, ctx->level_number,
                                                ctx->start_level, ctx->time_remaining, ammo);

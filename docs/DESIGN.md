@@ -3178,7 +3178,13 @@ the faithful intent, not a regression.
 **Consequences:**
 
 - On setgid installs, behaviour is unchanged (global rank, global prompt).
-- The bonus rank now always equals the final game-over placement.
+- The bonus rank now reflects the player's standing against the board they
+  compete on, at the post-bonus score of that level — no more empty-global
+  "always 1st". It is a snapshot, not a promise: later levels raise the
+  score (so the rank can only improve), and on setgid installs the global
+  per-uid dedup or a post-game table switch can still move the final
+  placement. The fix removes the systematic over-promise, not every
+  possible difference.
 - Guarded by unit tests (`predict_rank` incl. a predict-equals-insert
   divergence guard; `sys_priv_global_board_active`) and an integration test
   that seeds a higher personal score and asserts the interstitial reports
