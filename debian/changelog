@@ -1,3 +1,12 @@
+xboing (1.0-1) unstable; urgency=medium
+
+  * First stable release of the SDL2 modernization (1.0). Includes the
+    SDL2-accurate man page, the -scores fix for non-Debian platforms, and
+    the README/install rework. Version is single-sourced from
+    project(VERSION) and matches the v1.0 git tag and the Homebrew formula.
+
+ -- J Freeman <jmf@pobox.com>  Mon, 29 Jun 2026 17:41:01 -0700
+
 xboing (0.9-1) unstable; urgency=medium
 
   * Re-version the SDL2 modernization to 0.9 (pre-1.0). The "2.4" of the
