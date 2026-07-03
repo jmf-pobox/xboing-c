@@ -22,12 +22,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <SDL2/SDL.h>
 #include <cmocka.h>
 
 #include "block_system.h"
 #include "editor_system.h"
 #include "game_context.h"
 #include "game_init.h"
+#include "sdl2_cursor.h"
 #include "sdl2_input.h"
 #include "sdl2_state.h"
 
@@ -48,6 +50,20 @@ static void tick_frames(game_ctx_t *ctx, int n)
         sdl2_input_begin_frame(ctx->input);
         sdl2_state_update(ctx->state);
     }
+}
+
+/* Run one frame with a synthetic mouse-button event (down or up) at the
+ * given window coordinates, then tick the state machine. */
+static void tick_with_mouse_button(game_ctx_t *ctx, Uint8 button, bool pressed, int x, int y)
+{
+    sdl2_input_begin_frame(ctx->input);
+    SDL_Event e = {0};
+    e.type = pressed ? SDL_MOUSEBUTTONDOWN : SDL_MOUSEBUTTONUP;
+    e.button.button = button;
+    e.button.x = x;
+    e.button.y = y;
+    sdl2_input_process_event(ctx->input, &e);
+    sdl2_state_update(ctx->state);
 }
 
 /* =========================================================================
@@ -109,6 +125,29 @@ static void test_editor_ticking_no_crash(void **vstate)
     sdl2_state_mode_t mode = sdl2_state_current(f->ctx->state);
     /* May still be in EDIT, or editor may have auto-transitioned */
     assert_true(mode >= SDL2ST_NONE && mode < SDL2ST_COUNT);
+}
+
+/* Erasing (middle button held over the board) shows the skull cursor;
+ * releasing reverts to the crosshair.  Parity with original editor.c:535/573.
+ * The decision is observed via sdl2_cursor_current() (a cached enum, so it
+ * runs headless under the dummy driver). */
+static void test_editor_erase_shows_skull_cursor(void **vstate)
+{
+    test_fixture_t *f = (test_fixture_t *)*vstate;
+    game_ctx_t *ctx = f->ctx;
+
+    assert_int_equal(editor_system_get_state(ctx->editor), EDITOR_STATE_NONE);
+
+    /* Board cell (2,3) is play-area (192,80); window coords add
+     * PLAY_AREA_X=35 / PLAY_AREA_Y=60 (game_modes.c). */
+    const int wx = 192 + 35, wy = 80 + 60;
+
+    tick_with_mouse_button(ctx, SDL_BUTTON_MIDDLE, true, wx, wy);
+    assert_int_equal(editor_system_get_draw_action(ctx->editor), EDITOR_ACTION_ERASE);
+    assert_int_equal(sdl2_cursor_current(ctx->cursor), SDL2CUR_SKULL);
+
+    tick_with_mouse_button(ctx, SDL_BUTTON_MIDDLE, false, wx, wy);
+    assert_int_equal(sdl2_cursor_current(ctx->cursor), SDL2CUR_PLUS);
 }
 
 static void test_editor_draw_block(void **vstate)
@@ -196,6 +235,8 @@ int main(void)
 {
     const struct CMUnitTest tests[] = {
         cmocka_unit_test_setup_teardown(test_edit_mode_enters, setup_edit_mode, teardown),
+        cmocka_unit_test_setup_teardown(test_editor_erase_shows_skull_cursor, setup_edit_mode,
+                                        teardown),
         cmocka_unit_test_setup_teardown(test_editor_ticking_no_crash, setup_edit_mode, teardown),
         cmocka_unit_test_setup_teardown(test_editor_draw_block, setup_edit_mode, teardown),
         cmocka_unit_test_setup_teardown(test_editor_clear_grid, setup_edit_mode, teardown),

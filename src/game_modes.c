@@ -1352,6 +1352,20 @@ static void mode_edit_update(sdl2_state_mode_t mode, void *ud)
     /* Mouse drag */
     editor_system_mouse_motion(ctx->editor, play_x, play_y);
 
+    /* Cursor cue: skull while erasing, crosshair otherwise — original
+     * editor.c:535 (Button2 -> CURSOR_SKULL) / :573 (release -> CURSOR_PLUS).
+     * Only while editing (EDITOR_STATE_NONE); leave the cursor untouched
+     * during play-test so this doesn't fight that mode's cursor.  Set only
+     * on change so we don't hit SDL every frame. */
+    if (ctx->cursor && editor_system_get_state(ctx->editor) == EDITOR_STATE_NONE)
+    {
+        sdl2_cursor_id_t want = SDL2CUR_PLUS;
+        if (editor_system_get_draw_action(ctx->editor) == EDITOR_ACTION_ERASE)
+            want = SDL2CUR_SKULL;
+        if (sdl2_cursor_current(ctx->cursor) != want)
+            sdl2_cursor_set(ctx->cursor, want);
+    }
+
     /* Keyboard commands */
     if (sdl2_input_just_pressed(ctx->input, SDL2I_QUIT) ||
         sdl2_input_just_pressed(ctx->input, SDL2I_ABORT))
