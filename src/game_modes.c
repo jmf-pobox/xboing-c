@@ -314,7 +314,7 @@ static void mode_pause_enter(sdl2_state_mode_t mode, void *ud)
 
     /* Restore cursor while paused */
     if (ctx->cursor)
-        sdl2_cursor_set(ctx->cursor, SDL2CUR_POINT);
+        sdl2_cursor_set(ctx->cursor, SDL2CUR_ARROW);
 }
 
 static void mode_pause_update(sdl2_state_mode_t mode, void *ud)
@@ -367,6 +367,16 @@ static void attract_random_display(game_ctx_t *ctx, int is_animating)
     special_system_randomize(ctx->special, rand);
 }
 
+/* All menu/attract screens show the plain arrow (the original left the
+ * default cursor on them).  Setting it on every such mode's enter stops the
+ * cursor leaking in from the previous mode (e.g. the editor's plus/skull).
+ * Game hides the cursor; the editor sets plus/skull itself. */
+static void set_menu_cursor(game_ctx_t *ctx)
+{
+    if (ctx->cursor)
+        sdl2_cursor_set(ctx->cursor, SDL2CUR_ARROW);
+}
+
 /* =========================================================================
  * MODE_PRESENTS — splash screen sequence
  * ========================================================================= */
@@ -375,6 +385,7 @@ static void mode_presents_enter(sdl2_state_mode_t mode, void *ud)
 {
     (void)mode;
     game_ctx_t *ctx = ud;
+    set_menu_cursor(ctx);
     attract_frame_counter = 0;
     attract_next_flash = 0;
     presents_system_begin(ctx->presents, 0);
@@ -414,6 +425,7 @@ static void mode_intro_enter(sdl2_state_mode_t mode, void *ud)
 {
     (void)mode;
     game_ctx_t *ctx = ud;
+    set_menu_cursor(ctx);
     attract_frame_counter = 0;
     attract_next_flash = 0;
     intro_deveye_tick = 0;
@@ -490,6 +502,7 @@ static void mode_instruct_enter(sdl2_state_mode_t mode, void *ud)
 {
     (void)mode;
     game_ctx_t *ctx = ud;
+    set_menu_cursor(ctx);
     attract_frame_counter = 0;
     attract_next_flash = 0;
     intro_system_begin(ctx->intro, INTRO_MODE_INSTRUCT, 0);
@@ -531,6 +544,7 @@ static void mode_demo_enter(sdl2_state_mode_t mode, void *ud)
 {
     (void)mode;
     game_ctx_t *ctx = ud;
+    set_menu_cursor(ctx);
     attract_frame_counter = 0;
     attract_next_flash = 0;
     demo_system_begin(ctx->demo, DEMO_MODE_DEMO, 0);
@@ -589,6 +603,7 @@ static void mode_preview_enter(sdl2_state_mode_t mode, void *ud)
 {
     (void)mode;
     game_ctx_t *ctx = ud;
+    set_menu_cursor(ctx);
     attract_frame_counter = 0;
     attract_next_flash = 0;
     preview_message_set = 0;
@@ -643,6 +658,7 @@ static void mode_keys_enter(sdl2_state_mode_t mode, void *ud)
 {
     (void)mode;
     game_ctx_t *ctx = ud;
+    set_menu_cursor(ctx);
     attract_frame_counter = 0;
     attract_next_flash = 0;
     keys_deveye_tick = 0;
@@ -714,6 +730,7 @@ static void mode_keysedit_enter(sdl2_state_mode_t mode, void *ud)
 {
     (void)mode;
     game_ctx_t *ctx = ud;
+    set_menu_cursor(ctx);
     attract_frame_counter = 0;
     attract_next_flash = 0;
     keys_system_begin(ctx->keys, KEYS_MODE_EDITOR, 0);
@@ -786,7 +803,7 @@ static void mode_bonus_enter(sdl2_state_mode_t mode, void *ud)
 
     /* Restore cursor during bonus tally */
     if (ctx->cursor)
-        sdl2_cursor_set(ctx->cursor, SDL2CUR_POINT);
+        sdl2_cursor_set(ctx->cursor, SDL2CUR_ARROW);
 
     unsigned long score_val = score_system_get(ctx->score);
     int ammo = gun_system_get_ammo(ctx->gun);
@@ -1060,7 +1077,7 @@ static void mode_highscore_enter(sdl2_state_mode_t mode, void *ud)
 
     /* Restore cursor when leaving gameplay */
     if (ctx->cursor)
-        sdl2_cursor_set(ctx->cursor, SDL2CUR_POINT);
+        sdl2_cursor_set(ctx->cursor, SDL2CUR_ARROW);
 
     /* Did we just submit a score (game-over path)?  Mode_highscore_enter
      * runs in two scenarios per game over: (1) wisdom_pending after the

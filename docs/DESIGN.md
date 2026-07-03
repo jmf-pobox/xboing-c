@@ -3231,3 +3231,39 @@ and `scripts/gen_cursors.py` record the source and regeneration command.
   unit test; the erase→`SKULL` selection has PR #169's editor integration
   test). The on-screen *appearance* is a manual check — the hardware cursor is
   an OS overlay, not captured by the screenshot pipeline.
+
+## ADR-052: Every mode sets its cursor; plain arrow on menu/attract screens
+
+**Status:** Accepted (2026-07-03)
+**Context:** `fix/cursor-state-arrow` — cursor state leaked between modes.
+
+Seven attract/menu mode-enter handlers (intro, instruct, keys, keysedit, demo,
+preview, presents) set no cursor, so they inherited whatever the previous mode
+left — e.g. entering the instructions screen after the editor showed the
+editor's crosshair/plus instead of a normal pointer. The port had also put a
+*hand* (`POINT`) on pause/bonus/highscore, which the original didn't.
+
+**Original policy (ground truth).** Only the editor (plus/skull, a hand over
+the toolbar, hidden during play-test) and the game (hidden) ever changed the
+cursor; every other screen used the plain default arrow.
+
+**Decision.** Make **every mode's enter handler set its cursor explicitly** —
+no mode inherits, so leaks are impossible by construction. The cursor-per-
+screen policy:
+
+- **Game** (and editor play-test): hidden (`SDL2CUR_NONE`).
+- **Editor** (editing): `SDL2CUR_PLUS` (draw) / `SDL2CUR_SKULL` (erase).
+- **Everything else** — intro, instructions, keys, keysedit, demo, preview,
+  presents, highscore, bonus, pause: the plain arrow (`SDL2CUR_ARROW`, added
+  for this — a visible `SDL_SYSTEM_CURSOR_ARROW`), matching the original.
+
+A `set_menu_cursor()` helper centralises the menu choice. `POINT` (the hand)
+is retained in the cursor set but no longer used by any screen.
+
+**Consequences:**
+
+- No cursor leaks; the instructions screen shows the arrow whether reached
+  fresh or after the editor.
+- Guarded by an integration test asserting the cursor is `ARROW` after an
+  editor→instructions transition (not the leftover plus), plus the cursor
+  unit tests updated for the new `SDL2CUR_ARROW`.

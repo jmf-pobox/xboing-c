@@ -150,6 +150,20 @@ static void test_editor_erase_shows_skull_cursor(void **vstate)
     assert_int_equal(sdl2_cursor_current(ctx->cursor), SDL2CUR_PLUS);
 }
 
+/* Cursor state doesn't leak between modes: the editor sets the plus, and
+ * entering the instructions screen resets it to the arrow rather than
+ * inheriting the leftover editor cursor. */
+static void test_cursor_no_leak_editor_to_instruct(void **vstate)
+{
+    test_fixture_t *f = (test_fixture_t *)*vstate;
+    game_ctx_t *ctx = f->ctx;
+
+    assert_int_equal(sdl2_cursor_current(ctx->cursor), SDL2CUR_PLUS);
+
+    sdl2_state_transition(ctx->state, SDL2ST_INSTRUCT);
+    assert_int_equal(sdl2_cursor_current(ctx->cursor), SDL2CUR_ARROW);
+}
+
 static void test_editor_draw_block(void **vstate)
 {
     test_fixture_t *f = (test_fixture_t *)*vstate;
@@ -236,6 +250,8 @@ int main(void)
     const struct CMUnitTest tests[] = {
         cmocka_unit_test_setup_teardown(test_edit_mode_enters, setup_edit_mode, teardown),
         cmocka_unit_test_setup_teardown(test_editor_erase_shows_skull_cursor, setup_edit_mode,
+                                        teardown),
+        cmocka_unit_test_setup_teardown(test_cursor_no_leak_editor_to_instruct, setup_edit_mode,
                                         teardown),
         cmocka_unit_test_setup_teardown(test_editor_ticking_no_crash, setup_edit_mode, teardown),
         cmocka_unit_test_setup_teardown(test_editor_draw_block, setup_edit_mode, teardown),
