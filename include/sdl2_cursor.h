@@ -20,11 +20,12 @@
 typedef enum
 {
     SDL2CUR_WAIT = 0,  /* Watch/hourglass (legacy XC_watch) */
-    SDL2CUR_PLUS = 1,  /* Crosshair (legacy XC_plus) */
+    SDL2CUR_PLUS = 1,  /* X11 plus, editor draw (XC_plus) */
     SDL2CUR_NONE = 2,  /* Invisible/hidden cursor */
     SDL2CUR_POINT = 3, /* Hand/pointer (legacy XC_hand2) */
-    SDL2CUR_SKULL = 4, /* Crosshair, skull substitute (legacy XC_pirate) */
-    SDL2CUR_COUNT = 5
+    SDL2CUR_SKULL = 4, /* X11 skull-and-crossbones, editor erase (XC_pirate) */
+    SDL2CUR_ARROW = 5, /* Plain arrow — default for menu/attract screens */
+    SDL2CUR_COUNT = 6
 } sdl2_cursor_id_t;
 
 /* Status codes returned by sdl2_cursor functions. */

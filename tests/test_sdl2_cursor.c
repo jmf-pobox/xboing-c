@@ -197,6 +197,7 @@ static void test_name_values(void **state)
     assert_string_equal(sdl2_cursor_name(SDL2CUR_NONE), "none");
     assert_string_equal(sdl2_cursor_name(SDL2CUR_POINT), "point");
     assert_string_equal(sdl2_cursor_name(SDL2CUR_SKULL), "skull");
+    assert_string_equal(sdl2_cursor_name(SDL2CUR_ARROW), "arrow");
 }
 
 /* TC-14: Out-of-range ID returns "unknown". */

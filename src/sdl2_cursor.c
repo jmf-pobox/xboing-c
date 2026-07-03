@@ -32,7 +32,7 @@ struct sdl2_cursor
 static const SDL_SystemCursor system_cursor_map[SDL2CUR_COUNT] = {
     [SDL2CUR_WAIT] = SDL_SYSTEM_CURSOR_WAIT,       [SDL2CUR_PLUS] = SDL_SYSTEM_CURSOR_CROSSHAIR,
     [SDL2CUR_NONE] = SDL_SYSTEM_CURSOR_ARROW,      [SDL2CUR_POINT] = SDL_SYSTEM_CURSOR_HAND,
-    [SDL2CUR_SKULL] = SDL_SYSTEM_CURSOR_CROSSHAIR,
+    [SDL2CUR_SKULL] = SDL_SYSTEM_CURSOR_CROSSHAIR, [SDL2CUR_ARROW] = SDL_SYSTEM_CURSOR_ARROW,
 };
 
 /*
@@ -181,6 +181,8 @@ const char *sdl2_cursor_name(sdl2_cursor_id_t id)
             return "point";
         case SDL2CUR_SKULL:
             return "skull";
+        case SDL2CUR_ARROW:
+            return "arrow";
         case SDL2CUR_COUNT:
             break;
     }
