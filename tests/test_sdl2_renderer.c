@@ -187,6 +187,38 @@ static void test_is_fullscreen_initial(void **state)
 }
 
 /* =========================================================================
+ * Group 3b: Mouse grab (-grab)
+ * ========================================================================= */
+
+/* TC-10: Not grabbed by default; set true confines, set false releases.
+ * SDL's dummy video driver tracks the grab flag, so this runs headless. */
+static void test_mouse_grab_set_and_release(void **state)
+{
+    (void)state;
+    sdl2_renderer_config_t cfg = sdl2_renderer_config_defaults();
+    sdl2_renderer_t *ctx = sdl2_renderer_create(&cfg);
+    assert_non_null(ctx);
+
+    assert_false(sdl2_renderer_get_mouse_grab(ctx));
+
+    sdl2_renderer_set_mouse_grab(ctx, true);
+    assert_true(sdl2_renderer_get_mouse_grab(ctx));
+
+    sdl2_renderer_set_mouse_grab(ctx, false);
+    assert_false(sdl2_renderer_get_mouse_grab(ctx));
+
+    sdl2_renderer_destroy(ctx);
+}
+
+/* TC-11: NULL-safe — no crash, returns false. */
+static void test_mouse_grab_null_safe(void **state)
+{
+    (void)state;
+    sdl2_renderer_set_mouse_grab(NULL, true); /* must not crash */
+    assert_false(sdl2_renderer_get_mouse_grab(NULL));
+}
+
+/* =========================================================================
  * Group 6: Null safety
  * ========================================================================= */
 
@@ -271,6 +303,8 @@ int main(void)
         /* Group 5: Fullscreen */
         cmocka_unit_test(test_fullscreen_toggle),
         cmocka_unit_test(test_is_fullscreen_initial),
+        cmocka_unit_test(test_mouse_grab_set_and_release),
+        cmocka_unit_test(test_mouse_grab_null_safe),
         /* Group 6: Null safety */
         cmocka_unit_test(test_destroy_null),
         /* Group 7: Invalid config */

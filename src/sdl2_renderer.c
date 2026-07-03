@@ -234,6 +234,24 @@ bool sdl2_renderer_is_fullscreen(const sdl2_renderer_t *ctx)
     return ctx->fullscreen;
 }
 
+void sdl2_renderer_set_mouse_grab(sdl2_renderer_t *ctx, bool grab)
+{
+    if (ctx == NULL || ctx->window == NULL)
+    {
+        return;
+    }
+    SDL_SetWindowMouseGrab(ctx->window, grab ? SDL_TRUE : SDL_FALSE);
+}
+
+bool sdl2_renderer_get_mouse_grab(const sdl2_renderer_t *ctx)
+{
+    if (ctx == NULL || ctx->window == NULL)
+    {
+        return false;
+    }
+    return SDL_GetWindowMouseGrab(ctx->window) == SDL_TRUE;
+}
+
 SDL_Renderer *sdl2_renderer_get(const sdl2_renderer_t *ctx)
 {
     if (ctx == NULL)
