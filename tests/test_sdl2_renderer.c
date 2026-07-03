@@ -190,7 +190,7 @@ static void test_is_fullscreen_initial(void **state)
  * Group 3b: Mouse grab (-grab)
  * ========================================================================= */
 
-/* TC-10: Not grabbed by default; set true confines, set false releases.
+/* Not grabbed by default; set true confines, set false releases.
  * SDL's dummy video driver tracks the grab flag, so this runs headless. */
 static void test_mouse_grab_set_and_release(void **state)
 {
@@ -210,7 +210,7 @@ static void test_mouse_grab_set_and_release(void **state)
     sdl2_renderer_destroy(ctx);
 }
 
-/* TC-11: NULL-safe — no crash, returns false. */
+/* NULL-safe — no crash, returns false. */
 static void test_mouse_grab_null_safe(void **state)
 {
     (void)state;
