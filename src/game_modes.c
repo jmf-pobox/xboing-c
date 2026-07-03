@@ -486,7 +486,6 @@ static void mode_intro_update(sdl2_state_mode_t mode, void *ud)
             }
         }
     }
-
 }
 
 /* =========================================================================
