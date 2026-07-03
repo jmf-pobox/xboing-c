@@ -3291,8 +3291,9 @@ Two problems, one root cause.
 
 **Decision.** Handle attract-screen `space` in `game_input_global` (once per
 visual frame, `mode` captured at frame start, so exactly one transition per
-press), exactly like the `c`-cycle key. Delete the six per-tick handlers
-(`intro`, `instruct`, `demo`, `preview`, `keys`, `keysedit`). Mapping:
+press), exactly like the `c`-cycle key. Delete the seven per-tick handlers
+(`intro`, `instruct`, `demo`, `preview`, `keys`, `keysedit`, `highscore`).
+Mapping:
 
 - **Title (`INTRO`) opens `INSTRUCT`.** Deliberate deviation from the 1996
   original (`main.c:547`, where title `space` opens `MODE_GAME`), at the
@@ -3306,7 +3307,7 @@ press), exactly like the `c`-cycle key. Delete the six per-tick handlers
 
 **Consequences:**
 
-- Quality improves: six duplicated per-tick blocks collapse to one handler
+- Quality improves: seven duplicated per-tick blocks collapse to one handler
   that mirrors the established `c`-cycle pattern; the edge-key policy is now
   applied consistently.
 - A single press can never cascade, regardless of tick count.
