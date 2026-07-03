@@ -15,7 +15,8 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 find_package(PkgConfig REQUIRED)
 
 # SDL2 libraries — required for the modernized game binary.
-pkg_check_modules(SDL2       REQUIRED sdl2)
+# >=2.0.16 for SDL_SetWindowMouseGrab (used by the -grab option).
+pkg_check_modules(SDL2       REQUIRED sdl2>=2.0.16)
 pkg_check_modules(SDL2_IMAGE REQUIRED SDL2_image)
 pkg_check_modules(SDL2_MIXER REQUIRED SDL2_mixer)
 pkg_check_modules(SDL2_TTF   REQUIRED SDL2_ttf)
