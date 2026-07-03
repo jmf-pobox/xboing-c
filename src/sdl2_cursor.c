@@ -10,6 +10,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "sdl2_cursor_bitmaps.h" /* generated XC_plus / XC_pirate bitmaps */
+
 /* =========================================================================
  * Internal data structures
  * ========================================================================= */
@@ -21,18 +23,37 @@ struct sdl2_cursor
 };
 
 /*
- * Map cursor IDs to SDL2 system cursor constants.
- * SDL2CUR_NONE uses SDL_SYSTEM_CURSOR_ARROW as a placeholder — the
- * actual hiding is done via SDL_ShowCursor(SDL_DISABLE).
- * SDL2CUR_SKULL maps to SDL_SYSTEM_CURSOR_CROSSHAIR since SDL2 has
- * no pirate/skull cursor; crosshair is the closest match and is also
- * used in the editor context where skull appears.
+ * Fallback system cursors, used when a custom bitmap cursor can't be built.
+ * SDL2CUR_NONE uses SDL_SYSTEM_CURSOR_ARROW as a placeholder — the actual
+ * hiding is done via SDL_ShowCursor(SDL_DISABLE).  PLUS and SKULL are built
+ * from the real X11 cursor-font bitmaps (see create_custom_cursor); the
+ * crosshair here is only their fallback when SDL_CreateCursor fails.
  */
 static const SDL_SystemCursor system_cursor_map[SDL2CUR_COUNT] = {
     [SDL2CUR_WAIT] = SDL_SYSTEM_CURSOR_WAIT,       [SDL2CUR_PLUS] = SDL_SYSTEM_CURSOR_CROSSHAIR,
     [SDL2CUR_NONE] = SDL_SYSTEM_CURSOR_ARROW,      [SDL2CUR_POINT] = SDL_SYSTEM_CURSOR_HAND,
     [SDL2CUR_SKULL] = SDL_SYSTEM_CURSOR_CROSSHAIR,
 };
+
+/*
+ * Build the exact original editor cursor from the X11 cursor-font bitmaps:
+ * XC_plus (draw) and XC_pirate (skull, erase).  Returns NULL for ids with
+ * no custom bitmap (the caller then falls back to the system cursor).
+ */
+static SDL_Cursor *create_custom_cursor(sdl2_cursor_id_t id)
+{
+    switch (id)
+    {
+        case SDL2CUR_PLUS:
+            return SDL_CreateCursor(cursor_plus_data, cursor_plus_mask, CURSOR_PLUS_W,
+                                    CURSOR_PLUS_H, CURSOR_PLUS_HOTX, CURSOR_PLUS_HOTY);
+        case SDL2CUR_SKULL:
+            return SDL_CreateCursor(cursor_pirate_data, cursor_pirate_mask, CURSOR_PIRATE_W,
+                                    CURSOR_PIRATE_H, CURSOR_PIRATE_HOTX, CURSOR_PIRATE_HOTY);
+        default:
+            return NULL;
+    }
+}
 
 /* =========================================================================
  * Internal helpers
@@ -69,7 +90,13 @@ sdl2_cursor_t *sdl2_cursor_create(sdl2_cursor_status_t *status)
      */
     for (int i = 0; i < SDL2CUR_COUNT; i++)
     {
-        ctx->cursors[i] = SDL_CreateSystemCursor(system_cursor_map[i]);
+        /* Custom X11-font bitmap for PLUS/SKULL; system cursor otherwise or
+         * as a fallback if the bitmap cursor can't be created. */
+        ctx->cursors[i] = create_custom_cursor((sdl2_cursor_id_t)i);
+        if (ctx->cursors[i] == NULL)
+        {
+            ctx->cursors[i] = SDL_CreateSystemCursor(system_cursor_map[i]);
+        }
         if (ctx->cursors[i] == NULL)
         {
             SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,

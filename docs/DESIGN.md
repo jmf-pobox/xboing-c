@@ -3189,3 +3189,45 @@ the faithful intent, not a regression.
   divergence guard; `sys_priv_global_board_active`) and an integration test
   that seeds a higher personal score and asserts the interstitial reports
   rank 2, not 1.
+
+## ADR-051: Faithful editor cursors from the X11 cursor font
+
+**Status:** Accepted (2026-07-03)
+**Context:** `feat/faithful-editor-cursors` — the editor's draw/erase cursors.
+
+The original editor used two X11 cursor-font glyphs: `XC_plus` (draw) and
+`XC_pirate` (skull-and-crossbones, erase) — `original/init.c:849,857`, loaded
+via `XCreateFontCursor`. SDL2 has no equivalent: `SDL_CreateSystemCursor`
+exposes ~12 system cursors and no pirate/skull, so the port mapped both
+`SDL2CUR_PLUS` and `SDL2CUR_SKULL` to `SDL_SYSTEM_CURSOR_CROSSHAIR`. Result:
+the plus wasn't faithful and the erase cue was invisible (both were the same
+crosshair). PR #169 wired the editor to select `SKULL` while erasing, but
+selecting a crosshair-that-looks-like-the-plus showed no visible change.
+
+**Decision:** Reproduce the **exact** original cursors from the X.Org `cursor`
+bitmap font (`font-cursor-misc`, `cursor.bdf`; MIT/X11). The font stores each
+cursor as a monochrome *source* glyph + *mask* glyph, which maps directly onto
+the classic `SDL_CreateCursor(data, mask, w, h, hot_x, hot_y)` — no image
+conversion, the exact 1996 bits.
+
+- `scripts/gen_cursors.py` extracts `XC_plus` (90/91) and `XC_pirate` (88/89),
+  aligns source+mask on a common byte-padded canvas by their BBX offsets, and
+  emits `src/sdl2_cursor_bitmaps.h` (data/mask arrays + dimensions + hotspot).
+- `sdl2_cursor` builds `PLUS`/`SKULL` with `SDL_CreateCursor` from those
+  bitmaps, falling back to the system crosshair if creation fails.
+
+**Why not a redrawn image / `SDL_CreateColorCursor`.** The X font *is* the
+authentic source; monochrome source+mask is exactly what `SDL_CreateCursor`
+consumes, so it's both faithful and simpler (no PNG/asset, no surface).
+
+**License/provenance.** The X.Org cursor font is MIT/X11; the generated header
+and `scripts/gen_cursors.py` record the source and regeneration command.
+
+**Consequences:**
+
+- The editor now shows the real X11 plus (draw) and skull (erase).
+- Testable parts are guarded (the generated bitmaps' array sizes match their
+  declared dimensions, and `SDL_CreateCursor` accepts them — asset-validity
+  unit test; the erase→`SKULL` selection has PR #169's editor integration
+  test). The on-screen *appearance* is a manual check — the hardware cursor is
+  an OS overlay, not captured by the screenshot pipeline.
