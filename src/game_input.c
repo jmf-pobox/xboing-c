@@ -390,7 +390,12 @@ void game_input_global(game_ctx_t *ctx)
      * so exactly one transition fires per press.  Mirrors the C-cycle above.
      *
      * Title -> instructions (not the game); the other attract screens ->
-     * game; highscore -> new game, or intro if shown after a game over. */
+     * game; highscore -> new game, or intro if shown after a game over.
+     *
+     * PRESENTS and BONUS are intentionally absent: their Space merely
+     * fast-forwards that one screen (presents_system_skip / bonus_system_skip),
+     * which is idempotent and cannot cascade, so it stays per-tick in their
+     * mode_*_update handlers. */
     if (sdl2_input_just_pressed(ctx->input, SDL2I_START))
     {
         if (mode == SDL2ST_INTRO)
