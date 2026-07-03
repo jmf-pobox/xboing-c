@@ -243,7 +243,7 @@ static void test_grab_flag_applied(void **vstate)
     assert_non_null(ctx);
     /* Capture, destroy, then assert — so a failing assert still frees the
      * context (cmocka longjmps out of the test on failure). */
-    bool grabbed = sdl2_renderer_get_mouse_grab(ctx->renderer);
+    bool grabbed = sdl2_renderer_is_mouse_grabbed(ctx->renderer);
     game_destroy(ctx);
     assert_true(grabbed);
 }
@@ -255,7 +255,7 @@ static void test_grab_flag_absent_default(void **vstate)
     char *argv[] = {arg_prog, NULL};
     game_ctx_t *ctx = game_create(1, argv);
     assert_non_null(ctx);
-    bool grabbed = sdl2_renderer_get_mouse_grab(ctx->renderer);
+    bool grabbed = sdl2_renderer_is_mouse_grabbed(ctx->renderer);
     game_destroy(ctx);
     assert_false(grabbed);
 }

@@ -89,7 +89,7 @@ bool sdl2_renderer_is_fullscreen(const sdl2_renderer_t *ctx);
 void sdl2_renderer_set_mouse_grab(sdl2_renderer_t *ctx, bool grab);
 
 /* Query whether the mouse pointer is currently grabbed to the window. */
-bool sdl2_renderer_get_mouse_grab(const sdl2_renderer_t *ctx);
+bool sdl2_renderer_is_mouse_grabbed(const sdl2_renderer_t *ctx);
 
 /* Access the underlying SDL_Renderer (for drawing operations). */
 SDL_Renderer *sdl2_renderer_get(const sdl2_renderer_t *ctx);

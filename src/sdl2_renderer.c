@@ -243,7 +243,7 @@ void sdl2_renderer_set_mouse_grab(sdl2_renderer_t *ctx, bool grab)
     SDL_SetWindowMouseGrab(ctx->window, grab ? SDL_TRUE : SDL_FALSE);
 }
 
-bool sdl2_renderer_get_mouse_grab(const sdl2_renderer_t *ctx)
+bool sdl2_renderer_is_mouse_grabbed(const sdl2_renderer_t *ctx)
 {
     if (ctx == NULL || ctx->window == NULL)
     {

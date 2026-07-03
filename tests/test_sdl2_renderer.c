@@ -187,7 +187,7 @@ static void test_is_fullscreen_initial(void **state)
 }
 
 /* =========================================================================
- * Group 3b: Mouse grab (-grab)
+ * Group 5b: Mouse grab (-grab)
  * ========================================================================= */
 
 /* Not grabbed by default; set true confines, set false releases.
@@ -199,13 +199,13 @@ static void test_mouse_grab_set_and_release(void **state)
     sdl2_renderer_t *ctx = sdl2_renderer_create(&cfg);
     assert_non_null(ctx);
 
-    assert_false(sdl2_renderer_get_mouse_grab(ctx));
+    assert_false(sdl2_renderer_is_mouse_grabbed(ctx));
 
     sdl2_renderer_set_mouse_grab(ctx, true);
-    assert_true(sdl2_renderer_get_mouse_grab(ctx));
+    assert_true(sdl2_renderer_is_mouse_grabbed(ctx));
 
     sdl2_renderer_set_mouse_grab(ctx, false);
-    assert_false(sdl2_renderer_get_mouse_grab(ctx));
+    assert_false(sdl2_renderer_is_mouse_grabbed(ctx));
 
     sdl2_renderer_destroy(ctx);
 }
@@ -215,7 +215,7 @@ static void test_mouse_grab_null_safe(void **state)
 {
     (void)state;
     sdl2_renderer_set_mouse_grab(NULL, true); /* must not crash */
-    assert_false(sdl2_renderer_get_mouse_grab(NULL));
+    assert_false(sdl2_renderer_is_mouse_grabbed(NULL));
 }
 
 /* =========================================================================
