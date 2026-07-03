@@ -241,8 +241,11 @@ static void test_grab_flag_applied(void **vstate)
     char *argv[] = {arg_prog, arg_grab, NULL};
     game_ctx_t *ctx = game_create(2, argv);
     assert_non_null(ctx);
-    assert_true(sdl2_renderer_get_mouse_grab(ctx->renderer));
+    /* Capture, destroy, then assert — so a failing assert still frees the
+     * context (cmocka longjmps out of the test on failure). */
+    bool grabbed = sdl2_renderer_get_mouse_grab(ctx->renderer);
     game_destroy(ctx);
+    assert_true(grabbed);
 }
 
 /* Without -grab, the mouse is not grabbed (default). */
@@ -252,8 +255,9 @@ static void test_grab_flag_absent_default(void **vstate)
     char *argv[] = {arg_prog, NULL};
     game_ctx_t *ctx = game_create(1, argv);
     assert_non_null(ctx);
-    assert_false(sdl2_renderer_get_mouse_grab(ctx->renderer));
+    bool grabbed = sdl2_renderer_get_mouse_grab(ctx->renderer);
     game_destroy(ctx);
+    assert_false(grabbed);
 }
 
 static void test_mode_pause(void **vstate)
