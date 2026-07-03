@@ -1359,9 +1359,9 @@ static void mode_edit_update(sdl2_state_mode_t mode, void *ud)
      * on change so we don't hit SDL every frame. */
     if (ctx->cursor && editor_system_get_state(ctx->editor) == EDITOR_STATE_NONE)
     {
-        sdl2_cursor_id_t want =
-            editor_system_get_draw_action(ctx->editor) == EDITOR_ACTION_ERASE ? SDL2CUR_SKULL
-                                                                              : SDL2CUR_PLUS;
+        sdl2_cursor_id_t want = SDL2CUR_PLUS;
+        if (editor_system_get_draw_action(ctx->editor) == EDITOR_ACTION_ERASE)
+            want = SDL2CUR_SKULL;
         if (sdl2_cursor_current(ctx->cursor) != want)
             sdl2_cursor_set(ctx->cursor, want);
     }
