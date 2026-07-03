@@ -381,4 +381,44 @@ void game_input_global(game_ctx_t *ctx)
             sdl2_state_transition(ctx->state, next);
         }
     }
+
+    /* Space on the attract screens.  Handled here once per visual frame, NOT
+     * in the per-tick mode_*_update handlers: the fixed-timestep loop runs
+     * several ticks per frame (a large catch-up burst on the first frame), so
+     * a per-tick edge handler let a single press cascade through several
+     * screens straight into the game.  `mode` is captured once at frame start,
+     * so exactly one transition fires per press.  Mirrors the C-cycle above.
+     *
+     * Title -> instructions (not the game); the other attract screens ->
+     * game; highscore -> new game, or intro if shown after a game over.
+     *
+     * PRESENTS and BONUS are intentionally absent: their Space merely
+     * fast-forwards that one screen (presents_system_skip / bonus_system_skip),
+     * which is idempotent and cannot cascade, so it stays per-tick in their
+     * mode_*_update handlers. */
+    if (sdl2_input_just_pressed(ctx->input, SDL2I_START))
+    {
+        if (mode == SDL2ST_INTRO)
+        {
+            sdl2_loop_set_speed(ctx->loop, SDL2L_DEFAULT_SPEED);
+            sdl2_state_transition(ctx->state, SDL2ST_INSTRUCT);
+        }
+        else if (mode == SDL2ST_INSTRUCT || mode == SDL2ST_DEMO || mode == SDL2ST_PREVIEW ||
+                 mode == SDL2ST_KEYS || mode == SDL2ST_KEYSEDIT)
+        {
+            sdl2_state_transition(ctx->state, SDL2ST_GAME);
+        }
+        else if (mode == SDL2ST_HIGHSCORE)
+        {
+            if (ctx->game_active)
+            {
+                ctx->game_active = false;
+                sdl2_state_transition(ctx->state, SDL2ST_INTRO);
+            }
+            else
+            {
+                sdl2_state_transition(ctx->state, SDL2ST_GAME);
+            }
+        }
+    }
 }

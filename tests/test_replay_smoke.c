@@ -117,18 +117,20 @@ static void test_replay_space_starts_game(void **vstate)
     test_fixture_t *f = (test_fixture_t *)*vstate;
 
     /*
-     * Script: press Space once to skip presents → intro,
-     * then press Space again during intro to start the game.
+     * Script: Space skips presents → intro; Space on the title advances to
+     * the instructions screen; Space there starts the game.
      *
-     * First Space during PRESENTS triggers presents_system_skip(),
-     * which accelerates to on_finished → INTRO transition.
-     * Second Space during INTRO triggers game start.
+     * First Space during PRESENTS triggers presents_system_skip() →
+     * on_finished → INTRO.  Second Space during INTRO → INSTRUCT.  Third
+     * Space during INSTRUCT → GAME.
      */
     replay_event_t script[] = {
         { 10, SDL2I_START, 1}, /* Skip presents */
         { 11, SDL2I_START, 0},
-        {500, SDL2I_START, 1}, /* Start game from intro */
+        {500, SDL2I_START, 1}, /* Intro -> instructions */
         {501, SDL2I_START, 0},
+        {505, SDL2I_START, 1}, /* Instructions -> game */
+        {506, SDL2I_START, 0},
         REPLAY_END,
     };
 
@@ -148,13 +150,16 @@ static void test_replay_game_then_pause(void **vstate)
     test_fixture_t *f = (test_fixture_t *)*vstate;
 
     /*
-     * Script: press Space to start game, then press P to pause.
+     * Script: reach the game (title -> instructions -> game), then press P
+     * to pause.
      */
     replay_event_t script[] = {
         { 10, SDL2I_START, 1}, /* Skip presents */
         { 11, SDL2I_START, 0},
-        {500, SDL2I_START, 1}, /* Start game */
+        {500, SDL2I_START, 1}, /* Intro -> instructions */
         {501, SDL2I_START, 0},
+        {505, SDL2I_START, 1}, /* Instructions -> game */
+        {506, SDL2I_START, 0},
         {550, SDL2I_PAUSE, 1}, /* Pause */
         {551, SDL2I_PAUSE, 0},
         REPLAY_END,
@@ -193,8 +198,10 @@ static void test_replay_extended_gameplay(void **vstate)
     replay_event_t script[] = {
         { 10, SDL2I_START, 1},  /* Skip presents */
         { 11, SDL2I_START, 0},
-        {500, SDL2I_START, 1},  /* Start game */
+        {500, SDL2I_START, 1},  /* Intro -> instructions */
         {501, SDL2I_START, 0},
+        {505, SDL2I_START, 1},  /* Instructions -> game */
+        {506, SDL2I_START, 0},
         {600, SDL2I_LEFT, 1},   /* Hold left */
         {700, SDL2I_LEFT, 0},   /* Release left */
         {700, SDL2I_RIGHT, 1},  /* Hold right */
