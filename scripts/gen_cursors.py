@@ -27,19 +27,20 @@ def parse_bdf(path):
     glyphs = {}
     enc = bbx = rows = None
     inbmp = False
-    for line in open(path):
-        line = line.rstrip("\n")
-        if line.startswith("ENCODING"):
-            enc = int(line.split()[1])
-        elif line.startswith("BBX"):
-            bbx = list(map(int, line.split()[1:]))  # w h xoff yoff
-        elif line == "BITMAP":
-            inbmp, rows = True, []
-        elif line.startswith("ENDCHAR"):
-            glyphs[enc] = (bbx, rows)
-            inbmp = False
-        elif inbmp:
-            rows.append(int(line, 16))
+    with open(path) as f:
+        for line in f:
+            line = line.rstrip("\n")
+            if line.startswith("ENCODING"):
+                enc = int(line.split()[1])
+            elif line.startswith("BBX"):
+                bbx = list(map(int, line.split()[1:]))  # w h xoff yoff
+            elif line == "BITMAP":
+                inbmp, rows = True, []
+            elif line.startswith("ENDCHAR"):
+                glyphs[enc] = (bbx, rows)
+                inbmp = False
+            elif inbmp:
+                rows.append(int(line, 16))
     return glyphs
 
 
