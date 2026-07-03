@@ -80,6 +80,17 @@ bool sdl2_renderer_toggle_fullscreen(sdl2_renderer_t *ctx);
 /* Query the current fullscreen state. */
 bool sdl2_renderer_is_fullscreen(const sdl2_renderer_t *ctx);
 
+/*
+ * Confine (grab) the mouse pointer to the window, or release it.
+ * Wraps SDL_SetWindowMouseGrab — the modern equivalent of the original's
+ * XGrabPointer(confine_to=window) for the -grab option.  No-op if ctx or
+ * the window is NULL.
+ */
+void sdl2_renderer_set_mouse_grab(sdl2_renderer_t *ctx, bool grab);
+
+/* Query whether the mouse pointer is currently grabbed to the window. */
+bool sdl2_renderer_is_mouse_grabbed(const sdl2_renderer_t *ctx);
+
 /* Access the underlying SDL_Renderer (for drawing operations). */
 SDL_Renderer *sdl2_renderer_get(const sdl2_renderer_t *ctx);
 

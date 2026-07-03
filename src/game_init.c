@@ -357,6 +357,10 @@ game_ctx_t *game_create(int argc, char *argv[])
         goto fail;
     }
 
+    /* -grab: confine the mouse pointer to the window (original/main.c:248
+     * grabbed via XGrabPointer with confine_to=window). */
+    sdl2_renderer_set_mouse_grab(ctx->renderer, cli.grab);
+
     /* Texture cache.  Resolution order (matches paths.c's level/sound
      * file lookup, freedesktop XDG Base Directory spec):
      *   1. $XDG_DATA_DIRS/xboing/images  (handles --prefix=/usr,

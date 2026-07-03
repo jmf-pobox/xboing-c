@@ -38,6 +38,7 @@
 #include "highscore_io.h"
 #include "score_system.h"
 #include "sdl2_input.h"
+#include "sdl2_renderer.h"
 #include "sdl2_state.h"
 
 /* =========================================================================
@@ -227,6 +228,38 @@ static void test_bonus_rank_tie_lands_behind(void **vstate)
     assert_int_equal(bonus_system_get_highscore_rank(ctx->bonus), 2);
 }
 
+/* =========================================================================
+ * -grab wiring — game_create applies the CLI flag to the window
+ * ========================================================================= */
+
+static char arg_grab[] = "-grab";
+
+/* With -grab, the window's mouse is grabbed after game_create. */
+static void test_grab_flag_applied(void **vstate)
+{
+    (void)vstate;
+    char *argv[] = {arg_prog, arg_grab, NULL};
+    game_ctx_t *ctx = game_create(2, argv);
+    assert_non_null(ctx);
+    /* Capture, destroy, then assert — so a failing assert still frees the
+     * context (cmocka longjmps out of the test on failure). */
+    bool grabbed = sdl2_renderer_is_mouse_grabbed(ctx->renderer);
+    game_destroy(ctx);
+    assert_true(grabbed);
+}
+
+/* Without -grab, the mouse is not grabbed (default). */
+static void test_grab_flag_absent_default(void **vstate)
+{
+    (void)vstate;
+    char *argv[] = {arg_prog, NULL};
+    game_ctx_t *ctx = game_create(1, argv);
+    assert_non_null(ctx);
+    bool grabbed = sdl2_renderer_is_mouse_grabbed(ctx->renderer);
+    game_destroy(ctx);
+    assert_false(grabbed);
+}
+
 static void test_mode_pause(void **vstate)
 {
     test_fixture_t *f = (test_fixture_t *)*vstate;
@@ -314,6 +347,8 @@ int main(void)
         cmocka_unit_test_setup_teardown(test_mode_game, setup, teardown),
         cmocka_unit_test_setup_teardown(test_bonus_rank_uses_personal_board, setup, teardown),
         cmocka_unit_test_setup_teardown(test_bonus_rank_tie_lands_behind, setup, teardown),
+        cmocka_unit_test(test_grab_flag_applied),
+        cmocka_unit_test(test_grab_flag_absent_default),
         cmocka_unit_test_setup_teardown(test_mode_pause, setup, teardown),
         cmocka_unit_test_setup_teardown(test_mode_edit, setup, teardown),
         cmocka_unit_test_setup_teardown(test_mode_dialogue_push_pop, setup, teardown),
