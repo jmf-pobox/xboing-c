@@ -117,9 +117,16 @@ def emit_c(defs):
 
 
 def main():
-    args = [a for a in sys.argv[1:] if a != "--ascii"]
-    ascii_preview = "--ascii" in sys.argv[1:]
+    argv = sys.argv[1:]
+    ascii_preview = "--ascii" in argv
+    args = [a for a in argv if a != "--ascii"]
+    if not args:
+        sys.exit("usage: gen_cursors.py path/to/cursor.bdf [--ascii] > out.h")
     glyphs = parse_bdf(args[0])
+    missing = [e for e in (88, 89, 90, 91) if e not in glyphs]
+    if missing:
+        sys.exit(f"error: {args[0]} is missing cursor glyph(s) {missing} "
+                 "(expected XC_plus 90/91, XC_pirate 88/89)")
     emit_c([
         build(glyphs, 90, 91, "cursor_plus", ascii_preview),
         build(glyphs, 88, 89, "cursor_pirate", ascii_preview),

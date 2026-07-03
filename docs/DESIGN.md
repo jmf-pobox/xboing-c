@@ -3201,8 +3201,8 @@ via `XCreateFontCursor`. SDL2 has no equivalent: `SDL_CreateSystemCursor`
 exposes ~12 system cursors and no pirate/skull, so the port mapped both
 `SDL2CUR_PLUS` and `SDL2CUR_SKULL` to `SDL_SYSTEM_CURSOR_CROSSHAIR`. Result:
 the plus wasn't faithful and the erase cue was invisible (both were the same
-crosshair). ADR-050's wiring selected `SKULL` while erasing, but selecting a
-crosshair-that-looks-like-the-plus showed no visible change.
+crosshair). PR #169 wired the editor to select `SKULL` while erasing, but
+selecting a crosshair-that-looks-like-the-plus showed no visible change.
 
 **Decision:** Reproduce the **exact** original cursors from the X.Org `cursor`
 bitmap font (`font-cursor-misc`, `cursor.bdf`; MIT/X11). The font stores each
@@ -3228,6 +3228,6 @@ and `scripts/gen_cursors.py` record the source and regeneration command.
 - The editor now shows the real X11 plus (draw) and skull (erase).
 - Testable parts are guarded (the generated bitmaps' array sizes match their
   declared dimensions, and `SDL_CreateCursor` accepts them — asset-validity
-  unit test; the erase→`SKULL` selection has ADR-050's integration test). The
-  on-screen *appearance* is a manual check — the hardware cursor is an OS
-  overlay, not captured by the screenshot pipeline.
+  unit test; the erase→`SKULL` selection has PR #169's editor integration
+  test). The on-screen *appearance* is a manual check — the hardware cursor is
+  an OS overlay, not captured by the screenshot pipeline.
