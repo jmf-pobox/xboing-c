@@ -13,6 +13,7 @@
 #include <cmocka.h>
 
 #include "sdl2_cursor.h"
+#include "sdl2_cursor_bitmaps.h" /* generated XC_plus / XC_pirate bitmaps */
 
 /* =========================================================================
  * Fixtures — SDL2 video subsystem and cursor context
@@ -240,6 +241,29 @@ static void test_status_string_unknown(void **state)
  * Test runner
  * ========================================================================= */
 
+/* The generated XC_plus / XC_pirate bitmaps are well-formed: array sizes
+ * match the declared dimensions (guards a bad regeneration) and SDL accepts
+ * them as real cursors. */
+static void test_custom_cursor_bitmaps_valid(void **state)
+{
+    (void)state;
+    assert_true(sizeof(cursor_plus_data) == (size_t)(((CURSOR_PLUS_W + 7) / 8) * CURSOR_PLUS_H));
+    assert_true(sizeof(cursor_plus_mask) == (size_t)(((CURSOR_PLUS_W + 7) / 8) * CURSOR_PLUS_H));
+    assert_true(sizeof(cursor_pirate_data) ==
+                (size_t)(((CURSOR_PIRATE_W + 7) / 8) * CURSOR_PIRATE_H));
+    assert_true(sizeof(cursor_pirate_mask) ==
+                (size_t)(((CURSOR_PIRATE_W + 7) / 8) * CURSOR_PIRATE_H));
+
+    SDL_Cursor *plus = SDL_CreateCursor(cursor_plus_data, cursor_plus_mask, CURSOR_PLUS_W,
+                                        CURSOR_PLUS_H, CURSOR_PLUS_HOTX, CURSOR_PLUS_HOTY);
+    SDL_Cursor *skull = SDL_CreateCursor(cursor_pirate_data, cursor_pirate_mask, CURSOR_PIRATE_W,
+                                         CURSOR_PIRATE_H, CURSOR_PIRATE_HOTX, CURSOR_PIRATE_HOTY);
+    assert_non_null(plus);
+    assert_non_null(skull);
+    SDL_FreeCursor(plus);
+    SDL_FreeCursor(skull);
+}
+
 int main(void)
 {
     const struct CMUnitTest error_tests[] = {
@@ -263,6 +287,7 @@ int main(void)
         cmocka_unit_test_setup_teardown(test_set_same_twice, setup_cursor_ctx, teardown_cursor_ctx),
         cmocka_unit_test_setup_teardown(test_current_tracks_set, setup_cursor_ctx,
                                         teardown_cursor_ctx),
+        cmocka_unit_test(test_custom_cursor_bitmaps_valid),
     };
 
     const struct CMUnitTest name_tests[] = {

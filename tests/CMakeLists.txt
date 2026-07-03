@@ -187,6 +187,8 @@ endif()
 if(SDL2_FOUND)
     add_executable(test_sdl2_cursor test_sdl2_cursor.c)
     target_compile_options(test_sdl2_cursor PRIVATE ${XBOING_STRICT_WARNINGS} -Werror ${CMOCKA_WARNING_FIXUPS})
+    # src/ for the generated sdl2_cursor_bitmaps.h asset-validity test.
+    target_include_directories(test_sdl2_cursor PRIVATE ${CMAKE_SOURCE_DIR}/src)
     target_link_libraries(test_sdl2_cursor PRIVATE sdl2_cursor ${CMOCKA_LIBRARIES})
     add_test(NAME test_sdl2_cursor COMMAND test_sdl2_cursor)
     set_tests_properties(test_sdl2_cursor PROPERTIES ENVIRONMENT "SDL_VIDEODRIVER=dummy")
