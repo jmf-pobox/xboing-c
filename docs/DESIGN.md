@@ -3267,3 +3267,50 @@ is retained in the cursor set but no longer used by any screen.
 - Guarded by an integration test asserting the cursor is `ARROW` after an
   editor→instructions transition (not the leftover plus), plus the cursor
   unit tests updated for the new `SDL2CUR_ARROW`.
+
+## ADR-053: Attract-screen `space` is once-per-frame; title `space` opens instructions
+
+**Status:** Accepted (2026-07-03)
+**Context:** `fix/title-space-to-instructions`.
+
+Two problems, one root cause.
+
+1. **Behaviour:** `space` on the title started the game. The desired flow is
+   `space` on the title → the instructions screen (the next attract screen);
+   the game is reached from there.
+2. **Bug:** a *single* `space` press on boot dropped the player straight into
+   the game, skipping the intended screen. `space` (an edge-triggered
+   `just_pressed`) was handled in the **per-tick** `mode_*_update` handlers.
+   The fixed-timestep loop runs several ticks per visual frame — and the first
+   frame runs a large catch-up burst — so one press's edge was consumed by
+   several screens in sequence within one frame:
+   `PRESENTS → INTRO → INSTRUCT → GAME`. This is the multi-fire anti-pattern
+   `docs/TESTING.md` documents ("edge keys go in `game_input_global`, once per
+   frame; per-tick `just_pressed` handlers multi-fire"). `c` never had the bug
+   because it was already handled once per frame.
+
+**Decision.** Handle attract-screen `space` in `game_input_global` (once per
+visual frame, `mode` captured at frame start, so exactly one transition per
+press), exactly like the `c`-cycle key. Delete the six per-tick handlers
+(`intro`, `instruct`, `demo`, `preview`, `keys`, `keysedit`). Mapping:
+
+- **Title (`INTRO`) opens `INSTRUCT`.** Deliberate deviation from the 1996
+  original (`main.c:547`, where title `space` opens `MODE_GAME`), at the
+  user's request.
+- **`INSTRUCT` / `DEMO` / `PREVIEW` / `KEYS` / `KEYSEDIT` start the game.**
+- **`HIGHSCORE`** starts a new game, or returns to `INTRO` when shown after a
+  game over (`game_active`).
+- **`PRESENTS` / `BONUS`:** `space` still fast-forwards that one screen
+  (`presents_system_skip` / `bonus_system_skip`) — idempotent, no cascade, so
+  it stays per-tick.
+
+**Consequences:**
+
+- Quality improves: six duplicated per-tick blocks collapse to one handler
+  that mirrors the established `c`-cycle pattern; the edge-key policy is now
+  applied consistently.
+- A single press can never cascade, regardless of tick count.
+- Guarded by `test_title_space_goes_to_instructions` and
+  `test_title_space_single_press_no_cascade` (one press then 20 ticks stays on
+  instructions). Replay bootstraps updated to the two-hop
+  title→instructions→game path.

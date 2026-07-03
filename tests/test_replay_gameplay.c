@@ -76,9 +76,14 @@ static void end_game_session(game_session_t *s)
  * Fixture with game start preamble baked into script
  * ========================================================================= */
 
-/* Common preamble: skip presents at frame 10, start game at frame 500 */
-#define PREAMBLE_SKIP_PRESENTS  { 10, SDL2I_START, 1}, { 11, SDL2I_START, 0}
-#define PREAMBLE_START_GAME    {500, SDL2I_START, 1}, {501, SDL2I_START, 0}
+/* Common preamble: skip presents at frame 10, then reach the game.  Space on
+ * the title advances to the instructions screen (not the game), so starting a
+ * game takes two presses: title -> instructions (500), instructions -> game
+ * (505). */
+#define PREAMBLE_SKIP_PRESENTS {10, SDL2I_START, 1}, {11, SDL2I_START, 0}
+#define PREAMBLE_TITLE_TO_INSTR {500, SDL2I_START, 1}, {501, SDL2I_START, 0}
+#define PREAMBLE_INSTR_TO_GAME {505, SDL2I_START, 1}, {506, SDL2I_START, 0}
+#define PREAMBLE_START_GAME PREAMBLE_TITLE_TO_INSTR, PREAMBLE_INSTR_TO_GAME
 #define GAME_START_FRAME 510
 
 /* =========================================================================

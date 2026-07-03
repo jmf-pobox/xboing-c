@@ -487,11 +487,6 @@ static void mode_intro_update(sdl2_state_mode_t mode, void *ud)
         }
     }
 
-    if (sdl2_input_just_pressed(ctx->input, SDL2I_START))
-    {
-        sdl2_state_transition(ctx->state, SDL2ST_GAME);
-        return;
-    }
 }
 
 /* =========================================================================
@@ -528,12 +523,6 @@ static void mode_instruct_update(sdl2_state_mode_t mode, void *ud)
     }
 
     attract_random_display(ctx, intro_system_get_state(ctx->intro) == INTRO_STATE_EXPLODE);
-
-    if (sdl2_input_just_pressed(ctx->input, SDL2I_START))
-    {
-        sdl2_state_transition(ctx->state, SDL2ST_GAME);
-        return;
-    }
 }
 
 /* =========================================================================
@@ -585,12 +574,6 @@ static void mode_demo_update(sdl2_state_mode_t mode, void *ud)
     }
 
     attract_random_display(ctx, demo_system_get_state(ctx->demo) == DEMO_STATE_SPARKLE);
-
-    if (sdl2_input_just_pressed(ctx->input, SDL2I_START))
-    {
-        sdl2_state_transition(ctx->state, SDL2ST_GAME);
-        return;
-    }
 }
 
 /* =========================================================================
@@ -638,12 +621,6 @@ static void mode_preview_update(sdl2_state_mode_t mode, void *ud)
             message_system_set(ctx->message, msg, 0, frame);
             preview_message_set = 1;
         }
-    }
-
-    if (sdl2_input_just_pressed(ctx->input, SDL2I_START))
-    {
-        sdl2_state_transition(ctx->state, SDL2ST_GAME);
-        return;
     }
 }
 
@@ -714,12 +691,6 @@ static void mode_keys_update(sdl2_state_mode_t mode, void *ud)
             }
         }
     }
-
-    if (sdl2_input_just_pressed(ctx->input, SDL2I_START))
-    {
-        sdl2_state_transition(ctx->state, SDL2ST_GAME);
-        return;
-    }
 }
 
 /* =========================================================================
@@ -758,12 +729,6 @@ static void mode_keysedit_update(sdl2_state_mode_t mode, void *ud)
     }
 
     attract_random_display(ctx, keys_system_get_state(ctx->keys) == KEYS_STATE_SPARKLE);
-
-    if (sdl2_input_just_pressed(ctx->input, SDL2I_START))
-    {
-        sdl2_state_transition(ctx->state, SDL2ST_GAME);
-        return;
-    }
 }
 
 /* =========================================================================
@@ -1219,21 +1184,6 @@ static void mode_highscore_update(sdl2_state_mode_t mode, void *ud)
 
     attract_random_display(ctx, highscore_system_get_state(ctx->highscore_display) ==
                                     HIGHSCORE_STATE_SPARKLE);
-
-    if (sdl2_input_just_pressed(ctx->input, SDL2I_START))
-    {
-        /* If came from game over, start new game; if attract mode, go to intro */
-        if (ctx->game_active)
-        {
-            ctx->game_active = false;
-            sdl2_state_transition(ctx->state, SDL2ST_INTRO);
-        }
-        else
-        {
-            sdl2_state_transition(ctx->state, SDL2ST_GAME);
-        }
-        return;
-    }
 
     /* on_finished callback handles auto-cycle */
 }

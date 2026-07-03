@@ -428,6 +428,32 @@ static void test_attract_c_cycles_screen(void **vstate)
     assert_int_equal(sdl2_state_current(ctx->state), SDL2ST_INSTRUCT);
 }
 
+/* Space on the title advances to the instructions screen, not into the game.
+ * Handled once per frame in game_input_global (like the C-cycle key). */
+static void test_title_space_goes_to_instructions(void **vstate)
+{
+    game_ctx_t *ctx = ((kb_fixture_t *)*vstate)->ctx;
+    assert_int_equal(sdl2_state_current(ctx->state), SDL2ST_INTRO);
+    inject_key(ctx, SDL_SCANCODE_SPACE);
+    game_input_global(ctx);
+    assert_int_equal(sdl2_state_current(ctx->state), SDL2ST_INSTRUCT);
+}
+
+/* A single space press must NOT cascade past instructions into the game, even
+ * across many state-machine ticks in one frame (the first-frame catch-up
+ * burst).  Regression for the per-tick multi-fire bug. */
+static void test_title_space_single_press_no_cascade(void **vstate)
+{
+    game_ctx_t *ctx = ((kb_fixture_t *)*vstate)->ctx;
+    assert_int_equal(sdl2_state_current(ctx->state), SDL2ST_INTRO);
+    inject_key(ctx, SDL_SCANCODE_SPACE);
+    game_input_global(ctx);
+    /* Same held edge, many ticks in the frame: must stay on instructions. */
+    for (int i = 0; i < 20; i++)
+        sdl2_state_update(ctx->state);
+    assert_int_equal(sdl2_state_current(ctx->state), SDL2ST_INSTRUCT);
+}
+
 static void test_attract_c_full_cycle_order(void **vstate)
 {
     game_ctx_t *ctx = ((kb_fixture_t *)*vstate)->ctx;
@@ -494,6 +520,10 @@ int main(void)
 
     const struct CMUnitTest attract_tests[] = {
         cmocka_unit_test(test_attract_cycle_table),
+        cmocka_unit_test_setup_teardown(test_title_space_goes_to_instructions, setup_attract,
+                                        teardown),
+        cmocka_unit_test_setup_teardown(test_title_space_single_press_no_cascade, setup_attract,
+                                        teardown),
         cmocka_unit_test_setup_teardown(test_attract_c_cycles_screen, setup_attract, teardown),
         cmocka_unit_test_setup_teardown(test_attract_c_full_cycle_order, setup_attract, teardown),
     };
