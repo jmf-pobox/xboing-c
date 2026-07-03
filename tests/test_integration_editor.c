@@ -21,7 +21,6 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 
 #include <SDL2/SDL.h>
 #include <cmocka.h>
@@ -58,8 +57,7 @@ static void tick_frames(game_ctx_t *ctx, int n)
 static void tick_with_mouse_button(game_ctx_t *ctx, Uint8 button, bool pressed, int x, int y)
 {
     sdl2_input_begin_frame(ctx->input);
-    SDL_Event e;
-    memset(&e, 0, sizeof(e));
+    SDL_Event e = {0};
     e.type = pressed ? SDL_MOUSEBUTTONDOWN : SDL_MOUSEBUTTONUP;
     e.button.button = button;
     e.button.x = x;
