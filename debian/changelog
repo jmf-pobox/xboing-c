@@ -1,3 +1,23 @@
+xboing (1.0.2-1) unstable; urgency=medium
+
+  * Faithful X11 editor cursors: the level editor now shows the real X11
+    plus (XC_plus) while drawing and skull-and-crossbones (XC_pirate) while
+    erasing, rebuilt from the original cursor-font bitmaps. (ADR-051.)
+  * Fix cursor state leaking between screens. Every screen now sets its own
+    cursor explicitly: the plain arrow on all menu/attract screens, hidden
+    during gameplay, plus/skull in the editor. Entering the instructions
+    screen after the editor no longer shows the leftover crosshair.
+    (ADR-052.)
+  * Space on the title screen now opens the instructions screen (the next
+    attract screen) instead of starting the game, and a single keypress on
+    boot can no longer cascade several screens straight into the game.
+    Attract-screen Space is handled once per visual frame, matching the C
+    cycle key. (ADR-053.)
+  * Wire the -grab command-line flag to confine the mouse pointer to the
+    game window (SDL_SetWindowMouseGrab), restoring the original's behaviour.
+
+ -- J Freeman <jmf@pobox.com>  Fri, 03 Jul 2026 17:31:57 -0700
+
 xboing (1.0.1-1) unstable; urgency=medium
 
   * Fix the between-level bonus interstitial reporting the wrong high-score
