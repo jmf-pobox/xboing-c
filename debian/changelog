@@ -1,3 +1,20 @@
+xboing (1.0.3-1) unstable; urgency=medium
+
+  * Fix the attract-cycle high-score screen showing a blank Hall of Fame on
+    installs with no shared/global board (Homebrew, dev builds). It now falls
+    back to the player's personal board when the global board is empty.
+    (ADR-054.)
+  * Fix the game-over flag leaking into the attract screens. After a game
+    over, the first Space on the high-score screen now starts a game instead
+    of advancing the attract loop; the flag is cleared on returning to the
+    title. (ADR-055.)
+  * Fix a failed level load dropping straight into an empty bonus screen. The
+    game now refuses to start and returns to the title when a level file
+    cannot be loaded, instead of entering gameplay with an empty grid.
+    (ADR-056.)
+
+ -- J Freeman <jmf@pobox.com>  Sat, 11 Jul 2026 12:24:04 -0700
+
 xboing (1.0.2-1) unstable; urgency=medium
 
   * Faithful X11 editor cursors: the level editor now shows the real X11
