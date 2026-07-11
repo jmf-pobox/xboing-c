@@ -1,6 +1,7 @@
 # Resume — Screen State Machine: bugs proven & closed with Z + TDD
 
-**Branch:** `docs/screen-state-z-spec` (no PR opened yet — see Next steps).
+**Branch:** `docs/screen-state-z-spec` — PR
+[#174](https://github.com/jmf-pobox/xboing-c/pull/174).
 **Date opened:** 2026-07-04. **Completed:** 2026-07-11.
 
 ## Outcome
@@ -46,10 +47,9 @@ change against the 1996 source.
 
 ## Next steps
 
-- **PR when you want one.** The three fixes live on
-  `docs/screen-state-z-spec`. `docs/GIT.md` normally requires a PR for
-  code; this branch carried the work per the recorded-session plan. Say
-  the word and I'll open it and run the review loop.
+- **PR #174 is open and in review.** The three screen-state fixes and the
+  mission-process doc overhaul ship together in one PR off
+  `docs/screen-state-z-spec`, driven through the `docs/GIT.md` review loop.
 - **Separate investigation:** *why* a level load would fail on the brew
   build (packaging / levels-dir resolution) is a distinct concern from the
   state machine degrading safely. `SafeGame` guarantees no empty-BONUS;
