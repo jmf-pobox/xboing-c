@@ -22,12 +22,16 @@
  * Requires: SDL_VIDEODRIVER=dummy, SDL_AUDIODRIVER=dummy
  */
 
+#include <errno.h>
 #include <setjmp.h>
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 #include <cmocka.h>
 
@@ -36,6 +40,7 @@
 #include "game_init.h"
 #include "gun_system.h"
 #include "highscore_io.h"
+#include "highscore_system.h"
 #include "score_system.h"
 #include "sdl2_input.h"
 #include "sdl2_renderer.h"
@@ -229,6 +234,128 @@ static void test_bonus_rank_tie_lands_behind(void **vstate)
 }
 
 /* =========================================================================
+ * SafeHighscore invariant — attract-path board selection
+ *
+ * On the attract auto-cycle (game_active == false) the high-score screen
+ * defaults to the GLOBAL board (game_init.c:340).  On an unprivileged
+ * install the global Hall of Fame is empty, so displaying it shows a blank
+ * leaderboard even though the player has personal scores.  The screen must
+ * fall back to the populated personal board.
+ *
+ * Formal proof of the reachable violation:
+ * docs/specs/2026-07-04-screen-state-machine.tex, invariant SafeHighscore
+ * (probcli goal-found trace to mHighscore / bGlobal / globalHasData=false /
+ * personalHasData=true).  The test process is never setgid and sets no
+ * XBOING_SCORE_FILE, so hs_global is inactive/empty — the exact scenario.
+ * ========================================================================= */
+static void test_highscore_attract_falls_back_to_personal(void **vstate)
+{
+    test_fixture_t *f = (test_fixture_t *)*vstate;
+    game_ctx_t *ctx = f->ctx;
+
+    /* Unprivileged install: empty global board, populated personal. */
+    highscore_io_init_table(&ctx->hs_global);
+    seed_personal_top(ctx, 50000);
+    ctx->highscore_request_type = HIGHSCORE_TYPE_GLOBAL; /* startup default */
+    ctx->game_active = false;                            /* attract path */
+
+    sdl2_state_status_t st = sdl2_state_transition(ctx->state, SDL2ST_HIGHSCORE);
+    assert_int_equal(st, SDL2ST_OK);
+
+    /* highscore_system copies the bound table by value, so assert on
+     * content: the displayed board must be non-empty and show the
+     * player's personal top score, not the blank global board. */
+    const highscore_table_t *shown = highscore_system_get_table(ctx->highscore_display);
+    assert_int_not_equal(highscore_io_count(shown), 0);
+    assert_int_equal(shown->entries[0].score, 50000);
+}
+
+/* Negative case: when the global board HAS data the attract screen must
+ * keep showing it (no spurious personal fallback), so the fallback guard
+ * fires only in the empty-global scenario it was written for. */
+static void test_highscore_attract_keeps_populated_global(void **vstate)
+{
+    test_fixture_t *f = (test_fixture_t *)*vstate;
+    game_ctx_t *ctx = f->ctx;
+
+    highscore_io_init_table(&ctx->hs_global);
+    ctx->hs_global.entries[0].score = 70000;
+    snprintf(ctx->hs_global.entries[0].name, HIGHSCORE_NAME_LEN, "Global Champ");
+    seed_personal_top(ctx, 50000);
+    ctx->highscore_request_type = HIGHSCORE_TYPE_GLOBAL;
+    ctx->game_active = false;
+
+    sdl2_state_status_t st = sdl2_state_transition(ctx->state, SDL2ST_HIGHSCORE);
+    assert_int_equal(st, SDL2ST_OK);
+
+    const highscore_table_t *shown = highscore_system_get_table(ctx->highscore_display);
+    assert_int_equal(shown->entries[0].score, 70000);
+}
+
+/* Guard's other branch: when there is nothing to fall back to (both boards
+ * empty) the attract screen stays on GLOBAL — the fallback fires only when
+ * the personal board actually has scores, so dropping the ">0" check would
+ * fail this. */
+static void test_highscore_attract_both_empty_stays_global(void **vstate)
+{
+    test_fixture_t *f = (test_fixture_t *)*vstate;
+    game_ctx_t *ctx = f->ctx;
+
+    highscore_io_init_table(&ctx->hs_global);
+    highscore_io_init_table(&ctx->hs_personal);
+    ctx->highscore_request_type = HIGHSCORE_TYPE_GLOBAL;
+    ctx->game_active = false;
+
+    sdl2_state_status_t st = sdl2_state_transition(ctx->state, SDL2ST_HIGHSCORE);
+    assert_int_equal(st, SDL2ST_OK);
+
+    assert_int_equal(ctx->highscore_request_type, HIGHSCORE_TYPE_GLOBAL);
+    const highscore_table_t *shown = highscore_system_get_table(ctx->highscore_display);
+    assert_int_equal(highscore_io_count(shown), 0);
+}
+
+/* =========================================================================
+ * SafeAttract invariant — game_active must not leak into attract screens
+ *
+ * After a game over the Highscore screen is shown with game_active still
+ * true (it gates score submission).  When the finish-timer auto-advances
+ * to the next attract screen (Intro), game_active must be cleared.  The
+ * single clear site is mode_intro_enter, which every attract exit from
+ * Highscore lands on (timer, C key, Space return; ADR-055).  If it leaks,
+ * the next Highscore's Space returns to Intro instead of starting a game.
+ *
+ * Formal proof: docs/specs/2026-07-04-screen-state-machine.tex, invariant
+ * SafeAttract (probcli goal "mode = mIntro & gameActive = ztrue" reachable
+ * via GameOver ; AttractAdvance).
+ * ========================================================================= */
+static void test_highscore_autoadvance_clears_game_active(void **vstate)
+{
+    test_fixture_t *f = (test_fixture_t *)*vstate;
+    game_ctx_t *ctx = f->ctx;
+
+    /* Simulate the game-over Highscore display; score already submitted so
+     * the enter handler does not attempt a real submission. */
+    ctx->game_active = true;
+    ctx->score_submitted = true;
+    sdl2_state_status_t st = sdl2_state_transition(ctx->state, SDL2ST_HIGHSCORE);
+    assert_int_equal(st, SDL2ST_OK);
+
+    /* Tick until the finish-timer auto-advances out of Highscore.  The
+     * display reaches HIGHSCORE_END_FRAME_OFFSET (4000) at
+     * ATTRACT_FRAME_MULTIPLIER (6) sub-frames per tick, i.e. ~670 ticks;
+     * the 5000 cap is ~7x that headroom and only bounds a hang. */
+    int guard = 0;
+    while (sdl2_state_current(ctx->state) == SDL2ST_HIGHSCORE && guard < 5000)
+    {
+        sdl2_input_begin_frame(ctx->input);
+        sdl2_state_update(ctx->state);
+        guard++;
+    }
+    assert_int_equal(sdl2_state_current(ctx->state), SDL2ST_INTRO);
+    assert_false(ctx->game_active);
+}
+
+/* =========================================================================
  * -grab wiring — game_create applies the CLI flag to the window
  * ========================================================================= */
 
@@ -258,6 +385,96 @@ static void test_grab_flag_absent_default(void **vstate)
     bool grabbed = sdl2_renderer_is_mouse_grabbed(ctx->renderer);
     game_destroy(ctx);
     assert_false(grabbed);
+}
+
+/* =========================================================================
+ * SafeGame invariant — a failed level load must not enter GAME
+ *
+ * start_new_game must never leave the machine in GAME with an unloaded
+ * (empty) grid: the unconditional game_rules_check (game_rules.c:333) would
+ * read the empty grid as "level complete" and drop to BONUS on the first
+ * tick.  Faithful to original/file.c:142-146 (SetupStage ShutDown on a
+ * ReadNextLevel failure), modernised to refuse the game and return to the
+ * attract cycle instead of exiting.  See ADR-056.
+ *
+ * Formal proof: docs/specs/2026-07-04-screen-state-machine.tex, invariant
+ * SafeGame (probcli goal "mode = mGame & blocksLoaded = zfalse").
+ *
+ * A corrupt level file in XBOING_LEVELS_DIR forces a deterministic parse
+ * failure: resolve_asset's legacy-override branch (src/paths.c:240-248)
+ * short-circuits on file_exists, so the load hits this file rather than the
+ * real levels/ tree the test's working directory would otherwise provide.
+ * ========================================================================= */
+static void test_game_aborts_on_level_load_failure(void **vstate)
+{
+    (void)vstate;
+
+    /* EEXIST is the only tolerable mkdir failure; capture the verdict now
+     * (errno is only valid immediately after the call) and assert at the end. */
+    bool tmp_ok = (mkdir(".tmp", 0755) == 0 || errno == EEXIST);
+    char dir[] = ".tmp/xboing_badlevel_XXXXXX";
+    assert_non_null(mkdtemp(dir));
+
+    char lvl_path[128];
+    snprintf(lvl_path, sizeof(lvl_path), "%s/level01.data", dir);
+    FILE *fp = fopen(lvl_path, "w");
+    if (fp == NULL)
+        rmdir(dir); /* clean up before the assert longjmps out */
+    assert_non_null(fp);
+    /* One line only: the parser needs a second line (time bonus) and returns
+     * LEVEL_SYS_ERR_PARSE_FAILED on EOF, so the load fails deterministically. */
+    fputs("not a valid xboing level file\n", fp);
+    fclose(fp);
+
+    /* strdup so a long pre-existing value round-trips exactly on restore
+     * (a fixed buffer would truncate it and corrupt the env for later tests). */
+    const char *prev = getenv("XBOING_LEVELS_DIR");
+    char *saved = prev ? strdup(prev) : NULL;
+    int set_rc = setenv("XBOING_LEVELS_DIR", dir, 1);
+
+    char *argv[] = {arg_prog, NULL};
+    game_ctx_t *ctx = game_create(1, argv);
+    /* Paths are resolved at create; restore the environment immediately.
+     * Capture the return code and assert at the end so a restore failure
+     * doesn't leak the temp dir via longjmp. */
+    int restore_rc = saved ? setenv("XBOING_LEVELS_DIR", saved, 1) : unsetenv("XBOING_LEVELS_DIR");
+    free(saved);
+    if (ctx == NULL)
+    {
+        unlink(lvl_path); /* clean up before the assert longjmps out */
+        rmdir(dir);
+    }
+    assert_non_null(ctx);
+
+    ctx->start_level = 1; /* pin to level01.data regardless of on-disk config */
+    ctx->level_number = 1;
+
+    sdl2_state_transition(ctx->state, SDL2ST_INTRO);
+    sdl2_state_transition(ctx->state, SDL2ST_GAME);
+    /* Post-fix, mode_game_enter redirects to INTRO synchronously inside the
+     * GAME transition above (nested transition), so we are already on INTRO
+     * here.  This tick only matters pre-fix: it runs mode_game_update ->
+     * game_rules_check on the empty grid, which is what dropped to BONUS. */
+    sdl2_state_update(ctx->state);
+
+    /* Capture before destroy so a failing assert still frees the context. */
+    sdl2_state_mode_t mode = sdl2_state_current(ctx->state);
+    bool active = ctx->game_active;
+    game_destroy(ctx);
+    unlink(lvl_path);
+    rmdir(dir);
+
+    /* Env/mkdir bookkeeping asserted here (post-cleanup) so a failure can't
+     * silently make the test use the wrong levels dir or leak the temp dir. */
+    assert_true(tmp_ok);
+    assert_int_equal(set_rc, 0);
+    assert_int_equal(restore_rc, 0);
+
+    /* Must not corrupt into an empty-grid BONUS; refuse the game and return
+     * to the title with no active session. */
+    assert_int_not_equal(mode, SDL2ST_BONUS);
+    assert_int_equal(mode, SDL2ST_INTRO);
+    assert_false(active);
 }
 
 static void test_mode_pause(void **vstate)
@@ -347,8 +564,17 @@ int main(void)
         cmocka_unit_test_setup_teardown(test_mode_game, setup, teardown),
         cmocka_unit_test_setup_teardown(test_bonus_rank_uses_personal_board, setup, teardown),
         cmocka_unit_test_setup_teardown(test_bonus_rank_tie_lands_behind, setup, teardown),
+        cmocka_unit_test_setup_teardown(test_highscore_attract_falls_back_to_personal, setup,
+                                        teardown),
+        cmocka_unit_test_setup_teardown(test_highscore_attract_keeps_populated_global, setup,
+                                        teardown),
+        cmocka_unit_test_setup_teardown(test_highscore_attract_both_empty_stays_global, setup,
+                                        teardown),
+        cmocka_unit_test_setup_teardown(test_highscore_autoadvance_clears_game_active, setup,
+                                        teardown),
         cmocka_unit_test(test_grab_flag_applied),
         cmocka_unit_test(test_grab_flag_absent_default),
+        cmocka_unit_test(test_game_aborts_on_level_load_failure),
         cmocka_unit_test_setup_teardown(test_mode_pause, setup, teardown),
         cmocka_unit_test_setup_teardown(test_mode_edit, setup, teardown),
         cmocka_unit_test_setup_teardown(test_mode_dialogue_push_pop, setup, teardown),

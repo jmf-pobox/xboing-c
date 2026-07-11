@@ -3315,3 +3315,153 @@ Mapping:
   `test_title_space_single_press_no_cascade` (one press then 20 ticks stays on
   instructions). Replay bootstraps updated to the two-hop
   title→instructions→game path.
+
+## ADR-054: Attract high-score screen falls back to the personal board when the global board is empty
+
+**Status:** Accepted (2026-07-11)
+**Context:** `docs/screen-state-z-spec`; bead `xboing-2wl`.
+
+**Problem.** On the attract auto-cycle the high-score screen binds its display
+to `ctx->highscore_request_type`, which defaults to `GLOBAL`
+(`src/game_init.c:340`, matching the original `static int scoreType = GLOBAL`,
+`original/highscore.c:136`). On an unprivileged install (Homebrew, dev builds)
+there is no `/var/games` global board, so `hs_global` is zero-filled and the
+attract cycle renders a **blank Hall of Fame** even though the player has real
+personal scores. The original never hit this: it installed setgid to a shared
+score directory and opened the file `O_CREAT, 0666` (`original/highscore.c:1041`),
+so the global board always existed and accumulated scores. Dropping setgid for
+modern platforms removed that precondition — the same category of change as
+PseudoColor→TrueColor.
+
+**Formal proof.** Modelled in `docs/specs/2026-07-04-screen-state-machine.tex`
+(invariant `SafeHighscore`). probcli goal-directed model checking reached the
+violating state — `mHighscore ∧ gameActive=false ∧ bGlobal ∧ globalHasData=false
+∧ personalHasData=true` — purely by attract-cycling (`Init; Boot; AttractAdvance*`),
+a machine-checked counter-example for the reported symptom.
+
+**Decision.** In `mode_highscore_enter`, on the attract path only
+(`!game_active`), when the global board is empty
+(`highscore_io_count(&hs_global) == 0`) and the personal board has scores, show
+the personal board instead. This extends the original's own principle — "don't
+show the player an irrelevant board when their own data is more informative"
+(`original/level.c:446-449`, `ResetHighScore(PERSONAL)` on a failed global
+insert) — to a condition the original's environment never produced. The label
+switches to `<H> - Personal Best`, so the display reports what is actually
+shown.
+
+**Consequences.**
+
+- Privileged/setgid installs with a populated global board are unaffected
+  (global has data → still global). The game-over path keeps its separate
+  submit-based fallback (`src/game_modes.c:1134`) and is gated out by
+  `game_active`.
+- A manual `<h>` (request GLOBAL) toggle is deliberately overridden while the
+  global board is empty — never render a blank board when real data exists. A
+  future engineer must not "fix" the toggle to force the empty global back on.
+- Re-proof: with both entry paths modelled, the negated `SafeHighscore` goal is
+  unreachable (138 states, *No counter example found. ALL states visited*).
+- Guarded by `test_highscore_attract_falls_back_to_personal`,
+  `test_highscore_attract_keeps_populated_global`,
+  `test_highscore_attract_both_empty_stays_global`, and `highscore_io_count`
+  unit tests. New pure seam: `highscore_io_count`.
+
+## ADR-055: `game_active` is cleared on entering the title, closing the game-over leak into attract
+
+**Status:** Accepted (2026-07-11)
+**Context:** `docs/screen-state-z-spec`; bead `xboing-dk8` (SafeAttract).
+
+**Problem.** `game_active` is set at game start and, on a game over, stays true
+through the Highscore display (it gates score submission and the "GAME OVER"
+message bar — `src/game_modes.c:1150-1156`). Before this change the only place
+it was cleared was the Highscore Space handler (`src/game_input.c:415`). Both
+other exits from a game-over Highscore — the finish-timer auto-advance
+(`highscore_cb_on_finished`) and the C cycle key (`game_input.c:377`) — advanced
+to the next attract screen **without** clearing it. So after a game over that
+the player let time out (or dismissed with C), `game_active=true` leaked into
+Intro and the rest of the attract cycle. The next time the cycle reached
+Highscore, its Space handler took the `if (game_active)` branch
+(`game_input.c:413`) and returned to Intro instead of starting a game — the
+reported "first Space advances the loop, second Space starts the game" symptom.
+
+**Formal proof.** `docs/specs/2026-07-04-screen-state-machine.tex`, invariant
+`SafeAttract` (`mode ∈ attractModes ∧ mode ≠ mHighscore ⟹ gameActive=false`).
+probcli goal-directed model checking found a 7-step trace to `mIntro ∧
+gameActive=true` via `GameOver ; AttractAdvance`.
+
+**Decision.** Clear `game_active` in `mode_intro_enter`. Every attract advance
+out of Highscore lands on Intro — `game_callbacks_attract_next(HIGHSCORE) ==
+INTRO` — so one clear at the Intro entry closes all three leak paths (timer, C
+key, Space-return) at a single site, rather than duplicating the clear across
+three modules. Entering the title screen unambiguously means no game session is
+active; `mode_game_enter` re-establishes `game_active` when a game actually
+starts, so the space→new-game path is unaffected (exit clears, enter sets).
+
+The single-site clear also closes a second latent instance of the same
+invariant violation: pressing `E` mid-game (`game_input.c:332`) jumps to the
+editor with `game_active` still true, and quitting the editor always returns to
+Intro (`game_callbacks.c:1028`, `game_modes.c:1372`) — never back to the
+abandoned game. That route leaked the flag before this change too; it now lands
+on the same Intro clear.
+
+A broader `mode_highscore` `on_exit` clear was rejected: `on_exit` also fires
+when Highscore pushes the "words of wisdom" dialogue, where `game_active` must
+persist to finish the deferred score submission on pop-back.
+
+**Consequences.**
+
+- Re-proof: the negated `SafeAttract` goal is unreachable (90 states, *No
+  counter example found. ALL states visited*); no non-Highscore attract mode is
+  reachable with `game_active=true`.
+- Guarded by `test_highscore_autoadvance_clears_game_active`
+  (`tests/test_integration_modes.c`, finish-timer path),
+  `test_highscore_c_cycle_clears_game_active` and
+  `test_highscore_space_return_clears_game_active`
+  (`tests/test_keybindings.c`, C key and Space-return). The Highscore Space
+  handler's own `game_active = false` (formerly `game_input.c:415`) was removed
+  as redundant, making `mode_intro_enter` the single clear site that all three
+  tests now regression-guard.
+
+## ADR-056: A failed level load refuses GAME and returns to the title
+
+**Status:** Accepted (2026-07-11)
+**Context:** `docs/screen-state-z-spec`; bead `xboing-2y7` (SafeGame).
+
+**Problem.** `start_new_game` (`src/game_modes.c`) set `game_active=true`,
+cleared the block grid, then loaded the start level — but ignored the result of
+`level_system_load_file` (and only warned on a path-resolution miss). On a
+failed load the grid stayed empty, the machine entered `MODE_GAME` anyway, and
+on the first tick the unconditional `game_rules_check` (`src/game_rules.c:333`,
+"no required blocks remain → BONUS") dropped straight to the bonus screen with
+an empty grid. On the brew/macOS build this showed up as: cycle to a level
+preview, press space, and get the level-over/bonus screen instead of a game.
+
+**Original behavior.** The 1996 game treated a level-load failure as fatal:
+`SetupStage` checked `ReadNextLevel`'s return (`original/file.c:142-146`) and,
+on failure, called `ShutDown` → `ExitProgramNow` (`original/init.c:355-362`) —
+the process exited with an error message. It never let `gameActive` flip true
+or reached the rule check with an unloaded grid.
+
+**Formal proof.** `docs/specs/2026-07-04-screen-state-machine.tex`, invariant
+`SafeGame` (`mode=GAME ⟹ blocksLoaded`). probcli goal `mode = mGame &
+blocksLoaded = zfalse` was reachable via `StartNewGameFail`.
+
+**Decision.** Preserve the original's guarantee (never enter gameplay with an
+unloaded grid), modernise the mechanism (mode-refusal, not process exit — a
+crash-to-desktop is worse UX than the terminal-era original and no ADR
+authorizes it). `start_new_game` now returns `bool`: on a failed load it logs
+the error, leaves `game_active` false, and returns false; `mode_game_enter`
+then transitions back to `SDL2ST_INTRO` instead of completing GAME entry. The
+model's `StartNewGameFail` now targets `mIntro`.
+
+**Consequences.**
+
+- Re-proof: the negated `SafeGame` goal is unreachable (76 states, *No counter
+  example found. ALL states visited*), alongside `SafeAttract` and
+  `SafeHighscore` in the same pass.
+- Guarded by `test_game_aborts_on_level_load_failure`
+  (`tests/test_integration_modes.c`), which forces a deterministic parse
+  failure via a corrupt level file in `XBOING_LEVELS_DIR` (the
+  `resolve_asset` legacy-override branch short-circuits on `file_exists`).
+- Not addressed here: *why* a load might fail on a given install (a packaging
+  or path issue) is a separate concern; this ADR only guarantees the state
+  machine degrades safely rather than into an empty bonus.

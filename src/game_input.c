@@ -412,7 +412,9 @@ void game_input_global(game_ctx_t *ctx)
         {
             if (ctx->game_active)
             {
-                ctx->game_active = false;
+                /* Game-over Highscore: return to the title.  game_active is
+                 * cleared by mode_intro_enter (the single clear site all
+                 * attract exits from Highscore funnel through) — see ADR-055. */
                 sdl2_state_transition(ctx->state, SDL2ST_INTRO);
             }
             else

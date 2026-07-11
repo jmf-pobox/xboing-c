@@ -87,7 +87,10 @@ void game_modes_set_level_pending(void)
     level_pending = 1;
 }
 
-static void start_new_game(game_ctx_t *ctx)
+/* Returns true when the game started (level loaded).  On a level-load
+ * failure it returns false without leaving game_active set, so the caller
+ * can refuse to enter GAME rather than dropping into an empty-grid BONUS. */
+static bool start_new_game(game_ctx_t *ctx)
 {
     /* Reset game state */
     ctx->level_number = ctx->start_level;
@@ -125,14 +128,28 @@ static void start_new_game(game_ctx_t *ctx)
     snprintf(filename, sizeof(filename), "level%02d.data", file_num);
 
     char level_path[PATHS_MAX_PATH];
-    if (paths_level_file(&ctx->paths, filename, level_path, sizeof(level_path)) == PATHS_OK)
+    bool resolved =
+        paths_level_file(&ctx->paths, filename, level_path, sizeof(level_path)) == PATHS_OK;
+    bool loaded = false;
+    if (resolved)
     {
         level_system_advance_background(ctx->level);
-        level_system_load_file(ctx->level, level_path);
+        loaded = (level_system_load_file(ctx->level, level_path) == LEVEL_SYS_OK);
     }
-    else
+
+    /* A failed load must not enter gameplay: game_rules_check reads the empty
+     * grid as a completed level and drops to BONUS.  Faithful to
+     * original/file.c:142-146 (SetupStage exits via ShutDown on a
+     * ReadNextLevel failure); modernised to refuse the game and return to the
+     * attract cycle instead of exiting the process.  See ADR-056.  Log the
+     * resolved path when we have it (parse failure) so the failing file is
+     * diagnosable; fall back to the filename when resolution itself failed. */
+    if (!loaded)
     {
-        fprintf(stderr, "Warning: could not find level file: %s\n", filename);
+        fprintf(stderr, "Error: could not load level file %s — returning to title\n",
+                resolved ? level_path : filename);
+        ctx->game_active = false;
+        return false;
     }
 
     /* Initialize timer from level file time bonus */
@@ -163,6 +180,8 @@ static void start_new_game(game_ctx_t *ctx)
 
     if (ctx->audio)
         sdl2_audio_play_at_percent(ctx->audio, "buzzer", 70);
+
+    return true;
 }
 
 static void mode_game_enter(sdl2_state_mode_t mode, void *ud)
@@ -181,8 +200,9 @@ static void mode_game_enter(sdl2_state_mode_t mode, void *ud)
             const char *ans = dialogue_system_get_input(ctx->dialogue);
             if (ans && (ans[0] == 'y' || ans[0] == 'Y'))
             {
-                /* Don't clear game_active — mode_highscore_enter uses it
-                 * to gate score submission and clears it after. */
+                /* Don't clear game_active — mode_highscore_enter uses it to
+                 * gate score submission; it is cleared by mode_intro_enter on
+                 * the return to the title (ADR-055). */
                 ctx->highscore_request_type = HIGHSCORE_TYPE_PERSONAL;
                 sdl2_state_transition(ctx->state, SDL2ST_HIGHSCORE);
                 return;
@@ -229,8 +249,14 @@ static void mode_game_enter(sdl2_state_mode_t mode, void *ud)
              prev == SDL2ST_INSTRUCT || prev == SDL2ST_DEMO || prev == SDL2ST_KEYS ||
              prev == SDL2ST_KEYSEDIT || prev == SDL2ST_PREVIEW || prev == SDL2ST_PRESENTS)
     {
-        /* Coming from attract mode or game over — start a new game */
-        start_new_game(ctx);
+        /* Coming from attract mode or game over — start a new game.  If the
+         * level fails to load, refuse GAME and return to the title rather
+         * than entering with an empty grid (ADR-056). */
+        if (!start_new_game(ctx))
+        {
+            sdl2_state_transition(ctx->state, SDL2ST_INTRO);
+            return;
+        }
     }
     /* Coming from pause or bonus — just resume, don't reset */
 
@@ -425,6 +451,17 @@ static void mode_intro_enter(sdl2_state_mode_t mode, void *ud)
 {
     (void)mode;
     game_ctx_t *ctx = ud;
+
+    /* End any game-over session on reaching the title.  A game-over
+     * Highscore display keeps game_active true (it gates score submission
+     * and the message bar); every attract advance out of Highscore — the
+     * finish-timer (highscore_cb_on_finished), the C cycle key, and the
+     * Space return — lands here, since attract_next(HIGHSCORE) == INTRO.
+     * Clearing it in this one place stops the flag leaking into the attract
+     * screens, where the next Highscore's Space would return to Intro
+     * instead of starting a game.  See ADR-055. */
+    ctx->game_active = false;
+
     set_menu_cursor(ctx);
     attract_frame_counter = 0;
     attract_next_flash = 0;
@@ -1137,6 +1174,24 @@ static void mode_highscore_enter(sdl2_state_mode_t mode, void *ud)
     }
 
     highscore_type_t type = ctx->highscore_request_type;
+
+    /* Attract path (no game-over submission): the global Hall of Fame is
+     * empty on unprivileged installs with no /var/games board, so binding
+     * the display to it shows a blank leaderboard even though the player
+     * has personal scores.  Fall back to the populated personal board.
+     * The game-over path above applies its own PERSONAL fallback
+     * (just_submitted && !global_ok) and is gated out by game_active.
+     *
+     * This deliberately overrides a manual <h> (request GLOBAL) toggle
+     * while the global board is empty: never render a blank board when the
+     * player has real data.  The label below reports the board actually
+     * shown, so the display stays honest.  See ADR-054. */
+    if (!ctx->game_active && type == HIGHSCORE_TYPE_GLOBAL &&
+        highscore_io_count(&ctx->hs_global) == 0 && highscore_io_count(&ctx->hs_personal) > 0)
+    {
+        type = HIGHSCORE_TYPE_PERSONAL;
+    }
+
     const highscore_table_t *table =
         (type == HIGHSCORE_TYPE_GLOBAL) ? &ctx->hs_global : &ctx->hs_personal;
     highscore_system_set_table(ctx->highscore_display, table);

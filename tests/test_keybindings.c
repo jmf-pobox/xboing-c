@@ -428,6 +428,47 @@ static void test_attract_c_cycles_screen(void **vstate)
     assert_int_equal(sdl2_state_current(ctx->state), SDL2ST_INSTRUCT);
 }
 
+/* The C cycle key out of a game-over Highscore must clear game_active — the
+ * same single-source clear (mode_intro_enter) the finish-timer relies on — so
+ * the flag does not leak into the attract screens (SafeAttract).  Without it,
+ * the next Highscore's Space would return to Intro instead of starting a game.
+ * Proof: docs/specs/2026-07-04-screen-state-machine.tex, invariant SafeAttract. */
+static void test_highscore_c_cycle_clears_game_active(void **vstate)
+{
+    game_ctx_t *ctx = ((kb_fixture_t *)*vstate)->ctx;
+    /* Enter Highscore via the real game-over path: game_active true and
+     * score already submitted (so the enter handler skips submission). */
+    ctx->game_active = true;
+    ctx->score_submitted = true;
+    sdl2_state_transition(ctx->state, SDL2ST_HIGHSCORE);
+
+    inject_key(ctx, SDL_SCANCODE_C);
+    game_input_global(ctx);
+
+    assert_int_equal(sdl2_state_current(ctx->state), SDL2ST_INTRO);
+    assert_false(ctx->game_active);
+}
+
+/* Space on a game-over Highscore returns to the title and must clear
+ * game_active.  Since ADR-055 removed the handler's own clear (game_input.c),
+ * this now regression-guards the sole clear site (mode_intro_enter) for the
+ * Space-return path, alongside the timer and C-key tests. */
+static void test_highscore_space_return_clears_game_active(void **vstate)
+{
+    game_ctx_t *ctx = ((kb_fixture_t *)*vstate)->ctx;
+    /* Enter Highscore via the real game-over path: game_active true and
+     * score already submitted (so the enter handler skips submission). */
+    ctx->game_active = true;
+    ctx->score_submitted = true;
+    sdl2_state_transition(ctx->state, SDL2ST_HIGHSCORE);
+
+    inject_key(ctx, SDL_SCANCODE_SPACE);
+    game_input_global(ctx);
+
+    assert_int_equal(sdl2_state_current(ctx->state), SDL2ST_INTRO);
+    assert_false(ctx->game_active);
+}
+
 /* Space on the title advances to the instructions screen, not into the game.
  * Handled once per frame in game_input_global (like the C-cycle key). */
 static void test_title_space_goes_to_instructions(void **vstate)
@@ -525,6 +566,10 @@ int main(void)
         cmocka_unit_test_setup_teardown(test_title_space_single_press_no_cascade, setup_attract,
                                         teardown),
         cmocka_unit_test_setup_teardown(test_attract_c_cycles_screen, setup_attract, teardown),
+        cmocka_unit_test_setup_teardown(test_highscore_c_cycle_clears_game_active, setup_attract,
+                                        teardown),
+        cmocka_unit_test_setup_teardown(test_highscore_space_return_clears_game_active,
+                                        setup_attract, teardown),
         cmocka_unit_test_setup_teardown(test_attract_c_full_cycle_order, setup_attract, teardown),
     };
 

@@ -63,3 +63,12 @@ debian/xboing-dbgsym/
 # `.punt-labs/ethos.yaml` (repo config) ARE tracked.
 .punt-labs/quarry/
 .punt-labs/vox/
+docs/fuzz.sty
+docs/*.mf
+docs/specs/*.aux
+docs/specs/*.log
+docs/specs/*.out
+docs/specs/*.toc
+docs/specs/*.fuzz
+docs/specs/*.fuzz.json
+docs/specs/*.report.json

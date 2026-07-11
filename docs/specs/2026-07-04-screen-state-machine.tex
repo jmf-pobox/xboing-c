@@ -1,0 +1,553 @@
+%
+% 2026-07-04-screen-state-machine.tex
+%
+% Z Specification for the XBoing screen / mode state machine.
+%
+% Models the code AS IS: the flat screen mode, the attract-cycle
+% transition constraint, the shared inner sub-screen systems, and the
+% shared resources (game-active flag, required-block grid, high-score
+% board selection) that the mode-enter and input handlers read/write.
+%
+% Peer-reviewed against the current code on 2026-07-04; the board-load,
+% board-selection, and game-active-lifecycle facts below are grounded
+% in cited file:line evidence.
+%
+
+\documentclass[a4paper,10pt,fleqn]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{fuzz}
+\usepackage[colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue]{hyperref}
+
+% Long \texttt identifiers (e.g. game_callbacks.c:750--759) do not
+% hyphenate; let TeX stretch interword space to avoid overfull boxes.
+\setlength{\emergencystretch}{4em}
+
+\begin{document}
+
+\title{XBoing Screen State Machine: A Z Specification}
+\author{Formal Model of the Flat Mode Machine and its Shared Resources}
+\date{July 2026}
+\hypersetup{
+  pdftitle={XBoing Screen State Machine: A Z Specification},
+  pdfauthor={xboing-c},
+  pdfsubject={Z Specification},
+  pdfcreator={fuzz/probcli}
+}
+\maketitle
+
+\tableofcontents
+\newpage
+
+\section{Introduction}
+
+The XBoing screen machine is \emph{flat}.  \texttt{struct sdl2\_state}
+(\texttt{src/sdl2\_state.c}) holds a single \textsf{current} mode
+(\texttt{SDL2ST\_*}), plus \textsf{previous} and a \textsf{saved} slot
+for dialogue push/pop.  There is no enclosing ``attract'' super-state:
+\textsf{Intro}, \textsf{Instruct}, \textsf{Demo}, \textsf{Preview},
+\textsf{Keys}, \textsf{KeysEdit} and \textsf{Highscore} are all
+peer top-level modes.  The ``attract loop'' is a designated
+\emph{subset} with a constrained transition order (\texttt{attract\_cycle[]}),
+i.e.\ a constraint on a flat machine, not a nesting.
+
+A second, orthogonal nesting axis does exist but is out of scope here:
+while \textsf{current} sits on an attract mode, that mode's driving
+\emph{system} runs its own animation phase (\texttt{intro\_state\_t},
+\texttt{demo\_state\_t}, \dots) held inside \texttt{ctx->intro} /
+\texttt{ctx->demo} / \texttt{ctx->keys}, not inside \texttt{sdl2\_state}.
+Three systems are each shared by two modes (\texttt{intro\_system}
+  drives \textsf{Intro}/\textsf{Instruct}; \texttt{demo\_system} drives
+  \textsf{Demo}/\textsf{Preview}; \texttt{keys\_system} drives
+\textsf{Keys}/\textsf{KeysEdit}).
+
+Three resources are \emph{shared} between the attract screens and real
+gameplay: the \texttt{game\_active} flag, the required-block grid
+(\texttt{block\_system\_still\_active}), and the high-score tables
+(\texttt{hs\_global} / \texttt{hs\_personal}, chosen by
+\texttt{highscore\_request\_type}).  The observed defects all arise
+because a transition reads a shared resource that a prior transition
+left in the wrong state.  This model names the safety invariants the
+handlers must preserve and shows which operations break them.
+
+\section{Free Types}
+
+The outer modes.  Legacy \textsf{BallWait}/\textsf{Wait} (defined but
+never assigned) are omitted.
+
+\begin{zed}
+  Mode ::= mNone | mPresents | mIntro | mInstruct \\
+  \quad~ | mDemo | mPreview | mKeys | mKeysedit \\
+  \quad~ | mHighscore | mBonus | mGame | mPause \\
+  \quad~ | mDialogue | mEdit
+\end{zed}
+
+The shared inner systems (descriptive: the nesting axis noted above).
+
+\begin{zed}
+  System ::= sysNone | sysIntro | sysDemo | sysKeys
+\end{zed}
+
+Which high-score table the display is bound to
+(\texttt{highscore\_request\_type}).
+
+\begin{zed}
+  Board ::= bGlobal | bPersonal
+\end{zed}
+
+fuzz has no built-in boolean; \textsf{ZBOOL} avoids the ProB/B keyword
+clash with \textsf{BOOL}.
+
+\begin{zed}
+  ZBOOL ::= ztrue | zfalse
+\end{zed}
+
+\section{Screen Sets and the Attract Cycle}
+
+The attract screens form the auto-cycle; \textsf{Presents} is not part
+of it.
+
+\begin{axdef}
+  attractModes : \power Mode
+  \where
+  attractModes = \{ mIntro, mInstruct, mDemo, mPreview, \\
+  \quad~ mKeys, mKeysedit, mHighscore \}
+\end{axdef}
+
+Attract screens on which \textsf{Space} starts a game directly.
+\textsf{Intro} (goes to \textsf{Instruct}) and \textsf{Highscore}
+(conditional) are handled separately (\texttt{game\_input.c:399--423}).
+
+\begin{axdef}
+  spaceStartModes : \power Mode
+  \where
+  spaceStartModes = \{ mInstruct, mDemo, mPreview, mKeys, mKeysedit \}
+\end{axdef}
+
+The cycle order used by the C key and each screen's finish-timer
+auto-advance (\texttt{attract\_cycle[]}, \texttt{game\_callbacks.c:54--68}).
+
+\begin{axdef}
+  attractNext : Mode \pfun Mode
+  \where
+  attractNext = \{ mIntro \mapsto mInstruct, \\
+    \quad~ mInstruct \mapsto mDemo, \\
+    \quad~ mDemo \mapsto mKeys, \\
+    \quad~ mKeys \mapsto mKeysedit, \\
+    \quad~ mKeysedit \mapsto mPreview, \\
+    \quad~ mPreview \mapsto mHighscore, \\
+  \quad~ mHighscore \mapsto mIntro \}
+\end{axdef}
+
+The shared system driving each attract screen (two-to-one sharing).
+
+\begin{axdef}
+  driver : Mode \pfun System
+  \where
+  driver = \{ mIntro \mapsto sysIntro, \\
+    \quad~ mInstruct \mapsto sysIntro, \\
+    \quad~ mDemo \mapsto sysDemo, \\
+    \quad~ mPreview \mapsto sysDemo, \\
+    \quad~ mKeys \mapsto sysKeys, \\
+  \quad~ mKeysedit \mapsto sysKeys \}
+\end{axdef}
+
+\section{State}
+
+The flattened screen state.  \textsf{blocksLoaded} abstracts
+\texttt{block\_system\_still\_active} (required blocks present).
+\textsf{globalHasData} / \textsf{personalHasData} record whether each
+table held rows after the startup read
+(\texttt{game\_init.c:327--335}); on an unprivileged install (no
+\texttt{/var/games}) \textsf{globalHasData} is \textsf{zfalse} while
+\textsf{personalHasData} may be \textsf{ztrue}.  \textsf{boardChoice}
+is \texttt{highscore\_request\_type}.
+
+\begin{schema}{Screen}
+  mode : Mode \\
+  gameActive : ZBOOL \\
+  blocksLoaded : ZBOOL \\
+  boardChoice : Board \\
+  globalHasData : ZBOOL \\
+  personalHasData : ZBOOL
+\end{schema}
+
+The machine boots into \textsf{Presents}: \texttt{ctx} is
+\texttt{calloc}'d so \textsf{gameActive} is \textsf{zfalse}
+(\texttt{game\_init.c:231}); no level is loaded; both boards are read
+from disk (\texttt{game\_init.c:327--335}) so the data flags reflect
+what was on disk --- left unconstrained here because they are
+platform-dependent; and \textsf{boardChoice} defaults to
+\textsf{bGlobal} (\texttt{game\_init.c:340}).
+
+\begin{schema}{Init}
+  Screen'
+  \where
+  mode' = mPresents \\
+  gameActive' = zfalse \\
+  blocksLoaded' = zfalse \\
+  boardChoice' = bGlobal
+\end{schema}
+
+\section{Safety Invariants (the intended contract)}
+
+Stated as observer schemas, deliberately \emph{not} folded into
+\textsf{Screen}: in Z the state predicate constrains every
+$\Delta\textsf{Screen}$, so folding an invariant in would silently
+\emph{disable} the violating transitions rather than expose them (probcli
+then reports a spurious deadlock).  Instead each contract is machine-checked
+by model-checking toward its \emph{negation} as a probcli goal:
+\begin{quote}
+\texttt{probcli spec.tex -model\_check -goal "<negated invariant>"}
+\end{quote}
+A reachable state matching the negation is a counter-example proving the
+defect; ``\textsf{No counter example found. ALL states visited}'' after a
+fix proves the guard closes it.
+
+A game may only run once its level's required blocks are on the grid;
+otherwise the per-tick rule check reads an empty grid and declares the
+level complete.
+
+\begin{schema}{SafeGame}
+  Screen
+  \where
+  mode = mGame \implies blocksLoaded = ztrue
+\end{schema}
+
+The high-score screen must not display an \emph{empty} board when a
+populated one is available: if it is bound to an empty global board,
+the personal board must also be empty (nothing better to show).
+
+\begin{schema}{SafeHighscore}
+  Screen
+  \where
+  (mode = mHighscore \\
+    \quad~ \land boardChoice = bGlobal \\
+  \quad~ \land globalHasData = zfalse) \\
+  \implies personalHasData = zfalse
+\end{schema}
+
+\textsf{game\_active} may legitimately stay true on the game-over
+\textsf{Highscore} display (it gates score submission), but it must
+not propagate to the \emph{other} attract screens; otherwise the
+\textsf{Highscore} \textsf{Space} routing misfires.
+
+\begin{schema}{SafeAttract}
+  Screen
+  \where
+  (mode \in attractModes \land mode \neq mHighscore) \\
+  \implies gameActive = zfalse
+\end{schema}
+
+\section{Operations (as coded)}
+
+\subsection{Boot: Presents auto-advances to Intro}
+
+The machine boots into \textsf{Presents}; when the credits animation
+finishes, \texttt{presents\_cb\_on\_finished}
+(\texttt{game\_callbacks.c:596--600}) transitions unconditionally to
+\textsf{Intro}, entering the attract cycle.  \textsf{Presents} is not
+part of \texttt{attract\_cycle[]}.
+
+\begin{schema}{Boot}
+  \Delta Screen
+  \where
+  mode = mPresents \\
+  mode' = mIntro \\
+  gameActive' = gameActive \\
+  blocksLoaded' = blocksLoaded \\
+  boardChoice' = boardChoice \\
+  globalHasData' = globalHasData \\
+  personalHasData' = personalHasData
+\end{schema}
+
+\subsection{Attract auto-advance and the C key}
+
+Both the finish-timer (\texttt{highscore\_cb\_on\_finished} and peers)
+and the C key advance the cycle.  Crucially, this transition
+\emph{preserves} \textsf{gameActive} --- the auto-advance from
+\textsf{Highscore} does not clear it (\texttt{game\_callbacks.c:750--759}).
+Entering \textsf{Highscore} binds the display to \textsf{boardChoice}
+but performs no disk read and no global-to-personal fallback on the
+attract path (\texttt{game\_modes.c:1139--1142}).
+
+\begin{schema}{AttractAdvance}
+  \Delta Screen
+  \where
+  mode \in \dom attractNext \\
+  mode' = attractNext(mode) \\
+  (mode' = mIntro \implies gameActive' = zfalse) \\
+  (mode' \neq mIntro \implies gameActive' = gameActive) \\
+  blocksLoaded' = blocksLoaded \\
+  (mode' = mHighscore \land gameActive = zfalse \\
+    \quad~ \land globalHasData = zfalse \land personalHasData = ztrue \\
+  \quad~ \implies boardChoice' = bPersonal) \\
+  (\lnot (mode' = mHighscore \land gameActive = zfalse \\
+    \quad~ \land globalHasData = zfalse \land personalHasData = ztrue) \\
+  \quad~ \implies boardChoice' = boardChoice) \\
+  globalHasData' = globalHasData \\
+  personalHasData' = personalHasData
+\end{schema}
+
+\subsection{Starting a game --- level load succeeds}
+
+\texttt{start\_new\_game} (\texttt{game\_modes.c:90--166}) sets
+\textsf{gameActive} and, on a successful load, populates the grid via
+the \texttt{on\_add\_block} callback.  This is the correct path.
+
+\begin{schema}{StartNewGameOk}
+  \Delta Screen
+  \where
+  mode \in spaceStartModes \\
+  mode' = mGame \\
+  gameActive' = ztrue \\
+  blocksLoaded' = ztrue \\
+  boardChoice' = boardChoice \\
+  globalHasData' = globalHasData \\
+  personalHasData' = personalHasData
+\end{schema}
+
+\subsection{Starting a game --- level load fails silently}
+
+If the level file cannot be resolved or parsed
+(\texttt{game\_modes.c:128--136}) \texttt{start\_new\_game} only warns
+to stderr and still enters \textsf{Game} with the grid left cleared.
+
+\begin{schema}{StartNewGameFail}
+  \Delta Screen
+  \where
+  mode \in spaceStartModes \\
+  mode' = mIntro \\
+  gameActive' = zfalse \\
+  blocksLoaded' = zfalse \\
+  boardChoice' = boardChoice \\
+  globalHasData' = globalHasData \\
+  personalHasData' = personalHasData
+\end{schema}
+
+\subsection{Space on the title}
+
+\begin{schema}{IntroSpace}
+  \Delta Screen
+  \where
+  mode = mIntro \\
+  mode' = mInstruct \\
+  gameActive' = gameActive \\
+  blocksLoaded' = blocksLoaded \\
+  boardChoice' = boardChoice \\
+  globalHasData' = globalHasData \\
+  personalHasData' = personalHasData
+\end{schema}
+
+\subsection{Space on the high-score screen}
+
+The \textsf{Space} handler routes on \textsf{gameActive}
+(\texttt{game\_input.c:411--423}): a live game-over returns to
+\textsf{Intro}; otherwise it starts a game.  On the return to
+\textsf{Intro}, \textsf{gameActive} is cleared by
+\texttt{mode\_intro\_enter} --- the single clear site every attract exit
+from \textsf{Highscore} lands on (ADR-055) --- as the postcondition below
+records.
+
+\begin{schema}{HighscoreSpaceReturn}
+  \Delta Screen
+  \where
+  mode = mHighscore \\
+  gameActive = ztrue \\
+  mode' = mIntro \\
+  gameActive' = zfalse \\
+  blocksLoaded' = blocksLoaded \\
+  boardChoice' = boardChoice \\
+  globalHasData' = globalHasData \\
+  personalHasData' = personalHasData
+\end{schema}
+
+\begin{schema}{HighscoreSpaceStart}
+  \Delta Screen
+  \where
+  mode = mHighscore \\
+  gameActive = zfalse \\
+  mode' = mGame \\
+  gameActive' = ztrue \\
+  blocksLoaded' = ztrue \\
+  boardChoice' = boardChoice \\
+  globalHasData' = globalHasData \\
+  personalHasData' = personalHasData
+\end{schema}
+
+\subsection{Game over}
+
+\texttt{game\_rules\_ball\_died} (\texttt{game\_rules.c:294--296})
+leaves \textsf{gameActive} true and shows \textsf{Highscore}.
+
+\begin{schema}{GameOver}
+  \Delta Screen
+  \where
+  mode = mGame \\
+  mode' = mHighscore \\
+  gameActive' = ztrue \\
+  blocksLoaded' = blocksLoaded \\
+  (globalHasData = zfalse \land personalHasData = ztrue \\
+  \quad~ \implies boardChoice' = bPersonal) \\
+  (\lnot (globalHasData = zfalse \land personalHasData = ztrue) \\
+  \quad~ \implies boardChoice' = bGlobal) \\
+  globalHasData' = globalHasData \\
+  personalHasData' = personalHasData
+\end{schema}
+
+\subsection{The per-tick rule check}
+
+Every \textsf{Game} tick, \texttt{game\_rules\_check}
+(\texttt{game\_rules.c:330--340}) sends the machine to \textsf{Bonus}
+the instant no required blocks remain.  It is \emph{unconditional} ---
+no guard that a level was actually loaded.
+
+\begin{schema}{GameRulesToBonus}
+  \Delta Screen
+  \where
+  mode = mGame \\
+  blocksLoaded = zfalse \\
+  mode' = mBonus \\
+  gameActive' = gameActive \\
+  blocksLoaded' = blocksLoaded \\
+  boardChoice' = boardChoice \\
+  globalHasData' = globalHasData \\
+  personalHasData' = personalHasData
+\end{schema}
+
+\subsection{Bonus completes: next level loads}
+
+On bonus completion \texttt{bonus\_cb\_on\_finished} advances to the next
+level (\texttt{game\_rules\_next\_level}) and re-enters \textsf{Game} with
+the new level's blocks loaded (\texttt{game\_callbacks.c:671--678}).
+Modelled so \textsf{Bonus} is not a terminal (deadlocking) mode.
+
+\begin{schema}{BonusToGame}
+  \Delta Screen
+  \where
+  mode = mBonus \\
+  mode' = mGame \\
+  blocksLoaded' = ztrue \\
+  gameActive' = gameActive \\
+  boardChoice' = boardChoice \\
+  globalHasData' = globalHasData \\
+  personalHasData' = personalHasData
+\end{schema}
+
+\section{Conjectures: where the invariants break}
+
+Each defect is a reachable state that violates one safety schema.  A
+model checker (probcli) explores \textsf{Init} plus the operations and
+reports the trace; the prose states the trace and the missing guard.
+
+\subsection*{Defect 2 --- empty high-score board in the attract cycle
+  (PROVEN, FIXED)}
+
+The boards \emph{are} read at startup, so ``never loaded'' is not the
+cause.  On an unprivileged install \textsf{globalHasData} =
+\textsf{zfalse} and \textsf{personalHasData} = \textsf{ztrue}, and
+\textsf{boardChoice} = \textsf{bGlobal} from \textsf{Init}.  Goal-directed
+model checking of the negated \textsf{SafeHighscore} reached
+\textsf{mode} = \textsf{mHighscore}, \textsf{gameActive} = \textsf{zfalse}
+still bound to the empty global board by pure attract-cycling
+($Init \semi Boot \semi AttractAdvance^{*}$), the machine-checked
+counter-example for the reported symptom.
+
+\textbf{Fix.} \texttt{mode\_highscore\_enter}
+(\texttt{src/game\_modes.c}) now falls back to \textsf{bPersonal} on the
+attract path (\texttt{!game\_active}) when the global board is empty
+(\texttt{highscore\_io\_count(\&hs\_global) == 0}) and the personal board
+has scores.  The game-over path keeps its own submit-based fallback
+(\texttt{game\_modes.c:1134}).  Both entry paths are modelled here in
+\textsf{AttractAdvance} and \textsf{GameOver}; re-running the goal now
+reports \emph{No counter example found. ALL states visited} (138 states),
+so the fixed operations cannot reach the violating state.  Regression:
+\texttt{test\_highscore\_attract\_falls\_back\_to\_personal}
+(\texttt{tests/test\_integration\_modes.c}) plus
+\texttt{highscore\_io\_count} unit tests.
+
+\subsection*{Defect 3 --- first Space advances the loop (PROVEN, FIXED)}
+
+In a \emph{pure} attract cycle \textsf{gameActive} is always
+\textsf{zfalse} (set only by \textsf{StartNewGame*}, cleared only by
+the \textsf{Highscore} \textsf{Space} handler), so
+\textsf{IntroSpace} (\textsf{Intro} $\to$ \textsf{Instruct}) is the
+\emph{intended} PR~\#172 behavior, not a bug.  The genuine violation
+requires a prior game over: goal-directed model checking of the negated
+\textsf{SafeAttract} found the 7-step trace
+$\dots \semi GameOver \semi AttractAdvance$ carrying
+\textsf{gameActive} = \textsf{ztrue} out of \textsf{Highscore} into
+\textsf{Intro} (\textsf{SafeAttract} violated at \textsf{Intro}); the
+next time the cycle reaches \textsf{Highscore},
+\textsf{HighscoreSpaceReturn} fires and the first \textsf{Space} goes to
+\textsf{Intro} instead of starting a game.
+
+\textbf{Fix.} Every attract advance out of \textsf{Highscore} --- the
+finish-timer (\texttt{highscore\_cb\_on\_finished}), the C cycle key
+(\texttt{game\_input.c}), and the \textsf{Space} return --- lands on
+\textsf{Intro}, since \texttt{attract\_next(HIGHSCORE) == INTRO}.  A
+single clear in \texttt{mode\_intro\_enter} (\texttt{src/game\_modes.c})
+therefore closes all three leak paths at one site; modelled here as
+\textsf{AttractAdvance} setting \textsf{gameActive'} = \textsf{zfalse}
+whenever \textsf{mode'} = \textsf{mIntro}.  Re-running the goal now
+reports \emph{No counter example found. ALL states visited} (90 states),
+and no non-\textsf{Highscore} attract mode is reachable with
+\textsf{gameActive} = \textsf{ztrue}.  Regression:
+\texttt{test\_highscore\_autoadvance\_clears\_game\_active} (timer path)
+and \texttt{test\_highscore\_c\_cycle\_clears\_game\_active} (C key).
+See ADR-055.
+
+\subsection*{Defect 1 --- Space lands in Bonus with an empty grid
+  (PROVEN, FIXED)}
+
+\textsf{StartNewGameOk} establishes \textsf{blocksLoaded}, so the model
+exonerates the \emph{happy-path} \textsf{Space}-to-game edge.  Goal-directed
+model checking of the negated \textsf{SafeGame} reached \textsf{mode} =
+\textsf{mGame}, \textsf{blocksLoaded} = \textsf{zfalse} via
+\textsf{StartNewGameFail} --- a silent level-load failure
+(\texttt{start\_new\_game} ignored the load result and entered
+\textsf{Game} with the grid cleared); the next \textsf{GameRulesToBonus}
+tick then dropped to \textsf{Bonus}.
+
+\textbf{Fix.} \texttt{start\_new\_game} (\texttt{src/game\_modes.c}) now
+checks \texttt{level\_system\_load\_file} and returns failure without
+setting \textsf{game\_active}; \texttt{mode\_game\_enter} refuses
+\textsf{Game} and returns to \textsf{Intro}.  This preserves the
+original's guarantee --- \texttt{original/file.c:142--146}
+(\texttt{SetupStage} exits via \texttt{ShutDown} on a
+\texttt{ReadNextLevel} failure) never let gameplay run on an unloaded
+grid --- modernising only the mechanism (mode-refusal, not process
+exit).  Modelled as \textsf{StartNewGameFail} now targeting
+\textsf{mIntro} with \textsf{gameActive} = \textsf{zfalse}; the goal is
+unreachable (76 states, \emph{No counter example found}).  Regression:
+\texttt{test\_game\_aborts\_on\_level\_load\_failure}.  See ADR-056.
+
+\section{Verification summary}
+
+Each invariant was machine-checked by model-checking toward its negation
+as a probcli goal.  In the as-coded model all three goals were reachable
+(counter-example traces above); after the fixes all three are unreachable
+in one exhaustive pass:
+
+\begin{itemize}
+  \item \textsf{SafeHighscore} --- attract \textsf{Highscore} falls back to
+    the populated personal board when the global board is empty
+    (\texttt{mode\_highscore\_enter}; ADR-054).
+  \item \textsf{SafeAttract} --- \textsf{game\_active} is cleared on
+    entering the title, so it cannot leak into the attract screens
+    (\texttt{mode\_intro\_enter}; ADR-055).
+  \item \textsf{SafeGame} --- a failed level load refuses \textsf{Game} and
+    returns to the title instead of entering with an empty grid
+    (\texttt{start\_new\_game} / \texttt{mode\_game\_enter}; ADR-056).
+\end{itemize}
+
+\begin{verbatim}
+probcli spec.tex -model_check -goal "<negated invariant>"
+  =>  No counter example found. ALL states visited.
+\end{verbatim}
+
+The mode suite previously force-transitioned to each mode and ticked for
+\emph{no-crash} only, asserting nothing about the shared resources.  Each
+invariant is now both a re-proven model postcondition and a red$\to$green
+regression test, named in its per-defect section above.
+
+\end{document}
