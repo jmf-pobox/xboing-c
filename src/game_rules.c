@@ -293,7 +293,8 @@ void game_rules_ball_died(game_ctx_t *ctx)
     {
         /* Game over.  Don't clear ctx->game_active here — the highscore
          * mode's on_enter uses it to distinguish real game-over from
-         * attract-cycle entry, and clears it itself after submitting. */
+         * attract-cycle entry.  It is cleared by mode_intro_enter when the
+         * game-over highscore returns to the title (ADR-055). */
         if (ctx->audio)
             sdl2_audio_play_at_percent(ctx->audio, "game_over", 99);
         message_system_set(ctx->message, "GAME OVER", 0, 0);

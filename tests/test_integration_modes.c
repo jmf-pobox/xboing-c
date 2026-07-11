@@ -318,8 +318,9 @@ static void test_highscore_attract_both_empty_stays_global(void **vstate)
  *
  * After a game over the Highscore screen is shown with game_active still
  * true (it gates score submission).  When the finish-timer auto-advances
- * to the next attract screen (Intro), game_active must be cleared — the
- * only other clear is the Space handler (game_input.c:415).  If it leaks,
+ * to the next attract screen (Intro), game_active must be cleared.  The
+ * single clear site is mode_intro_enter, which every attract exit from
+ * Highscore lands on (timer, C key, Space return; ADR-055).  If it leaks,
  * the next Highscore's Space returns to Intro instead of starting a game.
  *
  * Formal proof: docs/specs/2026-07-04-screen-state-machine.tex, invariant

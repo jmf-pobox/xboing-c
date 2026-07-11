@@ -340,9 +340,13 @@ to stderr and still enters \textsf{Game} with the grid left cleared.
 
 \subsection{Space on the high-score screen}
 
-The \textsf{Space} handler routes on \textsf{gameActive} and clears it
-here (\texttt{game\_input.c:411--423}): a live game-over returns to
-\textsf{Intro}; otherwise it starts a game.
+The \textsf{Space} handler routes on \textsf{gameActive}
+(\texttt{game\_input.c:411--423}): a live game-over returns to
+\textsf{Intro}; otherwise it starts a game.  On the return to
+\textsf{Intro}, \textsf{gameActive} is cleared by
+\texttt{mode\_intro\_enter} --- the single clear site every attract exit
+from \textsf{Highscore} lands on (ADR-055) --- as the postcondition below
+records.
 
 \begin{schema}{HighscoreSpaceReturn}
   \Delta Screen

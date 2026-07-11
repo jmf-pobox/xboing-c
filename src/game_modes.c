@@ -195,8 +195,9 @@ static void mode_game_enter(sdl2_state_mode_t mode, void *ud)
             const char *ans = dialogue_system_get_input(ctx->dialogue);
             if (ans && (ans[0] == 'y' || ans[0] == 'Y'))
             {
-                /* Don't clear game_active — mode_highscore_enter uses it
-                 * to gate score submission and clears it after. */
+                /* Don't clear game_active — mode_highscore_enter uses it to
+                 * gate score submission; it is cleared by mode_intro_enter on
+                 * the return to the title (ADR-055). */
                 ctx->highscore_request_type = HIGHSCORE_TYPE_PERSONAL;
                 sdl2_state_transition(ctx->state, SDL2ST_HIGHSCORE);
                 return;
