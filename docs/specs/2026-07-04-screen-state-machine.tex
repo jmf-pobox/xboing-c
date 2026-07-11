@@ -316,8 +316,8 @@ to stderr and still enters \textsf{Game} with the grid left cleared.
   \Delta Screen
   \where
   mode \in spaceStartModes \\
-  mode' = mGame \\
-  gameActive' = ztrue \\
+  mode' = mIntro \\
+  gameActive' = zfalse \\
   blocksLoaded' = zfalse \\
   boardChoice' = boardChoice \\
   globalHasData' = globalHasData \\
@@ -492,42 +492,58 @@ and no non-\textsf{Highscore} attract mode is reachable with
 and \texttt{test\_highscore\_c\_cycle\_clears\_game\_active} (C key).
 See ADR-055.
 
-\subsection*{Defect 1 --- Space lands in Bonus with an empty grid}
+\subsection*{Defect 1 --- Space lands in Bonus with an empty grid
+  (PROVEN, FIXED)}
 
 \textsf{StartNewGameOk} establishes \textsf{blocksLoaded}, so the model
-exonerates the \emph{happy-path} \textsf{Space}-to-game edge.  The
-violation is \textsf{StartNewGameFail}: a silent level-load failure
-(\texttt{game\_modes.c:128--136}) enters \textsf{Game} with
-\textsf{blocksLoaded} = \textsf{zfalse}, and the very next
-\textsf{GameRulesToBonus} tick drops to \textsf{Bonus}
-(\textsf{SafeGame} violated).  \textbf{Missing guard:}
-\texttt{start\_new\_game} must not enter \textsf{Game} on a failed
-load, and/or \texttt{game\_rules\_check} must require a
-positive ``level populated'' precondition rather than trusting the
-grid.
+exonerates the \emph{happy-path} \textsf{Space}-to-game edge.  Goal-directed
+model checking of the negated \textsf{SafeGame} reached \textsf{mode} =
+\textsf{mGame}, \textsf{blocksLoaded} = \textsf{zfalse} via
+\textsf{StartNewGameFail} --- a silent level-load failure
+(\texttt{start\_new\_game} ignored the load result and entered
+\textsf{Game} with the grid cleared); the next \textsf{GameRulesToBonus}
+tick then dropped to \textsf{Bonus}.
 
-\section{Test-coverage gap}
+\textbf{Fix.} \texttt{start\_new\_game} (\texttt{src/game\_modes.c}) now
+checks \texttt{level\_system\_load\_file} and returns failure without
+setting \textsf{game\_active}; \texttt{mode\_game\_enter} refuses
+\textsf{Game} and returns to \textsf{Intro}.  This preserves the
+original's guarantee --- \texttt{original/file.c:142--146}
+(\texttt{SetupStage} exits via \texttt{ShutDown} on a
+\texttt{ReadNextLevel} failure) never let gameplay run on an unloaded
+grid --- modernising only the mechanism (mode-refusal, not process
+exit).  Modelled as \textsf{StartNewGameFail} now targeting
+\textsf{mIntro} with \textsf{gameActive} = \textsf{zfalse}; the goal is
+unreachable (76 states, \emph{No counter example found}).  Regression:
+\texttt{test\_game\_aborts\_on\_level\_load\_failure}.  See ADR-056.
 
-The mode suite (\texttt{tests/test\_integration\_modes.c})
-force-transitions to each mode and ticks for \emph{no-crash} only; it
-asserts nothing about the shared resources.  None of the three
-invariants is guarded:
+\section{Verification summary}
+
+Each invariant was machine-checked by model-checking toward its negation
+as a probcli goal.  In the as-coded model all three goals were reachable
+(counter-example traces above); after the fixes all three are unreachable
+in one exhaustive pass:
 
 \begin{itemize}
-  \item No test drives $Init \semi AttractAdvance^{*}$ to
-    \textsf{Highscore} with an empty global board and asserts the display
-    falls back to a populated personal board (\textsf{SafeHighscore}).
-  \item No test drives \textsf{GameOver} then auto-cycles and asserts
-    \textsf{gameActive} is cleared before the next attract screen
-    (\textsf{SafeAttract}), nor that the first \textsf{Space} after an
-    auto-cycled game-over starts a game.
-  \item No test asserts entering \textsf{Game} on a failed level load
-    does not immediately fall to \textsf{Bonus} (\textsf{SafeGame}); the
-    one bonus-fixture test deliberately uses an \emph{empty} grid,
-    exercising the opposite.
+  \item \textsf{SafeHighscore} --- attract \textsf{Highscore} falls back to
+    the populated personal board when the global board is empty
+    (\texttt{mode\_highscore\_enter}; ADR-054).
+  \item \textsf{SafeAttract} --- \textsf{game\_active} is cleared on
+    entering the title, so it cannot leak into the attract screens
+    (\texttt{mode\_intro\_enter}; ADR-055).
+  \item \textsf{SafeGame} --- a failed level load refuses \textsf{Game} and
+    returns to the title instead of entering with an empty grid
+    (\texttt{start\_new\_game} / \texttt{mode\_game\_enter}; ADR-056).
 \end{itemize}
 
-Each invariant should become a checked postcondition of the
-corresponding handler and a regression test.
+\begin{verbatim}
+probcli spec.tex -model_check -goal "<negated invariant>"
+  =>  No counter example found. ALL states visited.
+\end{verbatim}
+
+The mode suite previously force-transitioned to each mode and ticked for
+\emph{no-crash} only, asserting nothing about the shared resources.  Each
+invariant is now both a re-proven model postcondition and a red$\to$green
+regression test, named in its per-defect section above.
 
 \end{document}

@@ -3413,8 +3413,55 @@ persist to finish the deferred score submission on pop-back.
   counter example found. ALL states visited*); no non-Highscore attract mode is
   reachable with `game_active=true`.
 - Guarded by `test_highscore_autoadvance_clears_game_active`
-  (`tests/test_integration_modes.c`, finish-timer path) and
-  `test_highscore_c_cycle_clears_game_active` (`tests/test_keybindings.c`, C
-  key). The Space-return path stays covered by the existing Space handler and
-  its clear at `game_input.c:415` (now redundant with the Intro-entry clear, but
-  retained: it is load-bearing for the branch decision it guards).
+  (`tests/test_integration_modes.c`, finish-timer path),
+  `test_highscore_c_cycle_clears_game_active` and
+  `test_highscore_space_return_clears_game_active`
+  (`tests/test_keybindings.c`, C key and Space-return). The Highscore Space
+  handler's own `game_active = false` (formerly `game_input.c:415`) was removed
+  as redundant, making `mode_intro_enter` the single clear site that all three
+  tests now regression-guard.
+
+## ADR-056: A failed level load refuses GAME and returns to the title
+
+**Status:** Accepted (2026-07-11)
+**Context:** `docs/screen-state-z-spec`; bead `xboing-2y7` (SafeGame).
+
+**Problem.** `start_new_game` (`src/game_modes.c`) set `game_active=true`,
+cleared the block grid, then loaded the start level — but ignored the result of
+`level_system_load_file` (and only warned on a path-resolution miss). On a
+failed load the grid stayed empty, the machine entered `MODE_GAME` anyway, and
+on the first tick the unconditional `game_rules_check` (`src/game_rules.c:333`,
+"no required blocks remain → BONUS") dropped straight to the bonus screen with
+an empty grid. On the brew/macOS build this showed up as: cycle to a level
+preview, press space, and get the level-over/bonus screen instead of a game.
+
+**Original behavior.** The 1996 game treated a level-load failure as fatal:
+`SetupStage` checked `ReadNextLevel`'s return (`original/file.c:142-146`) and,
+on failure, called `ShutDown` → `ExitProgramNow` (`original/init.c:355-362`) —
+the process exited with an error message. It never let `gameActive` flip true
+or reached the rule check with an unloaded grid.
+
+**Formal proof.** `docs/specs/2026-07-04-screen-state-machine.tex`, invariant
+`SafeGame` (`mode=GAME ⟹ blocksLoaded`). probcli goal `mode = mGame &
+blocksLoaded = zfalse` was reachable via `StartNewGameFail`.
+
+**Decision.** Preserve the original's guarantee (never enter gameplay with an
+unloaded grid), modernise the mechanism (mode-refusal, not process exit — a
+crash-to-desktop is worse UX than the terminal-era original and no ADR
+authorizes it). `start_new_game` now returns `bool`: on a failed load it logs
+the error, leaves `game_active` false, and returns false; `mode_game_enter`
+then transitions back to `SDL2ST_INTRO` instead of completing GAME entry. The
+model's `StartNewGameFail` now targets `mIntro`.
+
+**Consequences.**
+
+- Re-proof: the negated `SafeGame` goal is unreachable (76 states, *No counter
+  example found. ALL states visited*), alongside `SafeAttract` and
+  `SafeHighscore` in the same pass.
+- Guarded by `test_game_aborts_on_level_load_failure`
+  (`tests/test_integration_modes.c`), which forces a deterministic parse
+  failure via a corrupt level file in `XBOING_LEVELS_DIR` (the
+  `resolve_asset` legacy-override branch short-circuits on `file_exists`).
+- Not addressed here: *why* a load might fail on a given install (a packaging
+  or path issue) is a separate concern; this ADR only guarantees the state
+  machine degrades safely rather than into an empty bonus.

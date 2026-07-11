@@ -87,7 +87,10 @@ void game_modes_set_level_pending(void)
     level_pending = 1;
 }
 
-static void start_new_game(game_ctx_t *ctx)
+/* Returns true when the game started (level loaded).  On a level-load
+ * failure it returns false without leaving game_active set, so the caller
+ * can refuse to enter GAME rather than dropping into an empty-grid BONUS. */
+static bool start_new_game(game_ctx_t *ctx)
 {
     /* Reset game state */
     ctx->level_number = ctx->start_level;
@@ -125,14 +128,23 @@ static void start_new_game(game_ctx_t *ctx)
     snprintf(filename, sizeof(filename), "level%02d.data", file_num);
 
     char level_path[PATHS_MAX_PATH];
+    bool loaded = false;
     if (paths_level_file(&ctx->paths, filename, level_path, sizeof(level_path)) == PATHS_OK)
     {
         level_system_advance_background(ctx->level);
-        level_system_load_file(ctx->level, level_path);
+        loaded = (level_system_load_file(ctx->level, level_path) == LEVEL_SYS_OK);
     }
-    else
+
+    /* A failed load must not enter gameplay: game_rules_check reads the empty
+     * grid as a completed level and drops to BONUS.  Faithful to
+     * original/file.c:142-146 (SetupStage exits via ShutDown on a
+     * ReadNextLevel failure); modernised to refuse the game and return to the
+     * attract cycle instead of exiting the process.  See ADR-056. */
+    if (!loaded)
     {
-        fprintf(stderr, "Warning: could not find level file: %s\n", filename);
+        fprintf(stderr, "Error: could not load level file: %s — returning to title\n", filename);
+        ctx->game_active = false;
+        return false;
     }
 
     /* Initialize timer from level file time bonus */
@@ -163,6 +175,8 @@ static void start_new_game(game_ctx_t *ctx)
 
     if (ctx->audio)
         sdl2_audio_play_at_percent(ctx->audio, "buzzer", 70);
+
+    return true;
 }
 
 static void mode_game_enter(sdl2_state_mode_t mode, void *ud)
@@ -229,8 +243,14 @@ static void mode_game_enter(sdl2_state_mode_t mode, void *ud)
              prev == SDL2ST_INSTRUCT || prev == SDL2ST_DEMO || prev == SDL2ST_KEYS ||
              prev == SDL2ST_KEYSEDIT || prev == SDL2ST_PREVIEW || prev == SDL2ST_PRESENTS)
     {
-        /* Coming from attract mode or game over — start a new game */
-        start_new_game(ctx);
+        /* Coming from attract mode or game over — start a new game.  If the
+         * level fails to load, refuse GAME and return to the title rather
+         * than entering with an empty grid (ADR-056). */
+        if (!start_new_game(ctx))
+        {
+            sdl2_state_transition(ctx->state, SDL2ST_INTRO);
+            return;
+        }
     }
     /* Coming from pause or bonus — just resume, don't reset */
 

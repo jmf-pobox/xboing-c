@@ -28,6 +28,9 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 #include <cmocka.h>
 
@@ -382,6 +385,92 @@ static void test_grab_flag_absent_default(void **vstate)
     assert_false(grabbed);
 }
 
+/* =========================================================================
+ * SafeGame invariant — a failed level load must not enter GAME
+ *
+ * start_new_game must never leave the machine in GAME with an unloaded
+ * (empty) grid: the unconditional game_rules_check (game_rules.c:333) would
+ * read the empty grid as "level complete" and drop to BONUS on the first
+ * tick.  Faithful to original/file.c:142-146 (SetupStage ShutDown on a
+ * ReadNextLevel failure), modernised to refuse the game and return to the
+ * attract cycle instead of exiting.  See ADR-056.
+ *
+ * Formal proof: docs/specs/2026-07-04-screen-state-machine.tex, invariant
+ * SafeGame (probcli goal "mode = mGame & blocksLoaded = zfalse").
+ *
+ * A corrupt level file in XBOING_LEVELS_DIR forces a deterministic parse
+ * failure: resolve_asset's legacy-override branch (src/paths.c:240-248)
+ * short-circuits on file_exists, so the load hits this file rather than the
+ * real levels/ tree the test's working directory would otherwise provide.
+ * ========================================================================= */
+static void test_game_aborts_on_level_load_failure(void **vstate)
+{
+    (void)vstate;
+
+    mkdir(".tmp", 0755); /* ok if it already exists */
+    char dir[] = ".tmp/xboing_badlevel_XXXXXX";
+    assert_non_null(mkdtemp(dir));
+
+    char lvl_path[128];
+    snprintf(lvl_path, sizeof(lvl_path), "%s/level01.data", dir);
+    FILE *fp = fopen(lvl_path, "w");
+    if (fp == NULL)
+        rmdir(dir); /* clean up before the assert longjmps out */
+    assert_non_null(fp);
+    /* One line only: the parser needs a second line (time bonus) and returns
+     * LEVEL_SYS_ERR_PARSE_FAILED on EOF, so the load fails deterministically. */
+    fputs("not a valid xboing level file\n", fp);
+    fclose(fp);
+
+    char saved[512];
+    const char *prev = getenv("XBOING_LEVELS_DIR");
+    bool had_prev = prev != NULL;
+    if (had_prev)
+    {
+        strncpy(saved, prev, sizeof(saved) - 1);
+        saved[sizeof(saved) - 1] = '\0';
+    }
+    setenv("XBOING_LEVELS_DIR", dir, 1);
+
+    char *argv[] = {arg_prog, NULL};
+    game_ctx_t *ctx = game_create(1, argv);
+    /* Paths are resolved at create; restore the environment immediately. */
+    if (had_prev)
+        setenv("XBOING_LEVELS_DIR", saved, 1);
+    else
+        unsetenv("XBOING_LEVELS_DIR");
+    if (ctx == NULL)
+    {
+        unlink(lvl_path); /* clean up before the assert longjmps out */
+        rmdir(dir);
+    }
+    assert_non_null(ctx);
+
+    ctx->start_level = 1; /* pin to level01.data regardless of on-disk config */
+    ctx->level_number = 1;
+
+    sdl2_state_transition(ctx->state, SDL2ST_INTRO);
+    sdl2_state_transition(ctx->state, SDL2ST_GAME);
+    /* Post-fix, mode_game_enter redirects to INTRO synchronously inside the
+     * GAME transition above (nested transition), so we are already on INTRO
+     * here.  This tick only matters pre-fix: it runs mode_game_update ->
+     * game_rules_check on the empty grid, which is what dropped to BONUS. */
+    sdl2_state_update(ctx->state);
+
+    /* Capture before destroy so a failing assert still frees the context. */
+    sdl2_state_mode_t mode = sdl2_state_current(ctx->state);
+    bool active = ctx->game_active;
+    game_destroy(ctx);
+    unlink(lvl_path);
+    rmdir(dir);
+
+    /* Must not corrupt into an empty-grid BONUS; refuse the game and return
+     * to the title with no active session. */
+    assert_int_not_equal(mode, SDL2ST_BONUS);
+    assert_int_equal(mode, SDL2ST_INTRO);
+    assert_false(active);
+}
+
 static void test_mode_pause(void **vstate)
 {
     test_fixture_t *f = (test_fixture_t *)*vstate;
@@ -479,6 +568,7 @@ int main(void)
                                         teardown),
         cmocka_unit_test(test_grab_flag_applied),
         cmocka_unit_test(test_grab_flag_absent_default),
+        cmocka_unit_test(test_game_aborts_on_level_load_failure),
         cmocka_unit_test_setup_teardown(test_mode_pause, setup, teardown),
         cmocka_unit_test_setup_teardown(test_mode_edit, setup, teardown),
         cmocka_unit_test_setup_teardown(test_mode_dialogue_push_pop, setup, teardown),
