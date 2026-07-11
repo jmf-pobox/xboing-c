@@ -36,6 +36,7 @@
 #include "game_init.h"
 #include "gun_system.h"
 #include "highscore_io.h"
+#include "highscore_system.h"
 #include "score_system.h"
 #include "sdl2_input.h"
 #include "sdl2_renderer.h"
@@ -229,6 +230,87 @@ static void test_bonus_rank_tie_lands_behind(void **vstate)
 }
 
 /* =========================================================================
+ * SafeHighscore invariant — attract-path board selection
+ *
+ * On the attract auto-cycle (game_active == false) the high-score screen
+ * defaults to the GLOBAL board (game_init.c:340).  On an unprivileged
+ * install the global Hall of Fame is empty, so displaying it shows a blank
+ * leaderboard even though the player has personal scores.  The screen must
+ * fall back to the populated personal board.
+ *
+ * Formal proof of the reachable violation:
+ * docs/specs/2026-07-04-screen-state-machine.tex, invariant SafeHighscore
+ * (probcli goal-found trace to mHighscore / bGlobal / globalHasData=false /
+ * personalHasData=true).  The test process is never setgid and sets no
+ * XBOING_SCORE_FILE, so hs_global is inactive/empty — the exact scenario.
+ * ========================================================================= */
+static void test_highscore_attract_falls_back_to_personal(void **vstate)
+{
+    test_fixture_t *f = (test_fixture_t *)*vstate;
+    game_ctx_t *ctx = f->ctx;
+
+    /* Unprivileged install: empty global board, populated personal. */
+    highscore_io_init_table(&ctx->hs_global);
+    seed_personal_top(ctx, 50000);
+    ctx->highscore_request_type = HIGHSCORE_TYPE_GLOBAL; /* startup default */
+    ctx->game_active = false;                            /* attract path */
+
+    sdl2_state_status_t st = sdl2_state_transition(ctx->state, SDL2ST_HIGHSCORE);
+    assert_int_equal(st, SDL2ST_OK);
+
+    /* highscore_system copies the bound table by value, so assert on
+     * content: the displayed board must be non-empty and show the
+     * player's personal top score, not the blank global board. */
+    const highscore_table_t *shown = highscore_system_get_table(ctx->highscore_display);
+    assert_int_not_equal(highscore_io_count(shown), 0);
+    assert_int_equal(shown->entries[0].score, 50000);
+}
+
+/* Negative case: when the global board HAS data the attract screen must
+ * keep showing it (no spurious personal fallback), so the fallback guard
+ * fires only in the empty-global scenario it was written for. */
+static void test_highscore_attract_keeps_populated_global(void **vstate)
+{
+    test_fixture_t *f = (test_fixture_t *)*vstate;
+    game_ctx_t *ctx = f->ctx;
+
+    highscore_io_init_table(&ctx->hs_global);
+    ctx->hs_global.entries[0].score = 70000;
+    snprintf(ctx->hs_global.entries[0].name, HIGHSCORE_NAME_LEN, "Global Champ");
+    seed_personal_top(ctx, 50000);
+    ctx->highscore_request_type = HIGHSCORE_TYPE_GLOBAL;
+    ctx->game_active = false;
+
+    sdl2_state_status_t st = sdl2_state_transition(ctx->state, SDL2ST_HIGHSCORE);
+    assert_int_equal(st, SDL2ST_OK);
+
+    const highscore_table_t *shown = highscore_system_get_table(ctx->highscore_display);
+    assert_int_equal(shown->entries[0].score, 70000);
+}
+
+/* Guard's other branch: when there is nothing to fall back to (both boards
+ * empty) the attract screen stays on GLOBAL — the fallback fires only when
+ * the personal board actually has scores, so dropping the ">0" check would
+ * fail this. */
+static void test_highscore_attract_both_empty_stays_global(void **vstate)
+{
+    test_fixture_t *f = (test_fixture_t *)*vstate;
+    game_ctx_t *ctx = f->ctx;
+
+    highscore_io_init_table(&ctx->hs_global);
+    highscore_io_init_table(&ctx->hs_personal);
+    ctx->highscore_request_type = HIGHSCORE_TYPE_GLOBAL;
+    ctx->game_active = false;
+
+    sdl2_state_status_t st = sdl2_state_transition(ctx->state, SDL2ST_HIGHSCORE);
+    assert_int_equal(st, SDL2ST_OK);
+
+    assert_int_equal(ctx->highscore_request_type, HIGHSCORE_TYPE_GLOBAL);
+    const highscore_table_t *shown = highscore_system_get_table(ctx->highscore_display);
+    assert_int_equal(highscore_io_count(shown), 0);
+}
+
+/* =========================================================================
  * -grab wiring — game_create applies the CLI flag to the window
  * ========================================================================= */
 
@@ -347,6 +429,12 @@ int main(void)
         cmocka_unit_test_setup_teardown(test_mode_game, setup, teardown),
         cmocka_unit_test_setup_teardown(test_bonus_rank_uses_personal_board, setup, teardown),
         cmocka_unit_test_setup_teardown(test_bonus_rank_tie_lands_behind, setup, teardown),
+        cmocka_unit_test_setup_teardown(test_highscore_attract_falls_back_to_personal, setup,
+                                        teardown),
+        cmocka_unit_test_setup_teardown(test_highscore_attract_keeps_populated_global, setup,
+                                        teardown),
+        cmocka_unit_test_setup_teardown(test_highscore_attract_both_empty_stays_global, setup,
+                                        teardown),
         cmocka_unit_test(test_grab_flag_applied),
         cmocka_unit_test(test_grab_flag_absent_default),
         cmocka_unit_test_setup_teardown(test_mode_pause, setup, teardown),

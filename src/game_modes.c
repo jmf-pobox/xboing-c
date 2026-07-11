@@ -1137,6 +1137,24 @@ static void mode_highscore_enter(sdl2_state_mode_t mode, void *ud)
     }
 
     highscore_type_t type = ctx->highscore_request_type;
+
+    /* Attract path (no game-over submission): the global Hall of Fame is
+     * empty on unprivileged installs with no /var/games board, so binding
+     * the display to it shows a blank leaderboard even though the player
+     * has personal scores.  Fall back to the populated personal board.
+     * The game-over path above applies its own PERSONAL fallback
+     * (just_submitted && !global_ok) and is gated out by game_active.
+     *
+     * This deliberately overrides a manual <h> (request GLOBAL) toggle
+     * while the global board is empty: never render a blank board when the
+     * player has real data.  The label below reports the board actually
+     * shown, so the display stays honest.  See ADR-054. */
+    if (!ctx->game_active && type == HIGHSCORE_TYPE_GLOBAL &&
+        highscore_io_count(&ctx->hs_global) == 0 && highscore_io_count(&ctx->hs_personal) > 0)
+    {
+        type = HIGHSCORE_TYPE_PERSONAL;
+    }
+
     const highscore_table_t *table =
         (type == HIGHSCORE_TYPE_GLOBAL) ? &ctx->hs_global : &ctx->hs_personal;
     highscore_system_set_table(ctx->highscore_display, table);

@@ -1091,3 +1091,21 @@ void highscore_io_init_table(highscore_table_t *table)
     memset(table, 0, sizeof(*table));
     strncpy(table->master_text, "Anyone play this game?", HIGHSCORE_NAME_LEN - 1);
 }
+
+int highscore_io_count(const highscore_table_t *table)
+{
+    if (!table)
+    {
+        return 0;
+    }
+
+    int count = 0;
+    for (int i = 0; i < HIGHSCORE_NUM_ENTRIES; i++)
+    {
+        if (table->entries[i].score > 0)
+        {
+            count++;
+        }
+    }
+    return count;
+}

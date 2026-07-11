@@ -3315,3 +3315,52 @@ Mapping:
   `test_title_space_single_press_no_cascade` (one press then 20 ticks stays on
   instructions). Replay bootstraps updated to the two-hop
   title→instructions→game path.
+
+## ADR-054: Attract high-score screen falls back to the personal board when the global board is empty
+
+**Status:** Accepted (2026-07-11)
+**Context:** `docs/screen-state-z-spec`; bead `xboing-2wl`.
+
+**Problem.** On the attract auto-cycle the high-score screen binds its display
+to `ctx->highscore_request_type`, which defaults to `GLOBAL`
+(`src/game_init.c:340`, matching the original `static int scoreType = GLOBAL`,
+`original/highscore.c:136`). On an unprivileged install (Homebrew, dev builds)
+there is no `/var/games` global board, so `hs_global` is zero-filled and the
+attract cycle renders a **blank Hall of Fame** even though the player has real
+personal scores. The original never hit this: it installed setgid to a shared
+score directory and opened the file `O_CREAT, 0666` (`original/highscore.c:1041`),
+so the global board always existed and accumulated scores. Dropping setgid for
+modern platforms removed that precondition — the same category of change as
+PseudoColor→TrueColor.
+
+**Formal proof.** Modelled in `docs/specs/2026-07-04-screen-state-machine.tex`
+(invariant `SafeHighscore`). probcli goal-directed model checking reached the
+violating state — `mHighscore ∧ gameActive=false ∧ bGlobal ∧ globalHasData=false
+∧ personalHasData=true` — purely by attract-cycling (`Init; Boot; AttractAdvance*`),
+a machine-checked counter-example for the reported symptom.
+
+**Decision.** In `mode_highscore_enter`, on the attract path only
+(`!game_active`), when the global board is empty
+(`highscore_io_count(&hs_global) == 0`) and the personal board has scores, show
+the personal board instead. This extends the original's own principle — "don't
+show the player an irrelevant board when their own data is more informative"
+(`original/level.c:446-449`, `ResetHighScore(PERSONAL)` on a failed global
+insert) — to a condition the original's environment never produced. The label
+switches to `<H> - Personal Best`, so the display reports what is actually
+shown.
+
+**Consequences.**
+
+- Privileged/setgid installs with a populated global board are unaffected
+  (global has data → still global). The game-over path keeps its separate
+  submit-based fallback (`src/game_modes.c:1134`) and is gated out by
+  `game_active`.
+- A manual `<h>` (request GLOBAL) toggle is deliberately overridden while the
+  global board is empty — never render a blank board when real data exists. A
+  future engineer must not "fix" the toggle to force the empty global back on.
+- Re-proof: with both entry paths modelled, the negated `SafeHighscore` goal is
+  unreachable (138 states, *No counter example found. ALL states visited*).
+- Guarded by `test_highscore_attract_falls_back_to_personal`,
+  `test_highscore_attract_keeps_populated_global`,
+  `test_highscore_attract_both_empty_stays_global`, and `highscore_io_count`
+  unit tests. New pure seam: `highscore_io_count`.

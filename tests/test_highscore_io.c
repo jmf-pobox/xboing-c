@@ -2,7 +2,7 @@
  * test_highscore_io.c — Tests for JSON-based high score file I/O.
  *
  * 7 groups:
- *   1. Table initialization (2 tests)
+ *   1. Table initialization and count (5 tests)
  *   2. Sorting (3 tests)
  *   3. Insert and ranking (4 tests)
  *   4. Write and read round-trip (3 tests)
@@ -96,6 +96,27 @@ static void test_init_table_null(void **state)
     (void)state;
     /* Should not crash. */
     highscore_io_init_table(NULL);
+}
+
+static void test_count_empty(void **state)
+{
+    (void)state;
+    highscore_table_t t;
+    highscore_io_init_table(&t);
+    assert_int_equal(highscore_io_count(&t), 0);
+}
+
+static void test_count_populated(void **state)
+{
+    (void)state;
+    highscore_table_t t = make_populated_table();
+    assert_int_equal(highscore_io_count(&t), 5);
+}
+
+static void test_count_null(void **state)
+{
+    (void)state;
+    assert_int_equal(highscore_io_count(NULL), 0);
 }
 
 /* =========================================================================
@@ -750,6 +771,9 @@ int main(void)
         /* Group 1: Table initialization */
         cmocka_unit_test(test_init_table),
         cmocka_unit_test(test_init_table_null),
+        cmocka_unit_test(test_count_empty),
+        cmocka_unit_test(test_count_populated),
+        cmocka_unit_test(test_count_null),
         /* Group 2: Sorting */
         cmocka_unit_test(test_sort_already_sorted),
         cmocka_unit_test(test_sort_reversed),

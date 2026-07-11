@@ -190,4 +190,12 @@ int highscore_io_would_be_global_master(const highscore_table_t *table, unsigned
  */
 void highscore_io_init_table(highscore_table_t *table);
 
+/*
+ * Number of populated entries (score > 0).  Empty slots left by
+ * highscore_io_init_table have score 0, so a return of 0 means the board
+ * holds no scores — e.g. the global Hall of Fame on an unprivileged
+ * install with no /var/games board.
+ */
+int highscore_io_count(const highscore_table_t *table);
+
 #endif /* HIGHSCORE_IO_H */

@@ -190,9 +190,18 @@ platform-dependent; and \textsf{boardChoice} defaults to
 
 \section{Safety Invariants (the intended contract)}
 
-Stated as observer schemas so a model checker can flag any reachable
-state that breaks them; deliberately not folded into \textsf{Screen},
-because the coded operations can reach violating states.
+Stated as observer schemas, deliberately \emph{not} folded into
+\textsf{Screen}: in Z the state predicate constrains every
+$\Delta\textsf{Screen}$, so folding an invariant in would silently
+\emph{disable} the violating transitions rather than expose them (probcli
+then reports a spurious deadlock).  Instead each contract is machine-checked
+by model-checking toward its \emph{negation} as a probcli goal:
+\begin{quote}
+\texttt{probcli spec.tex -model\_check -goal "<negated invariant>"}
+\end{quote}
+A reachable state matching the negation is a counter-example proving the
+defect; ``\textsf{No counter example found. ALL states visited}'' after a
+fix proves the guard closes it.
 
 A game may only run once its level's required blocks are on the grid;
 otherwise the per-tick rule check reads an empty grid and declares the
@@ -231,6 +240,26 @@ not propagate to the \emph{other} attract screens; otherwise the
 
 \section{Operations (as coded)}
 
+\subsection{Boot: Presents auto-advances to Intro}
+
+The machine boots into \textsf{Presents}; when the credits animation
+finishes, \texttt{presents\_cb\_on\_finished}
+(\texttt{game\_callbacks.c:596--600}) transitions unconditionally to
+\textsf{Intro}, entering the attract cycle.  \textsf{Presents} is not
+part of \texttt{attract\_cycle[]}.
+
+\begin{schema}{Boot}
+  \Delta Screen
+  \where
+  mode = mPresents \\
+  mode' = mIntro \\
+  gameActive' = gameActive \\
+  blocksLoaded' = blocksLoaded \\
+  boardChoice' = boardChoice \\
+  globalHasData' = globalHasData \\
+  personalHasData' = personalHasData
+\end{schema}
+
 \subsection{Attract auto-advance and the C key}
 
 Both the finish-timer (\texttt{highscore\_cb\_on\_finished} and peers)
@@ -248,7 +277,12 @@ attract path (\texttt{game\_modes.c:1139--1142}).
   mode' = attractNext(mode) \\
   gameActive' = gameActive \\
   blocksLoaded' = blocksLoaded \\
-  boardChoice' = boardChoice \\
+  (mode' = mHighscore \land gameActive = zfalse \\
+    \quad~ \land globalHasData = zfalse \land personalHasData = ztrue \\
+  \quad~ \implies boardChoice' = bPersonal) \\
+  (\lnot (mode' = mHighscore \land gameActive = zfalse \\
+    \quad~ \land globalHasData = zfalse \land personalHasData = ztrue) \\
+  \quad~ \implies boardChoice' = boardChoice) \\
   globalHasData' = globalHasData \\
   personalHasData' = personalHasData
 \end{schema}
@@ -347,7 +381,10 @@ leaves \textsf{gameActive} true and shows \textsf{Highscore}.
   mode' = mHighscore \\
   gameActive' = ztrue \\
   blocksLoaded' = blocksLoaded \\
-  boardChoice' = boardChoice \\
+  (globalHasData = zfalse \land personalHasData = ztrue \\
+  \quad~ \implies boardChoice' = bPersonal) \\
+  (\lnot (globalHasData = zfalse \land personalHasData = ztrue) \\
+  \quad~ \implies boardChoice' = bGlobal) \\
   globalHasData' = globalHasData \\
   personalHasData' = personalHasData
 \end{schema}
@@ -372,24 +409,56 @@ no guard that a level was actually loaded.
   personalHasData' = personalHasData
 \end{schema}
 
+\subsection{Bonus completes: next level loads}
+
+On bonus completion \texttt{bonus\_cb\_on\_finished} advances to the next
+level (\texttt{game\_rules\_next\_level}) and re-enters \textsf{Game} with
+the new level's blocks loaded (\texttt{game\_callbacks.c:671--678}).
+Modelled so \textsf{Bonus} is not a terminal (deadlocking) mode.
+
+\begin{schema}{BonusToGame}
+  \Delta Screen
+  \where
+  mode = mBonus \\
+  mode' = mGame \\
+  blocksLoaded' = ztrue \\
+  gameActive' = gameActive \\
+  boardChoice' = boardChoice \\
+  globalHasData' = globalHasData \\
+  personalHasData' = personalHasData
+\end{schema}
+
 \section{Conjectures: where the invariants break}
 
 Each defect is a reachable state that violates one safety schema.  A
 model checker (probcli) explores \textsf{Init} plus the operations and
 reports the trace; the prose states the trace and the missing guard.
 
-\subsection*{Defect 2 --- empty high-score board in the attract cycle}
+\subsection*{Defect 2 --- empty high-score board in the attract cycle
+  (PROVEN, FIXED)}
 
 The boards \emph{are} read at startup, so ``never loaded'' is not the
 cause.  On an unprivileged install \textsf{globalHasData} =
 \textsf{zfalse} and \textsf{personalHasData} = \textsf{ztrue}, and
-\textsf{boardChoice} = \textsf{bGlobal} from \textsf{Init}.  The trace
-$Init \semi AttractAdvance^{*}$ reaches \textsf{mode} =
-\textsf{mHighscore} still bound to the empty global board, violating
-\textsf{SafeHighscore}.  \textbf{Missing logic:} on the attract path,
-\texttt{mode\_highscore\_enter} must fall back to \textsf{bPersonal}
-when the global board is inactive/empty --- the fallback at
-\texttt{game\_modes.c:1134} fires only post-game-over.
+\textsf{boardChoice} = \textsf{bGlobal} from \textsf{Init}.  Goal-directed
+model checking of the negated \textsf{SafeHighscore} reached
+\textsf{mode} = \textsf{mHighscore}, \textsf{gameActive} = \textsf{zfalse}
+still bound to the empty global board by pure attract-cycling
+($Init \semi Boot \semi AttractAdvance^{*}$), the machine-checked
+counter-example for the reported symptom.
+
+\textbf{Fix.} \texttt{mode\_highscore\_enter}
+(\texttt{src/game\_modes.c}) now falls back to \textsf{bPersonal} on the
+attract path (\texttt{!game\_active}) when the global board is empty
+(\texttt{highscore\_io\_count(\&hs\_global) == 0}) and the personal board
+has scores.  The game-over path keeps its own submit-based fallback
+(\texttt{game\_modes.c:1134}).  Both entry paths are modelled here in
+\textsf{AttractAdvance} and \textsf{GameOver}; re-running the goal now
+reports \emph{No counter example found. ALL states visited} (138 states),
+so the fixed operations cannot reach the violating state.  Regression:
+\texttt{test\_highscore\_attract\_falls\_back\_to\_personal}
+(\texttt{tests/test\_integration\_modes.c}) plus
+\texttt{highscore\_io\_count} unit tests.
 
 \subsection*{Defect 3 --- first Space advances the loop}
 

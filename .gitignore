@@ -69,3 +69,6 @@ docs/specs/*.aux
 docs/specs/*.log
 docs/specs/*.out
 docs/specs/*.toc
+docs/specs/*.fuzz
+docs/specs/*.fuzz.json
+docs/specs/*.report.json
