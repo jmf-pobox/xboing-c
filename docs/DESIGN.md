@@ -3364,3 +3364,57 @@ shown.
   `test_highscore_attract_keeps_populated_global`,
   `test_highscore_attract_both_empty_stays_global`, and `highscore_io_count`
   unit tests. New pure seam: `highscore_io_count`.
+
+## ADR-055: `game_active` is cleared on entering the title, closing the game-over leak into attract
+
+**Status:** Accepted (2026-07-11)
+**Context:** `docs/screen-state-z-spec`; bead `xboing-dk8` (SafeAttract).
+
+**Problem.** `game_active` is set at game start and, on a game over, stays true
+through the Highscore display (it gates score submission and the "GAME OVER"
+message bar — `src/game_modes.c:1150-1156`). Before this change the only place
+it was cleared was the Highscore Space handler (`src/game_input.c:415`). Both
+other exits from a game-over Highscore — the finish-timer auto-advance
+(`highscore_cb_on_finished`) and the C cycle key (`game_input.c:377`) — advanced
+to the next attract screen **without** clearing it. So after a game over that
+the player let time out (or dismissed with C), `game_active=true` leaked into
+Intro and the rest of the attract cycle. The next time the cycle reached
+Highscore, its Space handler took the `if (game_active)` branch
+(`game_input.c:413`) and returned to Intro instead of starting a game — the
+reported "first Space advances the loop, second Space starts the game" symptom.
+
+**Formal proof.** `docs/specs/2026-07-04-screen-state-machine.tex`, invariant
+`SafeAttract` (`mode ∈ attractModes ∧ mode ≠ mHighscore ⟹ gameActive=false`).
+probcli goal-directed model checking found a 7-step trace to `mIntro ∧
+gameActive=true` via `GameOver ; AttractAdvance`.
+
+**Decision.** Clear `game_active` in `mode_intro_enter`. Every attract advance
+out of Highscore lands on Intro — `game_callbacks_attract_next(HIGHSCORE) ==
+INTRO` — so one clear at the Intro entry closes all three leak paths (timer, C
+key, Space-return) at a single site, rather than duplicating the clear across
+three modules. Entering the title screen unambiguously means no game session is
+active; `mode_game_enter` re-establishes `game_active` when a game actually
+starts, so the space→new-game path is unaffected (exit clears, enter sets).
+
+The single-site clear also closes a second latent instance of the same
+invariant violation: pressing `E` mid-game (`game_input.c:332`) jumps to the
+editor with `game_active` still true, and quitting the editor always returns to
+Intro (`game_callbacks.c:1028`, `game_modes.c:1372`) — never back to the
+abandoned game. That route leaked the flag before this change too; it now lands
+on the same Intro clear.
+
+A broader `mode_highscore` `on_exit` clear was rejected: `on_exit` also fires
+when Highscore pushes the "words of wisdom" dialogue, where `game_active` must
+persist to finish the deferred score submission on pop-back.
+
+**Consequences.**
+
+- Re-proof: the negated `SafeAttract` goal is unreachable (90 states, *No
+  counter example found. ALL states visited*); no non-Highscore attract mode is
+  reachable with `game_active=true`.
+- Guarded by `test_highscore_autoadvance_clears_game_active`
+  (`tests/test_integration_modes.c`, finish-timer path) and
+  `test_highscore_c_cycle_clears_game_active` (`tests/test_keybindings.c`, C
+  key). The Space-return path stays covered by the existing Space handler and
+  its clear at `game_input.c:415` (now redundant with the Intro-entry clear, but
+  retained: it is load-bearing for the branch decision it guards).

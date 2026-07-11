@@ -275,7 +275,8 @@ attract path (\texttt{game\_modes.c:1139--1142}).
   \where
   mode \in \dom attractNext \\
   mode' = attractNext(mode) \\
-  gameActive' = gameActive \\
+  (mode' = mIntro \implies gameActive' = zfalse) \\
+  (mode' \neq mIntro \implies gameActive' = gameActive) \\
   blocksLoaded' = blocksLoaded \\
   (mode' = mHighscore \land gameActive = zfalse \\
     \quad~ \land globalHasData = zfalse \land personalHasData = ztrue \\
@@ -460,23 +461,36 @@ so the fixed operations cannot reach the violating state.  Regression:
 (\texttt{tests/test\_integration\_modes.c}) plus
 \texttt{highscore\_io\_count} unit tests.
 
-\subsection*{Defect 3 --- first Space advances the loop}
+\subsection*{Defect 3 --- first Space advances the loop (PROVEN, FIXED)}
 
 In a \emph{pure} attract cycle \textsf{gameActive} is always
 \textsf{zfalse} (set only by \textsf{StartNewGame*}, cleared only by
 the \textsf{Highscore} \textsf{Space} handler), so
 \textsf{IntroSpace} (\textsf{Intro} $\to$ \textsf{Instruct}) is the
 \emph{intended} PR~\#172 behavior, not a bug.  The genuine violation
-requires a prior game over: the trace
-$\dots \semi GameOver \semi AttractAdvance^{*}$ carries
+requires a prior game over: goal-directed model checking of the negated
+\textsf{SafeAttract} found the 7-step trace
+$\dots \semi GameOver \semi AttractAdvance$ carrying
 \textsf{gameActive} = \textsf{ztrue} out of \textsf{Highscore} into
-\textsf{Intro} and beyond (\textsf{SafeAttract} violated at
-\textsf{Intro}); the next time the cycle reaches \textsf{Highscore},
-\textsf{HighscoreSpaceReturn} fires and the first \textsf{Space} goes
-to \textsf{Intro} instead of starting a game.  \textbf{Missing
-postcondition:} the \textsf{Highscore} finish-timer auto-advance
-(\texttt{highscore\_cb\_on\_finished}) must set \textsf{gameActive'} =
-\textsf{zfalse} when it is not a \textsf{Space}-driven new game.
+\textsf{Intro} (\textsf{SafeAttract} violated at \textsf{Intro}); the
+next time the cycle reaches \textsf{Highscore},
+\textsf{HighscoreSpaceReturn} fires and the first \textsf{Space} goes to
+\textsf{Intro} instead of starting a game.
+
+\textbf{Fix.} Every attract advance out of \textsf{Highscore} --- the
+finish-timer (\texttt{highscore\_cb\_on\_finished}), the C cycle key
+(\texttt{game\_input.c}), and the \textsf{Space} return --- lands on
+\textsf{Intro}, since \texttt{attract\_next(HIGHSCORE) == INTRO}.  A
+single clear in \texttt{mode\_intro\_enter} (\texttt{src/game\_modes.c})
+therefore closes all three leak paths at one site; modelled here as
+\textsf{AttractAdvance} setting \textsf{gameActive'} = \textsf{zfalse}
+whenever \textsf{mode'} = \textsf{mIntro}.  Re-running the goal now
+reports \emph{No counter example found. ALL states visited} (90 states),
+and no non-\textsf{Highscore} attract mode is reachable with
+\textsf{gameActive} = \textsf{ztrue}.  Regression:
+\texttt{test\_highscore\_autoadvance\_clears\_game\_active} (timer path)
+and \texttt{test\_highscore\_c\_cycle\_clears\_game\_active} (C key).
+See ADR-055.
 
 \subsection*{Defect 1 --- Space lands in Bonus with an empty grid}
 

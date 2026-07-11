@@ -425,6 +425,17 @@ static void mode_intro_enter(sdl2_state_mode_t mode, void *ud)
 {
     (void)mode;
     game_ctx_t *ctx = ud;
+
+    /* End any game-over session on reaching the title.  A game-over
+     * Highscore display keeps game_active true (it gates score submission
+     * and the message bar); every attract advance out of Highscore — the
+     * finish-timer (highscore_cb_on_finished), the C cycle key, and the
+     * Space return — lands here, since attract_next(HIGHSCORE) == INTRO.
+     * Clearing it in this one place stops the flag leaking into the attract
+     * screens, where the next Highscore's Space would return to Intro
+     * instead of starting a game.  See ADR-055. */
+    ctx->game_active = false;
+
     set_menu_cursor(ctx);
     attract_frame_counter = 0;
     attract_next_flash = 0;

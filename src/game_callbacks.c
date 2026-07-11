@@ -754,7 +754,10 @@ static void highscore_cb_on_finished(highscore_type_t type, void *ud)
     /* Sound (gate@50, original/highscore.c:492) is stored in
      * highscore_system's sound struct and relayed by
      * mode_highscore_update — matches the keys/presents/intro/etc.
-     * relay pattern.  Callback only handles the state transition. */
+     * relay pattern.  Callback only handles the state transition.
+     * game_active (set on a game-over display) is cleared by
+     * mode_intro_enter, the single exit every attract advance from
+     * Highscore lands on (attract_next(HIGHSCORE) == INTRO).  See ADR-055. */
     sdl2_state_transition(ctx->state, game_callbacks_attract_next(SDL2ST_HIGHSCORE));
 }
 

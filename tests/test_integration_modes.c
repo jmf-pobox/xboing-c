@@ -311,6 +311,46 @@ static void test_highscore_attract_both_empty_stays_global(void **vstate)
 }
 
 /* =========================================================================
+ * SafeAttract invariant — game_active must not leak into attract screens
+ *
+ * After a game over the Highscore screen is shown with game_active still
+ * true (it gates score submission).  When the finish-timer auto-advances
+ * to the next attract screen (Intro), game_active must be cleared — the
+ * only other clear is the Space handler (game_input.c:415).  If it leaks,
+ * the next Highscore's Space returns to Intro instead of starting a game.
+ *
+ * Formal proof: docs/specs/2026-07-04-screen-state-machine.tex, invariant
+ * SafeAttract (probcli goal "mode = mIntro & gameActive = ztrue" reachable
+ * via GameOver ; AttractAdvance).
+ * ========================================================================= */
+static void test_highscore_autoadvance_clears_game_active(void **vstate)
+{
+    test_fixture_t *f = (test_fixture_t *)*vstate;
+    game_ctx_t *ctx = f->ctx;
+
+    /* Simulate the game-over Highscore display; score already submitted so
+     * the enter handler does not attempt a real submission. */
+    ctx->game_active = true;
+    ctx->score_submitted = true;
+    sdl2_state_status_t st = sdl2_state_transition(ctx->state, SDL2ST_HIGHSCORE);
+    assert_int_equal(st, SDL2ST_OK);
+
+    /* Tick until the finish-timer auto-advances out of Highscore.  The
+     * display reaches HIGHSCORE_END_FRAME_OFFSET (4000) at
+     * ATTRACT_FRAME_MULTIPLIER (6) sub-frames per tick, i.e. ~670 ticks;
+     * the 5000 cap is ~7x that headroom and only bounds a hang. */
+    int guard = 0;
+    while (sdl2_state_current(ctx->state) == SDL2ST_HIGHSCORE && guard < 5000)
+    {
+        sdl2_input_begin_frame(ctx->input);
+        sdl2_state_update(ctx->state);
+        guard++;
+    }
+    assert_int_equal(sdl2_state_current(ctx->state), SDL2ST_INTRO);
+    assert_false(ctx->game_active);
+}
+
+/* =========================================================================
  * -grab wiring — game_create applies the CLI flag to the window
  * ========================================================================= */
 
@@ -434,6 +474,8 @@ int main(void)
         cmocka_unit_test_setup_teardown(test_highscore_attract_keeps_populated_global, setup,
                                         teardown),
         cmocka_unit_test_setup_teardown(test_highscore_attract_both_empty_stays_global, setup,
+                                        teardown),
+        cmocka_unit_test_setup_teardown(test_highscore_autoadvance_clears_game_active, setup,
                                         teardown),
         cmocka_unit_test(test_grab_flag_applied),
         cmocka_unit_test(test_grab_flag_absent_default),
