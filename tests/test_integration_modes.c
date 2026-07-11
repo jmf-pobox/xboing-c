@@ -22,6 +22,7 @@
  * Requires: SDL_VIDEODRIVER=dummy, SDL_AUDIODRIVER=dummy
  */
 
+#include <errno.h>
 #include <setjmp.h>
 #include <stdarg.h>
 #include <stddef.h>
@@ -408,7 +409,9 @@ static void test_game_aborts_on_level_load_failure(void **vstate)
 {
     (void)vstate;
 
-    mkdir(".tmp", 0755); /* ok if it already exists */
+    /* EEXIST is the only tolerable mkdir failure; capture the verdict now
+     * (errno is only valid immediately after the call) and assert at the end. */
+    bool tmp_ok = (mkdir(".tmp", 0755) == 0 || errno == EEXIST);
     char dir[] = ".tmp/xboing_badlevel_XXXXXX";
     assert_non_null(mkdtemp(dir));
 
@@ -427,18 +430,15 @@ static void test_game_aborts_on_level_load_failure(void **vstate)
      * (a fixed buffer would truncate it and corrupt the env for later tests). */
     const char *prev = getenv("XBOING_LEVELS_DIR");
     char *saved = prev ? strdup(prev) : NULL;
-    setenv("XBOING_LEVELS_DIR", dir, 1);
+    int set_rc = setenv("XBOING_LEVELS_DIR", dir, 1);
 
     char *argv[] = {arg_prog, NULL};
     game_ctx_t *ctx = game_create(1, argv);
-    /* Paths are resolved at create; restore the environment immediately. */
-    if (saved)
-    {
-        setenv("XBOING_LEVELS_DIR", saved, 1);
-        free(saved);
-    }
-    else
-        unsetenv("XBOING_LEVELS_DIR");
+    /* Paths are resolved at create; restore the environment immediately.
+     * Capture the return code and assert at the end so a restore failure
+     * doesn't leak the temp dir via longjmp. */
+    int restore_rc = saved ? setenv("XBOING_LEVELS_DIR", saved, 1) : unsetenv("XBOING_LEVELS_DIR");
+    free(saved);
     if (ctx == NULL)
     {
         unlink(lvl_path); /* clean up before the assert longjmps out */
@@ -463,6 +463,12 @@ static void test_game_aborts_on_level_load_failure(void **vstate)
     game_destroy(ctx);
     unlink(lvl_path);
     rmdir(dir);
+
+    /* Env/mkdir bookkeeping asserted here (post-cleanup) so a failure can't
+     * silently make the test use the wrong levels dir or leak the temp dir. */
+    assert_true(tmp_ok);
+    assert_int_equal(set_rc, 0);
+    assert_int_equal(restore_rc, 0);
 
     /* Must not corrupt into an empty-grid BONUS; refuse the game and return
      * to the title with no active session. */

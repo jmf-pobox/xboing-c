@@ -113,8 +113,9 @@ bd close <id>         # Complete work
 
 Use `bd` for ALL task tracking. NEVER hand-edit `.beads/issues.jsonl`.
 bd runs an **embedded local Dolt engine** (no Dolt remote — see `bd dolt show`)
-and auto-exports to the git-tracked `.beads/issues.jsonl`. So the "sync" is
-just `git`: commit and push the repo. There is no `bd dolt push`/`bd sync` step.
+and auto-exports to the git-tracked `.beads/issues.jsonl`, so syncing issues
+means committing and pushing that file with `git` — there is no Dolt remote to
+push to.
 
 <!-- quarry:begin -->
 ## Quarry

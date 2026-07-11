@@ -12,8 +12,8 @@ bd close <id>         # Complete work
 ```
 
 bd uses an embedded local Dolt engine (no remote) and auto-exports to the
-git-tracked `.beads/issues.jsonl` — so `git commit` + `git push` is the sync;
-there is no `bd dolt push`/`bd sync` step.
+git-tracked `.beads/issues.jsonl`, so syncing issues means committing and
+pushing that file with `git` — there is no Dolt remote to push to.
 
 ## Landing the Plane (Session Completion)
 
