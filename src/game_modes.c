@@ -128,8 +128,10 @@ static bool start_new_game(game_ctx_t *ctx)
     snprintf(filename, sizeof(filename), "level%02d.data", file_num);
 
     char level_path[PATHS_MAX_PATH];
+    bool resolved =
+        paths_level_file(&ctx->paths, filename, level_path, sizeof(level_path)) == PATHS_OK;
     bool loaded = false;
-    if (paths_level_file(&ctx->paths, filename, level_path, sizeof(level_path)) == PATHS_OK)
+    if (resolved)
     {
         level_system_advance_background(ctx->level);
         loaded = (level_system_load_file(ctx->level, level_path) == LEVEL_SYS_OK);
@@ -139,10 +141,13 @@ static bool start_new_game(game_ctx_t *ctx)
      * grid as a completed level and drops to BONUS.  Faithful to
      * original/file.c:142-146 (SetupStage exits via ShutDown on a
      * ReadNextLevel failure); modernised to refuse the game and return to the
-     * attract cycle instead of exiting the process.  See ADR-056. */
+     * attract cycle instead of exiting the process.  See ADR-056.  Log the
+     * resolved path when we have it (parse failure) so the failing file is
+     * diagnosable; fall back to the filename when resolution itself failed. */
     if (!loaded)
     {
-        fprintf(stderr, "Error: could not load level file: %s — returning to title\n", filename);
+        fprintf(stderr, "Error: could not load level file %s — returning to title\n",
+                resolved ? level_path : filename);
         ctx->game_active = false;
         return false;
     }

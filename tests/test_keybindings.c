@@ -436,8 +436,11 @@ static void test_attract_c_cycles_screen(void **vstate)
 static void test_highscore_c_cycle_clears_game_active(void **vstate)
 {
     game_ctx_t *ctx = ((kb_fixture_t *)*vstate)->ctx;
+    /* Enter Highscore via the real game-over path: game_active true and
+     * score already submitted (so the enter handler skips submission). */
+    ctx->game_active = true;
+    ctx->score_submitted = true;
     sdl2_state_transition(ctx->state, SDL2ST_HIGHSCORE);
-    ctx->game_active = true; /* simulate the game-over Highscore display */
 
     inject_key(ctx, SDL_SCANCODE_C);
     game_input_global(ctx);
@@ -453,8 +456,11 @@ static void test_highscore_c_cycle_clears_game_active(void **vstate)
 static void test_highscore_space_return_clears_game_active(void **vstate)
 {
     game_ctx_t *ctx = ((kb_fixture_t *)*vstate)->ctx;
+    /* Enter Highscore via the real game-over path: game_active true and
+     * score already submitted (so the enter handler skips submission). */
+    ctx->game_active = true;
+    ctx->score_submitted = true;
     sdl2_state_transition(ctx->state, SDL2ST_HIGHSCORE);
-    ctx->game_active = true; /* simulate the game-over Highscore display */
 
     inject_key(ctx, SDL_SCANCODE_SPACE);
     game_input_global(ctx);

@@ -423,21 +423,20 @@ static void test_game_aborts_on_level_load_failure(void **vstate)
     fputs("not a valid xboing level file\n", fp);
     fclose(fp);
 
-    char saved[512];
+    /* strdup so a long pre-existing value round-trips exactly on restore
+     * (a fixed buffer would truncate it and corrupt the env for later tests). */
     const char *prev = getenv("XBOING_LEVELS_DIR");
-    bool had_prev = prev != NULL;
-    if (had_prev)
-    {
-        strncpy(saved, prev, sizeof(saved) - 1);
-        saved[sizeof(saved) - 1] = '\0';
-    }
+    char *saved = prev ? strdup(prev) : NULL;
     setenv("XBOING_LEVELS_DIR", dir, 1);
 
     char *argv[] = {arg_prog, NULL};
     game_ctx_t *ctx = game_create(1, argv);
     /* Paths are resolved at create; restore the environment immediately. */
-    if (had_prev)
+    if (saved)
+    {
         setenv("XBOING_LEVELS_DIR", saved, 1);
+        free(saved);
+    }
     else
         unsetenv("XBOING_LEVELS_DIR");
     if (ctx == NULL)

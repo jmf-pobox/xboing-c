@@ -9,8 +9,11 @@ bd ready              # Find available work
 bd show <id>          # View issue details
 bd update <id> --status in_progress  # Claim work
 bd close <id>         # Complete work
-bd dolt push          # Sync beads to remote
 ```
+
+bd uses an embedded local Dolt engine (no remote) and auto-exports to the
+git-tracked `.beads/issues.jsonl` — so `git commit` + `git push` is the sync;
+there is no `bd dolt push`/`bd sync` step.
 
 ## Landing the Plane (Session Completion)
 
@@ -25,8 +28,7 @@ bd dolt push          # Sync beads to remote
 
    ```bash
    git pull --rebase
-   bd dolt push
-   git push
+   git push   # commits the auto-exported .beads/issues.jsonl too
    git status  # MUST show "up to date with origin"
    ```
 
