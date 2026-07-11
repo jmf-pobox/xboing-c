@@ -311,6 +311,31 @@ void sdl2_renderer_get_window_size(const sdl2_renderer_t *ctx, int *w, int *h)
     SDL_GetWindowSize(ctx->window, w, h);
 }
 
+int sdl2_renderer_set_logical_width(sdl2_renderer_t *ctx, int new_logical_width)
+{
+    if (ctx == NULL || new_logical_width <= 0)
+    {
+        return -1;
+    }
+    if (new_logical_width == ctx->logical_width)
+    {
+        return 0;
+    }
+
+    if (!ctx->fullscreen)
+    {
+        int win_w = 0;
+        int win_h = 0;
+        SDL_GetWindowSize(ctx->window, &win_w, &win_h);
+        int new_win_w = (new_logical_width * win_h) / ctx->logical_height;
+        SDL_SetWindowSize(ctx->window, new_win_w, win_h);
+    }
+
+    ctx->logical_width = new_logical_width;
+    SDL_RenderSetLogicalSize(ctx->renderer, ctx->logical_width, ctx->logical_height);
+    return 0;
+}
+
 int sdl2_renderer_save_screenshot(const sdl2_renderer_t *ctx, const char *path)
 {
     if (ctx == NULL || ctx->renderer == NULL || path == NULL)

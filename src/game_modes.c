@@ -47,6 +47,7 @@
 #include "sdl2_cursor.h"
 #include "sdl2_input.h"
 #include "sdl2_loop.h"
+#include "sdl2_renderer.h"
 #include "sdl2_state.h"
 #include "sfx_system.h"
 #include "special_system.h"
@@ -1341,10 +1342,27 @@ static void mode_edit_enter(sdl2_state_mode_t mode, void *ud)
     if (ctx->cursor)
         sdl2_cursor_set(ctx->cursor, SDL2CUR_PLUS);
 
+    /* Widen the canvas to reveal the tool palette, matching the
+     * original's ResizeMainWindow(oldWidth + EDITOR_TOOL_WIDTH, ...)
+     * (original/editor.c:161-164).  See
+     * docs/specs/2026-07-11-editor-window-width.md. */
+    sdl2_renderer_set_logical_width(ctx->renderer, SDL2R_LOGICAL_WIDTH + EDITOR_TOOL_WIDTH);
+
     editor_system_reset(ctx->editor);
     editor_system_init_palette(ctx->editor, MAX_STATIC_BLOCKS);
     /* Don't clear blocks here — editor_system's do_load_level handles loading.
      * The on_load_level callback calls block_system_clear_all before loading. */
+}
+
+static void mode_edit_exit(sdl2_state_mode_t mode, void *ud)
+{
+    (void)mode;
+    game_ctx_t *ctx = ud;
+
+    /* Restore the canvas width, matching the original's
+     * ResizeMainWindow(oldWidth, ...) on editor exit
+     * (original/editor.c:381-383). */
+    sdl2_renderer_set_logical_width(ctx->renderer, SDL2R_LOGICAL_WIDTH);
 }
 
 static void mode_edit_update(sdl2_state_mode_t mode, void *ud)
@@ -1591,6 +1609,7 @@ void game_modes_register(game_ctx_t *ctx)
         sdl2_state_mode_def_t def = {
             .on_enter = mode_edit_enter,
             .on_update = mode_edit_update,
+            .on_exit = mode_edit_exit,
         };
         sdl2_state_register(ctx->state, SDL2ST_EDIT, &def);
     }

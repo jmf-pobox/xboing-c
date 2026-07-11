@@ -1,0 +1,14 @@
+reflections:
+    - round: 1
+      created_at: "2026-07-11T22:13:04Z"
+      author: jdc
+      converging: true
+      signals:
+        - 'coverage complete: 5 unit criteria (a-e) + fullscreen case + 4 integration transitions (695/575/575/695) via sdl2_state_transition, no keystroke injection'
+        - windowed-growth test asserts exact formula (new_logical_w*win_h)/SDL2R_LOGICAL_HEIGHT matching src/sdl2_renderer.c:330 verbatim; not satisfied by a broken no-op impl
+        - 'restore-exact is bit-exact by construction: restore recomputes the same integer-division expression used at window creation (src/sdl2_renderer.c:100); proven independent of display clamping via a dummy-driver probe (GetDisplayUsableBounds returns 1024x768, clamp branch active, test still passes because expected_w derives from measured win_h)'
+        - setup_editor lands in SDL2ST_EDIT (PRESENTS->EDIT; same mode_edit_enter code path as INTRO->EDIT, unconditional widen); ctx->renderer is a real renderer under dummy driver, not NULL
+        - 'characterization value confirmed by inspection: pre-fix the unit file wouldn''t compile (function absent) and integration assertions would see 575 not 695'
+        - git diff isolated to tests/test_sdl2_renderer.c + tests/test_keybindings.c; no production code, no CMakeLists change (executables already registered); zero new -Werror warnings
+      recommendation: stop
+      reason: All test coverage and quality criteria verified with no findings. Both suites independently reran green (ctest debug 61/61, asan 61/61); the 7 Group-9 renderer cases and 3 editor-width keybindings cases confirmed executing. Assertions are non-tautological and not display-clamp-flaky. Ready to close.

@@ -687,16 +687,27 @@ static void render_main_background(const game_ctx_t *ctx)
     if (tw <= 0 || th <= 0)
         return;
 
-    for (int ty = 0; ty < SDL2R_LOGICAL_HEIGHT; ty += th)
+    /* Query the renderer's *current* logical size rather than the
+     * compile-time SDL2R_LOGICAL_WIDTH/HEIGHT macros — SDL2ST_EDIT
+     * widens the logical canvas at runtime (see
+     * sdl2_renderer_set_logical_width, docs/specs/
+     * 2026-07-11-editor-window-width.md) and the background must
+     * tile across the full widened canvas, not just the original
+     * 575px play/status area. */
+    int logical_w = 0;
+    int logical_h = 0;
+    sdl2_renderer_get_logical_size(ctx->renderer, &logical_w, &logical_h);
+
+    for (int ty = 0; ty < logical_h; ty += th)
     {
-        for (int tx = 0; tx < SDL2R_LOGICAL_WIDTH; tx += tw)
+        for (int tx = 0; tx < logical_w; tx += tw)
         {
             int dw = tw;
             int dh = th;
-            if (tx + dw > SDL2R_LOGICAL_WIDTH)
-                dw = SDL2R_LOGICAL_WIDTH - tx;
-            if (ty + dh > SDL2R_LOGICAL_HEIGHT)
-                dh = SDL2R_LOGICAL_HEIGHT - ty;
+            if (tx + dw > logical_w)
+                dw = logical_w - tx;
+            if (ty + dh > logical_h)
+                dh = logical_h - ty;
             SDL_Rect src = {0, 0, dw, dh};
             SDL_Rect dst = {tx, ty, dw, dh};
             SDL_RenderCopy(sdl, tex.texture, &src, &dst);

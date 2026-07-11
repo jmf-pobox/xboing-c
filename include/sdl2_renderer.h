@@ -103,6 +103,32 @@ void sdl2_renderer_get_logical_size(const sdl2_renderer_t *ctx, int *w, int *h);
 /* Get the current physical window size. */
 void sdl2_renderer_get_window_size(const sdl2_renderer_t *ctx, int *w, int *h);
 
+/*
+ * Change the renderer's logical width while preserving the on-screen
+ * pixel size of existing logical content (height is never touched).
+ *
+ * Windowed mode: grows/shrinks the physical window width in lockstep,
+ * derived from the window's current height, so the logical->physical
+ * scale factor is unchanged.  Existing content (e.g. the play area)
+ * does not resize or shift; only new horizontal logical space is
+ * exposed (or reclaimed).  The window is not repositioned or
+ * recentred — same top-left-anchored growth as the original's
+ * ResizeMainWindow (original/editor.c:162-164).
+ *
+ * Fullscreen mode: the physical window already spans the display and
+ * cannot grow, so only the logical width changes.  SDL's own uniform
+ * letterbox scaling then shrinks the whole canvas to fit the new,
+ * wider aspect ratio.  This is a deliberate, documented fidelity
+ * trade-off unique to fullscreen editor use — see
+ * docs/specs/2026-07-11-editor-window-width.md.
+ *
+ * No-op if new_logical_width already equals the current logical
+ * width (idempotent — safe to call on every mode-enter).
+ *
+ * Returns 0 on success, -1 on NULL ctx or non-positive width.
+ */
+int sdl2_renderer_set_logical_width(sdl2_renderer_t *ctx, int new_logical_width);
+
 /* Save the current framebuffer to a BMP file.  Returns 0 on success. */
 int sdl2_renderer_save_screenshot(const sdl2_renderer_t *ctx, const char *path);
 

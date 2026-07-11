@@ -946,6 +946,17 @@ static const char *vc_bonus_name(int s)
     }
 }
 
+static const char *vc_edit_name(int s)
+{
+    switch (s)
+    {
+        case EDITOR_STATE_NONE:
+            return "editing";
+        default:
+            return NULL;
+    }
+}
+
 static void vc_signal_modern(const char *mode_name, const char *substate, int seq)
 {
     /* Pre-signal pause: the SDL_RenderPresent that ran in
@@ -964,7 +975,7 @@ static void vc_signal_modern(const char *mode_name, const char *substate, int se
 }
 
 static void vc_check(game_ctx_t *ctx, int pre_presents, int pre_credits, int pre_intro,
-                     int pre_demo, int pre_keys, int pre_highscore, int pre_bonus)
+                     int pre_demo, int pre_keys, int pre_highscore, int pre_bonus, int pre_edit)
 {
     static sdl2_state_mode_t prev_mode = SDL2ST_NONE;
     static unsigned long next_capture_frame = 0;
@@ -1090,6 +1101,12 @@ static void vc_check(game_ctx_t *ctx, int pre_presents, int pre_credits, int pre
         post_sub = (int)bonus_system_get_highest_reached(ctx->bonus);
         mode_str = "bonus";
     }
+    else if (mode == SDL2ST_EDIT)
+    {
+        pre_sub = pre_edit;
+        post_sub = (int)editor_system_get_state(ctx->editor);
+        mode_str = "editor";
+    }
 
     if (!mode_str)
         return;
@@ -1109,6 +1126,8 @@ static void vc_check(game_ctx_t *ctx, int pre_presents, int pre_credits, int pre
         name_fn = vc_highscore_name;
     else if (mode == SDL2ST_BONUS)
         name_fn = vc_bonus_name;
+    else if (mode == SDL2ST_EDIT)
+        name_fn = vc_edit_name;
 
     if (!name_fn)
         return;
@@ -1152,6 +1171,7 @@ static int vc_pre_demo_state;
 static int vc_pre_keys_state;
 static int vc_pre_highscore_state;
 static int vc_pre_bonus_state;
+static int vc_pre_edit_state;
 
 static void stub_tick(void *user_data)
 {
@@ -1164,6 +1184,7 @@ static void stub_tick(void *user_data)
     vc_pre_keys_state = (int)keys_system_get_state(ctx->keys);
     vc_pre_highscore_state = (int)highscore_system_get_state(ctx->highscore_display);
     vc_pre_bonus_state = (int)bonus_system_get_highest_reached(ctx->bonus);
+    vc_pre_edit_state = (int)editor_system_get_state(ctx->editor);
 
     sdl2_state_update(ctx->state);
 }
@@ -1177,7 +1198,8 @@ static void stub_render(double alpha, void *user_data)
 
     if (ctx->vc_mode >= 0)
         vc_check(ctx, vc_pre_presents_state, vc_pre_credits_stage, vc_pre_intro_state,
-                 vc_pre_demo_state, vc_pre_keys_state, vc_pre_highscore_state, vc_pre_bonus_state);
+                 vc_pre_demo_state, vc_pre_keys_state, vc_pre_highscore_state, vc_pre_bonus_state,
+                 vc_pre_edit_state);
 }
 
 /* =========================================================================

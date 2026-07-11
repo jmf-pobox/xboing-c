@@ -3465,3 +3465,61 @@ model's `StartNewGameFail` now targets `mIntro`.
 - Not addressed here: *why* a load might fail on a given install (a packaging
   or path issue) is a separate concern; this ADR only guarantees the state
   machine degrades safely rather than into an empty bonus.
+
+## ADR-057: Editor widens the logical canvas and window in lockstep
+
+**Status:** Accepted (2026-07-11)
+**Context:** `docs/specs/2026-07-11-editor-window-width.md`; bead
+`xboing-di8`. Full design and verification plan live in that spec; this ADR
+records the decision.
+
+**Problem.** In `SDL2ST_EDIT` the modern port kept the fixed gameplay logical
+width `SDL2R_LOGICAL_WIDTH = 575` (`include/sdl2_renderer.h`). The editor tool
+palette is drawn at `PALETTE_X = 545` with `PALETTE_W = 100` and a highlight
+rect out to x=649 (`src/game_render.c`), overflowing the 575px logical canvas
+by ~74px — the palette rendered clipped against the window edge (user
+screenshot, 2026-07-11).
+
+**Original behavior.** The 1996 game widened the X11 main window by
+`EDITOR_TOOL_WIDTH = 120` on editor entry (`original/editor.c:161-164`,
+`ResizeMainWindow(oldWidth + EDITOR_TOOL_WIDTH, ...)`) and restored `oldWidth`
+on exit (`original/editor.c:381-383`). The palette's `blockWindow` sits at
+x=545, width 120 (`original/stage.c:273-274`) — an exact match for the modern
+`PALETTE_X`. Xlib has no rescaling: it grew the window in 1:1 pixel space,
+top-left anchored, revealing the panel. `EDITOR_TOOL_WIDTH = 120` was already
+carried into the modern port (`include/editor_system.h:27`) but never consumed.
+
+**Decision.** Mirror the original, adapted for SDL2's logical-canvas model.
+`SDL_RenderSetLogicalSize` applies a single uniform scale
+`min(win_w/logical_w, win_h/logical_h)` and letterboxes the excess axis, so
+widening logical width *alone* would shrink the play area on screen. Instead,
+grow logical width **and** physical window width in lockstep, sized so the
+logical→physical scale is provably unchanged: `new_win_w = (new_logical_w *
+win_h) / logical_h` — the same operand order used at window creation
+(`src/sdl2_renderer.c:100`), making it self-inverting. A new renderer primitive
+`sdl2_renderer_set_logical_width` (idempotent; windowed grows the window,
+fullscreen changes logical only — a disclosed fullscreen fidelity trade-off)
+is called from `mode_edit_enter` (575→695) and a new `mode_edit_exit`
+(695→575). `PALETTE_X`/`PALETTE_W` are unchanged — the fix is entirely canvas
+size. A secondary bug fixed in the same change: `render_main_background` tiled
+using compile-time `SDL2R_LOGICAL_WIDTH/HEIGHT`, leaving the widened panel bare
+black; it now queries the renderer's current logical size.
+
+**Consequences.**
+
+- No z-spec: deterministic, stateless geometry (one arithmetic formula applied
+  symmetrically on mode enter/exit); `sdl2_state_transition` already guarantees
+  exactly one `on_exit`/`on_enter` pair per transition, so no widened state can
+  leak into a non-EDIT mode.
+- Guarded by 7 unit tests (`tests/test_sdl2_renderer.c`, incl. widen,
+  proportional window growth, exact round-trip restore, no-op idempotence,
+  NULL/non-positive guards, fullscreen-no-window-change) and 3 integration
+  tests (`tests/test_keybindings.c`: INTRO→EDIT=695, EDIT→INTRO=575, and the
+  EDIT→GAME→EDIT→INTRO playtest round trip), all headless under
+  `SDL_VIDEODRIVER=dummy`.
+- Fullscreen editor use shrinks the whole canvas slightly to fit the wider
+  aspect ratio inside fixed display bounds — deliberate and documented; the
+  windowed case this bead is about is unaffected.
+- Out of scope: editor grid-line parity (`xboing-c40`); a future modal dialogue
+  wired into the editor would need `SDL2RGN_DIALOGUE`'s hardcoded 575 re-centred
+  against 695 (flagged in the spec, no call site exists today).
