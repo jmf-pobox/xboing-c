@@ -11,10 +11,11 @@ Definition-of-Done gate and does NOT count as delegation. The leader
 
 **Leader ≠ worker for code.** For `implement`/`test` the worker MUST be a
 domain specialist (`jdc`/`gjm`/`sjl`), never the leader — the leader does
-not write production code solo. The leader MAY be the worker ONLY for
-`design`/`report` and doc-only/governance missions (e.g. this process doc).
-The store enforces `worker ≠ evaluator`; `leader ≠ worker` for code is a
-rule you uphold, not a store refusal — so do not rationalize around it.
+not write production code solo. The leader MAY be the worker for the
+non-code archetypes — `design`/`report`/`review`/`investigate` — whose
+output is analysis or docs, not shipped code. The store enforces
+`worker ≠ evaluator`; `leader ≠ worker` for code is a rule you uphold, not a
+store refusal — so do not rationalize around it.
 
 ## Mission Protocol (mandatory — no exceptions)
 
@@ -73,7 +74,5 @@ measure→test→verify.
 ## Worker/Evaluator Pairing
 
 Worker ≠ evaluator (DES-033): `jdc`→`gjm`, `sjl`→`jdc`, `gjm`→`jdc`,
-`jck`→`jmf-pobox`.
-
-Persist: specs→`docs/specs/`, reviews→`docs/reviews/`, contracts→
-`.tmp/missions/`. Spawn workers `run_in_background: true` unless blocked.
+`jck`→`jmf-pobox`. Persist: specs→`docs/specs/`, reviews→`docs/reviews/`,
+contracts→`.tmp/missions/`. Spawn workers `run_in_background: true`.
