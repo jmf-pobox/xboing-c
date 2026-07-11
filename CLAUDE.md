@@ -109,7 +109,7 @@ bd ready              # Find available work
 bd show <id>          # View issue details
 bd update <id> --claim  # Claim work
 bd close <id>         # Complete work
-bd sync               # Sync before session end
+bd dolt push          # Sync beads to remote before session end
 ```
 
 Use `bd` for ALL task tracking. NEVER hand-edit `.beads/issues.jsonl`.
