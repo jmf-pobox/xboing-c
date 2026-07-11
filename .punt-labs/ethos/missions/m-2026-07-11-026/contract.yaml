@@ -1,0 +1,44 @@
+mission_id: m-2026-07-11-026
+status: closed
+type: investigate
+created_at: "2026-07-11T22:39:51Z"
+updated_at: "2026-07-11T22:56:32Z"
+closed_at: "2026-07-11T22:56:32Z"
+leader: claude
+worker: jck
+evaluator:
+    handle: jdc
+    pinned_at: "2026-07-11T22:39:51Z"
+    hash: c08223356d3e6d5aed56e28da477a1aa2707509febfef7c5f62c25871a3e841f
+inputs:
+    ticket: xboing-di8
+write_set:
+    - docs/audits/2026-07-11-editor-parity.md
+success_criteria:
+    - docs/audits/2026-07-11-editor-parity.md exists and is markdownlint-clean (one H1, blank lines around lists/fences/headings, fenced blocks have a language, ~72-col prose wrap)
+    - 'EVERY editor-fidelity gap enumerated (not just the ~8 already spotted), each with: (1) what the original does + original/editor.c or stage.c line citation; (2) the modern file/function responsible (or ''absent''); (3) severity (blocker/major/minor); (4) whether already tracked (xboing-c40 grid lines, xboing-di8 width-DONE)'
+    - 'Coverage across all editor sub-systems: play grid (grid lines, background pixmap), blockWindow palette, typeWindow special/type selectors + digit keys + Active indicator, selection highlight geometry, top HUD (levelWindow/DisplayLevelInfo: score/lives/tilt/level number), bottom status (messWindow ''Editing level N'', DrawSpecials flags row, level timer), whether ball/paddle should render in-editor, editor input model (click-to-place, key bindings), save/load flow'
+    - A prioritized recommended implementation order (what to build first, dependencies between gaps) to feed the design phase
+    - Explicitly separate confirmed-from-code findings from 'verify' items (e.g. background-tile mismatch) so the design phase knows what still needs checking
+budget:
+    rounds: 1
+    reflection_after_each: true
+current_round: 1
+context: |
+    The level editor (SDL2ST_EDIT) has never been through a parity audit against
+    the 1996 original. A visual comparison (modern screenshot vs
+    original/level-editor.gif) surfaced ~8 obvious gaps, but we need the COMPLETE,
+    authoritative list before designing the parity work. This is an investigate/
+    audit mission: produce a written deliverable, no code changes.
+
+    The just-landed width fix (commit c490555, this branch) widened the editor
+    canvas 575->695 so the palette is visible — that part is DONE and is NOT in
+    scope for this audit except to note it as resolved. Everything else about the
+    editor's fidelity is in scope.
+
+    Canonical reference: original/editor.c and original/stage.c (the editor's
+    sub-windows: playWindow, blockWindow, typeWindow, levelWindow, messWindow).
+    Modern implementation: src/editor_system.c, src/game_render.c (editor render
+    dispatch), src/game_modes.c (mode_edit_*), src/game_input.c (editor input),
+    src/game_callbacks.c (editor callbacks). Read the original FIRST, cite
+    original/<file>.c:<line> for every gap.

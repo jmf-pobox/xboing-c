@@ -1,0 +1,30 @@
+results:
+    - mission: m-2026-07-11-026
+      round: 1
+      created_at: "2026-07-11T22:51:46Z"
+      author: jck
+      verdict: pass
+      confidence: 0.9
+      files_changed:
+        - path: docs/audits/2026-07-11-editor-parity.md
+          added: 439
+          removed: 0
+      evidence:
+        - name: 19 gaps enumerated (9 blockers, 6 majors, 4 minors incl. 1 confirmed non-issue), each cited to original/<file>.c:<line> + modern file/function + severity + tracking status
+          status: pass
+        - name: 'coverage across all editor subsystems: HUD, paddle/ball suppression, yes-no + input dialogues, set-time, save-time, counter slide, random-flag roundtrip, palette 20/30 cap, Active indicator, highlight geometry, two-column layout, right-click inspect, grid lines (c40), background, on_error, digit-key ADR, levels-dir split (resolved)'
+          status: pass
+        - name: dependency-ordered 11-step build plan + separated 'Verify' section (background tile, blind-index reachability, random-flag live roundtrip)
+          status: pass
+        - name: 'git status: only docs/audits/2026-07-11-editor-parity.md added by this mission; no code touched'
+          status: pass
+        - name: 'markdownlint: NOT installed on this macOS host (CI only); jck manually verified against .claude/rules/markdown.md + .markdownlint.json — leader to confirm in CI'
+          status: skip
+      prose: |-
+        Exhaustive parity audit of SDL2ST_EDIT vs original/editor.c + stage.c + file.c.
+        Found far more than the ~8 eyeballed visual gaps: the top blockers are live
+        data-corruption bugs in the save/load path (hardcoded 120s time bonus at
+        game_callbacks.c:990; counter hit-count zeroed in block_type_to_char; RANDOM_BLK
+        not restored before save; yes/no + input dialogues are stubs). Leader reviewed
+        the full doc before filing. jdc to verify the top blocker citations against the
+        actual code.
