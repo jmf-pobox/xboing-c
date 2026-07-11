@@ -1,0 +1,30 @@
+mission_id: m-2026-07-11-011
+status: closed
+type: design
+created_at: "2026-07-11T17:52:10Z"
+updated_at: "2026-07-11T18:02:58Z"
+closed_at: "2026-07-11T18:02:58Z"
+leader: claude
+worker: claude
+evaluator:
+    handle: jdc
+    pinned_at: "2026-07-11T17:52:10Z"
+    hash: c08223356d3e6d5aed56e28da477a1aa2707509febfef7c5f62c25871a3e841f
+inputs:
+    ticket: process-fix-missions
+write_set:
+    - CLAUDE.md
+    - docs/WORKFLOW.md
+    - .claude/rules/delegation.md
+success_criteria:
+    - delegation.md loads on src, include, tests, docs paths (not docs-only)
+    - Mission Protocol is mandatory and names create/result/reflect/advance/close
+    - WORKFLOW Gate 3 requires a review mission, not a bare agent spawn
+    - CLAUDE.md operating principles forbid solo implementation by the leader
+    - CLAUDE.md stays under 200 lines and delegation.md stays 80 or fewer
+budget:
+    rounds: 2
+    reflection_after_each: true
+current_round: 2
+context: |
+    Fix the dev-process docs so ethos missions are mandatory and unmissable for delegated work. Root cause of the failure being corrected: (1) .claude/rules/delegation.md was scoped via paths: to docs/specs, docs/reviews, docs/research only, so the mission mandate did NOT load into context during src/** and tests/** work — exactly when implementing; (2) docs/WORKFLOW.md Gate 3 told the reader to run a bare pr-review-toolkit:code-reviewer spawn, never a mission; (3) mission language was soft ("where applicable"). The session that triggered this shipped three code fixes with zero missions, severing the contract -> commit -> audit-trail chain ethos exists to keep. This change corrects CLAUDE.md, docs/WORKFLOW.md, and .claude/rules/delegation.md.

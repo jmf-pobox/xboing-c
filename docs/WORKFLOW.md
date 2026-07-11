@@ -28,12 +28,13 @@ restructures how modules interact, or adds a new subsystem must go
 through a structured design exercise before implementation:
 
 1. Read the original source to understand the problem space.
-2. Launch a design agent (`code-architect`) to produce a blueprint.
-3. Launch a peer review agent (`code-reviewer`) on the design.
-4. Incorporate review findings. Update the plan.
-5. Write an ADR in `docs/DESIGN.md` for key decisions.
-6. Get user approval on the final plan.
-7. Only then proceed to Phase 3.
+2. Open a `design` **ethos mission** (`.claude/rules/delegation.md`):
+   the worker (e.g. `jdc`) produces the blueprint; the evaluator (≠ worker)
+   reviews it. Design is reviewed *before* code starts. Do not solo-design.
+3. Incorporate the evaluator's findings via `reflect`/`advance`; close the
+   mission with a result artifact.
+4. Write an ADR in `docs/DESIGN.md` for key decisions.
+5. Get user approval on the final plan, then proceed to Phase 3.
 
 Do not skip this for "simple" changes that turn out to involve
 architectural decisions. If you find yourself reverting code, you
@@ -41,9 +42,20 @@ skipped the design phase.
 
 ## Phase 3: Implement (TDD when feasible)
 
+**Implementation is delegated, not solo.** Open an `implement` (and/or
+`test`) ethos mission and spawn the domain worker — `jdc` for C, `gjm` for
+tests, `sjl` for SDL2/AV (`.claude/rules/delegation.md`). The leader
+(`claude`) writes the contract and reviews; the leader does not write the
+production code directly. "I did it faster myself" is the failure mode this
+prevents — it severs the contract→commit→audit-trail chain ethos exists to
+keep. See `.claude/rules/delegation.md`, Mission Protocol.
+
+Within the mission:
+
 1. Write failing tests first when feasible.
 2. Write the code that makes the tests pass.
 3. Run quality gates after each logical change.
+4. Worker submits a `result`; evaluator (≠ worker) reviews; close the mission.
 
 ## Phase 4: Definition of Done
 
@@ -63,8 +75,13 @@ errors.
 
 ### Gate 3: Local code review
 
-Run `pr-review-toolkit:code-reviewer` or `feature-dev:code-reviewer`
-on the diff. Address every valid finding. Repeat until clean.
+Gate 3 is a `review` **ethos mission**, not a bare agent spawn. Open the
+mission with an evaluator who is neither the worker nor the leader (`jdc`
+reviews C, `gjm` reviews tests, `jck` approves gameplay-affecting changes —
+`.claude/rules/delegation.md`). Address every valid finding via
+`reflect`/`advance`; close with a result. A chat-only `code-reviewer` spawn
+with no mission does **not** satisfy this gate — it leaves no contract,
+no audit trail, and no `Mission:` commit trailer.
 
 ### Gate 4: Game run + visual verification
 
@@ -100,9 +117,16 @@ ambiguity**, not size.
 
 | Tier | When | Tracking |
 |------|------|----------|
-| **T1: Forge** | Epics, cross-cutting, competing approaches | Pipeline + beads |
-| **T2: Feature Dev** | Features, multi-file, clear goal | Pipeline + beads |
-| **T3: Direct** | Tasks, bugs, obvious path | Single mission + beads |
+| **T1: Forge** | Epics, cross-cutting, competing approaches | Pipeline (`formal`/`full`) + beads |
+| **T2: Feature Dev** | Features, multi-file, clear goal | Pipeline (`standard`) + beads |
+| **T3: Direct** | Tasks, bugs, obvious path | `quick` pipeline (implement→review) + beads |
+
+**Every tier is tracked by ethos missions — there is no mission-free tier.**
+The smallest bug fix (T3) is at minimum an `implement` mission plus a `review`
+mission (or the `quick` pipeline), each with a worker and a distinct
+evaluator, created and closed. Reporting "0 missions" for delegated work is a
+process failure, not efficiency. If you are doing the coding yourself with no
+open mission, stop and open one (`.claude/rules/delegation.md`).
 
 **Escalation only goes up.** If T3 reveals unexpected scope,
 escalate to T2. If T2 reveals competing designs, escalate to T1.

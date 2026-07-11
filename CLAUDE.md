@@ -48,6 +48,7 @@ XBoing is a classic X11 breakout/blockout game (1993-1996, Justin C. Kibell) mod
 
 ## Operating Principles
 
+- **Delegation is a mission, not a solo act.** Design, implementation, tests, and review run as `ethos` mission contracts — a worker agent (`jdc` C, `gjm` tests, `sjl` AV) and a *distinct* evaluator, `create → result → reflect → close`. The leader (`claude`) writes the contract and reviews; it does **not** write production code solo, and a bare `Agent`/`Task` spawn does not satisfy a Definition-of-Done gate. This is what makes every line traceable to the contract that authorized it (`Mission:` git trailers). "0 missions" for delegated work is a process failure. See `.claude/rules/delegation.md` and `docs/WORKFLOW.md`.
 - **Ship the result, not the process.** PRs squash on merge — nobody reads the PR body after merge, and there is no commit-history forensics to protect. Group every change that serves the goal in front of you into the current PR. No "out of scope," no "follow-up bead," no "separate PR for cleanliness." If the audit found 5 problems, fix all 5 in this PR.
 - **`make` is the source of truth.** `make check` runs the full local CI parity.
 - **Dogfood before shipping.** Build, install, run the user journey. Don't add stabilizing flags.

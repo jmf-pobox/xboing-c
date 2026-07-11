@@ -53,6 +53,13 @@ Format: `type(scope): description`
 | `build:` | CMake, CI, dependency changes |
 | `docs:` | Documentation |
 
+**Mission traceability.** Delegated work is done under an `ethos` mission
+(`.claude/rules/delegation.md`). Commits produced by a mission carry
+`Mission:` / `Delegation:` git trailers (stamped by the commit-msg hook) so
+`git blame → commit → trailer → contract → prompt → audit trail` is
+reconstructable. A code commit with no mission trailer means the work
+skipped the mission process — that is a defect, not a style choice.
+
 ## Stop and Ask
 
 The following modify shared state in ways that are hard to reverse.

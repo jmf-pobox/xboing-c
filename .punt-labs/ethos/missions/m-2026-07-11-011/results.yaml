@@ -1,0 +1,31 @@
+results:
+    - mission: m-2026-07-11-011
+      round: 2
+      created_at: "2026-07-11T18:02:51Z"
+      author: claude
+      verdict: pass
+      confidence: 0.9
+      files_changed:
+        - path: .claude/rules/delegation.md
+          added: 63
+          removed: 47
+        - path: docs/WORKFLOW.md
+          added: 35
+          removed: 11
+        - path: CLAUDE.md
+          added: 1
+          removed: 0
+      evidence:
+        - name: 'delegation.md loads at session start (paths: frontmatter dropped, Finding A root-cause fix)'
+          status: pass
+        - name: leader!=worker carve-out documented; store enforces only worker!=evaluator (Finding C)
+          status: pass
+        - name: Mission Protocol mandatory, names create/result/reflect/advance/close
+          status: pass
+        - name: WORKFLOW Gate 3 requires a review mission, not a bare agent spawn
+          status: pass
+        - name: 'CLAUDE.md forbids solo leader implementation; budgets: CLAUDE 138<200, delegation 79<80'
+          status: pass
+      open_questions:
+        - Store-side leader!=worker enforcement is documentary only — tracked in bead xboing-yup
+        - review/investigate leader-as-worker rule unstated — tracked in bead xboing-e16
