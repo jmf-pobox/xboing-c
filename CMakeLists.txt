@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(xboing VERSION 1.0.2 LANGUAGES C)
+project(xboing VERSION 1.0.3 LANGUAGES C)
 include(GNUInstallDirs)
 
 # Release date shown in the man page .TH header.  A fixed ISO date (not a
