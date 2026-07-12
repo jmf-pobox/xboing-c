@@ -431,6 +431,51 @@ void game_render_playfield(const game_ctx_t *ctx)
 }
 
 /* =========================================================================
+ * Editor grid overlay
+ * ========================================================================= */
+
+/*
+ * Faint red grid lines over the editable play area, matching
+ * DrawEditorGrid (original/editor.c:139-153):
+ *
+ *   xinc = PLAY_WIDTH / MAX_COL;                     // 495/9  = 55
+ *   yinc = PLAY_HEIGHT / MAX_ROW;                    // 580/18 = 32
+ *   for (x = xinc; x <= PLAY_WIDTH; x += xinc)
+ *       DrawLine(x, 0, x, PLAY_HEIGHT - 4 - ((MAX_ROW - MAX_ROW_EDIT) * yinc), reds[4]);
+ *   for (y = yinc; y <= PLAY_HEIGHT - ((MAX_ROW - MAX_ROW_EDIT) * yinc); y += yinc)
+ *       DrawLine(0, y, PLAY_WIDTH, y, reds[4]);
+ *
+ * MAX_ROW - MAX_ROW_EDIT = 18 - 15 = 3 (the paddle-reserved bottom rows,
+ * EDITOR_MAX_ROW_EDIT from editor_system.h), so vertical lines run from
+ * the top of the play area down to y=480 (580 - 4 - 3*32), and horizontal
+ * lines run at y=32,64,...,480 across the full play width.  Color matches
+ * reds[4] = "#700" (original/init.c:231) -> RGB(0x77, 0x00, 0x00).
+ *
+ * Caller gates this off during play-test (RedrawEditorArea,
+ * original/editor.c:210-211: "if (EditState != EDIT_TEST)").
+ */
+static void game_render_editor_grid(const game_ctx_t *ctx)
+{
+    SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
+
+    int xinc = PLAY_AREA_W / MAX_COL;
+    int yinc = PLAY_AREA_H / MAX_ROW;
+    int reserved_rows = MAX_ROW - EDITOR_MAX_ROW_EDIT;
+    int vert_bottom = PLAY_AREA_H - 4 - reserved_rows * yinc;
+    int horiz_loop_bound = PLAY_AREA_H - reserved_rows * yinc;
+
+    SDL_SetRenderDrawColor(sdl, 0x77, 0x00, 0x00, 255);
+
+    for (int x = xinc; x <= PLAY_AREA_W; x += xinc)
+        SDL_RenderDrawLine(sdl, PLAY_AREA_X + x, PLAY_AREA_Y, PLAY_AREA_X + x,
+                            PLAY_AREA_Y + vert_bottom);
+
+    for (int y = yinc; y <= horiz_loop_bound; y += yinc)
+        SDL_RenderDrawLine(sdl, PLAY_AREA_X, PLAY_AREA_Y + y, PLAY_AREA_X + PLAY_AREA_W,
+                            PLAY_AREA_Y + y);
+}
+
+/* =========================================================================
  * Background rendering
  * ========================================================================= */
 
@@ -790,11 +835,41 @@ static const char *palette_entry_sprite_key(const editor_palette_entry_t *entry)
     return sprite_block_key(entry->block_type);
 }
 
+/*
+ * Draw a 2px red border ring around the outside of rgn, matching the
+ * 2px red border blockWindow/typeWindow got for free from XCreateSimpleWindow
+ * (original/stage.c:273-279: border_width=2, border color=red).  The ring
+ * sits OUTSIDE rgn (expanded by thickness on every side), since the X11
+ * border was drawn outside each window's client area, not overlapping it.
+ */
+static void draw_panel_border(SDL_Renderer *sdl, SDL_Rect rgn, int thickness)
+{
+    SDL_SetRenderDrawColor(sdl, 200, 0, 0, 255);
+
+    int bx = rgn.x - thickness;
+    int by = rgn.y - thickness;
+    int bw = rgn.w + 2 * thickness;
+    int bh = rgn.h + 2 * thickness;
+
+    SDL_Rect top = {bx, by, bw, thickness};
+    SDL_Rect bottom = {bx, by + bh - thickness, bw, thickness};
+    SDL_Rect left = {bx, by, thickness, bh};
+    SDL_Rect right = {bx + bw - thickness, by, thickness, bh};
+    SDL_RenderFillRect(sdl, &top);
+    SDL_RenderFillRect(sdl, &bottom);
+    SDL_RenderFillRect(sdl, &left);
+    SDL_RenderFillRect(sdl, &right);
+}
+
 void game_render_editor_palette(const game_ctx_t *ctx)
 {
     SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
     int count = editor_system_get_palette_count(ctx->editor);
     int col1_count = PALETTE_COL1_COUNT;
+
+    /* blockWindow / typeWindow 2px red borders (original/stage.c:273-279). */
+    draw_panel_border(sdl, sdl2_region_get(SDL2RGN_EDITOR), BORDER_THICKNESS);
+    draw_panel_border(sdl, sdl2_region_get(SDL2RGN_EDITOR_TYPE), BORDER_THICKNESS);
 
     for (int i = 0; i < count; i++)
     {
@@ -1374,8 +1449,16 @@ void game_render_frame(const game_ctx_t *ctx)
             break;
 
         case SDL2ST_EDIT:
-            /* Editor: show grid background + blocks + palette */
+            /* Editor: show grid background + blocks + palette.
+             * Grid drawn BEFORE blocks (RedrawEditorArea,
+             * original/editor.c:206-216: DrawStageBackground ->
+             * DrawEditorGrid -> RedrawAllBlocks), so block sprites paint
+             * over the grid lines in occupied cells; the grid is visible
+             * only in empty cells, matching the original.  Gated off
+             * during play-test per editor.c:210-211. */
             game_render_background(ctx);
+            if (editor_system_get_state(ctx->editor) != EDITOR_STATE_TEST)
+                game_render_editor_grid(ctx);
             game_render_playfield(ctx);
             game_render_editor_palette(ctx);
             break;

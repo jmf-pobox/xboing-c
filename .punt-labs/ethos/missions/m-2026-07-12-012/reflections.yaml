@@ -1,0 +1,13 @@
+reflections:
+    - round: 1
+      created_at: "2026-07-12T03:45:07Z"
+      author: jck
+      converging: true
+      signals:
+        - 'grid: xinc=495/9=55, yinc=580/18=32, reserved_rows=MAX_ROW-EDITOR_MAX_ROW_EDIT=3, bounds PLAY_AREA_H-4-3*yinc / -3*yinc match original/editor.c:139-153; color 0x770000 = reds[4] #700 (original/init.c:231); offset by PLAY_AREA_X/Y'
+        - 'z-order: SDL2ST_EDIT dispatch background->grid->playfield (grid before blocks), matching RedrawEditorArea (original/editor.c:206-216); blocks paint over grid, grid shows only in empty cells. (Contract''s ''after blocks'' wording was wrong; jck ruled by source; impl correct)'
+        - 'play-test gate: grid skipped when EDITOR_STATE_TEST (original/editor.c:210-211)'
+        - 'panel borders: 2px red ring OUTSIDE region rects for SDL2RGN_EDITOR {545,60,120,580} + SDL2RGN_EDITOR_TYPE {545,650,120,35}, matching blockWindow/typeWindow border_width=2 red (original/stage.c:273-279)'
+        - 'editor-only: both new fns called only from SDL2ST_EDIT branch; GAME/PAUSE untouched'
+      recommendation: stop
+      reason: Editor grid + palette-panel red borders faithful to the original. Grid geometry matches DrawEditorGrid verbatim; z-order corrected to grid-under-blocks (RedrawEditorArea order); play-test gate correct; 2px red borders on both palette+Active regions match blockWindow/typeWindow. Editor-only. Leader-verified 61/61 both. Approve.
