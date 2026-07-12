@@ -1477,7 +1477,7 @@ static void mode_edit_update(sdl2_state_mode_t mode, void *ud)
      * original's early return before its Button1/2/3 switch
      * (original/editor.c:498-512) -- the previously inspected value is
      * left on screen, exactly as scoreWindow is never reverted. */
-    if (sdl2_input_mouse_pressed(ctx->input, 3) && play_x >= 0 && play_x < EDITOR_PLAY_WIDTH &&
+    if (sdl2_input_mouse_just_pressed(ctx->input, 3) && play_x >= 0 && play_x < EDITOR_PLAY_WIDTH &&
         play_y >= 0 && play_y < EDITOR_PLAY_HEIGHT)
     {
         int inspect_row = 0, inspect_col = 0;
