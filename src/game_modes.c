@@ -67,6 +67,7 @@ static int wisdom_pending;
 static int quit_pending;
 static int abort_pending;
 static int level_pending;
+static int editor_dialogue_pending;
 
 /* Stashed when the wisdom dialogue is pushed; consumed by the post-wisdom
  * insert path so personal+global rows agree on score/time/name. */
@@ -86,6 +87,10 @@ void game_modes_set_abort_pending(void)
 void game_modes_set_level_pending(void)
 {
     level_pending = 1;
+}
+void game_modes_set_editor_dialogue_pending(void)
+{
+    editor_dialogue_pending = 1;
 }
 
 /* Returns true when the game started (level loaded).  On a level-load
@@ -1327,6 +1332,18 @@ static void mode_dialogue_exit(sdl2_state_mode_t mode, void *ud)
             }
         }
     }
+
+    /* Editor dialogue result — S/L/T/N/C/Q flows all route through here,
+     * since the destination after every editor dialogue is always
+     * SDL2ST_EDIT (no per-destination logic needed, unlike abort_pending
+     * which must reach mode_game_enter).  See
+     * docs/specs/2026-07-11-editor-parity.md S1.4. */
+    if (editor_dialogue_pending)
+    {
+        editor_dialogue_pending = 0;
+        editor_system_dialogue_result(ctx->editor, dialogue_system_was_cancelled(ctx->dialogue),
+                                      dialogue_system_get_input(ctx->dialogue));
+    }
 }
 
 /* =========================================================================
@@ -1342,22 +1359,48 @@ static void mode_edit_enter(sdl2_state_mode_t mode, void *ud)
     if (ctx->cursor)
         sdl2_cursor_set(ctx->cursor, SDL2CUR_PLUS);
 
-    /* Widen the canvas to reveal the tool palette, matching the
-     * original's ResizeMainWindow(oldWidth + EDITOR_TOOL_WIDTH, ...)
-     * (original/editor.c:161-164).  See
-     * docs/specs/2026-07-11-editor-window-width.md. */
-    sdl2_renderer_set_logical_width(ctx->renderer, SDL2R_LOGICAL_WIDTH + EDITOR_TOOL_WIDTH);
+    /* sdl2_state_pop_dialogue calls mode_dialogue_exit then the restored
+     * mode's on_enter — and the restored mode for every editor-originated
+     * dialogue (Save/Load/Time/Name/Clear/Quit) is SDL2ST_EDIT, so this
+     * fires on every dialogue close, not just a genuine (re-)entry into
+     * the editor.  Guard the reset/init-palette/canvas-widen block so a
+     * plain Save dialogue round-trip doesn't wipe modified/level_number/
+     * level_title/palette-selection or fight the exit-side skip below.
+     * See docs/specs/2026-07-11-editor-parity.md S1.5(a). */
+    if (sdl2_state_previous(ctx->state) != SDL2ST_DIALOGUE)
+    {
+        /* Widen the canvas to reveal the tool palette, matching the
+         * original's ResizeMainWindow(oldWidth + EDITOR_TOOL_WIDTH, ...)
+         * (original/editor.c:161-164).  See
+         * docs/specs/2026-07-11-editor-window-width.md. */
+        sdl2_renderer_set_logical_width(ctx->renderer, SDL2R_LOGICAL_WIDTH + EDITOR_TOOL_WIDTH);
 
-    editor_system_reset(ctx->editor);
-    editor_system_init_palette(ctx->editor, MAX_STATIC_BLOCKS);
-    /* Don't clear blocks here — editor_system's do_load_level handles loading.
-     * The on_load_level callback calls block_system_clear_all before loading. */
+        editor_system_reset(ctx->editor);
+        editor_system_init_palette(ctx->editor, MAX_STATIC_BLOCKS);
+        /* Don't clear blocks here — editor_system's do_load_level handles
+         * loading.  The on_load_level callback calls block_system_clear_all
+         * before loading. */
+    }
 }
 
 static void mode_edit_exit(sdl2_state_mode_t mode, void *ud)
 {
     (void)mode;
     game_ctx_t *ctx = ud;
+
+    /* sdl2_state_push_dialogue calls the CURRENT mode's on_exit before
+     * switching to SDL2ST_DIALOGUE — and it sets in_dialogue=true before
+     * that call, so sdl2_state_is_dialogue() is already true here when
+     * this fire is a dialogue push rather than a genuine exit (quit, or
+     * playtest via SDL2ST_GAME).  Without this guard, every editor
+     * dialogue would narrow the canvas immediately, and mode_edit_enter's
+     * dialogue-resume guard above (which correctly skips re-widening
+     * on a plain dialogue round-trip) would then leave it stranded at
+     * the narrow width for the rest of the session — found tracing the
+     * push/pop call sequence while implementing S1.5(a), not called out
+     * verbatim in the spec text. */
+    if (sdl2_state_is_dialogue(ctx->state))
+        return;
 
     /* Restore the canvas width, matching the original's
      * ResizeMainWindow(oldWidth, ...) on editor exit
@@ -1409,10 +1452,20 @@ static void mode_edit_update(sdl2_state_mode_t mode, void *ud)
     if (sdl2_input_just_pressed(ctx->input, SDL2I_QUIT) ||
         sdl2_input_just_pressed(ctx->input, SDL2I_ABORT))
     {
-        /* Try editor's quit flow first (sets state to FINISH) */
+        /* Try editor's quit flow first — a successful request now leaves
+         * the state at EDITOR_STATE_DIALOGUE (not FINISH) while the
+         * confirm dialogue is open. */
         editor_system_key_input(ctx->editor, EDITOR_KEY_QUIT);
-        /* If the editor didn't handle it (state unchanged), force exit */
-        if (editor_system_get_state(ctx->editor) != EDITOR_STATE_FINISH)
+        /* Force exit only when the editor neither opened a dialogue nor
+         * finished on its own — e.g. no on_request_yes_no_dialogue
+         * callback wired.  Requiring the state machine to still be in
+         * SDL2ST_EDIT stops this from killing the dialogue that was
+         * just opened: sdl2_state_current() has already flipped to
+         * SDL2ST_DIALOGUE by the time editor_system_key_input() above
+         * returns (the request callback pushes it synchronously).  See
+         * docs/specs/2026-07-11-editor-parity.md S1.5(b). */
+        if (sdl2_state_current(ctx->state) == SDL2ST_EDIT &&
+            editor_system_get_state(ctx->editor) != EDITOR_STATE_FINISH)
             sdl2_state_transition(ctx->state, SDL2ST_INTRO);
     }
     /* Editor keys match legacy editor.c:handleAllEditorKeys():

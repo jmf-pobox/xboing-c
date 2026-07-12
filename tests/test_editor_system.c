@@ -56,9 +56,11 @@ typedef struct
     /* Last sound */
     char last_sound[64];
 
-    /* Dialogue stubs */
-    const char *dialogue_result;
-    int yes_no_result;
+    /* Async dialogue request stubs — record the last request and whether
+     * the stub should report success (dialogue opened). */
+    int request_yes_no_count;
+    int request_input_count;
+    int request_dialogue_result; /* nonzero = stub reports "opened" */
 
     /* Load/save results */
     int load_result;
@@ -160,20 +162,22 @@ static void stub_error(const char *message, void *ud)
 }
 
 /* cppcheck-suppress constParameterCallback ; signature must match callback type */
-static const char *stub_input_dialogue(const char *message, int numeric_only, void *ud)
+static int stub_request_input_dialogue(const char *message, int numeric_only, void *ud)
 {
-    const test_state_t *s = (const test_state_t *)ud;
+    test_state_t *s = (test_state_t *)ud;
     (void)message;
     (void)numeric_only;
-    return s->dialogue_result;
+    s->request_input_count++;
+    return s->request_dialogue_result;
 }
 
 /* cppcheck-suppress constParameterCallback ; signature must match callback type */
-static int stub_yes_no_dialogue(const char *message, void *ud)
+static int stub_request_yes_no_dialogue(const char *message, void *ud)
 {
-    const test_state_t *s = (const test_state_t *)ud;
+    test_state_t *s = (test_state_t *)ud;
     (void)message;
-    return s->yes_no_result;
+    s->request_yes_no_count++;
+    return s->request_dialogue_result;
 }
 
 static void stub_set_time(int seconds, void *ud)
@@ -217,8 +221,8 @@ static editor_system_callbacks_t make_callbacks(void)
     cb.on_load_level = stub_load_level;
     cb.on_save_level = stub_save_level;
     cb.on_error = stub_error;
-    cb.on_input_dialogue = stub_input_dialogue;
-    cb.on_yes_no_dialogue = stub_yes_no_dialogue;
+    cb.on_request_input_dialogue = stub_request_input_dialogue;
+    cb.on_request_yes_no_dialogue = stub_request_yes_no_dialogue;
     cb.on_set_time = stub_set_time;
     cb.on_playtest_start = stub_playtest_start;
     cb.on_playtest_end = stub_playtest_end;
@@ -237,11 +241,10 @@ static int setup(void **vstate)
     test_fixture_t *f = calloc(1, sizeof(*f));
     assert_non_null(f);
 
-    /* Default: load succeeds, save succeeds */
+    /* Default: load succeeds, save succeeds, dialogue requests open */
     f->state.load_result = 1;
     f->state.save_result = 1;
-    f->state.yes_no_result = 1;
-    f->state.dialogue_result = "";
+    f->state.request_dialogue_result = 1;
 
     /* Initialize grid to NONE_BLK */
     for (int r = 0; r < EDITOR_MAX_ROW_EDIT; r++)
@@ -707,18 +710,22 @@ static void test_clear_grid(void **vstate)
 static void test_key_quit_when_unmodified(void **vstate)
 {
     test_fixture_t *f = (test_fixture_t *)*vstate;
-    f->state.yes_no_result = 1; /* User says yes */
 
     editor_system_key_input(f->editor, EDITOR_KEY_QUIT);
+    assert_int_equal(editor_system_get_state(f->editor), EDITOR_STATE_DIALOGUE);
+
+    editor_system_dialogue_result(f->editor, 0, "y"); /* User says yes */
     assert_int_equal(editor_system_get_state(f->editor), EDITOR_STATE_FINISH);
 }
 
 static void test_key_quit_denied(void **vstate)
 {
     test_fixture_t *f = (test_fixture_t *)*vstate;
-    f->state.yes_no_result = 0; /* User says no */
 
     editor_system_key_input(f->editor, EDITOR_KEY_QUIT);
+    assert_int_equal(editor_system_get_state(f->editor), EDITOR_STATE_DIALOGUE);
+
+    editor_system_dialogue_result(f->editor, 0, "n"); /* User says no */
     assert_int_equal(editor_system_get_state(f->editor), EDITOR_STATE_NONE);
 }
 
@@ -747,18 +754,22 @@ static void test_key_playtest_exits_test_mode(void **vstate)
 static void test_key_save(void **vstate)
 {
     test_fixture_t *f = (test_fixture_t *)*vstate;
-    f->state.dialogue_result = "5";
 
     editor_system_key_input(f->editor, EDITOR_KEY_SAVE);
+    assert_int_equal(editor_system_get_state(f->editor), EDITOR_STATE_DIALOGUE);
+
+    editor_system_dialogue_result(f->editor, 0, "5");
     assert_int_equal(f->state.save_count, 1);
 }
 
 static void test_key_load(void **vstate)
 {
     test_fixture_t *f = (test_fixture_t *)*vstate;
-    f->state.dialogue_result = "10";
 
     editor_system_key_input(f->editor, EDITOR_KEY_LOAD);
+    assert_int_equal(editor_system_get_state(f->editor), EDITOR_STATE_DIALOGUE);
+
+    editor_system_dialogue_result(f->editor, 0, "10");
     /* load_count starts at 1 from setup (initial level load) */
     assert_int_equal(f->state.load_count, 2);
     assert_int_equal(editor_system_get_level_number(f->editor), 10);
@@ -767,10 +778,10 @@ static void test_key_load(void **vstate)
 static void test_key_load_invalid_range(void **vstate)
 {
     test_fixture_t *f = (test_fixture_t *)*vstate;
-    f->state.dialogue_result = "999";
 
-    int before = f->state.load_count;
     editor_system_key_input(f->editor, EDITOR_KEY_LOAD);
+    int before = f->state.load_count;
+    editor_system_dialogue_result(f->editor, 0, "999");
     assert_int_equal(f->state.load_count, before); /* No load call */
     assert_true(f->state.last_message_sticky);     /* Error message shown */
 }
@@ -778,9 +789,11 @@ static void test_key_load_invalid_range(void **vstate)
 static void test_key_time(void **vstate)
 {
     test_fixture_t *f = (test_fixture_t *)*vstate;
-    f->state.dialogue_result = "120";
 
     editor_system_key_input(f->editor, EDITOR_KEY_TIME);
+    assert_int_equal(editor_system_get_state(f->editor), EDITOR_STATE_DIALOGUE);
+
+    editor_system_dialogue_result(f->editor, 0, "120");
     assert_int_equal(f->state.last_time_seconds, 120);
     assert_true(editor_system_is_modified(f->editor));
 }
@@ -788,9 +801,11 @@ static void test_key_time(void **vstate)
 static void test_key_name(void **vstate)
 {
     test_fixture_t *f = (test_fixture_t *)*vstate;
-    f->state.dialogue_result = "My Level";
 
     editor_system_key_input(f->editor, EDITOR_KEY_NAME);
+    assert_int_equal(editor_system_get_state(f->editor), EDITOR_STATE_DIALOGUE);
+
+    editor_system_dialogue_result(f->editor, 0, "My Level");
     assert_string_equal(editor_system_get_level_title(f->editor), "My Level");
     assert_true(editor_system_is_modified(f->editor));
 }
@@ -798,9 +813,10 @@ static void test_key_name(void **vstate)
 static void test_key_name_too_long(void **vstate)
 {
     test_fixture_t *f = (test_fixture_t *)*vstate;
-    f->state.dialogue_result = "This level name is far too long for the limit";
 
     editor_system_key_input(f->editor, EDITOR_KEY_NAME);
+    editor_system_dialogue_result(f->editor, 0,
+                                  "This level name is far too long for the limit");
     /* Name should NOT be updated */
     assert_string_equal(editor_system_get_level_title(f->editor), "");
 }
@@ -808,9 +824,11 @@ static void test_key_name_too_long(void **vstate)
 static void test_key_clear(void **vstate)
 {
     test_fixture_t *f = (test_fixture_t *)*vstate;
-    f->state.yes_no_result = 1;
 
     editor_system_key_input(f->editor, EDITOR_KEY_CLEAR);
+    assert_int_equal(editor_system_get_state(f->editor), EDITOR_STATE_DIALOGUE);
+
+    editor_system_dialogue_result(f->editor, 0, "y");
     assert_int_equal(f->state.clear_count, 1);
 }
 

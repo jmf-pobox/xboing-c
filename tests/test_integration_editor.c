@@ -29,12 +29,14 @@
 #include <cmocka.h>
 
 #include "block_system.h"
+#include "dialogue_system.h"
 #include "editor_system.h"
 #include "game_context.h"
 #include "game_init.h"
 #include "level_system.h"
 #include "sdl2_cursor.h"
 #include "sdl2_input.h"
+#include "sdl2_renderer.h"
 #include "sdl2_state.h"
 
 /* =========================================================================
@@ -68,6 +70,55 @@ static void tick_with_mouse_button(game_ctx_t *ctx, Uint8 button, bool pressed, 
     e.button.y = y;
     sdl2_input_process_event(ctx->input, &e);
     sdl2_state_update(ctx->state);
+}
+
+/* Run one frame with a synthetic keydown event for the given scancode,
+ * then tick the state machine -- drives mode_edit_update's SDL2I_QUIT/
+ * SDL2I_ABORT branch the same way a real keypress would (mode_edit_update
+ * uses sdl2_input_just_pressed(), not raw SDL_GetKeyboardState(), for
+ * those two). */
+static void tick_with_key(game_ctx_t *ctx, SDL_Scancode sc)
+{
+    sdl2_input_begin_frame(ctx->input);
+    SDL_Event e = {0};
+    e.type = SDL_KEYDOWN;
+    e.key.keysym.scancode = sc;
+    e.key.repeat = 0;
+    sdl2_input_process_event(ctx->input, &e);
+    sdl2_state_update(ctx->state);
+}
+
+/* =========================================================================
+ * Async dialogue resolution helpers (bead xboing-di8, stage 3)
+ *
+ * Drive the REAL production pipeline end to end: dialogue_system_update
+ * (via sdl2_state_update -> mode_dialogue_update), dialogue_system_key_input
+ * (the same function game_main.c's SDL event loop calls), sdl2_state's
+ * pop_dialogue, game_modes.c's mode_dialogue_exit, and finally
+ * editor_system_dialogue_result.  No test-local mirror of any of these —
+ * every step here is the same code path a real player's keystrokes drive.
+ * ========================================================================= */
+
+/* Types one character at a time then presses Return (or just Return for
+ * an empty/no-op submit), then ticks the dialogue closed. */
+static void resolve_dialogue_submit(game_ctx_t *ctx, const char *text)
+{
+    /* MAP -> TEXT, so dialogue_system_key_input's state guard accepts input. */
+    tick_frames(ctx, 1);
+    for (const char *p = text; p != NULL && *p != '\0'; p++)
+        dialogue_system_key_input(ctx->dialogue, DIALOGUE_KEY_CHAR, *p);
+    dialogue_system_key_input(ctx->dialogue, DIALOGUE_KEY_RETURN, '\0');
+    /* UNMAP -> FINISHED, then mode_dialogue_update pops it, which fires
+     * mode_dialogue_exit -> editor_system_dialogue_result. */
+    tick_frames(ctx, 1);
+}
+
+/* Presses Escape (cancel) instead of submitting. */
+static void resolve_dialogue_cancel(game_ctx_t *ctx)
+{
+    tick_frames(ctx, 1);
+    dialogue_system_key_input(ctx->dialogue, DIALOGUE_KEY_ESCAPE, '\0');
+    tick_frames(ctx, 1);
 }
 
 /* =========================================================================
@@ -235,13 +286,11 @@ static void test_editor_set_level_name(void **vstate)
 {
     test_fixture_t *f = (test_fixture_t *)*vstate;
 
-    /* Manually set the level name via the editor key */
-    /* The dialogue stub returns current level number as string,
-     * so we verify the name command doesn't crash */
+    /* N opens a real async input dialogue (bead xboing-di8 stage 3) —
+     * verify it opens and ticking while it's open doesn't crash. */
     editor_system_key_input(f->ctx->editor, EDITOR_KEY_NAME);
+    assert_int_equal(editor_system_get_state(f->ctx->editor), EDITOR_STATE_DIALOGUE);
 
-    /* Just verify no crash — the dialogue integration returns a
-     * default value that may or may not be a valid name length */
     tick_frames(f->ctx, 5);
 }
 
@@ -251,16 +300,19 @@ static void test_editor_set_level_name(void **vstate)
  * Drives the REAL editor_cb_save_level (static in src/game_callbacks.c)
  * through the production callback wiring, not a local copy:
  *
- *   EDITOR_KEY_SAVE -> editor_system.c do_save()
- *     -> ctx->cb.on_input_dialogue (stub, defaults to level 80)
- *     -> ctx->cb.on_save_level == editor_cb_save_level (game_callbacks.c)
+ *   EDITOR_KEY_SAVE -> editor_system.c begin_save()
+ *     -> ctx->cb.on_request_input_dialogue == editor_cb_request_input
+ *          (game_callbacks.c) -> pushes SDL2ST_DIALOGUE
+ *     -> resolve_dialogue_submit() types the level number and presses
+ *        Return, driving the real dialogue_system + sdl2_state pop +
+ *        mode_dialogue_exit -> editor_system_dialogue_result chain
+ *     -> finish_save() -> ctx->cb.on_save_level == editor_cb_save_level
  *
  * XBOING_LEVELS_DIR is redirected to a per-test tmp directory before
  * game_create() so both the editor's readable and writable levels dirs
  * point there (paths_levels_dir_readable/writable resolve the same env
- * override — src/paths.c).  do_save() writes to
- * <tmp>/level80.data; reading that file back proves what
- * editor_cb_save_level actually wrote.
+ * override — src/paths.c).  The save writes to <tmp>/level80.data;
+ * reading that file back proves what editor_cb_save_level actually wrote.
  * ========================================================================= */
 
 typedef struct
@@ -343,10 +395,18 @@ static void test_editor_save_writes_real_time_bonus(void **vstate)
     assert_int_equal(status, LEVEL_SYS_OK);
     assert_int_equal(level_system_get_time_bonus(ctx->level), 150);
 
-    /* Drive the real save path.  do_save() runs synchronously: reads
-     * the dialogue stub (defaults to level 80 since level_number == 0),
-     * builds <tmp>/level80.data, and calls editor_cb_save_level(). */
+    /* Drive the real async save path: SAVE opens a level-number input
+     * dialogue (begin_save -> on_request_input_dialogue). */
     editor_system_key_input(ctx->editor, EDITOR_KEY_SAVE);
+    assert_int_equal(editor_system_get_state(ctx->editor), EDITOR_STATE_DIALOGUE);
+    assert_int_equal(sdl2_state_current(ctx->state), SDL2ST_DIALOGUE);
+
+    /* Type "80" and submit -- resolves through the real production
+     * dialogue_system/sdl2_state/mode_dialogue_exit chain into
+     * editor_system_dialogue_result(), which calls finish_save() ->
+     * editor_cb_save_level() -> <tmp>/level80.data. */
+    resolve_dialogue_submit(ctx, "80");
+    assert_int_equal(sdl2_state_current(ctx->state), SDL2ST_EDIT);
 
     char saved_path[512];
     snprintf(saved_path, sizeof(saved_path), "%s/level80.data", f->tmp_levels_dir);
@@ -418,9 +478,14 @@ static void test_editor_save_preserves_counter_and_random(void **vstate)
     assert_true(info.occupied);
     assert_true(info.random);
 
-    /* Drive the real save path: EDITOR_KEY_SAVE -> do_save() (defaults
-     * to level 80 via the dialogue stub) -> editor_cb_save_level(). */
+    /* Drive the real async save path: EDITOR_KEY_SAVE -> begin_save()
+     * opens a level-number input dialogue; typing "80" and submitting
+     * resolves through the real dialogue_system/sdl2_state/
+     * mode_dialogue_exit chain into editor_system_dialogue_result() ->
+     * finish_save() -> editor_cb_save_level(). */
     editor_system_key_input(ctx->editor, EDITOR_KEY_SAVE);
+    assert_int_equal(editor_system_get_state(ctx->editor), EDITOR_STATE_DIALOGUE);
+    resolve_dialogue_submit(ctx, "80");
 
     char saved_path[512];
     snprintf(saved_path, sizeof(saved_path), "%s/level80.data", f->tmp_levels_dir);
@@ -446,6 +511,199 @@ static void test_editor_save_preserves_counter_and_random(void **vstate)
 }
 
 /* =========================================================================
+ * Async dialogue flows — stage 3 (bead xboing-di8,
+ * docs/specs/2026-07-11-editor-parity.md S1.3-1.6, S1.5)
+ *
+ * Reuses setup_edit_save/teardown_edit_save so Save's on_save_level
+ * writes stay confined to the per-test tmp levels dir even though most
+ * of these tests don't exercise Save directly.
+ * ========================================================================= */
+
+static void test_editor_save_flow_opens_dialogue_and_resumes(void **vstate)
+{
+    save_fixture_t *f = (save_fixture_t *)*vstate;
+    game_ctx_t *ctx = f->ctx;
+
+    editor_system_key_input(ctx->editor, EDITOR_KEY_SAVE);
+    assert_int_equal(editor_system_get_state(ctx->editor), EDITOR_STATE_DIALOGUE);
+    assert_int_equal(sdl2_state_current(ctx->state), SDL2ST_DIALOGUE);
+
+    resolve_dialogue_submit(ctx, "80");
+
+    assert_int_equal(editor_system_get_state(ctx->editor), EDITOR_STATE_NONE);
+    assert_int_equal(sdl2_state_current(ctx->state), SDL2ST_EDIT);
+
+    char saved_path[512];
+    snprintf(saved_path, sizeof(saved_path), "%s/level80.data", f->tmp_levels_dir);
+    struct stat st;
+    assert_int_equal(stat(saved_path, &st), 0);
+}
+
+static void test_editor_load_flow_opens_dialogue_and_resumes(void **vstate)
+{
+    save_fixture_t *f = (save_fixture_t *)*vstate;
+    game_ctx_t *ctx = f->ctx;
+
+    editor_system_key_input(ctx->editor, EDITOR_KEY_LOAD);
+    assert_int_equal(editor_system_get_state(ctx->editor), EDITOR_STATE_DIALOGUE);
+    assert_int_equal(sdl2_state_current(ctx->state), SDL2ST_DIALOGUE);
+
+    /* No level80.data seeded in the tmp dir -- on_load_level fails and
+     * on_error fires, but the dialogue itself must still resolve. */
+    resolve_dialogue_submit(ctx, "80");
+
+    assert_int_equal(editor_system_get_state(ctx->editor), EDITOR_STATE_NONE);
+    assert_int_equal(sdl2_state_current(ctx->state), SDL2ST_EDIT);
+}
+
+static void test_editor_time_flow_opens_dialogue_and_resumes(void **vstate)
+{
+    save_fixture_t *f = (save_fixture_t *)*vstate;
+    game_ctx_t *ctx = f->ctx;
+
+    editor_system_key_input(ctx->editor, EDITOR_KEY_TIME);
+    assert_int_equal(editor_system_get_state(ctx->editor), EDITOR_STATE_DIALOGUE);
+
+    resolve_dialogue_submit(ctx, "180");
+
+    assert_int_equal(editor_system_get_state(ctx->editor), EDITOR_STATE_NONE);
+    assert_int_equal(level_system_get_time_bonus(ctx->level), 180);
+}
+
+static void test_editor_name_flow_opens_dialogue_and_resumes(void **vstate)
+{
+    save_fixture_t *f = (save_fixture_t *)*vstate;
+    game_ctx_t *ctx = f->ctx;
+
+    editor_system_key_input(ctx->editor, EDITOR_KEY_NAME);
+    assert_int_equal(editor_system_get_state(ctx->editor), EDITOR_STATE_DIALOGUE);
+
+    resolve_dialogue_submit(ctx, "My Level");
+
+    assert_int_equal(editor_system_get_state(ctx->editor), EDITOR_STATE_NONE);
+    assert_string_equal(editor_system_get_level_title(ctx->editor), "My Level");
+}
+
+static void test_editor_clear_flow_opens_dialogue_and_resumes(void **vstate)
+{
+    save_fixture_t *f = (save_fixture_t *)*vstate;
+    game_ctx_t *ctx = f->ctx;
+
+    editor_system_select_palette(ctx->editor, 0);
+    editor_system_mouse_button(ctx->editor, 192, 80, 1, 1);
+    editor_system_mouse_button(ctx->editor, 192, 80, 1, 0);
+    assert_true(block_system_is_occupied(ctx->block, 2, 3));
+
+    editor_system_key_input(ctx->editor, EDITOR_KEY_CLEAR);
+    assert_int_equal(editor_system_get_state(ctx->editor), EDITOR_STATE_DIALOGUE);
+
+    resolve_dialogue_submit(ctx, "y");
+
+    assert_int_equal(editor_system_get_state(ctx->editor), EDITOR_STATE_NONE);
+    assert_false(block_system_is_occupied(ctx->block, 2, 3));
+}
+
+static void test_editor_quit_flow_opens_dialogue_and_finishes(void **vstate)
+{
+    save_fixture_t *f = (save_fixture_t *)*vstate;
+    game_ctx_t *ctx = f->ctx;
+
+    editor_system_key_input(ctx->editor, EDITOR_KEY_QUIT);
+    assert_int_equal(editor_system_get_state(ctx->editor), EDITOR_STATE_DIALOGUE);
+    assert_int_equal(sdl2_state_current(ctx->state), SDL2ST_DIALOGUE);
+
+    resolve_dialogue_submit(ctx, "y");
+
+    assert_int_equal(editor_system_get_state(ctx->editor), EDITOR_STATE_FINISH);
+
+    /* One more tick drives editor_system_update's FINISH branch, which
+     * fires on_finish -> editor_cb_on_finish -> transition to INTRO. */
+    tick_frames(ctx, 1);
+    assert_int_equal(sdl2_state_current(ctx->state), SDL2ST_INTRO);
+}
+
+/* S1.5(b): mode_edit_update's QUIT fallback must not force-transition to
+ * SDL2ST_INTRO once a real dialogue is already open -- drives the REAL
+ * mode_edit_update key dispatch (raw SDL_SCANCODE_Q keydown), not a
+ * direct editor_system_key_input() call, since the fallback lives in
+ * mode_edit_update itself. */
+static void test_editor_quit_key_does_not_force_intro_while_dialogue_open(void **vstate)
+{
+    save_fixture_t *f = (save_fixture_t *)*vstate;
+    game_ctx_t *ctx = f->ctx;
+
+    tick_with_key(ctx, SDL_SCANCODE_Q); /* SDL2I_QUIT's bound scancode */
+
+    assert_int_equal(sdl2_state_current(ctx->state), SDL2ST_DIALOGUE);
+    assert_int_equal(editor_system_get_state(ctx->editor), EDITOR_STATE_DIALOGUE);
+}
+
+/* S1.5(a): a dialogue round trip must not wipe modified/level_number/
+ * level_title/canvas width.  Establishes known state through two REAL
+ * dialogue round trips (Save, then Name), then drives a THIRD, cancelled
+ * round trip (Set-Time) and confirms nothing from the first two was
+ * reset -- mode_edit_enter fires on every dialogue close, and without
+ * the guard it would call editor_system_reset() on this third,
+ * unrelated resume. */
+static void test_editor_dialogue_round_trip_preserves_state(void **vstate)
+{
+    save_fixture_t *f = (save_fixture_t *)*vstate;
+    game_ctx_t *ctx = f->ctx;
+
+    int logical_w = 0, logical_h = 0;
+    sdl2_renderer_get_logical_size(ctx->renderer, &logical_w, &logical_h);
+    assert_int_equal(logical_w, SDL2R_LOGICAL_WIDTH + EDITOR_TOOL_WIDTH);
+
+    editor_system_key_input(ctx->editor, EDITOR_KEY_SAVE);
+    resolve_dialogue_submit(ctx, "42");
+    assert_int_equal(editor_system_get_level_number(ctx->editor), 42);
+
+    /* Draw a block directly (no dialogue) so modified is 1 again --
+     * finish_save() clears it back to 0 on success. */
+    editor_system_select_palette(ctx->editor, 0);
+    editor_system_mouse_button(ctx->editor, 192, 80, 1, 1);
+    editor_system_mouse_button(ctx->editor, 192, 80, 1, 0);
+    assert_true(editor_system_is_modified(ctx->editor));
+
+    editor_system_key_input(ctx->editor, EDITOR_KEY_NAME);
+    resolve_dialogue_submit(ctx, "Persisted Title");
+    assert_string_equal(editor_system_get_level_title(ctx->editor), "Persisted Title");
+
+    editor_system_key_input(ctx->editor, EDITOR_KEY_TIME);
+    assert_int_equal(editor_system_get_state(ctx->editor), EDITOR_STATE_DIALOGUE);
+    resolve_dialogue_cancel(ctx);
+
+    assert_int_equal(editor_system_get_state(ctx->editor), EDITOR_STATE_NONE);
+    assert_int_equal(editor_system_get_level_number(ctx->editor), 42);
+    assert_string_equal(editor_system_get_level_title(ctx->editor), "Persisted Title");
+    assert_true(editor_system_is_modified(ctx->editor));
+
+    sdl2_renderer_get_logical_size(ctx->renderer, &logical_w, &logical_h);
+    assert_int_equal(logical_w, SDL2R_LOGICAL_WIDTH + EDITOR_TOOL_WIDTH);
+}
+
+/* A cancelled (Escape) confirm must not perform the destructive action
+ * it was guarding. */
+static void test_editor_cancelled_confirm_skips_destructive_action(void **vstate)
+{
+    save_fixture_t *f = (save_fixture_t *)*vstate;
+    game_ctx_t *ctx = f->ctx;
+
+    editor_system_select_palette(ctx->editor, 0);
+    editor_system_mouse_button(ctx->editor, 192, 80, 1, 1);
+    editor_system_mouse_button(ctx->editor, 192, 80, 1, 0);
+    assert_true(block_system_is_occupied(ctx->block, 2, 3));
+
+    editor_system_key_input(ctx->editor, EDITOR_KEY_CLEAR);
+    assert_int_equal(editor_system_get_state(ctx->editor), EDITOR_STATE_DIALOGUE);
+
+    resolve_dialogue_cancel(ctx);
+
+    assert_int_equal(editor_system_get_state(ctx->editor), EDITOR_STATE_NONE);
+    assert_true(block_system_is_occupied(ctx->block, 2, 3)); /* NOT cleared */
+}
+
+/* =========================================================================
  * Test runner
  * ========================================================================= */
 
@@ -465,6 +723,27 @@ int main(void)
         cmocka_unit_test_setup_teardown(test_editor_save_writes_real_time_bonus, setup_edit_save,
                                         teardown_edit_save),
         cmocka_unit_test_setup_teardown(test_editor_save_preserves_counter_and_random,
+                                        setup_edit_save, teardown_edit_save),
+
+        /* Async dialogue flows (stage 3, bead xboing-di8) */
+        cmocka_unit_test_setup_teardown(test_editor_save_flow_opens_dialogue_and_resumes,
+                                        setup_edit_save, teardown_edit_save),
+        cmocka_unit_test_setup_teardown(test_editor_load_flow_opens_dialogue_and_resumes,
+                                        setup_edit_save, teardown_edit_save),
+        cmocka_unit_test_setup_teardown(test_editor_time_flow_opens_dialogue_and_resumes,
+                                        setup_edit_save, teardown_edit_save),
+        cmocka_unit_test_setup_teardown(test_editor_name_flow_opens_dialogue_and_resumes,
+                                        setup_edit_save, teardown_edit_save),
+        cmocka_unit_test_setup_teardown(test_editor_clear_flow_opens_dialogue_and_resumes,
+                                        setup_edit_save, teardown_edit_save),
+        cmocka_unit_test_setup_teardown(test_editor_quit_flow_opens_dialogue_and_finishes,
+                                        setup_edit_save, teardown_edit_save),
+        cmocka_unit_test_setup_teardown(
+            test_editor_quit_key_does_not_force_intro_while_dialogue_open, setup_edit_save,
+            teardown_edit_save),
+        cmocka_unit_test_setup_teardown(test_editor_dialogue_round_trip_preserves_state,
+                                        setup_edit_save, teardown_edit_save),
+        cmocka_unit_test_setup_teardown(test_editor_cancelled_confirm_skips_destructive_action,
                                         setup_edit_save, teardown_edit_save),
     };
 

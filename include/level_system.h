@@ -126,6 +126,10 @@ const char *level_system_get_title(const level_system_t *ctx);
 /* Return the time bonus (seconds) of the last loaded level, or 0. */
 int level_system_get_time_bonus(const level_system_t *ctx);
 
+/* Set the time bonus (seconds) — used by the editor's Set Time command
+ * to adjust the loaded level's time limit before saving. */
+void level_system_set_time_bonus(level_system_t *ctx, int seconds);
+
 /* =========================================================================
  * Utilities (stateless)
  * ========================================================================= */

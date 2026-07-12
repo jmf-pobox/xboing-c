@@ -20,8 +20,10 @@
 #include "bonus_system.h"
 #include "config_io.h"
 #include "demo_system.h"
+#include "dialogue_system.h"
 #include "editor_system.h"
 #include "game_context.h"
+#include "game_modes.h"
 #include "game_rules.h"
 #include "gun_system.h"
 #include "intro_system.h"
@@ -905,11 +907,21 @@ static int editor_cb_load_level(const char *path, void *ud)
     return level_system_load_file(ctx->level, path) == LEVEL_SYS_OK ? 1 : 0;
 }
 
-static int editor_cb_yes_no(const char *message, void *ud)
+/*
+ * Async yes/no dialogue request — editor_system.c cannot block (the
+ * fixed-timestep loop must keep returning every frame), so this pushes
+ * SDL2ST_DIALOGUE and returns immediately.  The answer arrives later via
+ * editor_system_dialogue_result(), routed through mode_dialogue_exit's
+ * editor_dialogue_pending flag (see game_modes.c).  Mirrors the existing
+ * abort/quit/level-set push+open+flag pattern at game_input.c:321-326.
+ */
+static int editor_cb_request_yes_no(const char *message, void *ud)
 {
-    (void)message;
-    (void)ud;
-    /* Always confirm — proper dialogue integration deferred to Phase 6 */
+    game_ctx_t *ctx = ud;
+    if (sdl2_state_push_dialogue(ctx->state) != SDL2ST_OK)
+        return 0;
+    dialogue_system_open(ctx->dialogue, message, DIALOGUE_ICON_TEXT, DIALOGUE_VALIDATION_YES_NO);
+    game_modes_set_editor_dialogue_pending();
     return 1;
 }
 
@@ -1030,21 +1042,39 @@ static int editor_cb_save_level(const char *path, void *ud)
 }
 
 /*
- * Simple input dialogue: returns the current editor level number as a string.
- * If no level is loaded (number=0), defaults to level 80.
- * Proper dialogue integration deferred to Phase 6.
+ * Async text/numeric input dialogue request — same non-blocking pattern
+ * as editor_cb_request_yes_no.  numeric_only selects the validation mode
+ * so the dialogue itself filters keystrokes to digits when appropriate
+ * (e.g. level numbers, time bonus), matching the original's per-prompt
+ * icon (docs/specs/2026-07-11-editor-parity.md S1.4 — TEXT_ICON
+ * throughout, no DIALOGUE_ICON_DISK use in any editor flow).
  */
-static const char *editor_cb_input_dialogue(const char *message, int numeric_only, void *ud)
+static int editor_cb_request_input(const char *message, int numeric_only, void *ud)
 {
-    (void)message;
-    (void)numeric_only;
-    const game_ctx_t *ctx = ud;
-    static char buf[16];
-    int num = editor_system_get_level_number(ctx->editor);
-    if (num <= 0 || num > 80)
-        num = 80;
-    snprintf(buf, sizeof(buf), "%d", num);
-    return buf;
+    game_ctx_t *ctx = ud;
+    if (sdl2_state_push_dialogue(ctx->state) != SDL2ST_OK)
+        return 0;
+    dialogue_validation_t validation =
+        numeric_only ? DIALOGUE_VALIDATION_NUMERIC : DIALOGUE_VALIDATION_TEXT;
+    dialogue_system_open(ctx->dialogue, message, DIALOGUE_ICON_TEXT, validation);
+    game_modes_set_editor_dialogue_pending();
+    return 1;
+}
+
+/* Non-sticky transient error display — matches the original's
+ * ErrorMessage dialogs (original/editor.c:163, :193, :382, :864, :918),
+ * which show briefly rather than persisting. */
+static void editor_cb_on_error(const char *message, void *ud)
+{
+    game_ctx_t *ctx = ud;
+    int frame = (int)sdl2_state_frame(ctx->state);
+    message_system_set(ctx->message, message, 0, frame);
+}
+
+static void editor_cb_on_set_time(int seconds, void *ud)
+{
+    game_ctx_t *ctx = ud;
+    level_system_set_time_bonus(ctx->level, seconds);
 }
 
 static void editor_cb_on_finish(void *ud)
@@ -1076,8 +1106,10 @@ editor_system_callbacks_t game_callbacks_editor(void)
         .on_message = editor_cb_on_message,
         .on_load_level = editor_cb_load_level,
         .on_save_level = editor_cb_save_level,
-        .on_yes_no_dialogue = editor_cb_yes_no,
-        .on_input_dialogue = editor_cb_input_dialogue,
+        .on_error = editor_cb_on_error,
+        .on_request_yes_no_dialogue = editor_cb_request_yes_no,
+        .on_request_input_dialogue = editor_cb_request_input,
+        .on_set_time = editor_cb_on_set_time,
         .on_finish = editor_cb_on_finish,
         .on_playtest_start = editor_cb_on_playtest_start,
         .on_playtest_end = editor_cb_on_playtest_end,

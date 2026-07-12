@@ -1,0 +1,3 @@
+{"ts":"2026-07-12T01:05:53Z","event":"create","actor":"claude","details":{"evaluator":"jck","ticket":"xboing-di8","worker":"jdc"}}
+{"ts":"2026-07-12T01:30:45Z","event":"result","actor":"jdc","details":{"confidence":1,"evidence_entries":1,"files_changed":0,"round":1,"verdict":"escalate"}}
+{"ts":"2026-07-12T01:30:49Z","event":"close","actor":"claude","details":{"round":1,"status":"failed","verdict":"escalate"}}

@@ -1,0 +1,93 @@
+mission_id: m-2026-07-12-004
+status: failed
+type: implement
+created_at: "2026-07-12T01:05:53Z"
+updated_at: "2026-07-12T01:30:49Z"
+closed_at: "2026-07-12T01:30:49Z"
+leader: claude
+worker: jdc
+evaluator:
+    handle: jck
+    pinned_at: "2026-07-12T01:05:53Z"
+    hash: 40cbe1204f644c77e6a26757a9b855e3298be267025e806d425bfdea99054f18
+inputs:
+    ticket: xboing-di8
+write_set:
+    - include/editor_system.h
+    - src/editor_system.c
+    - src/game_callbacks.c
+    - include/game_modes.h
+    - src/game_modes.c
+    - include/level_system.h
+    - src/level_system.c
+    - tests/test_integration_editor.c
+success_criteria:
+    - on_request_yes_no_dialogue / on_request_input_dialogue replace the sync stubs; editor_system_dialogue_result resumes the pending action; EDITOR_STATE_DIALOGUE added with mouse guards; pending_action enum + resume switch per design §1.3
+    - 'game_callbacks: editor_cb_request_* push SDL2ST_DIALOGUE + dialogue_system_open(DIALOGUE_ICON_TEXT) + set editor_dialogue_pending; on_error and on_set_time wired; the 8 existing prompt strings passed through unchanged'
+    - mode_dialogue_exit consumes editor_dialogue_pending -> editor_system_dialogue_result; gotcha (a) mode_edit_enter guarded against SDL2ST_DIALOGUE previous; gotcha (b) QUIT fallback also checks sdl2_state_current==SDL2ST_EDIT
+    - level_system_set_time_bonus added mirroring the getter; on_set_time uses it
+    - Save/Load/Set-Time/Set-Name/Clear/Quit-confirm each drive a real modal and resume correctly; unsaved-work confirms (Quit, Load-when-modified, Clear) actually prompt (no more silent auto-yes)
+    - 'Characterization/integration tests in test_integration_editor.c cover: (i) each dialogue flow reaches EDITOR_STATE_DIALOGUE then resumes on result; (ii) gotcha (a) — a dialogue round-trip (e.g. Save) does NOT reset modified/level state; (iii) gotcha (b) — opening a Quit-confirm dialogue does not force-exit to INTRO; (iv) the two coupled save tests updated to the async flow and still genuinely exercise the real save'
+    - 'make check-equivalent locally: cmake --preset debug + build clean (zero -Werror); ctest --test-dir build green; make asan-test green; only the 8 write-set files changed (CMake unchanged — test_integration_editor already registered); confirm no other src caller of the renamed callbacks breaks'
+budget:
+    rounds: 3
+    reflection_after_each: true
+current_round: 1
+context: |
+    Editor parity STAGE 3 of 12 — the async dialogue mechanism (design
+    docs/specs/2026-07-11-editor-parity.md §1 in full + §2.2 for on_set_time,
+    §4.2 for on_error, stage list §5.3; committed ffa9e56). This is the largest
+    stage. Read design §1.1-1.6 carefully — it fully specifies the mechanism.
+
+    PROBLEM: editor_cb_yes_no / editor_cb_input_dialogue (src/game_callbacks.c:
+    907-913, 1012-1023) are synchronous stubs (yes/no always returns 1; input
+    fabricates the level number). A faithful modal is ASYNC: push SDL2ST_DIALOGUE,
+    let the player answer, resume the pending editor action on the result. The
+    existing SDL2ST_DIALOGUE flows (abort/quit/set-level, src/game_input.c:311-370,
+    game_modes.c:66-89, 1257-1330) are the pattern to extend.
+
+    MECHANISM (design §1.3-1.4):
+    - include/editor_system.h: add EDITOR_STATE_DIALOGUE; replace the two sync
+      callbacks with int (*on_request_yes_no_dialogue)(const char*, void*) and
+      int (*on_request_input_dialogue)(const char*, int numeric_only, void*)
+      (return nonzero if opened); add editor_system_dialogue_result(ctx, cancelled,
+      input).
+    - src/editor_system.c: private editor_pending_action_t enum + pending_action
+      field; split do_load/do_save/do_set_time/do_set_name and the QUIT/CLEAR
+      branches into begin_* (build the message — the 8 prompt strings ALREADY EXIST
+      verbatim at editor_system.c:717,759,802,833,856,860,874,905 per jck — call
+      on_request_*; on success set pending_action + state=EDITOR_STATE_DIALOGUE; on
+      failure behave as today when callback is NULL) and a parse/act half moved into
+      editor_system_dialogue_result's switch. LOAD is the only two-step chain
+      (confirm-if-modified -> input). Add the EDITOR_STATE_DIALOGUE early-return
+      guard to mouse_button/mouse_motion (like the existing EDITOR_STATE_TEST guard
+      at :351-352).
+    - src/game_callbacks.c: rename editor_cb_yes_no/input to editor_cb_request_yes_no/
+      request_input; both call sdl2_state_push_dialogue + dialogue_system_open
+      (DIALOGUE_ICON_TEXT throughout) + game_modes_set_editor_dialogue_pending().
+      Wire on_error (editor_cb_on_error -> message_system_set non-sticky, design §4.2)
+      and on_set_time (editor_cb_on_set_time, design §2.2) in game_callbacks_editor().
+    - include/game_modes.h + src/game_modes.c: add editor_dialogue_pending flag +
+      game_modes_set_editor_dialogue_pending(); consume it in mode_dialogue_exit
+      (calls editor_system_dialogue_result with dialogue_system_was_cancelled/
+      get_input). THE TWO INTEGRATION GOTCHAS (design §1.5, MUST fix):
+      (a) guard mode_edit_enter's reset/init/widen block with
+          if (sdl2_state_previous(ctx->state) != SDL2ST_DIALOGUE) so a dialogue
+          resume doesn't wipe modified/level_number/title/palette;
+      (b) the mode_edit_update QUIT fallback (game_modes.c ~1409-1417) must also
+          require sdl2_state_current(ctx->state)==SDL2ST_EDIT so it doesn't kill a
+          just-opened dialogue.
+    - include/level_system.h + src/level_system.c: add level_system_set_time_bonus
+      (mirror the getter at level_system.c:314-320).
+
+    Do NOT do stage 7's HUD content-sync, the dialogue box re-centering (stage 4),
+    palette, or any other stage. Do NOT touch the render side.
+
+    COUPLED TESTS: stages 1 & 2 added save tests in tests/test_integration_editor.c
+    that drive EDITOR_KEY_SAVE expecting a SYNCHRONOUS save (via the old stub
+    returning level 80). After this change, EDITOR_KEY_SAVE opens a dialogue and the
+    save fires on editor_system_dialogue_result. You MUST update those two tests
+    (test_editor_save_writes_real_time_bonus, test_editor_save_preserves_counter_and_random)
+    to drive the async flow (trigger save -> assert EDITOR_STATE_DIALOGUE -> supply the
+    level number via the dialogue result path -> then read the file). Keep them genuine
+    (real production path, no mirrors).

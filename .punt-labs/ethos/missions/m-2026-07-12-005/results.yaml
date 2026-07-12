@@ -1,0 +1,57 @@
+results:
+    - mission: m-2026-07-12-005
+      round: 1
+      created_at: "2026-07-12T01:31:33Z"
+      author: jdc
+      verdict: pass
+      confidence: 0.85
+      files_changed:
+        - path: include/editor_system.h
+          added: 32
+          removed: 12
+        - path: src/editor_system.c
+          added: 200
+          removed: 53
+        - path: src/game_callbacks.c
+          added: 53
+          removed: 17
+        - path: include/game_modes.h
+          added: 1
+          removed: 0
+        - path: src/game_modes.c
+          added: 66
+          removed: 13
+        - path: include/level_system.h
+          added: 4
+          removed: 0
+        - path: src/level_system.c
+          added: 9
+          removed: 0
+        - path: tests/test_integration_editor.c
+          added: 290
+          removed: 21
+        - path: tests/test_editor_system.c
+          added: 42
+          removed: 24
+      evidence:
+        - name: 'async mechanism: on_request_* callbacks + EDITOR_STATE_DIALOGUE + pending_action enum + editor_system_dialogue_result resume switch; LOAD two-step chain; mouse guards (design §1.3)'
+          status: pass
+        - name: 'game_callbacks: editor_cb_request_yes_no/request_input push SDL2ST_DIALOGUE + dialogue_system_open(DIALOGUE_ICON_TEXT) + set editor_dialogue_pending; on_error + on_set_time wired; 8 prompt strings verbatim; grep confirms no other caller of old names'
+          status: pass
+        - name: gotcha (a) enter-guard (previous != DIALOGUE); gotcha (b) QUIT fallback (current == EDIT); gotcha (c) exit-guard (is_dialogue) — the third found during impl, interacts with committed width fix, validated by width-stays-695-across-3-dialogues test
+          status: pass
+        - name: six flows Save/Load/Set-Time/Set-Name/Clear/Quit each open a real modal and resume; unsaved-work confirms actually prompt; cancelled-confirm skips destructive — covered by 9 new integration tests using the REAL dialogue chain
+          status: pass
+        - name: coupled stage-1/2 save tests updated to async via resolve_dialogue_submit (real dialogue_system_update/key_input/pop/mode_dialogue_exit, no mirror); level_system_set_time_bonus added mirroring the getter
+          status: pass
+        - name: 'leader independently verified (jck has no Bash): cmake debug+asan rebuilt, ctest 61/61 both, zero -Werror/-Wconversion/-Wshadow warnings; git diff --stat = exactly the 9 write-set files; no CMake change'
+          status: pass
+      open_questions:
+        - 'jck: (1) confirm gotcha (c) guard distinguishes a dialogue-push exit from genuine exits (quit->INTRO, playtest->GAME) so those still narrow the canvas; (2) confirm dialogue prompt wording + safety-net behavior faithful to the original (real confirm on unsaved quit/load/clear; cancel aborts)'
+      prose: |-
+        Stage 3 re-recorded with the corrected 9-file write-set (prior m-2026-07-12-004
+        failed only on write-set scope). Full async dialogue mechanism; both designed
+        gotchas plus a third (canvas narrowing on dialogue push) found and fixed with a
+        regression test. Coupled save tests moved to the real async flow. Leader reviewed
+        game_modes.c integration in full and ran both suites green. jck evaluates
+        faithfulness + the gotcha-(c) interaction with the width fix.

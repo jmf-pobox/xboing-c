@@ -320,6 +320,15 @@ int level_system_get_time_bonus(const level_system_t *ctx)
     return ctx->time_bonus;
 }
 
+void level_system_set_time_bonus(level_system_t *ctx, int seconds)
+{
+    if (ctx == NULL)
+    {
+        return;
+    }
+    ctx->time_bonus = seconds;
+}
+
 /* =========================================================================
  * Utilities
  * ========================================================================= */
