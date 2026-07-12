@@ -1440,9 +1440,24 @@ static void mode_edit_update(sdl2_state_mode_t mode, void *ud)
     int play_x = mx - PLAY_AREA_X;
     int play_y = my - PLAY_AREA_Y;
 
-    /* Mouse buttons: left=draw, middle=erase, right=read-only inspect. */
+    /* Mouse buttons: left=draw, middle=erase, right=read-only inspect.
+     * Shift+left=erase too -- middle-click erase (original/editor.c:534-545)
+     * assumed a physical 3-button Sun/X11 mouse; modern trackpads and
+     * 2-button mice can't reach it.  Route the button-1 press through
+     * editor_system_mouse_button's button=2 (erase) case instead of
+     * button=1 (draw) whenever Shift is held.  This sets
+     * ctx->draw_action = EDITOR_ACTION_ERASE, so the unconditional
+     * editor_system_mouse_motion() call below drags-erases continuously,
+     * exactly like a middle-button drag -- no separate motion-path change
+     * needed.  See the "Editor erase reachable without a middle mouse
+     * button" ADR in docs/DESIGN.md. */
     if (sdl2_input_mouse_pressed(ctx->input, 1))
-        editor_system_mouse_button(ctx->editor, play_x, play_y, 1, 1);
+    {
+        if (sdl2_input_shift_held(ctx->input))
+            editor_system_mouse_button(ctx->editor, play_x, play_y, 2, 1);
+        else
+            editor_system_mouse_button(ctx->editor, play_x, play_y, 1, 1);
+    }
     else
         editor_system_mouse_button(ctx->editor, play_x, play_y, 1, 0);
 

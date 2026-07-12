@@ -3523,3 +3523,55 @@ black; it now queries the renderer's current logical size.
 - Out of scope: editor grid-line parity (`xboing-c40`); a future modal dialogue
   wired into the editor would need `SDL2RGN_DIALOGUE`'s hardcoded 575 re-centred
   against 695 (flagged in the spec, no call site exists today).
+
+## ADR-058: Editor erase reachable without a middle mouse button
+
+**Status:** Accepted (2026-07-11)
+**Context:** Mission m-2026-07-12-013, bead `xboing-di8`. User decision:
+erase must be reachable on modern hardware.
+
+**Problem.** The original editor's erase tool is bound to `Button2`
+(`original/editor.c:534-545`) — the middle button of a physical 3-button
+Sun/X11 mouse. The modern port carried this forward unchanged
+(`src/game_modes.c` `mode_edit_update`, button=2 → erase). Modern trackpads
+(Mac) and most 2-button mice have no middle button and no default
+middle-click gesture, so erase is unreachable for a large share of users on
+current hardware. Draw (`Button1`) and the read-only inspect (`Button3`,
+stage 10, `original/editor.c:547-557`) map cleanly to left-click and
+right-click and need no change.
+
+**Decision.** Add Shift+left-click as a second path to erase, alongside —
+not instead of — middle-click. In `mode_edit_update`
+(`src/game_modes.c`), a button-1 press routes to
+`editor_system_mouse_button(ctx->editor, x, y, 2, 1)` (the erase case)
+instead of `(..., 1, 1)` (draw) whenever `sdl2_input_shift_held(ctx->input)`
+is true; a plain left-click still draws. `editor_system_mouse_button`'s
+button parameter is the only thing that changes — the function has no
+knowledge of which physical button or modifier triggered the call, so no
+new code path is added there. Because pressing sets
+`ctx->draw_action = EDITOR_ACTION_ERASE`, the existing
+`editor_system_mouse_motion` drag call (already unconditional, already
+driven by `draw_action` rather than raw button state) continues erasing
+under the cursor for as long as the button stays down, exactly matching a
+middle-button drag — no separate motion-path change was needed. Shift
+detection uses the existing `sdl2_input_shift_held` accessor
+(`include/sdl2_input.h`), already exercised for `H`/`h` high-score-type
+disambiguation (`src/game_input.c:200`); no new input-layer code was
+required. Middle-click erase is retained unchanged for anyone with a
+3-button mouse. Right-click inspect is unchanged — faithful to the
+original, and this decision does not touch it.
+
+**Consequences.**
+
+- Deliberate, documented modernization deviation, not an infidelity: the
+  constraint forcing it is modern input hardware (Mac trackpads, 2-button
+  mice), not a change of feel or intent. Erase remains erase; only the
+  trigger gained a second binding.
+- `xboing.man.in`'s LEVEL EDITOR section documents both erase bindings and
+  notes middle-click needs a 3-button mouse.
+- Covered by an integration test in `tests/test_integration_editor.c`
+  driving the real `mode_edit_update` path: Shift+left-click on an occupied
+  cell erases it; a plain left-click (no Shift) on an empty cell still
+  draws.
+- Out of scope: the grid/palette-border render and the palette hit-test
+  (separate mission), and any change to the right-click inspect path.

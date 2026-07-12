@@ -1,0 +1,14 @@
+reflections:
+    - round: 1
+      created_at: "2026-07-12T03:42:52Z"
+      author: jck
+      converging: true
+      signals:
+        - 'additive: game_modes.c:1454-1459 Shift-held routes button-1 press to erase (button=2) else draw; middle(2)/right(3) untouched; drag-erase free via existing draw_action + unconditional mouse_motion'
+        - 'ADR-058 (docs/DESIGN.md:3527-3577): names modern-hardware constraint, cites original/editor.c:534-545, framed as alongside-not-instead-of; Status/Problem/Decision/Consequences format matches ADR-057'
+        - man page xboing.man.in:193-218 uses the same prose+.RS/.nf/.fi idiom as GAME CONTROL/SAVE-LOAD; erase description accurate
+        - 'no conflict: Shift+H/V editor keys are keyboard-channel (game_modes.c:1545,1561-1570), orthogonal to Shift+mouse; sdl2_input_shift_held reused (game_input.c:200 precedent)'
+        - 'tests genuine: tick_with_mouse_button_shift injects real SDL LSHIFT event (sets ctx->modifiers), drives real mode_edit_update, asserts block_system_is_occupied true->false'
+        - 'NON-BLOCKING: ADR-058 could add one line noting Shift already has editor keyboard semantics (flip/scroll) but no actual collision — optional polish, fold into dq5 doc pass'
+      recommendation: stop
+      reason: 'Shift+left-click erase is a legitimate, well-documented modern-input addition (not a redesign): middle-click erase + right-click inspect byte-identical to stage 10 (original/editor.c:519-583), one new trigger, zero removed, zero feel change for 3-button-mouse users. ADR-058 correctly scoped + formatted (matches ADR-054-057). Man page in-style + accurate. No modifier conflict (Shift+H is keyboard, orthogonal). Tests genuine (real LSHIFT event -> mode_edit_update -> block occupied true->false). Leader-verified 61/61 both. Approve.'

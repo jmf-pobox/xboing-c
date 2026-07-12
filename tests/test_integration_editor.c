@@ -74,6 +74,49 @@ static void tick_with_mouse_button(game_ctx_t *ctx, Uint8 button, bool pressed, 
     sdl2_state_update(ctx->state);
 }
 
+/* Set (or clear) the input layer's Shift-held state, then run one frame
+ * with a synthetic mouse-button event -- mirrors a real Shift+click, where
+ * SDL delivers the modifier keydown before the button event within the
+ * same poll loop.  Drives sdl2_input_process_event for both events so
+ * ctx->input's modifiers field (read by sdl2_input_shift_held) is set the
+ * same way a real LSHIFT keydown/keyup would set it -- no test-local
+ * mirror of the modifier tracking. */
+static void tick_with_mouse_button_shift(game_ctx_t *ctx, Uint8 button, bool pressed, int x, int y,
+                                         bool shift)
+{
+    sdl2_input_begin_frame(ctx->input);
+
+    SDL_Event key = {0};
+    key.type = shift ? SDL_KEYDOWN : SDL_KEYUP;
+    key.key.keysym.scancode = SDL_SCANCODE_LSHIFT;
+    key.key.keysym.mod = shift ? KMOD_LSHIFT : KMOD_NONE;
+    sdl2_input_process_event(ctx->input, &key);
+
+    SDL_Event e = {0};
+    e.type = pressed ? SDL_MOUSEBUTTONDOWN : SDL_MOUSEBUTTONUP;
+    e.button.button = button;
+    e.button.x = x;
+    e.button.y = y;
+    sdl2_input_process_event(ctx->input, &e);
+
+    sdl2_state_update(ctx->state);
+}
+
+/* Run one frame with a synthetic mouse-motion event (drag), same button
+ * state carried over from the prior tick_with_mouse_button(_shift) call --
+ * a real drag is a stream of SDL_MOUSEMOTION events with the button state
+ * untouched, not repeated button-down events. */
+static void tick_with_mouse_motion(game_ctx_t *ctx, int x, int y)
+{
+    sdl2_input_begin_frame(ctx->input);
+    SDL_Event e = {0};
+    e.type = SDL_MOUSEMOTION;
+    e.motion.x = x;
+    e.motion.y = y;
+    sdl2_input_process_event(ctx->input, &e);
+    sdl2_state_update(ctx->state);
+}
+
 /* Run one frame with a synthetic keydown event for the given scancode,
  * then tick the state machine -- drives mode_edit_update's SDL2I_QUIT/
  * SDL2I_ABORT branch the same way a real keypress would (mode_edit_update
@@ -867,6 +910,74 @@ static void test_editor_palette_click_column_and_bounds(void **vstate)
 }
 
 /* =========================================================================
+ * Shift+left-click erase (mission m-2026-07-12-013, bead xboing-di8) --
+ * ADR-058 (docs/DESIGN.md).  Middle-click erase (original/editor.c:534-545)
+ * assumed a physical 3-button mouse; modern trackpads and 2-button mice
+ * can't reach it.  Shift+left-click is the portable second binding to
+ * erase, added alongside -- not instead of -- middle-click.  Drives the
+ * REAL mode_edit_update path via tick_with_mouse_button(_shift), not
+ * editor_system_mouse_button directly.
+ * ========================================================================= */
+
+static void test_editor_shift_left_click_erases(void **vstate)
+{
+    test_fixture_t *f = (test_fixture_t *)*vstate;
+    game_ctx_t *ctx = f->ctx;
+
+    /* Cell (2,3): play-area (192,80); window coords add PLAY_AREA_X=35 /
+     * PLAY_AREA_Y=60 (game_modes.c), matching
+     * test_editor_erase_shows_skull_cursor's convention. */
+    const int row = 2, col = 3;
+    const int wx = 192 + 35, wy = 80 + 60;
+
+    editor_system_select_palette(ctx->editor, 0);
+
+    /* Plain left-click (no Shift) on an empty cell still draws. */
+    assert_false(block_system_is_occupied(ctx->block, row, col));
+    tick_with_mouse_button(ctx, SDL_BUTTON_LEFT, true, wx, wy);
+    tick_with_mouse_button(ctx, SDL_BUTTON_LEFT, false, wx, wy);
+    assert_true(block_system_is_occupied(ctx->block, row, col));
+
+    /* Shift+left-click on the same (now occupied) cell erases it. */
+    tick_with_mouse_button_shift(ctx, SDL_BUTTON_LEFT, true, wx, wy, true);
+    assert_false(block_system_is_occupied(ctx->block, row, col));
+
+    tick_with_mouse_button_shift(ctx, SDL_BUTTON_LEFT, false, wx, wy, false);
+}
+
+/* Shift+left-click-drag continues erasing under the cursor as it moves,
+ * matching a middle-button drag (test_editor_erase_shows_skull_cursor's
+ * Button2 case) -- editor_system_mouse_motion is driven by draw_action,
+ * not the raw button/modifier, so once the press sets
+ * EDITOR_ACTION_ERASE the drag needs no separate Shift-aware path. */
+static void test_editor_shift_left_drag_erases_continuously(void **vstate)
+{
+    test_fixture_t *f = (test_fixture_t *)*vstate;
+    game_ctx_t *ctx = f->ctx;
+
+    /* col=3 -> x≈3*55+27=192, col=4 -> x≈4*55+27=247 (same row, same
+     * COL_WIDTH arithmetic as test_editor_draw_block's comment). */
+    const int row_a = 2, col_a = 3, wx_a = 192 + 35, wy = 80 + 60;
+    const int row_b = 2, col_b = 4, wx_b = 247 + 35;
+
+    editor_system_select_palette(ctx->editor, 0);
+    tick_with_mouse_button(ctx, SDL_BUTTON_LEFT, true, wx_a, wy);
+    tick_with_mouse_motion(ctx, wx_b, wy);
+    tick_with_mouse_button(ctx, SDL_BUTTON_LEFT, false, wx_b, wy);
+    assert_true(block_system_is_occupied(ctx->block, row_a, col_a));
+    assert_true(block_system_is_occupied(ctx->block, row_b, col_b));
+
+    /* Shift+left press at cell A, drag to cell B: both get erased. */
+    tick_with_mouse_button_shift(ctx, SDL_BUTTON_LEFT, true, wx_a, wy, true);
+    assert_false(block_system_is_occupied(ctx->block, row_a, col_a));
+
+    tick_with_mouse_motion(ctx, wx_b, wy);
+    assert_false(block_system_is_occupied(ctx->block, row_b, col_b));
+
+    tick_with_mouse_button_shift(ctx, SDL_BUTTON_LEFT, false, wx_b, wy, false);
+}
+
+/* =========================================================================
  * Test runner
  * ========================================================================= */
 
@@ -921,6 +1032,12 @@ int main(void)
         cmocka_unit_test_setup_teardown(test_editor_palette_click_matches_render, setup_edit_mode,
                                         teardown),
         cmocka_unit_test_setup_teardown(test_editor_palette_click_column_and_bounds,
+                                        setup_edit_mode, teardown),
+
+        /* Shift+left-click erase (mission m-2026-07-12-013, bead xboing-di8) */
+        cmocka_unit_test_setup_teardown(test_editor_shift_left_click_erases, setup_edit_mode,
+                                        teardown),
+        cmocka_unit_test_setup_teardown(test_editor_shift_left_drag_erases_continuously,
                                         setup_edit_mode, teardown),
     };
 
