@@ -145,7 +145,12 @@ void game_input_global(game_ctx_t *ctx)
     if (sdl2_input_just_pressed(ctx->input, SDL2I_PAUSE))
     {
         if (mode == SDL2ST_GAME && ctx->play_test_active)
+        {
             editor_system_key_input(ctx->editor, EDITOR_KEY_PLAYTEST);
+            /* Prevents the same-frame mode_edit_update from re-processing
+             * the key (xboing-1ir). */
+            sdl2_input_consume(ctx->input, SDL2I_PAUSE);
+        }
         else if (mode == SDL2ST_GAME)
             sdl2_state_transition(ctx->state, SDL2ST_PAUSE);
         else if (mode == SDL2ST_PAUSE)
@@ -330,6 +335,9 @@ void game_input_global(game_ctx_t *ctx)
             if (ctx->play_test_active)
             {
                 editor_system_key_input(ctx->editor, EDITOR_KEY_PLAYTEST);
+                /* Prevents the same-frame mode_edit_update from re-processing
+                 * the key (xboing-1ir). */
+                sdl2_input_consume(ctx->input, SDL2I_ABORT);
             }
             else if (sdl2_state_push_dialogue(ctx->state) == SDL2ST_OK)
             {

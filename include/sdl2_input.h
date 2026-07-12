@@ -146,6 +146,14 @@ bool sdl2_input_pressed(const sdl2_input_t *ctx, sdl2_input_action_t action);
 /* True if the action's key was pressed this frame (edge trigger). */
 bool sdl2_input_just_pressed(const sdl2_input_t *ctx, sdl2_input_action_t action);
 
+/*
+ * Clear an action's just_pressed for the rest of the frame — so an input
+ * that triggers a mode transition isn't re-processed by the destination
+ * mode in the same frame.  Reset by sdl2_input_begin_frame like
+ * just_pressed.
+ */
+void sdl2_input_consume(sdl2_input_t *ctx, sdl2_input_action_t action);
+
 /* =========================================================================
  * Mouse queries
  * ========================================================================= */

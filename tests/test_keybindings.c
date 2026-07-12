@@ -649,6 +649,86 @@ static void test_playtest_escape_ends_via_live_game_input(void **vstate)
 }
 
 /* =========================================================================
+ * Group 7: FULL-FRAME regression for the same-frame double-fire
+ * (bead xboing-1ir) -- the shape that actually catches the bug.
+ *
+ * Group 6's tests above call only game_input_global and never run the
+ * SAME frame's editor tick, so they could NOT have caught xboing-1ir:
+ * just_pressed stays true for the rest of the frame once set, and the
+ * real loop (src/game_main.c:88-158) always runs game_input_global THEN
+ * the per-tick update (sdl2_loop_update -> ... -> sdl2_state_update)
+ * before the next begin_frame clears edge state.  Before the fix, ending
+ * play-test in game_input_global left SDL2I_PAUSE/SDL2I_ABORT still
+ * just_pressed; the following mode_edit_update (current mode is already
+ * SDL2ST_EDIT by then) re-read the still-pressed key and re-fired --
+ * P restarted play-test (-> SDL2ST_GAME, src/game_modes.c:1588-1589),
+ * Escape hit the editor's quit path (-> SDL2ST_INTRO,
+ * src/game_modes.c:1563-1581).  The fix (sdl2_input_consume,
+ * src/game_input.c:152 and :340) clears the action right after it ends
+ * play-test so the following mode_edit_update sees just_pressed == false.
+ *
+ * Per-frame call order below matches src/game_main.c exactly: ONE
+ * begin_frame (inside inject_key) + process, THEN game_input_global,
+ * THEN sdl2_state_update -- no begin_frame between the last two calls,
+ * because a real frame only clears edge triggers once, at the top.
+ * ========================================================================= */
+
+/* 'p' full-frame: draw a block, enter play-test, then in the SAME frame
+ * end it via game_input_global and immediately run the editor's per-tick
+ * update.  Without sdl2_input_consume this regresses to SDL2ST_GAME (P
+ * re-read by mode_edit_update's "P = playtest" branch,
+ * src/game_modes.c:1588-1589) -- a flash restart of play-test the player
+ * never asked for. */
+static void test_playtest_p_full_frame_no_restart(void **vstate)
+{
+    game_ctx_t *ctx = ((kb_fixture_t *)*vstate)->ctx;
+
+    editor_system_select_palette(ctx->editor, 0);
+    editor_system_mouse_button(ctx->editor, 192, 80, 1, 1);
+    editor_system_mouse_button(ctx->editor, 192, 80, 1, 0);
+    assert_true(block_system_is_occupied(ctx->block, 2, 3));
+
+    editor_system_key_input(ctx->editor, EDITOR_KEY_PLAYTEST);
+    assert_int_equal(sdl2_state_current(ctx->state), SDL2ST_GAME);
+    assert_true(ctx->play_test_active);
+
+    /* ONE frame: begin_frame + process 'p' (inject_key), then the two
+     * real per-frame calls in the real order -- no begin_frame between
+     * them, so just_pressed(P) is still whatever game_input_global left
+     * it as when mode_edit_update runs. */
+    inject_key(ctx, SDL_SCANCODE_P);
+    game_input_global(ctx);
+    sdl2_state_update(ctx->state);
+
+    assert_int_equal(sdl2_state_current(ctx->state), SDL2ST_EDIT);
+    assert_false(ctx->play_test_active);
+    /* Pre-test board still restored -- the same-frame editor tick did not
+     * re-enter play-test and re-hide it. */
+    assert_true(block_system_is_occupied(ctx->block, 2, 3));
+}
+
+/* Escape full-frame sibling: without sdl2_input_consume this regresses to
+ * SDL2ST_INTRO (Escape re-read by mode_edit_update's QUIT/ABORT branch,
+ * src/game_modes.c:1563-1581, which force-exits to INTRO when no dialogue
+ * opened and the editor isn't already FINISH) instead of staying on the
+ * editor screen the player just returned to. */
+static void test_playtest_escape_full_frame_no_reopen(void **vstate)
+{
+    game_ctx_t *ctx = ((kb_fixture_t *)*vstate)->ctx;
+
+    editor_system_key_input(ctx->editor, EDITOR_KEY_PLAYTEST);
+    assert_int_equal(sdl2_state_current(ctx->state), SDL2ST_GAME);
+    assert_true(ctx->play_test_active);
+
+    inject_key(ctx, SDL_SCANCODE_ESCAPE);
+    game_input_global(ctx);
+    sdl2_state_update(ctx->state);
+
+    assert_int_equal(sdl2_state_current(ctx->state), SDL2ST_EDIT);
+    assert_false(ctx->play_test_active);
+}
+
+/* =========================================================================
  * Test registration
  * ========================================================================= */
 
@@ -723,6 +803,13 @@ int main(void)
                                         setup_editor, teardown),
     };
 
+    const struct CMUnitTest playtest_full_frame_tests[] = {
+        cmocka_unit_test_setup_teardown(test_playtest_p_full_frame_no_restart, setup_editor,
+                                        teardown),
+        cmocka_unit_test_setup_teardown(test_playtest_escape_full_frame_no_reopen, setup_editor,
+                                        teardown),
+    };
+
     int rc = 0;
     rc |= cmocka_run_group_tests_name("global keys", global_tests, NULL, NULL);
     rc |= cmocka_run_group_tests_name("mode scoping", scoping_tests, NULL, NULL);
@@ -731,5 +818,7 @@ int main(void)
     rc |= cmocka_run_group_tests_name("editor window width", editor_width_tests, NULL, NULL);
     rc |= cmocka_run_group_tests_name("playtest live input (xboing-lpi)", playtest_live_input_tests,
                                       NULL, NULL);
+    rc |= cmocka_run_group_tests_name("playtest full-frame double-fire (xboing-1ir)",
+                                      playtest_full_frame_tests, NULL, NULL);
     return rc;
 }
