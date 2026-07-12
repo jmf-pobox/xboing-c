@@ -1,0 +1,38 @@
+results:
+    - mission: m-2026-07-12-007
+      round: 1
+      created_at: "2026-07-12T02:03:18Z"
+      author: sjl
+      verdict: pass
+      confidence: 0.85
+      files_changed:
+        - path: src/game_render.c
+          added: 66
+          removed: 28
+        - path: CMakeLists.txt
+          added: 1
+          removed: 0
+        - path: tests/CMakeLists.txt
+          added: 4
+          removed: 4
+      evidence:
+        - name: two-column palette (col1 idx 0-17, col2 18-24 + counter slides 25-29), all 30 entries, i<20 cap gone; col1_x base PALETTE_X+EDITOR_TOOL_WIDTH/4, col2_x base +EDITOR_TOOL_WIDTH*3/4; row pitch PLAY_AREA_H/MAX_ROW=32; matches original/editor.c:329-369
+          status: pass
+        - name: 'vertical centering added: ey = PALETTE_Y + row*PITCH + (PITCH/2 - tex.height/2), matching original/editor.c:339; horizontal centering ex = col_base - tex.width/2'
+          status: pass
+        - name: 'Active: indicator at SDL2RGN_EDITOR_TYPE (label + selected-entry preview, both centered), mirroring SetCurrentSymbol original/editor.c:256-268; invented yellow highlight removed entirely'
+          status: pass
+        - name: counter slides 25-29 render distinct sprites via palette_entry_sprite_key -> sprite_counter_slide_key (original/editor.c:364); composite overlays follow the sprite (ex,ey)
+          status: pass
+        - name: sdl2_regions linked into xboing (CMakeLists.txt) + integration test targets (tests/CMakeLists.txt) — pre-existing build gap, minimal link additions only
+          status: pass
+        - name: 'leader-verified: cmake debug+asan rebuilt, ctest 61/61 both, zero -Werror/-Wconversion warnings; git diff = exactly the 3 write-set files'
+          status: pass
+      open_questions:
+        - 'jck: confirm two-column geometry + vertical/horizontal centering faithful to original/editor.c:329-369/339; Active: indicator faithful to SetCurrentSymbol; highlight-removal correct. Pixel-exact placement is a Ubuntu golden-capture check (deferred)'
+      prose: |-
+        Palette rework (stages 5+6, re-scoped): two-column all-30 layout with per-sprite
+        vertical+horizontal centering, Active: indicator, invented highlight removed,
+        counter-slide sprite fix, and the load-bearing sdl2_regions link fix. Leader
+        reviewed the diff + ran both suites green. jck evaluates fidelity; final pixel
+        placement verified on the user's Ubuntu golden capture.

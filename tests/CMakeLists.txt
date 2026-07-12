@@ -508,7 +508,7 @@ if(SDL2_FOUND AND SDL2_IMAGE_FOUND AND SDL2_MIXER_FOUND AND SDL2_TTF_FOUND)
     target_link_libraries(test_integration_smoke PRIVATE
         # SDL2 platform
         sdl2_renderer sdl2_texture sdl2_font sdl2_audio sdl2_input
-        sdl2_cursor sdl2_state sdl2_loop sdl2_cli
+        sdl2_cursor sdl2_regions sdl2_state sdl2_loop sdl2_cli
         # Game systems
         ball_system block_system block_sound paddle_system gun_system score_system
         level_system special_system bonus_system sfx_system eyedude_system
@@ -549,7 +549,7 @@ if(SDL2_FOUND AND SDL2_IMAGE_FOUND AND SDL2_MIXER_FOUND AND SDL2_TTF_FOUND)
     target_compile_options(test_integration_autocycle PRIVATE ${XBOING_STRICT_WARNINGS} -Werror ${CMOCKA_WARNING_FIXUPS})
     target_link_libraries(test_integration_autocycle PRIVATE
         sdl2_renderer sdl2_texture sdl2_font sdl2_audio sdl2_input
-        sdl2_cursor sdl2_state sdl2_loop sdl2_cli
+        sdl2_cursor sdl2_regions sdl2_state sdl2_loop sdl2_cli
         ball_system block_system block_sound paddle_system gun_system score_system
         level_system special_system bonus_system sfx_system eyedude_system
         message_system editor_system
@@ -586,7 +586,7 @@ if(SDL2_FOUND AND SDL2_IMAGE_FOUND AND SDL2_MIXER_FOUND AND SDL2_TTF_FOUND)
     target_compile_options(test_integration_modes PRIVATE ${XBOING_STRICT_WARNINGS} -Werror ${CMOCKA_WARNING_FIXUPS})
     target_link_libraries(test_integration_modes PRIVATE
         sdl2_renderer sdl2_texture sdl2_font sdl2_audio sdl2_input
-        sdl2_cursor sdl2_state sdl2_loop sdl2_cli
+        sdl2_cursor sdl2_regions sdl2_state sdl2_loop sdl2_cli
         ball_system block_system block_sound paddle_system gun_system score_system
         level_system special_system bonus_system sfx_system eyedude_system
         message_system editor_system
@@ -624,7 +624,7 @@ if(SDL2_FOUND AND SDL2_IMAGE_FOUND AND SDL2_MIXER_FOUND AND SDL2_TTF_FOUND)
         target_compile_options(${NAME} PRIVATE ${XBOING_STRICT_WARNINGS} -Werror ${CMOCKA_WARNING_FIXUPS})
         target_link_libraries(${NAME} PRIVATE
             sdl2_renderer sdl2_texture sdl2_font sdl2_audio sdl2_input
-            sdl2_cursor sdl2_state sdl2_loop sdl2_cli
+            sdl2_cursor sdl2_regions sdl2_state sdl2_loop sdl2_cli
             ball_system block_system block_sound paddle_system gun_system score_system
             level_system special_system bonus_system sfx_system eyedude_system
             message_system editor_system

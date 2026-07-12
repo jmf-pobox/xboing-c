@@ -1,0 +1,64 @@
+mission_id: m-2026-07-12-006
+status: failed
+type: implement
+created_at: "2026-07-12T01:41:46Z"
+updated_at: "2026-07-12T01:54:18Z"
+closed_at: "2026-07-12T01:54:18Z"
+leader: claude
+worker: sjl
+evaluator:
+    handle: jck
+    pinned_at: "2026-07-12T01:41:46Z"
+    hash: 40cbe1204f644c77e6a26757a9b855e3298be267025e806d425bfdea99054f18
+inputs:
+    ticket: xboing-di8
+write_set:
+    - src/game_render.c
+success_criteria:
+    - game_render_editor_palette renders all 30 palette entries in two columns matching original/editor.c:329-369 (col1 0-17, col2 18-24 + counter slides 25-29); the i<20 cap is gone; row pitch = PLAY_AREA_H/MAX_ROW not the hardcoded 25
+    - 'Active: indicator drawn at SDL2RGN_EDITOR_TYPE: ''Active:'' label + full-size preview of the selected palette entry, mirroring original/editor.c:256-268 SetCurrentSymbol'
+    - the invented in-list yellow highlight (game_render.c:743-748) is removed entirely
+    - column x math uses EDITOR_TOOL_WIDTH quarters per design §3.1; sprites don't overflow the 120px palette panel or overlap between columns; verify against the constants (read block_types.h / editor_system.h)
+    - cmake --preset debug + build clean (zero -Werror warnings); ctest --test-dir build green (existing tests unaffected); make asan-test green; only src/game_render.c changed
+    - 'Visual verification is deferred to the Ubuntu golden pipeline (make modern-screen SCREEN=editor + visual-check vs screenshots/level-editor.gif) — NOT runnable on this macOS host; note what the reviewer/user should look for (all 30 swatches in two columns, Active: box populated, no yellow bar)'
+budget:
+    rounds: 3
+    reflection_after_each: true
+current_round: 1
+context: |
+    Editor parity STAGES 5+6 combined — editor tool-palette rework (design
+    docs/specs/2026-07-11-editor-parity.md §3.1 + §3.2, stage list §5.5/§5.6;
+    committed ffa9e56). Combined because both are game_render_editor_palette in
+    src/game_render.c and stage 6 depends on stage 5's geometry; splitting would
+    leave a mispositioned highlight mid-branch. Stage 4 (dialogue re-center) was
+    determined a NO-OP (the original doesn't re-center — keep bx=92), so this is
+    the first render-cluster change.
+
+    Current state (src/game_render.c:718-782): game_render_editor_palette renders a
+    SINGLE column capped at `i < 20` (PALETTE_ENTRY_H=25, PALETTE_W=100), with an
+    invented per-entry yellow highlight, and hides 10 of 30 palette entries.
+
+    THREE changes (all in game_render_editor_palette / its PALETTE_* constants):
+    1. TWO-COLUMN geometry matching original/editor.c:329-369 (SetupBlockWindow),
+       rendering ALL 30 entries (kills the i<20 cap = blocker 9). Design §3.1:
+       - editorRowHeight = PLAY_AREA_H / MAX_ROW (~32); replace PALETTE_ENTRY_H=25.
+       - column 1 = indices 0..min(MAX_ROW,MAX_STATIC_BLOCKS)-1 = 0..17;
+         column 2 = 18..24 (7 static) then counter slides 25..29 (5) = 12 entries.
+       - col1_x = PALETTE_X + EDITOR_TOOL_WIDTH/4 - sprite_w/2;
+         col2_x = PALETTE_X + EDITOR_TOOL_WIDTH/2 + EDITOR_TOOL_WIDTH/4 - sprite_w/2;
+         entry_y(row) = PALETTE_Y + row*editorRowHeight.
+       (EDITOR_TOOL_WIDTH=120 from include/editor_system.h; MAX_ROW/MAX_COL/
+       MAX_STATIC_BLOCKS from include/block_types.h — read to confirm values.)
+    2. ACTIVE: indicator at SDL2RGN_EDITOR_TYPE ({545,650,120,35}, src/sdl2_regions.c:44,
+       matches original/stage.c:277-279): draw the "Active:" label + a full-size
+       preview of editor_system_get_palette_entry(ctx->editor,
+       editor_system_get_selected_palette(ctx->editor)), mirroring SetCurrentSymbol
+       (original/editor.c:256-268).
+    3. REMOVE the invented in-list highlight (src/game_render.c:743-748) — the
+       original has NO per-swatch highlight (original/editor.c:270-369); the only
+       selection feedback is the Active: preview. Delete the highlight rect entirely.
+
+    Also present in game_render_editor_palette today: crude bottom title/"Level N"
+    text (lines 771-782). LEAVE that alone — the HUD level number is stage 7's job;
+    do NOT expand into HUD/paddle work here. Do NOT touch the RANDOM_BLK composite
+    (stage 8), dialogue, or any non-palette render.

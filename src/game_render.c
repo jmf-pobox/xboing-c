@@ -31,6 +31,7 @@
 #include "paddle_system.h"
 #include "score_system.h"
 #include "sdl2_font.h"
+#include "sdl2_regions.h"
 #include "sdl2_renderer.h"
 #include "sdl2_state.h"
 #include "sdl2_texture.h"
@@ -722,47 +723,92 @@ static void render_main_background(const game_ctx_t *ctx)
 /* Palette renders to the right of the play area */
 #define PALETTE_X (PLAY_AREA_X + PLAY_AREA_W + 15)
 #define PALETTE_Y PLAY_AREA_Y
-#define PALETTE_ENTRY_H 25
-#define PALETTE_W 100
+#define PALETTE_ROW_PITCH (PLAY_AREA_H / MAX_ROW)
+
+/*
+ * Look up the sprite key for a palette entry, accounting for COUNTER_BLK's
+ * five slide variants (original/editor.c:364: DrawTheBlock(..., COUNTER_BLK,
+ * j, 0, 0) with j=1..5 selecting the digit sprite).
+ */
+static const char *palette_entry_sprite_key(const editor_palette_entry_t *entry)
+{
+    if (entry->block_type == COUNTER_BLK && entry->counter_slide > 0)
+        return sprite_counter_slide_key(entry->counter_slide);
+    return sprite_block_key(entry->block_type);
+}
 
 void game_render_editor_palette(const game_ctx_t *ctx)
 {
     SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
     int count = editor_system_get_palette_count(ctx->editor);
-    int selected = editor_system_get_selected_palette(ctx->editor);
 
-    for (int i = 0; i < count && i < 20; i++) /* Show up to 20 entries */
+    /* Two-column layout (original/editor.c:329-369, SetupBlockWindow).
+     * Column 1 holds indices 0..min(MAX_ROW, MAX_STATIC_BLOCKS)-1; column 2
+     * continues with the remaining static types, then the 5 counter-block
+     * slide variants, matching editor_system_init_palette's fill order. */
+    int col1_count = (MAX_ROW < MAX_STATIC_BLOCKS) ? MAX_ROW : MAX_STATIC_BLOCKS;
+
+    for (int i = 0; i < count; i++)
     {
         const editor_palette_entry_t *entry = editor_system_get_palette_entry(ctx->editor, i);
         if (!entry)
             continue;
 
-        int ey = PALETTE_Y + i * PALETTE_ENTRY_H;
+        const char *key = palette_entry_sprite_key(entry);
+        if (!key)
+            continue;
 
-        /* Highlight selected entry */
-        if (i == selected)
-        {
-            SDL_SetRenderDrawColor(sdl, 255, 255, 0, 80);
-            SDL_Rect hl = {PALETTE_X - 2, ey - 2, PALETTE_W + 4, PALETTE_ENTRY_H};
-            SDL_RenderFillRect(sdl, &hl);
-        }
+        sdl2_texture_info_t tex;
+        if (sdl2_texture_get(ctx->texture, key, &tex) != SDL2T_OK)
+            continue;
 
-        /* Draw block sprite */
-        const char *key = sprite_block_key(entry->block_type);
-        if (key)
-        {
-            sdl2_texture_info_t tex;
-            if (sdl2_texture_get(ctx->texture, key, &tex) == SDL2T_OK)
-            {
-                SDL_Rect dst = {PALETTE_X, ey, tex.width, tex.height};
-                SDL_RenderCopy(sdl, tex.texture, NULL, &dst);
-            }
-        }
+        int in_col1 = i < col1_count;
+        int row = in_col1 ? i : i - col1_count;
+        int col_base = in_col1 ? PALETTE_X + EDITOR_TOOL_WIDTH / 4
+                                : PALETTE_X + EDITOR_TOOL_WIDTH / 2 + EDITOR_TOOL_WIDTH / 4;
+        int ex = col_base - tex.width / 2;
+        /* Center each sprite within its row cell (original/editor.c:339:
+         * y = y1 + ((editorRowHeight / 2) - (BlockInfo[i].height / 2))). */
+        int ey = PALETTE_Y + row * PALETTE_ROW_PITCH + (PALETTE_ROW_PITCH / 2 - tex.height / 2);
+
+        SDL_Rect dst = {ex, ey, tex.width, tex.height};
+        SDL_RenderCopy(sdl, tex.texture, NULL, &dst);
 
         /* Composite overlay (DROP digit, RANDOM "- R -", BULLET 4-bullets)
          * shared with game_render_blocks per Copilot review F3.
          * hit_points=1 is a sentinel for editor preview — DROP_BLK shows "1". */
-        render_block_composite(ctx, sdl, PALETTE_X, ey, entry->block_type, 1);
+        render_block_composite(ctx, sdl, ex, ey, entry->block_type, 1);
+    }
+
+    /* "Active:" indicator (original/editor.c:256-268, SetCurrentSymbol) —
+     * the only 1996 selection feedback; no per-swatch in-list highlight. */
+    SDL_Rect type_rgn = sdl2_region_get(SDL2RGN_EDITOR_TYPE);
+    SDL_Color active_label_color = {0, 200, 0, 255};
+    sdl2_font_metrics_t label_m = {0, 0};
+    int label_y = type_rgn.y + type_rgn.h / 2;
+    if (sdl2_font_measure(ctx->font, SDL2F_FONT_DATA, "Active:", &label_m) == SDL2F_OK)
+        label_y -= label_m.height / 2;
+    sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_DATA, "Active:", type_rgn.x + 10, label_y,
+                          active_label_color);
+
+    int selected = editor_system_get_selected_palette(ctx->editor);
+    const editor_palette_entry_t *active_entry =
+        editor_system_get_palette_entry(ctx->editor, selected);
+    if (active_entry)
+    {
+        const char *akey = palette_entry_sprite_key(active_entry);
+        if (akey)
+        {
+            sdl2_texture_info_t atex;
+            if (sdl2_texture_get(ctx->texture, akey, &atex) == SDL2T_OK)
+            {
+                int ax = type_rgn.x + 65;
+                int ay = type_rgn.y + type_rgn.h / 2 - atex.height / 2;
+                SDL_Rect adst = {ax, ay, atex.width, atex.height};
+                SDL_RenderCopy(sdl, atex.texture, NULL, &adst);
+                render_block_composite(ctx, sdl, ax, ay, active_entry->block_type, 1);
+            }
+        }
     }
 
     /* Editor status text */

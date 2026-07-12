@@ -1,0 +1,15 @@
+reflections:
+    - round: 1
+      created_at: "2026-07-12T02:08:52Z"
+      author: jck
+      converging: true
+      signals:
+        - 'two-column: col1_count=min(MAX_ROW 18, MAX_STATIC_BLOCKS 25)=18 matches original loop bound (editor.c:335); col2 = 18-24 static + 25-29 counter slides continuous-row, matches editor.c:348/359-368; all 30 render, no i<20 cap'
+        - x-geometry algebraically identical to original col1 (EDITOR_TOOL_WIDTH/4) and col2 (EDITOR_TOOL_WIDTH/2 + /4) once shared PALETTE_X offset added (editor.c:338/345/351); 40px sprites in 120px panel, columns 10-50 / 70-110, no overlap
+        - vertical centering ey=PALETTE_Y+row*PITCH+(PITCH/2-tex.height/2) matches editor.c:339, PITCH=PLAY_AREA_H/MAX_ROW=32 mirrors editorRowHeight (editor.c:332) — the round-2 fix
+        - 'Active: at SDL2RGN_EDITOR_TYPE {545,650,120,35} = typeWindow (stage.c:277-279); label x+10 (editor.c:263), preview x+65 (editor.c:266), both vertically centered (editor.c:265); reflects get_selected_palette'
+        - highlight removed (original has none); counter slides 25-29 distinct via palette_entry_sprite_key->sprite_counter_slide_key matching editor.c:364
+        - 'CMake: sdl2_regions target idiomatic; only the link-line additions to xboing + 4 integration test lists'
+        - 'Ubuntu capture should confirm: 18+12 centered swatches, 5 distinct counter digits, Active: box populated green, no yellow bar'
+      recommendation: stop
+      reason: 'Palette rework faithful to original/editor.c:329-369 (SetupBlockWindow) and :256-268 (SetCurrentSymbol) on all six points — two-column order, x-geometry, vertical+horizontal centering, Active: indicator, highlight removal, counter-slide sprites. No discrepancies. Leader-verified build 61/61 both. Stages 5+6 complete.'

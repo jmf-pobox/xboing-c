@@ -1,0 +1,22 @@
+results:
+    - mission: m-2026-07-12-006
+      round: 1
+      created_at: "2026-07-12T01:54:14Z"
+      author: sjl
+      verdict: escalate
+      confidence: 1
+      files_changed: []
+      evidence:
+        - name: 'write-set under-scoped: the Active: indicator needs sdl2_region_get, but sdl2_regions was built as a library and never linked into xboing or the integration tests (pre-existing gap) — fixing it required CMakeLists.txt + tests/CMakeLists.txt link-line additions, outside the src/game_render.c-only write-set, so the store refuses the result'
+          status: fail
+        - name: 'fidelity gap to close in round 2: sprites are top-aligned per the design doc''s literal formula, but original/editor.c:339 vertically CENTERS each sprite in its row (y = y1 + (rowHeight/2 - height/2)) — must add the per-sprite vertical offset'
+          status: fail
+      open_questions:
+        - Recreate with write-set incl. CMakeLists.txt + tests/CMakeLists.txt; add the vertical per-sprite centering. Two-column/Active/highlight-removal/counter-slide-sprite work is correct and stays in the tree.
+      prose: |-
+        Palette rework (two-column all-30, Active: indicator, highlight removed, counter-
+        slide sprite fix) is correct and in the tree, ctest 61/61 both. Terminating only
+        because (1) the Active: indicator forced a load-bearing link fix in CMakeLists.txt
+        + tests/CMakeLists.txt outside the declared write-set, and (2) a vertical-centering
+        fidelity gap (design-doc omission vs original/editor.c:339) needs closing. Leader
+        recreating with the corrected write-set + the centering fix.
