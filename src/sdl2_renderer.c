@@ -323,19 +323,28 @@ int sdl2_renderer_set_logical_width(sdl2_renderer_t *ctx, int new_logical_width)
         return 0;
     }
 
+    /* Resize the physical window before SDL_RenderSetLogicalSize so the
+     * logical-size call's scale computation reads the updated output size
+     * (ADR-004). Capture the old window size so the operation stays
+     * transactional: if SDL_RenderSetLogicalSize fails, revert the window
+     * so both logical and physical sizing stay unchanged. */
+    int old_win_w = 0;
+    int win_h = 0;
+    bool window_resized = false;
     if (!ctx->fullscreen)
     {
-        int win_w = 0;
-        int win_h = 0;
-        SDL_GetWindowSize(ctx->window, &win_w, &win_h);
+        SDL_GetWindowSize(ctx->window, &old_win_w, &win_h);
         int new_win_w = (new_logical_width * win_h) / ctx->logical_height;
         SDL_SetWindowSize(ctx->window, new_win_w, win_h);
+        window_resized = true;
     }
 
-    /* Update the cached logical width only after SDL accepts the new size,
-     * so a failure leaves the context consistent with the renderer. */
     if (SDL_RenderSetLogicalSize(ctx->renderer, new_logical_width, ctx->logical_height) != 0)
     {
+        if (window_resized)
+        {
+            SDL_SetWindowSize(ctx->window, old_win_w, win_h);
+        }
         return -1;
     }
     ctx->logical_width = new_logical_width;
