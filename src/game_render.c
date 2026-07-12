@@ -932,20 +932,6 @@ void game_render_editor_palette(const game_ctx_t *ctx)
             }
         }
     }
-
-    /* Editor status text */
-    SDL_Color white = {255, 255, 255, 255};
-    const char *title = editor_system_get_level_title(ctx->editor);
-    if (title)
-        sdl2_font_draw(ctx->font, SDL2F_FONT_COPY, title, PLAY_AREA_X, PLAY_AREA_Y - 15, white);
-
-    int level = editor_system_get_level_number(ctx->editor);
-    if (level > 0)
-    {
-        char buf[32];
-        snprintf(buf, sizeof(buf), "Level %d", level);
-        sdl2_font_draw(ctx->font, SDL2F_FONT_COPY, buf, PLAY_AREA_X + 200, PLAY_AREA_Y - 15, white);
-    }
 }
 
 /*
