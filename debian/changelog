@@ -1,3 +1,18 @@
+xboing (1.0.5-1) unstable; urgency=medium
+
+  * Fix the ammo belt desyncing from the end-of-level bullet bonus under
+    unlimited ammo. The MAXAMMO block hid the belt (showing no bullets) while
+    firing still worked and the bonus rewarded the full count; the belt now
+    draws the real count, matching the original and the bonus.
+  * Guard against a crafted save file inflating the ammo count: gun ammo is
+    now clamped to a legitimate maximum, so a tampered save can no longer make
+    the HUD issue thousands of draws per frame or award an inflated bonus.
+  * Fix the level editor writing "Untitled" over a level's real name on save.
+    Loading a level, editing, and saving now preserves the name, and renaming
+    in the editor updates the on-screen title immediately.
+
+ -- J Freeman <jmf@pobox.com>  Sun, 12 Jul 2026 10:51:18 -0700
+
 xboing (1.0.4-1) unstable; urgency=medium
 
   * Full level-editor parity with the 1996 original. The SDL2 editor had
