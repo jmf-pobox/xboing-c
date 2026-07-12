@@ -468,11 +468,11 @@ static void game_render_editor_grid(const game_ctx_t *ctx)
 
     for (int x = xinc; x <= PLAY_AREA_W; x += xinc)
         SDL_RenderDrawLine(sdl, PLAY_AREA_X + x, PLAY_AREA_Y, PLAY_AREA_X + x,
-                            PLAY_AREA_Y + vert_bottom);
+                           PLAY_AREA_Y + vert_bottom);
 
     for (int y = yinc; y <= horiz_loop_bound; y += yinc)
         SDL_RenderDrawLine(sdl, PLAY_AREA_X, PLAY_AREA_Y + y, PLAY_AREA_X + PLAY_AREA_W,
-                            PLAY_AREA_Y + y);
+                           PLAY_AREA_Y + y);
 }
 
 /* =========================================================================

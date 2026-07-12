@@ -1005,8 +1005,7 @@ static char block_type_to_char(int block_type, int counter_slide)
 static char resolve_save_char(const game_ctx_t *ctx, int row, int col)
 {
     block_system_render_info_t info;
-    if (block_system_get_render_info(ctx->block, row, col, &info) != BLOCK_SYS_OK ||
-        !info.occupied)
+    if (block_system_get_render_info(ctx->block, row, col, &info) != BLOCK_SYS_OK || !info.occupied)
         return block_type_to_char(NONE_BLK, 0);
 
     int effective_type = info.random ? RANDOM_BLK : info.block_type;

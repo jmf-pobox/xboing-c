@@ -52,8 +52,8 @@ struct editor_system
     void *user_data;
 
     editor_state_t state;
-    editor_state_t wait_mode; /* State to resume after WAIT */
-    int waiting_frame;        /* Target frame for WAIT */
+    editor_state_t wait_mode;               /* State to resume after WAIT */
+    int waiting_frame;                      /* Target frame for WAIT */
     editor_pending_action_t pending_action; /* Which op awaits a dialogue */
 
     /* Palette */

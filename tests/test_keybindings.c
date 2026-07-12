@@ -529,7 +529,7 @@ static void test_attract_c_full_cycle_order(void **vstate)
  * See docs/specs/2026-07-11-editor-window-width.md "Verification plan".
  * ========================================================================= */
 
-static int logical_width(game_ctx_t *ctx)
+static int logical_width(const game_ctx_t *ctx)
 {
     int w = 0, h = 0;
     sdl2_renderer_get_logical_size(ctx->renderer, &w, &h);

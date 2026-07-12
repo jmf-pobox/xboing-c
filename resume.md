@@ -68,6 +68,7 @@ bf6d4a3 fix(editor): remove the redundant 'Level N' text at the top
 ## Key data-corruption bugs fixed (the reason this mattered)
 
 The modern editor was silently corrupting levels on re-save:
+
 - hardcoded 120s time bonus overwrote the real value (only 6/80 levels are
   120; corrupted 92.5% on re-save) — `ebb0863`.
 - counter-block hit-count saved as 0, RANDOM_BLK saved as its resolved color
@@ -79,6 +80,7 @@ The modern editor was silently corrupting levels on re-save:
 
 The jck-approved design was directionally right but wrong on 4 specifics that
 only surfaced against real code — each fixed + spec corrected in `dad2289`:
+
 1. §1.6 editor dialogue re-center → WRONG (original never moves inputWindow;
    keep bx=92; stage 4 was a no-op).
 2. §4.2 on_error citation → the cited lines are `ShutDown`, not `ErrorMessage`;
