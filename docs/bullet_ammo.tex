@@ -147,8 +147,11 @@ bonusAmmo' = bonusAmmo
 
 \subsection{Pick up a MAXAMMO block (unlimited)}
 
-Sets unlimited and stores the sentinel count.  The belt rule then forces
-\texttt{displayedAmmo} to 0 --- the belt vanishes.
+Sets unlimited and stores the sentinel count.  Under the fixed belt rule
+(\texttt{displayedAmmo = actualAmmo}) the belt then shows all
+\texttt{unlimitedSentinel} (21) bullets, matching the original --- it does
+not vanish.  (The as-coded rule that forced \texttt{displayedAmmo} to 0
+here, and the desync it caused, are in section~\ref{sec:bug}.)
 
 \begin{schema}{PickupMaxAmmo}
 \Delta Gun
