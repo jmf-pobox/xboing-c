@@ -986,8 +986,8 @@ static int editor_cb_save_level(const char *path, void *ud)
     const char *title = editor_system_get_level_title(ctx->editor);
     fprintf(fp, "%s\n", (title && title[0] != '\0') ? title : "Untitled");
 
-    /* Line 2: time bonus (default 120) */
-    fprintf(fp, "120\n");
+    /* Line 2: time bonus */
+    fprintf(fp, "%d\n", level_system_get_time_bonus(ctx->level));
 
     /* Lines 3-17: 15 rows of 9 characters */
     for (int row = 0; row < 15; row++)

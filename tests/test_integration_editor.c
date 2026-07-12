@@ -21,6 +21,9 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 #include <SDL2/SDL.h>
 #include <cmocka.h>
@@ -29,6 +32,7 @@
 #include "editor_system.h"
 #include "game_context.h"
 #include "game_init.h"
+#include "level_system.h"
 #include "sdl2_cursor.h"
 #include "sdl2_input.h"
 #include "sdl2_state.h"
@@ -242,6 +246,128 @@ static void test_editor_set_level_name(void **vstate)
 }
 
 /* =========================================================================
+ * Editor save path — real time bonus (bead xboing-di8)
+ *
+ * Drives the REAL editor_cb_save_level (static in src/game_callbacks.c)
+ * through the production callback wiring, not a local copy:
+ *
+ *   EDITOR_KEY_SAVE -> editor_system.c do_save()
+ *     -> ctx->cb.on_input_dialogue (stub, defaults to level 80)
+ *     -> ctx->cb.on_save_level == editor_cb_save_level (game_callbacks.c)
+ *
+ * XBOING_LEVELS_DIR is redirected to a per-test tmp directory before
+ * game_create() so both the editor's readable and writable levels dirs
+ * point there (paths_levels_dir_readable/writable resolve the same env
+ * override — src/paths.c).  do_save() writes to
+ * <tmp>/level80.data; reading that file back proves what
+ * editor_cb_save_level actually wrote.
+ * ========================================================================= */
+
+typedef struct
+{
+    game_ctx_t *ctx;
+    char tmp_levels_dir[300];
+    char *prev_levels_dir; /* heap-owned strdup of caller's prior value, or NULL */
+} save_fixture_t;
+
+static int setup_edit_save(void **vstate)
+{
+    save_fixture_t *f = calloc(1, sizeof(*f));
+    assert_non_null(f);
+
+    /* Preserve the caller's XBOING_LEVELS_DIR so we don't leak
+     * environment changes across tests in this process. */
+    const char *existing = getenv("XBOING_LEVELS_DIR");
+    f->prev_levels_dir = existing ? strdup(existing) : NULL;
+
+    snprintf(f->tmp_levels_dir, sizeof(f->tmp_levels_dir),
+             ".tmp/test_integration_editor_levels_%d", (int)getpid());
+    (void)mkdir(".tmp", 0700);
+    (void)mkdir(f->tmp_levels_dir, 0700);
+    setenv("XBOING_LEVELS_DIR", f->tmp_levels_dir, 1);
+
+    char *argv[] = {arg_prog, NULL};
+    f->ctx = game_create(1, argv);
+    assert_non_null(f->ctx);
+
+    /* Enter EDIT mode; the LEVEL->NONE auto-load looks for
+     * <tmp>/editor.data, which doesn't exist -- on_load_level fails
+     * silently (on_error is unset in game_callbacks_editor()) and
+     * ctx->level is untouched, ready for this test to seed it below. */
+    sdl2_state_transition(f->ctx->state, SDL2ST_EDIT);
+    tick_frames(f->ctx, 5);
+
+    *vstate = f;
+    return 0;
+}
+
+static int teardown_edit_save(void **vstate)
+{
+    save_fixture_t *f = (save_fixture_t *)*vstate;
+
+    char saved_path[512];
+    snprintf(saved_path, sizeof(saved_path), "%s/level80.data", f->tmp_levels_dir);
+    (void)unlink(saved_path);
+
+    game_destroy(f->ctx);
+    (void)rmdir(f->tmp_levels_dir);
+
+    if (f->prev_levels_dir)
+    {
+        setenv("XBOING_LEVELS_DIR", f->prev_levels_dir, 1);
+        free(f->prev_levels_dir);
+    }
+    else
+    {
+        unsetenv("XBOING_LEVELS_DIR");
+    }
+    free(f);
+    return 0;
+}
+
+static void test_editor_save_writes_real_time_bonus(void **vstate)
+{
+    save_fixture_t *f = (save_fixture_t *)*vstate;
+    game_ctx_t *ctx = f->ctx;
+
+    /* Seed ctx->level with a real level file whose bonus is NOT 120
+     * (levels/level02.data == 150).  WORKING_DIRECTORY is
+     * CMAKE_SOURCE_DIR for integration tests (tests/CMakeLists.txt),
+     * so this relative path resolves under ctest. */
+    level_system_status_t status = level_system_load_file(ctx->level, "levels/level02.data");
+    if (status == LEVEL_SYS_ERR_FILE_NOT_FOUND)
+    {
+        skip();
+        return;
+    }
+    assert_int_equal(status, LEVEL_SYS_OK);
+    assert_int_equal(level_system_get_time_bonus(ctx->level), 150);
+
+    /* Drive the real save path.  do_save() runs synchronously: reads
+     * the dialogue stub (defaults to level 80 since level_number == 0),
+     * builds <tmp>/level80.data, and calls editor_cb_save_level(). */
+    editor_system_key_input(ctx->editor, EDITOR_KEY_SAVE);
+
+    char saved_path[512];
+    snprintf(saved_path, sizeof(saved_path), "%s/level80.data", f->tmp_levels_dir);
+
+    FILE *fp = fopen(saved_path, "r");
+    assert_non_null(fp);
+
+    char line1[256];
+    char line2[256];
+    assert_non_null(fgets(line1, sizeof(line1), fp));
+    assert_non_null(fgets(line2, sizeof(line2), fp));
+    fclose(fp);
+
+    line2[strcspn(line2, "\n")] = '\0';
+    int written_bonus = (int)strtol(line2, NULL, 10);
+
+    assert_int_equal(written_bonus, 150);
+    assert_int_not_equal(written_bonus, 120);
+}
+
+/* =========================================================================
  * Test runner
  * ========================================================================= */
 
@@ -258,6 +384,8 @@ int main(void)
         cmocka_unit_test_setup_teardown(test_editor_clear_grid, setup_edit_mode, teardown),
         cmocka_unit_test_setup_teardown(test_editor_playtest_transition, setup_edit_mode, teardown),
         cmocka_unit_test_setup_teardown(test_editor_set_level_name, setup_edit_mode, teardown),
+        cmocka_unit_test_setup_teardown(test_editor_save_writes_real_time_bonus, setup_edit_save,
+                                        teardown_edit_save),
     };
 
     return cmocka_run_group_tests(tests, NULL, NULL);

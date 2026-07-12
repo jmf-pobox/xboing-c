@@ -1,0 +1,40 @@
+mission_id: m-2026-07-12-001
+status: failed
+type: implement
+created_at: "2026-07-12T00:17:14Z"
+updated_at: "2026-07-12T00:29:11Z"
+closed_at: "2026-07-12T00:29:11Z"
+leader: claude
+worker: jdc
+evaluator:
+    handle: jck
+    pinned_at: "2026-07-12T00:17:14Z"
+    hash: 40cbe1204f644c77e6a26757a9b855e3298be267025e806d425bfdea99054f18
+inputs:
+    ticket: xboing-di8
+write_set:
+    - src/game_callbacks.c
+    - tests/test_editor_roundtrip.c
+success_criteria:
+    - editor_cb_save_level writes level_system_get_time_bonus(ctx->level) for the time-bonus line instead of the hardcoded 120; no other line of the save format changes
+    - 'Characterization test in tests/test_editor_roundtrip.c: seed a level whose time bonus is NOT 120 (e.g. via level_system with a known bonus, or load a real level file with a non-120 bonus), save via the editor save path, and assert the saved file''s line 2 equals the level''s real bonus (and would FAIL against the pre-fix hardcoded 120). State how you verified it fails pre-fix'
+    - cmake --preset debug + build clean (zero warnings under -Werror); ctest --test-dir build green incl. the new/updated test; make asan-test green
+    - No change to any other block encoding, scoring/physics/level constant, or file other than the two in the write-set
+budget:
+    rounds: 3
+    reflection_after_each: true
+current_round: 1
+context: |
+    Editor parity STAGE 1 of 12 (design docs/specs/2026-07-11-editor-parity.md
+    §2.1, stage list §5.1; committed ffa9e56). Fixes the highest-impact live
+    data-corruption bug: editor_cb_save_level (src/game_callbacks.c:978-1005)
+    writes a hardcoded fprintf(fp,"120\n") for the level time bonus (line 990),
+    overwriting the level's real value on EVERY re-save. Only 6/80 levels are
+    actually 120 (most common is 60) — so re-saving corrupts 92.5% of levels.
+    Fix: write level_system_get_time_bonus(ctx->level) instead of the literal
+    120. The accessor already exists (include/level_system.h:127); ctx->level is
+    the level_system (same ctx->level used at src/game_render.c:426). The original
+    writes the live value: original/file.c:544-546 (GetLevelTimeBonus). This stage
+    is INDEPENDENT of every other stage and ships first. Do NOT touch the dialogue
+    mechanism, Set-Time editing, counter-slide, or any other stage's scope — those
+    are separate missions.
