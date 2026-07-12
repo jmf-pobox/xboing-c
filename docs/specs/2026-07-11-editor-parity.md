@@ -190,25 +190,50 @@ dialogue callback is wired / the push failed) without clobbering a
 legitimately open dialogue, whose presence is signaled by
 `sdl2_state_current` having already changed to `SDL2ST_DIALOGUE`.
 
-### 1.6 Dialogue box re-centering (ADR-057 follow-up)
+### 1.6 Dialogue box position — no re-centering (correction)
 
-`game_render_dialogue` hardcodes `bx = 92` (`src/game_render.c:1002`,
-matching the `575`-wide canvas: `(575 - 381) / 2 ≈ 96`, off by a few
-px from `SDL2RGN_DIALOGUE`'s `x=97` — the two were never in sync,
-also out of scope here). Against the editor's widened `695`-wide
-canvas, the correct center is `(695 - 381) / 2 = 157`; a fixed value
-is wrong in one of the two modes no matter what it's set to. Fix:
-compute it at render time from the renderer's live logical size
-(`sdl2_renderer_get_logical_size`, already used elsewhere,
-`include/sdl2_renderer.h:101`):
+**This section originally claimed the dialogue box needed to
+re-center against the editor's widened canvas. That analysis was
+wrong — verified against `original/` before this correction.** The
+original's `inputWindow` is created exactly once, as a child of
+`mainWindow`, at a position computed from the *original* (pre-editor)
+window dimensions:
 
 ```c
-int logical_w = 0, logical_h = 0;
-sdl2_renderer_get_logical_size(ctx->renderer, &logical_w, &logical_h);
-int bx = (logical_w - DIALOGUE_WIDTH) / 2;
+/* original/stage.c:281-285 */
+inputWindow = XCreateSimpleWindow(display, mainWindow,
+    ((PLAY_WIDTH + MAIN_WIDTH) / 2) - (DIALOGUE_WIDTH / 2),
+    ((PLAY_HEIGHT + MAIN_HEIGHT) / 2) - (DIALOGUE_HEIGHT / 2),
+    DIALOGUE_WIDTH, DIALOGUE_HEIGHT, 4, red, black);
 ```
 
-`by` stays fixed — window height never changes between modes.
+With `PLAY_WIDTH=495`, `MAIN_WIDTH=70`, `DIALOGUE_WIDTH=(int)(495 /
+1.3)=380` (`original/include/dialogue.h:59`, `original/include/stage.h`),
+this evaluates to `x = ((495+70)/2) - (380/2) = 282 - 190 = 92` — a
+**fixed** value, computed once at `CreateAllWindows` time
+(`original/init.c` startup path), independent of whether the editor
+is active. `original/editor.c`'s window-widen on entry
+(`ResizeMainWindow(oldWidth + EDITOR_TOOL_WIDTH, ...)`,
+`original/editor.c:161-164`) grows `mainWindow` itself but never calls
+`XMoveWindow`/`XMoveResizeWindow` on `inputWindow` — confirmed by
+grepping every `editor.c`/`dialogue.c` reference to `inputWindow`:
+it is only mapped, unmapped, cleared, and drawn into, never moved.
+`original/CLAUDE.md`'s own coordinate-system table independently
+records `inputWindow` as fixed at `(92, 295)`. So widening the
+editor's logical canvas does **not** re-center the dialogue in the
+original — it stays exactly where it was created, at `x=92`, and
+looks visually off-center (relative to the wider canvas) while the
+editor's tool palette is showing. That is the faithful behavior, not
+a bug.
+
+**Corrected decision: keep `bx = 92` fixed in both `SDL2ST_GAME` and
+`SDL2ST_EDIT`. Do not compute it from the live logical width. Stage 4
+(the "re-centering" implementation stage) is a no-op — no code change
+is needed.** The shipped `game_render_dialogue`
+(`src/game_render.c:1244`) already does this: `int bx = 92;`, with a
+comment citing the same `original/stage.c:282-285` formula. `by`
+likewise stays fixed at `295` — window height never changes between
+modes, so this part of the original spec text was already correct.
 
 ## 2. Save-path data fixes (blockers 6, 7, 8; major 5)
 
@@ -350,27 +375,68 @@ this design; its doc comment should be updated to say so rather than
 check itself needs no separate sign-off since it is a direct port of
 `SaveLevelDataFile`'s existing logic, not a new design choice.
 
-**Render-side consequence found during design, not in the audit.**
-`render_block_composite`'s `RANDOM_BLK` case
-(`src/game_render.c:186-205`, shared by `game_render_blocks` and
-`game_render_editor_palette`) keys off `block_type == RANDOM_BLK`
-literally — which, per `block_system_add` above, is never true after
-the first frame (`block_type` is always the resolved color). This
-means the "- R -" overlay for a `RANDOM_BLK` cell is dead code today,
-in both live gameplay and the editor grid, once the editor grid also
-starts reading `.random`-aware cells for its own rendering (it
-currently doesn't — `game_render_blocks` reads `ctx->block` directly,
-not through `query_cell`). Recommend switching the composite's
-condition from `block_type == RANDOM_BLK` to a `random` flag added to
-`render_block_composite`'s parameters, since both call sites already
-have `info.random` available (`block_system_render_info_t.random`,
-`editor_palette_entry_t` doesn't carry a runtime flag — the palette
-swatch is a static preview, not a live cell, so it correctly keeps
-showing the `RANDOM_BLK` sprite for its dedicated palette entry and
-does not need this fix). This is a one-line condition change with a
-one-parameter signature change, low risk, but it is a gameplay-visible
-rendering change beyond pure editor scope — hence its own stage
-below rather than folding it into 2.4 silently.
+**Render-side "consequence" below was a MIS-ANALYSIS — corrected here,
+verified against `original/` after implementation and revert (mission
+`m-2026-07-12-009` round 2; bead `xboing-dq5`).** The paragraph as
+originally written claimed `render_block_composite`'s `RANDOM_BLK`
+case (keyed off `block_type == RANDOM_BLK`) was "dead code" because
+`block_system_add` resolves `RANDOM_BLK` to a concrete color
+immediately. That premise is correct in isolation but the conclusion
+is wrong: it is **not a bug that needs fixing** — it is the original's
+own behavior, faithfully reproduced.
+
+Tracing the full original call graph settles it:
+
+- `DrawTheBlock`'s `RANDOM_BLK` case
+  (`original/blocks.c:1700-1709`) draws the "- R -" label keyed off
+  the **parameter** `blockType` passed in, not off any stored runtime
+  flag.
+- `AddNewBlock` (`original/blocks.c:2285-2407`) calls `DrawTheBlock`
+  exactly once, at placement, with the as-yet-unresolved `blockType`
+  parameter still equal to `RANDOM_BLK` (`:2404-2406`,
+  `if (drawIt) DrawBlock(display, window, row, col, blockType);` —
+  the local `blockType` parameter, before `blockP->blockType` is
+  overwritten to `RED_BLK` a few lines earlier at `:2311`). So "- R -"
+  draws exactly once, on the placement frame.
+- `HandlePendingAnimations`'s random-block branch
+  (`original/blocks.c:1428-1444`) fires on the very next tick
+  (`nextFrame = frame + 1` set at `AddNewBlock:2312`), recolors the
+  block to a concrete `GetRandomType()` result, and redraws with
+  `DrawTheBlock(..., blockP->blockType, ...)` — the resolved color,
+  overwriting the one-tick "- R -" label.
+- Every later redraw in the original (collision damage, animation,
+  editor transforms) reads `blockP->blockType`, which after that first
+  tick is always a concrete color, never `RANDOM_BLK`.
+
+So "- R -" in the original is a **one-tick placement-redraw artifact**,
+never a persistent per-frame label — in gameplay OR the editor grid.
+The modern port's `render_block_composite` keying off
+`block_type == RANDOM_BLK` (which, per `block_system_add`, is likewise
+never true after the first frame for a live cell) was **already
+faithful** to this exact behavior, not a fidelity gap. Confirmed
+against the shipped code: `render_block_composite`
+(`src/game_render.c:187-206`) still keys its `RANDOM_BLK` case on
+`block_type` alone, no `random` parameter exists on the function, and
+`game_render_blocks`' call site (`src/game_render.c:150-152`) passes
+`info.block_type` — the resolved color — exactly as it did before this
+spec was written.
+
+**Resolution.** A `random`-flag-keyed "fix" (adding a `random`
+parameter to `render_block_composite` so "- R -" would show
+persistently for any cell placed as `RANDOM_BLK`, regardless of
+elapsed ticks) was implemented once and then **reverted**
+(mission `m-2026-07-12-009` round 2) once jck traced the call graph
+above — that version would have been a genuine deviation (a
+permanent every-frame "- R -" label the original never produces), not
+a fix. **No render-side change is needed for live cells.** The palette
+static swatch is unaffected either way: `editor_palette_entry_t`'s
+dedicated `RANDOM_BLK` entry has no runtime `.random` flag to key off
+(it's a static preview, not a live cell) and correctly keeps showing
+"- R -" via literal `block_type == RANDOM_BLK`, matching
+`SetupBlockWindow`'s palette draw
+(`original/editor.c:329-369`, which draws every static block type,
+including `RANDOM_BLK`, by its enum value with no runtime resolution
+involved).
 
 ## 3. Render clusters (blockers 1, 2, 9; majors 1, 2, 3, 6; minor 1)
 
@@ -398,6 +464,22 @@ col1_x          = PALETTE_X + EDITOR_TOOL_WIDTH / 4 - sprite_w / 2
 col2_x          = PALETTE_X + EDITOR_TOOL_WIDTH / 2
                     + EDITOR_TOOL_WIDTH / 4 - sprite_w / 2
 entry_y(row)    = PALETTE_Y + row * editorRowHeight
+```
+
+**Correction — vertical centering was omitted above, added during
+implementation.** The formula above only positions each swatch's
+row; it does not center the swatch vertically within that row's cell.
+The original does both: `SetupBlockWindow` computes
+`y = y1 + ((editorRowHeight / 2) - (BlockInfo[i].height / 2))`
+(`original/editor.c:339`, and again at `:352` for column 2 and `:363`
+for the counter-block variants) — each sprite is centered vertically
+in its row, not top-aligned. The shipped implementation
+(`src/game_render.c`) added this and it should have been in the
+formula above from the start:
+
+```text
+entry_y(row) = PALETTE_Y + row * PALETTE_ROW_PITCH
+               + (PALETTE_ROW_PITCH / 2 - sprite_h / 2)
 ```
 
 Also fix `PALETTE_ENTRY_H = 25` (`src/game_render.c:725`) to
@@ -660,11 +742,24 @@ mode-gated read).
 (`src/game_callbacks.c:1043-1061`), so `do_load`/`do_save`'s failure
 paths (`src/editor_system.c:736-739`, `:769-771`, `:785-787`)
 silently do nothing. Add `editor_cb_on_error` →
-`message_system_set(ctx->message, message, 0, frame)` (non-sticky,
-matching the transient nature of the original's `ErrorMessage`
-dialogs, `original/editor.c:163`, `:193`, `:382`, `:864`, `:918`).
-Trivial; bundle with section 1's `game_callbacks_editor()` edits
-since both touch the same struct literal.
+`message_system_set(ctx->message, message, 0, frame)` (non-sticky).
+
+**Citation correction.** `original/editor.c:193`, `:864`, and `:918`
+are **not** `ErrorMessage` dialogs — they are
+`ShutDown(display, 1, "...")` calls, i.e. the original exits the
+process on a failed editor load/save (`:193` initial `editor.data`
+load, `:864` the `L`-key reload, `:918` a failed save). Verified by
+reading each call site directly. (`original/editor.c:163` and `:382`
+are genuine `ErrorMessage` calls, but for a window-resize failure on
+editor entry/exit, an unrelated code path — not file save/load, and
+not what `.on_error` covers.) So the transient message-and-continue
+behavior added here is a **deliberate fidelity deviation**, not a
+faithful port: the original crashes to desktop on this failure class,
+the modern port shows a message and keeps running. See ADR-062
+(`docs/DESIGN.md`) for the recorded decision and its precedent
+(ADR-056's "refuse the mode, don't exit the process" principle).
+Bundle with section 1's `game_callbacks_editor()` edits since both
+touch the same struct literal.
 
 ### 4.3 ADR for digit-key/arrow palette selectors (minor 3)
 
@@ -862,19 +957,33 @@ Reuse the existing pipeline only — no new capture tooling.
 
 ## 8. Required ADRs
 
-Three:
+**Updated post-implementation: four, not three** (`docs/DESIGN.md`
+ADR-059 through ADR-062, added during the `xboing-dq5` documentation
+pass):
 
-1. **Editor async dialogue mechanism** (stage 3) — records the
-   pending-action design (section 1.3), the two integration gotchas
-   (section 1.5) and their fixes, and the callback signature change.
+1. **Editor async dialogue mechanism** (stage 3, ADR-059) — records
+   the pending-action design (section 1.3), the callback signature
+   change, and **three** integration gotchas, not the two anticipated
+   in section 1.5 — a third (the canvas-narrow-on-dialogue-push
+   interaction with ADR-057) was found only while implementing, by
+   tracing the actual `sdl2_state_push_dialogue`/`pop_dialogue` call
+   sequence, and is not describable from a static read of the spec.
    This is a genuine architectural decision (new state, new callback
    contract) and belongs in `docs/DESIGN.md` alongside ADR-057.
-2. **In-list highlight removal** (stage 6) — records the decision to
-   drop the invented highlight rather than fix its width, citing the
-   audit's major 1/2 findings and the original's lack of an
-   equivalent.
+2. **In-list highlight removal** (stage 6, ADR-060) — records the
+   decision to drop the invented highlight rather than fix its width,
+   citing the audit's major 1/2 findings and the original's lack of
+   an equivalent.
 3. **Digit-key/arrow palette selectors** (stage 12, already listed
-   in section 4.3) — records the additive input-model deviation.
+   in section 4.3; ADR-061) — records the additive input-model
+   deviation.
+4. **Editor file-error handling** (section 4.2, ADR-062; found at
+   implementation review, not anticipated when this spec was
+   written) — records that the modern port shows a transient message
+   and continues where the original calls `ShutDown` (process exit)
+   on the same editor save/load failures, correcting this spec's own
+   §4.2 miscitation of those `ShutDown` call sites as "`ErrorMessage`
+   dialogs" in the process.
 
 The `HandleRandomBlocks`-vs-read-time-normalization deviation
 (section 2.4) and the `RANDOM_BLK` composite condition fix (section

@@ -1,0 +1,68 @@
+mission_id: m-2026-07-12-014
+status: closed
+type: implement
+created_at: "2026-07-12T03:50:13Z"
+updated_at: "2026-07-12T04:00:43Z"
+closed_at: "2026-07-12T04:00:43Z"
+leader: claude
+worker: jdc
+evaluator:
+    handle: jck
+    pinned_at: "2026-07-12T03:50:13Z"
+    hash: 40cbe1204f644c77e6a26757a9b855e3298be267025e806d425bfdea99054f18
+inputs:
+    ticket: xboing-dq5
+write_set:
+    - docs/DESIGN.md
+    - docs/specs/2026-07-11-editor-parity.md
+success_criteria:
+    - 'docs/DESIGN.md gains ADRs for: async dialogue mechanism (+ the 3 gotchas), in-list highlight removal, digit-key/arrow palette selectors, and the on_error transient-vs-ShutDown deviation (as its own ADR or folded into the dialogue ADR); all in the established ADR format, numbered after ADR-058'
+    - docs/specs/2026-07-11-editor-parity.md §1.6 corrected (keep bx=92, no re-center; original inputWindow doesn't move; stage 4 no-op), §2.4/stage 8 corrected (block_type-keyed overlay already faithful, '- R -' is a placement artifact, stage 8 reverted), §3.1 notes the vertical centering fix, §4.2 citation corrected (ShutDown not ErrorMessage; modern transient-message deviation)
+    - every correction cites the original/<file>.c:<line> that settles it; markdownlint-clean (CI-verified); no code files touched
+    - 'cross-check: the doc now matches what actually shipped (grep the commits/code for the final behavior) — no stale claim remains that contradicts the committed implementation'
+budget:
+    rounds: 2
+    reflection_after_each: true
+current_round: 1
+context: |
+    Documentation pass for the editor parity effort (bead xboing-dq5), required before the
+    PR (DoD Gate 7). Two files: add the required ADRs to docs/DESIGN.md, and correct the
+    four design-doc mis-analyses in docs/specs/2026-07-11-editor-parity.md that the
+    implementation review caught. Read the full bead notes: `bd show xboing-dq5`.
+
+    ADRs to ADD to docs/DESIGN.md (next numbers after ADR-058, which already exists for the
+    Shift+click erase). Match the existing ADR format (Status/Context/Problem/Decision/
+    Consequences, bolded inline lead-ins like ADR-054-058):
+    1. Editor async dialogue mechanism (stage 3, design §1): the on_request_* callbacks +
+       EDITOR_STATE_DIALOGUE + pending_action sub-machine + editor_system_dialogue_result
+       resume, reusing the SDL2ST_DIALOGUE push/resume pattern; the three integration gotchas
+       (mode_edit_enter reset-on-pop guard; QUIT-fallback current-mode guard; mode_edit_exit
+       canvas-narrow-on-dialogue-push guard). This is a real architectural decision.
+    2. In-list palette highlight removed (stage 6): the invented yellow highlight was dropped
+       (the original has no per-swatch highlight; SetCurrentSymbol / the Active: box is the
+       only selection feedback, original/editor.c:256-268).
+    3. Digit-key/arrow palette selectors (minor 3): SDL2I_SPEED_1..9 + LEFT/RIGHT palette
+       selection is an additive input-model deviation with no 1996 counterpart (original only
+       had mouse-click on the palette). Record it as a deliberate modern affordance.
+
+    SPEC CORRECTIONS in docs/specs/2026-07-11-editor-parity.md (four errors the review found):
+    - §1.6 dialogue re-centering: WRONG. The original's inputWindow is a fixed child of
+      mainWindow that editor.c never moves, so the editor dialogue stays at bx=92 (does NOT
+      re-center on the widened canvas). Correct §1.6 to "keep bx=92 in both modes; do not
+      re-center" (original/stage.c:282, editor.c never repositions inputWindow). Stage 4 was
+      a no-op.
+    - §2.4 addendum / stage 8 RANDOM_BLK composite: MIS-ANALYSIS. The block_type-keyed "- R -"
+      overlay was ALREADY faithful — the original's "- R -" is a one-tick placement artifact
+      (original/blocks.c:2405-2406, overwritten next tick :1428-1444), not a persistent label;
+      the proposed random-flag "fix" was reverted. Strike/rewrite stage 8 to state no change
+      is needed for live cells (palette static swatch keeps "- R -" via block_type).
+    - §3.1 palette geometry: note the per-sprite VERTICAL centering (y = row_top + pitch/2 -
+      h/2, original/editor.c:339) that the original §3.1 formula omitted and the implementation
+      added.
+    - §4.2 on_error: the cited original/editor.c:193/864/918 are ShutDown(display,1,...) (the
+      original EXITS the process on file-save/load failure), NOT "ErrorMessage dialogs".
+      Correct the citation and note the modern on_error shows a transient message and continues
+      — a deliberate robustness deviation (add a short ADR for it too, #4, or fold the note into
+      the async-dialogue ADR — your call, but it must be recorded somewhere in docs/DESIGN.md).
+
+    No code changes. Do NOT touch anything but the two doc files.

@@ -3575,3 +3575,240 @@ original, and this decision does not touch it.
   draws.
 - Out of scope: the grid/palette-border render and the palette hit-test
   (separate mission), and any change to the right-click inspect path.
+
+## ADR-059: Editor async dialogue mechanism
+
+**Status:** Accepted (2026-07-12)
+**Context:** Mission `m-2026-07-11-028` / `m-2026-07-12-011` (implementation),
+bead `xboing-di8`. Full design in
+`docs/specs/2026-07-11-editor-parity.md` section 1; this ADR records
+the decision as shipped in `2c0e91b`.
+
+**Problem.** `editor_cb_yes_no` and `editor_cb_input_dialogue`
+(`src/game_callbacks.c`, pre-`2c0e91b`) were synchronous stubs — every
+yes/no prompt auto-confirmed and every input dialogue fabricated its
+answer — because the original's equivalents are genuinely blocking:
+`YesNoDialogue` and `UserInputDialogueMessage`
+(`original/editor.c:845-846`, `:900-901`, `:942-943`, `:974-975`; the
+`y`/`Y`-only accept logic lives in `original/misc.c:376-398`) run a
+nested `XNextEvent` loop that does not return until the player
+answers. `mode_edit_update` runs once per fixed-timestep tick and must
+return every frame so rendering and input polling continue — a
+mechanical port of the blocking signature cannot work in that loop.
+`editor_system.c`'s own state machine (`do_load`, `do_save`,
+`do_set_time`, `do_set_name`, and the `QUIT`/`CLEAR` cases of
+`handle_editor_key`) was written assuming the dialogue callback
+returns the final answer in the same call, so all of them needed
+restructuring, not just the two callback bodies.
+
+**Decision.** Reuse the existing `SDL2ST_DIALOGUE` push/resume pattern
+already proven for abort-game, quit, and set-starting-level
+(`src/game_input.c`), rather than invent a new mechanism:
+
+- Replace the two synchronous callbacks with fire-and-forget request
+  callbacks, `on_request_yes_no_dialogue` / `on_request_input_dialogue`
+  (`include/editor_system.h`), returning success/failure so the editor
+  can refuse to enter a dialogue state if the integration layer
+  couldn't open one.
+- Add `EDITOR_STATE_DIALOGUE` to `editor_state_t`, gated the same way
+  `EDITOR_STATE_TEST` already gates mouse input.
+- Add a private `pending_action` sub-machine (`editor_pending_action_t`,
+  internal to `src/editor_system.c`) with one state per in-flight
+  prompt (`QUIT_CONFIRM`, `LOAD_CONFIRM`, `LOAD_INPUT`, `SAVE_INPUT`,
+  `TIME_INPUT`, `NAME_INPUT`, `CLEAR_CONFIRM`). `LOAD` is the only
+  two-step chain — confirm-if-modified, then the level-number input.
+- Add `editor_system_dialogue_result(ctx, cancelled, input)`, called by
+  the integration layer once a requested dialogue resolves via
+  `sdl2_state_pop_dialogue`; it dispatches on `pending_action` and is a
+  no-op unless the editor is in `EDITOR_STATE_DIALOGUE`.
+- Wire `game_callbacks.c`'s renamed `editor_cb_request_yes_no` /
+  `editor_cb_request_input` through `sdl2_state_push_dialogue` +
+  `dialogue_system_open` (icon `DIALOGUE_ICON_TEXT` throughout, matching
+  the original's `TEXT_ICON` on every editor prompt), and a fourth
+  pending flag (`editor_dialogue_pending`) consumed in
+  `mode_dialogue_exit`, since the destination after every editor
+  dialogue is always `SDL2ST_EDIT`.
+
+**Three integration gotchas found while implementing this design, not
+visible to a static read of the spec, and their guards (all in
+`src/game_modes.c`):**
+
+1. **`mode_edit_enter` skips reset/init on a dialogue resume.**
+   `sdl2_state_pop_dialogue` calls the restored mode's `on_enter` on
+   every dialogue close, and the restored mode for every
+   editor-originated dialogue is `SDL2ST_EDIT` — so `mode_edit_enter`
+   fires after a plain Save just as much as after a genuine editor
+   entry. Unconditionally calling `editor_system_reset` and
+   `editor_system_init_palette` there would wipe `modified`,
+   `level_number`, `level_title`, and the palette selection the
+   instant any editor dialogue completes. Guard:
+   `if (sdl2_state_previous(ctx->state) != SDL2ST_DIALOGUE)` around the
+   reset/init/canvas-widen block.
+2. **The QUIT fallback requires `sdl2_state_current == SDL2ST_EDIT`.**
+   `mode_edit_update`'s force-exit-to-intro fallback used to fire
+   whenever `editor_system_get_state() != EDITOR_STATE_FINISH` after a
+   quit key press. Under the new design a successful quit *request*
+   leaves the editor at `EDITOR_STATE_DIALOGUE`, not `FINISH` — the old
+   condition would kill the just-opened confirm dialogue immediately.
+   Fix: also require `sdl2_state_current(ctx->state) == SDL2ST_EDIT`,
+   which is already false once the request callback has pushed
+   `SDL2ST_DIALOGUE` synchronously.
+3. **`mode_edit_exit` skips the canvas-narrow on a dialogue push.**
+   `sdl2_state_push_dialogue` calls the *current* mode's `on_exit`
+   before switching to `SDL2ST_DIALOGUE`, and sets `in_dialogue=true`
+   before that call — so `sdl2_state_is_dialogue(ctx->state)` is
+   already true inside `mode_edit_exit` when the exit is a dialogue
+   push rather than a genuine quit/playtest exit. Without a guard,
+   every editor dialogue would narrow the canvas back to 575px
+   immediately, and gotcha 1's resume guard (which correctly skips
+   re-widening on a plain round-trip) would then strand the editor at
+   the narrow width for the rest of the session — an interaction with
+   ADR-057's width fix. Fix: `if (sdl2_state_is_dialogue(ctx->state))
+   return;` before the restore-width code. This gotcha was found only
+   by tracing the actual push/pop call sequence during implementation,
+   not by the static read that produced the spec.
+
+**Consequences.**
+
+- Unsaved-work confirms (quit/load/clear) now really prompt, and a
+  cancel aborts the action, matching
+  `original/editor.c:1039` (Q), `:1056` (L), `:1086` (C) and
+  `original/misc.c:376-398` (`YesNoDialogue`: only `y`/`Y` proceeds).
+- `level_system_set_time_bonus` was added (mirroring the existing
+  getter) so `do_set_time`'s already-correct call to
+  `ctx->cb.on_set_time` has something to write to.
+- `editor_cb_on_error` was wired to `message_system_set` (non-sticky)
+  for `do_load`/`do_save` failure paths — see ADR-062 for why this is
+  a deliberate deviation from the original's fatal-exit behavior on
+  the same failures.
+- No z-spec: the pending-action sub-machine is confined to one mode
+  (`SDL2ST_EDIT` plus the shared `SDL2ST_DIALOGUE`) with a linear
+  resume path per action and exactly one two-step chain
+  (`LOAD_CONFIRM` → `LOAD_INPUT`); covered by the two integration
+  gotchas above (both concrete, both one-line guards) plus integration
+  tests, not a formal spec.
+- Guarded by 9 new integration tests driving the real
+  `mode_edit_update`/`mode_dialogue_update` path (save/load/set-time/
+  set-name/clear/quit, confirm and cancel branches).
+
+## ADR-060: In-list palette highlight removed
+
+**Status:** Accepted (2026-07-12)
+**Context:** `docs/specs/2026-07-11-editor-parity.md` section 3.2;
+bead `xboing-di8`; shipped in `1e54c0e`.
+
+**Problem.** The pre-`1e54c0e` palette renderer drew a yellow
+highlight rectangle around the selected swatch in the tool list
+(`src/game_render.c`, `PALETTE_W=100` against the actual `120`px
+region — the same magic-number mismatch ADR-057 traces to its root).
+The original has no in-list selection cue at all:
+`SetupBlockWindow` (`original/editor.c:329-369`) draws every swatch
+identically regardless of selection state, and the only 1996 feedback
+for "what's currently selected" is the separate `typeWindow`'s
+"Active:" preview, drawn by `SetCurrentSymbol`
+(`original/editor.c:256-268`).
+
+**Decision.** Remove the in-list highlight entirely rather than fix
+its width to match the 120px region. Once the "Active:" indicator
+exists (this same commit adds it, mirroring `SetCurrentSymbol`), a
+second, non-original selection cue in the list itself adds visual
+noise the port hasn't earned anywhere else and duplicates information
+already shown in the Active: box. jck confirmed at review — a
+UI-fidelity call, not a bug fix.
+
+**Consequences.**
+
+- The palette list now renders identically to
+  `original/editor.c:329-369`: swatches only, no per-entry decoration.
+- Selection feedback is exclusively the "Active:" preview at
+  `SDL2RGN_EDITOR_TYPE`, matching the original's single selection-
+  feedback mechanism.
+- A future engineer proposing to re-add an in-list highlight must
+  treat it as a new deviation requiring its own sign-off, not a
+  restoration of removed functionality.
+
+## ADR-061: Digit-key and arrow-key palette selectors
+
+**Status:** Accepted (2026-07-12)
+**Context:** `docs/specs/2026-07-11-editor-parity.md` section 4.3;
+bead `xboing-di8`; shipped in `1e54c0e`'s companion input-handling
+change, `src/game_modes.c`.
+
+**Problem/decision to record.** The modern editor binds
+`SDL2I_SPEED_1`..`SDL2I_SPEED_9` (keys 1-9) to select palette entries
+0-8 directly, and `SDL2I_LEFT`/`SDL2I_RIGHT` to cycle the selection
+one entry at a time, wrapping across all entries
+(`src/game_modes.c`, palette-selection block in `mode_edit_update`).
+`original/editor.c` has no keysym handler for palette selection at
+all — the only 1996 selection path is a mouse click on `blockWindow`,
+dispatched through `HandleEditorToolBar`
+(`original/editor.c:270-305`). This is therefore an **additive**
+modern input affordance with no 1996 counterpart, not a port of
+existing behavior.
+
+**Decision.** Keep it. Mouse-click selection is preserved unchanged
+(`game_render_editor_palette_index_at` backs both the render loop and
+the click hit-test, so a click always selects the entry actually
+drawn at that pixel); the digit/arrow bindings are added alongside it
+as a keyboard-only accessibility improvement, not a replacement.
+Recorded here as a deliberate, documented deviation rather than left
+implicit, per the audit's minor-3 finding. Index ranges are final now
+that the two-column palette (ADR-060's companion geometry change)
+ships all 30 entries: digit keys 1-9 reach only column-1 entries 0-8;
+arrow-cycling reaches all 30 via modulo wraparound.
+
+**Consequences.**
+
+- No original behavior is removed or altered — mouse selection is
+  untouched.
+- Documented here so a future audit against `original/editor.c` does
+  not flag the digit/arrow bindings as an unexplained fidelity gap.
+- If the palette entry count or column layout changes again, this
+  ADR's "1-9 reach column 1 only" note should be re-verified, not
+  assumed to hold.
+
+## ADR-062: Editor file-error handling shows a message and continues, instead of exiting
+
+**Status:** Accepted (2026-07-12)
+**Context:** `docs/specs/2026-07-11-editor-parity.md` section 4.2;
+bead `xboing-di8`; shipped alongside ADR-059 in `2c0e91b`.
+
+**Problem.** The original treats an editor file I/O failure as fatal.
+`ShutDown(display, 1, "Sorry, invalid level specified.")` on the
+initial `editor.data` load (`original/editor.c:193`) and on the `L`-key
+reload (`original/editor.c:864`), and
+`ShutDown(display, 1, "Sorry, unable to save level.")` on a failed
+save (`original/editor.c:918`), all call `ExitProgramNow` — the
+process exits. (`original/editor.c:163` and `:382` are genuine
+`ErrorMessage` calls, but for an unrelated failure — a window-resize
+error on editor entry/exit — not file save/load; they are not part of
+this decision.) Before this change, `game_callbacks_editor()` never
+assigned `.on_error` at all, so the equivalent modern failure paths
+(`do_load`/`do_save` in `src/editor_system.c`) silently did nothing —
+neither faithful to the original (no exit) nor useful (no feedback).
+
+**Decision.** Precedent: ADR-056 already established that a modern
+mode-refusal is the right modernization of a fatal original failure
+(there, a failed level load at game start) — "modernize the mechanism,
+not the guarantee." Apply the same principle here: add
+`editor_cb_on_error`, wired to `.on_error`, which calls
+`message_system_set(ctx->message, message, 0, frame)` — a transient,
+non-sticky message — and the editor keeps running. A crash-to-desktop
+on a bad save/load is worse UX than the terminal-era original and no
+ADR authorizes reintroducing it.
+
+**Consequences.**
+
+- Save/load/playtest-file failures in the editor now surface as a
+  message-bar notice instead of silently doing nothing (the pre-ADR
+  state) or exiting the process (the original's behavior).
+- This is a deliberate, documented fidelity deviation — not a bug —
+  consistent with ADR-056's precedent of refusing rather than
+  crashing.
+- Any future engineer citing `original/editor.c:193`, `:864`, or `:918`
+  as justification for "the original shows an error dialog and
+  continues" is citing the wrong behavior — those lines are
+  `ShutDown` (process exit), not `ErrorMessage`. This ADR is the
+  correction of that miscitation, which also appeared in
+  `docs/specs/2026-07-11-editor-parity.md` section 4.2 before this
+  documentation pass.
