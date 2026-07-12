@@ -18,6 +18,7 @@
 #include "config_io.h"
 #include "highscore_system.h" /* highscore_table_t (value type, needed inline) */
 #include "paths.h"            /* paths_config_t (value type, needed inline) */
+#include "savegame_io.h"      /* savegame_data_t / savegame_level_t (value types, needed inline) */
 
 /* =========================================================================
  * Forward declarations -- opaque pointers, no headers pulled in
@@ -165,6 +166,17 @@ typedef struct game_ctx
      * Gated to SDL2ST_EDIT only -- see game_render_score. */
     int editor_inspect_active;          /* 0 = show real score */
     unsigned long editor_inspect_value; /* last-queried hit points */
+
+    /* Editor play-test session (docs/specs/2026-07-12-playtest-fidelity.md
+     * S3.1/S3.5).  True for the duration of an EDIT->GAME->EDIT play-test
+     * round-trip started by EDITOR_KEY_PLAYTEST; matches the original's
+     * `mode == MODE_EDIT` staying true through SetupPlayTest/FinishPlayTest
+     * (original/editor.c:587-645) with no dedicated flag needed there --
+     * the modern port needs one because it re-enters a genuinely distinct
+     * SDL2ST_GAME mode to reuse the real gameplay pipeline. */
+    bool play_test_active;
+    savegame_data_t play_test_snapshot_info;   /* pre-test board+session snapshot */
+    savegame_level_t play_test_snapshot_level; /* pre-test block grid snapshot */
 
 } game_ctx_t;
 

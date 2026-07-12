@@ -310,11 +310,16 @@ void game_input_global(game_ctx_t *ctx)
 
         /* Escape — original/main.c:506-508.
          * If play-testing from editor: return to editor (no dialogue).
-         * Otherwise: "Abort current game? [y/n]" confirmation. */
+         * Otherwise: "Abort current game? [y/n]" confirmation.
+         *
+         * Reads ctx->play_test_active rather than re-deriving the same
+         * fact from sdl2_state_previous() == SDL2ST_EDIT -- the latter
+         * is a single-slot value silently overwritten by the next
+         * transition and was flagged as the fragile precedent this flag
+         * retires (docs/specs/2026-07-12-playtest-fidelity.md S3.1). */
         if (sdl2_input_just_pressed(ctx->input, SDL2I_ABORT))
         {
-            sdl2_state_mode_t prev = sdl2_state_previous(ctx->state);
-            if (prev == SDL2ST_EDIT)
+            if (ctx->play_test_active)
             {
                 sdl2_state_transition(ctx->state, SDL2ST_EDIT);
             }

@@ -1119,13 +1119,41 @@ static void editor_cb_on_finish(void *ud)
 static void editor_cb_on_playtest_start(void *ud)
 {
     game_ctx_t *ctx = ud;
+
+    /* Snapshot the board (+ incidental session state) before
+     * mode_game_enter's EDIT branch runs.  In-memory equivalent of
+     * SetupPlayTest's save-to-tempName (original/editor.c:591-597) --
+     * see docs/specs/2026-07-12-playtest-fidelity.md S3.5 for why no
+     * file round-trip is needed here. */
+    ctx->play_test_active = true;
+    savegame_system_capture(ctx, &ctx->play_test_snapshot_info, &ctx->play_test_snapshot_level);
+
+    /* Faithful port: original zeroes score for the test session
+     * (original/editor.c:603, SetTheScore(0L)) rather than carrying
+     * over whatever the editor's incidental score was. */
+    score_system_set(ctx->score, 0);
+
     sdl2_state_transition(ctx->state, SDL2ST_GAME);
 }
 
 static void editor_cb_on_playtest_end(void *ud)
 {
     game_ctx_t *ctx = ud;
+
+    /* Undo any block damage from the test session and restore the
+     * pre-test board -- matches FinishPlayTest's reload from
+     * tempName (original/editor.c:634-636), NOT a reload from
+     * editor.data (which would discard unsaved edits, xboing-bsz).
+     * Must run before the transition below: mode_edit_enter's
+     * play_test_active guard (game_modes.c) still needs to read
+     * true. */
+    savegame_system_restore(ctx, &ctx->play_test_snapshot_info, &ctx->play_test_snapshot_level);
+    score_system_set(ctx->score, 0); /* original/editor.c:629-630 */
+
     sdl2_state_transition(ctx->state, SDL2ST_EDIT);
+
+    /* Clear only after the transition returns -- see S3.4. */
+    ctx->play_test_active = false;
 }
 
 editor_system_callbacks_t game_callbacks_editor(void)
