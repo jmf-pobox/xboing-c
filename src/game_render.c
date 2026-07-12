@@ -560,7 +560,15 @@ void game_render_lives(const game_ctx_t *ctx)
      * coords (original/level.c:210 DisplayLevelNumber → DrawOutNumber at
      * window-local x=260, y=5).  Iterate digits least-significant first
      * so digit_index 0 is the rightmost. */
-    int level = (!ctx->game_active && ctx->attract_level_display > 0) ? ctx->attract_level_display
+    sdl2_state_mode_t effective_mode = sdl2_state_current(ctx->state);
+    if (effective_mode == SDL2ST_DIALOGUE)
+        effective_mode = sdl2_state_saved_mode(ctx->state);
+
+    int level;
+    if (effective_mode == SDL2ST_EDIT)
+        level = editor_system_get_level_number(ctx->editor);
+    else
+        level = (!ctx->game_active && ctx->attract_level_display > 0) ? ctx->attract_level_display
                                                                       : ctx->level_number;
     if (level <= 0)
         level = 1;
@@ -968,20 +976,41 @@ void game_render_messages(const game_ctx_t *ctx)
 
 void game_render_timer(const game_ctx_t *ctx)
 {
-    if (ctx->time_bonus_total <= 0)
-        return; /* No timer for this level */
+    sdl2_state_mode_t effective_mode = sdl2_state_current(ctx->state);
+    if (effective_mode == SDL2ST_DIALOGUE)
+        effective_mode = sdl2_state_saved_mode(ctx->state);
+
+    int seconds_remaining;
+    if (effective_mode == SDL2ST_EDIT)
+    {
+        /* The editor never counts down (it never runs the gameplay tick) --
+         * show the loaded level's full time bonus, statically, matching
+         * DoLoadLevel's timeWindow population (original/editor.c:196-201,
+         * original/file.c:366).  Gate on the editor's own value, not
+         * ctx->time_bonus_total, so a level with no gameplay history yet
+         * still shows its timer. */
+        seconds_remaining = level_system_get_time_bonus(ctx->level);
+        if (seconds_remaining <= 0)
+            return; /* No timer for this level */
+    }
+    else
+    {
+        if (ctx->time_bonus_total <= 0)
+            return; /* No timer for this level */
+        seconds_remaining = ctx->time_remaining;
+    }
 
     /* Format as MM:SS to match legacy DrawLevelTimeBonus */
-    int minutes = ctx->time_remaining / 60;
-    int seconds = ctx->time_remaining % 60;
+    int minutes = seconds_remaining / 60;
+    int seconds = seconds_remaining % 60;
     char buf[16];
     snprintf(buf, sizeof(buf), "%02d:%02d", minutes, seconds);
 
     /* Color thresholds match legacy: <=10s red, <=60s yellow, else green */
     SDL_Color color;
-    if (ctx->time_remaining <= 10)
+    if (seconds_remaining <= 10)
         color = (SDL_Color){255, 50, 50, 255}; /* Red — critical */
-    else if (ctx->time_remaining <= 60)
+    else if (seconds_remaining <= 60)
         color = (SDL_Color){255, 255, 50, 255}; /* Yellow — getting low */
     else
         color = (SDL_Color){50, 255, 50, 255}; /* Green — plenty of time */
@@ -1273,7 +1302,7 @@ void game_render_frame(const game_ctx_t *ctx)
 
     if (effective == SDL2ST_INTRO || effective == SDL2ST_INSTRUCT || effective == SDL2ST_DEMO ||
         effective == SDL2ST_PREVIEW || effective == SDL2ST_KEYS || effective == SDL2ST_KEYSEDIT ||
-        effective == SDL2ST_HIGHSCORE || effective == SDL2ST_BONUS)
+        effective == SDL2ST_HIGHSCORE || effective == SDL2ST_BONUS || effective == SDL2ST_EDIT)
     {
         game_render_score(ctx);
         game_render_lives(ctx);

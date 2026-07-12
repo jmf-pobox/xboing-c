@@ -1359,6 +1359,17 @@ static void mode_edit_enter(sdl2_state_mode_t mode, void *ud)
     if (ctx->cursor)
         sdl2_cursor_set(ctx->cursor, SDL2CUR_PLUS);
 
+    /* Clear any specials (Killer/Reverse/x2/x4/...) left active from an
+     * abandoned game -- E is reachable mid-game (src/game_input.c) -- so
+     * the editor never shows or plays under leftover special state.
+     * Matches DoLoadLevel's TurnSpecialsOff(display) (original/editor.c:200).
+     * Placed unconditionally, outside the dialogue-resume guard below:
+     * special_system_turn_off is idempotent when specials are already off
+     * (src/special_system.c), so refiring it on every dialogue-close-back-
+     * to-editor is harmless -- unlike the reset/init-palette block, which
+     * genuinely must not re-run on a plain dialogue round-trip. */
+    special_system_turn_off(ctx->special);
+
     /* sdl2_state_pop_dialogue calls mode_dialogue_exit then the restored
      * mode's on_enter — and the restored mode for every editor-originated
      * dialogue (Save/Load/Time/Name/Clear/Quit) is SDL2ST_EDIT, so this

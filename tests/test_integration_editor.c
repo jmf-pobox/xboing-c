@@ -38,6 +38,7 @@
 #include "sdl2_input.h"
 #include "sdl2_renderer.h"
 #include "sdl2_state.h"
+#include "special_system.h"
 
 /* =========================================================================
  * Writable argv buffer
@@ -157,6 +158,22 @@ static int teardown(void **vstate)
     return 0;
 }
 
+/* Creates the game context WITHOUT transitioning to EDIT yet, so a test
+ * can seed pre-editor state (e.g. an active special from an abandoned
+ * game) before driving the real SDL2ST_EDIT entry. */
+static int setup_pre_edit(void **vstate)
+{
+    test_fixture_t *f = calloc(1, sizeof(*f));
+    assert_non_null(f);
+
+    char *argv[] = {arg_prog, NULL};
+    f->ctx = game_create(1, argv);
+    assert_non_null(f->ctx);
+
+    *vstate = f;
+    return 0;
+}
+
 /* =========================================================================
  * Tests
  * ========================================================================= */
@@ -168,6 +185,26 @@ static void test_edit_mode_enters(void **vstate)
     /* Editor should be in NONE state (ready for input) after a few ticks */
     editor_state_t state = editor_system_get_state(f->ctx->editor);
     assert_int_equal(state, EDITOR_STATE_NONE);
+}
+
+/* S3.3 point 3 (docs/specs/2026-07-11-editor-parity.md): entering the
+ * editor must clear any specials left active from an abandoned game --
+ * E is reachable mid-game (src/game_input.c).  Matches DoLoadLevel's
+ * TurnSpecialsOff(display) (original/editor.c:200).  Drives the REAL
+ * mode_edit_enter via sdl2_state_transition, not a direct call to
+ * special_system_turn_off(). */
+static void test_editor_entry_clears_active_specials(void **vstate)
+{
+    test_fixture_t *f = (test_fixture_t *)*vstate;
+    game_ctx_t *ctx = f->ctx;
+
+    special_system_set(ctx->special, SPECIAL_KILLER, 1);
+    assert_true(special_system_is_active(ctx->special, SPECIAL_KILLER));
+
+    sdl2_state_transition(ctx->state, SDL2ST_EDIT);
+    tick_frames(ctx, 5);
+
+    assert_false(special_system_is_active(ctx->special, SPECIAL_KILLER));
 }
 
 static void test_editor_ticking_no_crash(void **vstate)
@@ -711,6 +748,8 @@ int main(void)
 {
     const struct CMUnitTest tests[] = {
         cmocka_unit_test_setup_teardown(test_edit_mode_enters, setup_edit_mode, teardown),
+        cmocka_unit_test_setup_teardown(test_editor_entry_clears_active_specials, setup_pre_edit,
+                                        teardown),
         cmocka_unit_test_setup_teardown(test_editor_erase_shows_skull_cursor, setup_edit_mode,
                                         teardown),
         cmocka_unit_test_setup_teardown(test_cursor_no_leak_editor_to_instruct, setup_edit_mode,

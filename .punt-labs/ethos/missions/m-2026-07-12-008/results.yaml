@@ -1,0 +1,36 @@
+results:
+    - mission: m-2026-07-12-008
+      round: 1
+      created_at: "2026-07-12T02:19:47Z"
+      author: sjl
+      verdict: pass
+      confidence: 0.85
+      files_changed:
+        - path: src/game_render.c
+          added: 37
+          removed: 8
+        - path: src/game_modes.c
+          added: 11
+          removed: 0
+        - path: tests/test_integration_editor.c
+          added: 39
+          removed: 0
+      evidence:
+        - name: HUD gate (game_render.c:1305) adds SDL2ST_EDIT via effective; covers editor + editor-dialogue overlay (effective resolves DIALOGUE->saved_mode)
+          status: pass
+        - name: 'level redirect: game_render_lives resolves effective mode, uses editor_system_get_level_number when SDL2ST_EDIT, else the attract/gameplay expr; level<=0->1 clamp preserved; read-time, no new field'
+          status: pass
+        - name: 'timer redirect: editor branch shows level_system_get_time_bonus(ctx->level) statically (gated on its own value not time_bonus_total), gameplay branch unchanged; single seconds_remaining into existing MM:SS + color logic'
+          status: pass
+        - name: 'specials reset: special_system_turn_off(ctx->special) unconditional at top of mode_edit_enter, OUTSIDE stage-3 dialogue guard (idempotent), mirroring DoLoadLevel TurnSpecialsOff (original/editor.c:200)'
+          status: pass
+        - name: 'genuine test test_editor_entry_clears_active_specials: set SPECIAL_KILLER active, transition to SDL2ST_EDIT (real mode_edit_enter), assert cleared; uses KILLER not SAVING (turn_off exempts saving, matches legacy)'
+          status: pass
+        - name: 'leader-verified: cmake debug+asan rebuilt, ctest 61/61 both, zero -Werror/-Wconversion warnings; only the 3 write-set files changed; no CMake change'
+          status: pass
+      open_questions:
+        - 'jck: confirm HUD content faithful to DoLoadLevel''s repopulation (original/editor.c:196-201) — level number from the edited level, static timer (original/file.c:366), specials shown OFF; note effective-mode resolution is duplicated across lives/timer/frame (acceptable read-time redirect, not a defect)'
+      prose: |-
+        Stage 7 HUD content-sync: gate + read-time level/timer redirects to editor sources
+        + idempotent specials reset. No stale gameplay HUD leaks into the editor. Leader
+        reviewed the diff + ran both suites green. jck evaluates faithfulness to DoLoadLevel.
