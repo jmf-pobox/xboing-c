@@ -23,6 +23,7 @@
 #include <cmocka.h>
 
 #include "ball_system.h"
+#include "block_system.h"
 #include "editor_system.h"
 #include "game_callbacks.h"
 #include "game_context.h"
@@ -578,6 +579,76 @@ static void test_editor_playtest_round_trip_logical_width(void **vstate)
 }
 
 /* =========================================================================
+ * Group 6: Play-test P/Escape must end play-test, not pause/abort
+ * (bead xboing-lpi) -- drives the REAL game_input.c handlers where the
+ * bug lived, not a direct editor_system_key_input(EDITOR_KEY_PLAYTEST)
+ * call.  The original regression test called editor_system_key_input
+ * directly, so it never exercised game_input_global's SDL2I_PAUSE/
+ * SDL2I_ABORT branches (src/game_input.c:145-153, :328-340) -- the
+ * exact live-input path that had to check ctx->play_test_active before
+ * routing to SDL2ST_PAUSE/the abort confirmation dialogue.
+ * ========================================================================= */
+
+/* Draws one block, enters play-test (setup, not the assertion), then
+ * injects 'p' through the SAME path a real player's keypress takes:
+ * inject_key + game_input_global.  Before the fix this fell through to
+ * the "mode == SDL2ST_GAME" branch and transitioned to SDL2ST_PAUSE
+ * instead of ending play-test. */
+static void test_playtest_p_ends_via_live_game_input(void **vstate)
+{
+    game_ctx_t *ctx = ((kb_fixture_t *)*vstate)->ctx;
+
+    editor_system_select_palette(ctx->editor, 0);
+    editor_system_mouse_button(ctx->editor, 192, 80, 1, 1);
+    editor_system_mouse_button(ctx->editor, 192, 80, 1, 0);
+    assert_true(block_system_is_occupied(ctx->block, 2, 3));
+
+    editor_system_key_input(ctx->editor, EDITOR_KEY_PLAYTEST);
+    assert_int_equal(sdl2_state_current(ctx->state), SDL2ST_GAME);
+    assert_true(ctx->play_test_active);
+
+    inject_key(ctx, SDL_SCANCODE_P);
+    game_input_global(ctx);
+
+    assert_int_equal(sdl2_state_current(ctx->state), SDL2ST_EDIT);
+    assert_false(ctx->play_test_active);
+    /* Pre-test board restored -- proves editor_cb_on_playtest_end ran,
+     * not a silent fall-through that left play-test state untouched. */
+    assert_true(block_system_is_occupied(ctx->block, 2, 3));
+}
+
+/* Sibling case: a REAL game (play_test_active == false) must still pause
+ * on 'p' -- the fix must not regress ordinary in-game pause. */
+static void test_real_game_p_still_pauses(void **vstate)
+{
+    game_ctx_t *ctx = ((kb_fixture_t *)*vstate)->ctx;
+    assert_false(ctx->play_test_active);
+
+    inject_key(ctx, SDL_SCANCODE_P);
+    game_input_global(ctx);
+
+    assert_int_equal(sdl2_state_current(ctx->state), SDL2ST_PAUSE);
+}
+
+/* Escape during play-test must also end it via the live abort path
+ * (src/game_input.c SDL2I_ABORT), not open the "Abort current game?"
+ * confirmation dialogue. */
+static void test_playtest_escape_ends_via_live_game_input(void **vstate)
+{
+    game_ctx_t *ctx = ((kb_fixture_t *)*vstate)->ctx;
+
+    editor_system_key_input(ctx->editor, EDITOR_KEY_PLAYTEST);
+    assert_int_equal(sdl2_state_current(ctx->state), SDL2ST_GAME);
+    assert_true(ctx->play_test_active);
+
+    inject_key(ctx, SDL_SCANCODE_ESCAPE);
+    game_input_global(ctx);
+
+    assert_int_equal(sdl2_state_current(ctx->state), SDL2ST_EDIT);
+    assert_false(ctx->play_test_active);
+}
+
+/* =========================================================================
  * Test registration
  * ========================================================================= */
 
@@ -644,11 +715,21 @@ int main(void)
                                         setup_editor, teardown),
     };
 
+    const struct CMUnitTest playtest_live_input_tests[] = {
+        cmocka_unit_test_setup_teardown(test_playtest_p_ends_via_live_game_input, setup_editor,
+                                        teardown),
+        cmocka_unit_test_setup_teardown(test_real_game_p_still_pauses, setup_game, teardown),
+        cmocka_unit_test_setup_teardown(test_playtest_escape_ends_via_live_game_input,
+                                        setup_editor, teardown),
+    };
+
     int rc = 0;
     rc |= cmocka_run_group_tests_name("global keys", global_tests, NULL, NULL);
     rc |= cmocka_run_group_tests_name("mode scoping", scoping_tests, NULL, NULL);
     rc |= cmocka_run_group_tests_name("gameplay keys", gameplay_tests, NULL, NULL);
     rc |= cmocka_run_group_tests_name("attract navigation", attract_tests, NULL, NULL);
     rc |= cmocka_run_group_tests_name("editor window width", editor_width_tests, NULL, NULL);
+    rc |= cmocka_run_group_tests_name("playtest live input (xboing-lpi)", playtest_live_input_tests,
+                                      NULL, NULL);
     return rc;
 }

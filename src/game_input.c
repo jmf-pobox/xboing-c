@@ -20,6 +20,7 @@
 #include "ball_system.h"
 #include "block_system.h"
 #include "dialogue_system.h"
+#include "editor_system.h"
 #include "gun_system.h"
 #include "level_system.h"
 #include "message_system.h"
@@ -138,10 +139,14 @@ void game_input_global(game_ctx_t *ctx)
                       mode == SDL2ST_HIGHSCORE || mode == SDL2ST_BONUS);
 
     /* P: pause/unpause — handled here (once per frame) not in
-     * game_input_update (per tick) to prevent multi-tick toggle. */
+     * game_input_update (per tick) to prevent multi-tick toggle.
+     * During play-test, P ends the test instead of pausing — matches
+     * FinishPlayTest (original/editor.c:994-1001). */
     if (sdl2_input_just_pressed(ctx->input, SDL2I_PAUSE))
     {
-        if (mode == SDL2ST_GAME)
+        if (mode == SDL2ST_GAME && ctx->play_test_active)
+            editor_system_key_input(ctx->editor, EDITOR_KEY_PLAYTEST);
+        else if (mode == SDL2ST_GAME)
             sdl2_state_transition(ctx->state, SDL2ST_PAUSE);
         else if (mode == SDL2ST_PAUSE)
             sdl2_state_transition(ctx->state, SDL2ST_GAME);
@@ -309,7 +314,10 @@ void game_input_global(game_ctx_t *ctx)
             (void)savegame_system_load(ctx);
 
         /* Escape — original/main.c:506-508.
-         * If play-testing from editor: return to editor (no dialogue).
+         * If play-testing from editor: end the test via the same path
+         * as P (editor_system_key_input -> on_playtest_end), restoring
+         * the pre-test board and clearing play_test_active — matches
+         * FinishPlayTest (original/editor.c:994-1001).
          * Otherwise: "Abort current game? [y/n]" confirmation.
          *
          * Reads ctx->play_test_active rather than re-deriving the same
@@ -321,7 +329,7 @@ void game_input_global(game_ctx_t *ctx)
         {
             if (ctx->play_test_active)
             {
-                sdl2_state_transition(ctx->state, SDL2ST_EDIT);
+                editor_system_key_input(ctx->editor, EDITOR_KEY_PLAYTEST);
             }
             else if (sdl2_state_push_dialogue(ctx->state) == SDL2ST_OK)
             {
