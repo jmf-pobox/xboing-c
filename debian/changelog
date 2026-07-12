@@ -1,3 +1,23 @@
+xboing (1.0.4-1) unstable; urgency=medium
+
+  * Full level-editor parity with the 1996 original. The SDL2 editor had
+    never been through a parity audit and was silently corrupting levels on
+    re-save; this release fixes the data-integrity bugs and rebuilds the UI
+    to match the original.
+  * Fix the editor writing a hardcoded 120-second time bonus over every
+    level's real value (only 6 of 80 levels are 120, so re-saving corrupted
+    92.5% of them), and fix counter-block hit-counts and RANDOM blocks being
+    lost on save.
+  * Real modal save/load/set-time/set-name/clear/quit dialogues with an
+    unsaved-work safety net, replacing stubs that silently auto-confirmed.
+  * Faithful editor UI: two-column tool palette with all 30 entries and the
+    Active indicator, in-editor HUD, red grid drawn under the blocks, and 2px
+    red borders around the palette panel. Right-click inspects a block's
+    point value; Shift+left-click erases (reachable without the physical
+    middle mouse button the 1996 Sun/X11 hardware assumed). (ADR-057..ADR-062.)
+
+ -- J Freeman <jmf@pobox.com>  Sun, 12 Jul 2026 08:24:17 -0700
+
 xboing (1.0.3-1) unstable; urgency=medium
 
   * Fix the attract-cycle high-score screen showing a blank Hall of Fame on
