@@ -329,6 +329,15 @@ void level_system_set_time_bonus(level_system_t *ctx, int seconds)
     ctx->time_bonus = seconds;
 }
 
+void level_system_set_title(level_system_t *ctx, const char *title)
+{
+    if (ctx == NULL || title == NULL)
+    {
+        return;
+    }
+    snprintf(ctx->title, sizeof(ctx->title), "%s", title);
+}
+
 /* =========================================================================
  * Utilities
  * ========================================================================= */

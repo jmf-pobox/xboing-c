@@ -868,6 +868,51 @@ static void test_get_level_number_initial(void **vstate)
 }
 
 /* =========================================================================
+ * Section 14: Level title seed API (bead xboing-dr1)
+ *
+ * editor_system_set_level_title() is the seam mode_edit_enter and
+ * editor_cb_load_level (src/game_modes.c, src/game_callbacks.c) use to
+ * seed the editor's level_title from level_system's title -- the fix for
+ * the "editor wrote 'Untitled' over the level's real name on save" bug.
+ * These are direct unit round-trips against editor_system.c's own storage,
+ * independent of the game_callbacks wiring exercised at the integration
+ * layer (tests/test_integration_editor.c).
+ * ========================================================================= */
+
+static void test_set_level_title_round_trip(void **vstate)
+{
+    test_fixture_t *f = (test_fixture_t *)*vstate;
+
+    editor_system_set_level_title(f->editor, "Genesis");
+    assert_string_equal(editor_system_get_level_title(f->editor), "Genesis");
+}
+
+static void test_set_level_title_truncates_long_name(void **vstate)
+{
+    test_fixture_t *f = (test_fixture_t *)*vstate;
+
+    /* 40 'x' characters -- well past EDITOR_LEVEL_NAME_MAX (26) -- must not
+     * overflow ctx->level_title's fixed buffer. */
+    const char long_name[] =
+        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
+    assert_true(strlen(long_name) >= (size_t)EDITOR_LEVEL_NAME_MAX);
+
+    editor_system_set_level_title(f->editor, long_name);
+
+    const char *title = editor_system_get_level_title(f->editor);
+    assert_true(strlen(title) < (size_t)EDITOR_LEVEL_NAME_MAX);
+}
+
+static void test_set_level_title_null_is_noop(void **vstate)
+{
+    test_fixture_t *f = (test_fixture_t *)*vstate;
+
+    editor_system_set_level_title(f->editor, "Genesis");
+    editor_system_set_level_title(f->editor, NULL);
+    assert_string_equal(editor_system_get_level_title(f->editor), "Genesis");
+}
+
+/* =========================================================================
  * Section 13: Sound suppression
  * ========================================================================= */
 
@@ -971,6 +1016,11 @@ int main(void)
 
         /* Section 13: Sound */
         cmocka_unit_test(test_no_sound_suppresses_callbacks),
+
+        /* Section 14: Level title seed API (bead xboing-dr1) */
+        cmocka_unit_test_setup_teardown(test_set_level_title_round_trip, setup, teardown),
+        cmocka_unit_test_setup_teardown(test_set_level_title_truncates_long_name, setup, teardown),
+        cmocka_unit_test_setup_teardown(test_set_level_title_null_is_noop, setup, teardown),
     };
 
     return cmocka_run_group_tests(tests, NULL, NULL);
