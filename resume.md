@@ -1,8 +1,8 @@
 # Resume — Level Editor Parity (xboing-di8)
 
-**Branch:** `feat/editor-window-width` (17 commits ahead of `master`).
-**Status:** Code + docs COMPLETE and committed locally. **Not pushed. No PR yet.**
-**Next action:** user does a final visual pass on macOS → says OK → open the PR.
+**Branch:** `feat/editor-window-width` -> PR #176.
+**Status:** Complete; PR #176 open and being driven to merge (docs/GIT.md review loop).
+**Next action:** review loop drives PR #176 to merge, then post-merge cleanup + close xboing-di8.
 
 ## One-line state
 
@@ -137,4 +137,3 @@ missions.jsonl`).
 - `.claude/agents/*.md` show as modified in `git status` — pre-session drift,
   unrelated, leave them.
 - format/cppcheck/markdownlint/deb-lint are NOT installed on this Mac → CI only.
-</content>

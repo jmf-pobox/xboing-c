@@ -537,7 +537,7 @@ static int logical_width(const game_ctx_t *ctx)
     return w;
 }
 
-/* INTRO -> EDIT widens to 695. */
+/* Editor entry (setup_editor: PRESENTS -> EDIT) widens to 695. */
 static void test_editor_enter_widens_logical_width(void **vstate)
 {
     const game_ctx_t *ctx = ((kb_fixture_t *)*vstate)->ctx;

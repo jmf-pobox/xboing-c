@@ -1060,9 +1060,11 @@ static int editor_cb_request_input(const char *message, int numeric_only, void *
     return 1;
 }
 
-/* Non-sticky transient error display — matches the original's
- * ErrorMessage dialogs (original/editor.c:163, :193, :382, :864, :918),
- * which show briefly rather than persisting. */
+/* Non-sticky transient error display.  The original's genuine ErrorMessage
+ * calls (original/editor.c:163, :382) show briefly rather than persisting;
+ * on file load/save failures the original ShutDowns the process instead
+ * (:193, :864, :918), which the modern port replaces with this transient
+ * message (ADR-062). */
 static void editor_cb_on_error(const char *message, void *ud)
 {
     game_ctx_t *ctx = ud;
