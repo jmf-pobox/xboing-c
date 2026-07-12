@@ -405,11 +405,23 @@ void game_render_playfield(const game_ctx_t *ctx)
     /* Render blocks */
     game_render_blocks(ctx);
 
-    /* Render paddle */
-    game_render_paddle(ctx);
+    /* Paddle and ball are suppressed in the editor except during
+     * play-test (RedrawEditorArea, original/editor.c:206-216, never
+     * draws them; SetupPlayTest, original/editor.c:587-621, places
+     * them explicitly for the play-test run).  Gameplay modes
+     * (GAME/PAUSE) are unaffected since sdl2_state_current() there
+     * is never SDL2ST_EDIT. */
+    int suppress_paddle_ball = sdl2_state_current(ctx->state) == SDL2ST_EDIT &&
+                               editor_system_get_state(ctx->editor) != EDITOR_STATE_TEST;
 
-    /* Render balls */
-    game_render_balls(ctx);
+    if (!suppress_paddle_ball)
+    {
+        /* Render paddle */
+        game_render_paddle(ctx);
+
+        /* Render balls */
+        game_render_balls(ctx);
+    }
 
     /* Render bullets and tinks */
     game_render_bullets(ctx);
