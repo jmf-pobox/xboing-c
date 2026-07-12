@@ -313,7 +313,8 @@ void sdl2_renderer_get_window_size(const sdl2_renderer_t *ctx, int *w, int *h)
 
 int sdl2_renderer_set_logical_width(sdl2_renderer_t *ctx, int new_logical_width)
 {
-    if (ctx == NULL || ctx->window == NULL || ctx->renderer == NULL || new_logical_width <= 0)
+    if (ctx == NULL || ctx->window == NULL || ctx->renderer == NULL || ctx->logical_height <= 0 ||
+        new_logical_width <= 0)
     {
         return -1;
     }
@@ -331,11 +332,13 @@ int sdl2_renderer_set_logical_width(sdl2_renderer_t *ctx, int new_logical_width)
         SDL_SetWindowSize(ctx->window, new_win_w, win_h);
     }
 
-    ctx->logical_width = new_logical_width;
-    if (SDL_RenderSetLogicalSize(ctx->renderer, ctx->logical_width, ctx->logical_height) != 0)
+    /* Update the cached logical width only after SDL accepts the new size,
+     * so a failure leaves the context consistent with the renderer. */
+    if (SDL_RenderSetLogicalSize(ctx->renderer, new_logical_width, ctx->logical_height) != 0)
     {
         return -1;
     }
+    ctx->logical_width = new_logical_width;
     return 0;
 }
 
