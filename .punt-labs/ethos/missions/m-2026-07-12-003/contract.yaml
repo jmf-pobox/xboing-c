@@ -1,0 +1,60 @@
+mission_id: m-2026-07-12-003
+status: closed
+type: implement
+created_at: "2026-07-12T00:46:35Z"
+updated_at: "2026-07-12T01:04:21Z"
+closed_at: "2026-07-12T01:04:21Z"
+leader: claude
+worker: jdc
+evaluator:
+    handle: jck
+    pinned_at: "2026-07-12T00:46:35Z"
+    hash: 40cbe1204f644c77e6a26757a9b855e3298be267025e806d425bfdea99054f18
+inputs:
+    ticket: xboing-di8
+write_set:
+    - src/game_callbacks.c
+    - src/editor_system.c
+    - tests/test_integration_editor.c
+success_criteria:
+    - 'editor_cb_query_cell reads via block_system_get_render_info: cell->block_type = info.random ? RANDOM_BLK : info.block_type, cell->counter_slide = info.counter_slide (no hardcoded 0)'
+    - block_type_to_char takes counter_slide and returns '0'+clamp(counter_slide,0,5) for COUNTER_BLK; every other type unchanged; confirmed no other caller than the save loop
+    - editor_cb_save_level per-cell resolution goes through a random+slide-aware path (resolve_save_char) so a RANDOM_BLK cell saves as '?' and a COUNTER_BLK saves as its real '0'-'5' digit — matching original/file.c:418-440 and :562-609 exactly
+    - src/editor_system.c normalize_random_blocks doc comment updated to reflect the permanent no-op under read-time normalization; NO logic change to that function
+    - 'GENUINE roundtrip test in tests/test_integration_editor.c (extend the setup_edit_save pattern from stage 1): seed a grid containing a COUNTER_BLK at a known non-zero slide AND a RANDOM_BLK, save via the REAL editor save path (EDITOR_KEY_SAVE -> on_save_level -> editor_cb_save_level), read back the exact grid chars, assert the counter cell is its ''1''-''5'' digit and the random cell is ''?''. Must call the production functions, not local copies'
+    - 'Prove the test guards production: it FAILS against the pre-fix code (counter saves ''0'', random saves resolved color) — state how verified (temporary local revert, reverted after)'
+    - cmake --preset debug + build clean (zero -Werror warnings); ctest --test-dir build green incl. the new test; make asan-test green; only the 3 write-set files changed; no CMake change (test_integration_editor already registered)
+budget:
+    rounds: 3
+    reflection_after_each: true
+current_round: 1
+context: |
+    Editor parity STAGE 2 of 12 (design docs/specs/2026-07-11-editor-parity.md
+    §2.3/§2.4, stage list §5.2; committed ffa9e56). Fixes two save-path data-loss
+    bugs together (they share one read path):
+    (a) Counter-block hit-count is saved as 0: block_type_to_char
+        (src/game_callbacks.c:919-976) takes only block_type and returns '0' for
+        COUNTER_BLK, dropping the slide. Original format encodes '0'-'5' per slide
+        (original/file.c:418-440). COUNTER_BLK is in most of the 80 levels.
+    (b) RANDOM_BLK cells save as their resolved color, not '?': editor_cb_query_cell
+        (src/game_callbacks.c:875-884) hardcodes counter_slide=0 and never checks the
+        random flag; the save loop reads block_system_get_type directly. The original
+        writes '?' by checking blockP->random at save time (original/file.c:562-609) —
+        this design REPLICATES that (not a deviation, per jck's round-1 design ruling).
+    Mechanism (design §2.3): block_system_get_render_info (include/block_system.h:367-369)
+    already fills a block_system_render_info_t carrying BOTH counter_slide (:96) and
+    random (:98) in one call — no new accessor needed.
+    - editor_cb_query_cell: read via get_render_info; set
+      cell->block_type = info.random ? RANDOM_BLK : info.block_type;
+      cell->counter_slide = info.counter_slide (stop hardcoding 0). This also fixes
+      counter-slide loss across all board transforms (they read through query_cell).
+    - block_type_to_char: take a counter_slide arg; for COUNTER_BLK return
+      '0' + clamp(counter_slide, 0, 5).
+    - editor_cb_save_level save loop (src/game_callbacks.c:992-1001): extract a static
+      resolve_save_char(ctx,row,col) that calls get_render_info once and applies the
+      same random substitution + passes counter_slide to block_type_to_char.
+    - src/editor_system.c normalize_random_blocks (94-111): update the doc comment to
+      say it stays a no-op under read-time normalization (NO logic change).
+    Confirm block_type_to_char has no caller other than the save loop before changing
+    its signature. Do NOT touch the render-side RANDOM_BLK composite (that is stage 8),
+    the dialogue mechanism, or any other stage.

@@ -196,10 +196,13 @@ Press
 \(em from the intro/attract screens or during a game \(em to open the
 built-in level editor. Click a
 block type in the tool bar, then draw into the level: the left mouse button
-draws, the middle button erases (hold and drag for continuous draw/erase),
-and the right button reports a block's point value. You can play-test the
-level (infinite lives, never ends) and flip or scroll the board. Editor
-keys:
+draws, Shift+left-click erases, and the right button reports a block's
+point value. Hold and drag while drawing or erasing for continuous action;
+the right button is a single-click inspect. The middle button also erases,
+for mice with a third button; most trackpads and
+two-button mice don't have one, so Shift+left-click is the portable
+binding. You can play-test the level (infinite lives, never ends) and flip
+or scroll the board. Editor keys:
 .RS 4
 .nf
 q  Exit editor

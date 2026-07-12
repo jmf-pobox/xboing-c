@@ -1,0 +1,36 @@
+results:
+    - mission: m-2026-07-12-010
+      round: 1
+      created_at: "2026-07-12T02:58:13Z"
+      author: jdc
+      verdict: pass
+      confidence: 0.85
+      files_changed:
+        - path: src/game_modes.c
+          added: 40
+          removed: 3
+        - path: include/game_context.h
+          added: 2
+          removed: 0
+        - path: src/game_render.c
+          added: 12
+          removed: 2
+        - path: tests/test_integration_editor.c
+          added: 58
+          removed: 0
+      evidence:
+        - name: 'button 3 split: middle (2) erases, right (3) is a read-only inspect that bypasses editor_system_mouse_button, queries block_system_get_hit_points, sets editor_inspect_active+value; button 1 draws; no grid mutation on right-click (original/editor.c:547-557)'
+          status: pass
+        - name: two game_ctx_t fields editor_inspect_active/editor_inspect_value (modeled on attract_level_display); game_render_score shows the override only when effective mode==SDL2ST_EDIT && editor_inspect_active; mode_edit_exit resets the flag
+          status: pass
+        - name: 'genuine tests: right-click occupied cell -> active=1, value=100(RED hp), block SURVIVES (still occupied); right-click empty -> value=0; via real tick_with_mouse_button(SDL_BUTTON_RIGHT)'
+          status: pass
+        - name: 'leader-verified: cmake debug+asan rebuilt, ctest 61/61 both, zero -Werror/-Wconversion warnings; only the 4 write-set files changed; no CMake change'
+          status: pass
+      open_questions:
+        - 'jck: confirm right-click read-only faithful (original/editor.c:547-557, empty->0, no erase). NOTE a DRY concern to weigh: the play_x/play_y->(row,col) math is REPLICATED in game_modes.c because editor_system.c''s pixel_to_col/pixel_to_row are static (not in write-set); it uses immutable grid constants. Separately, the user just found a related coordinate-divergence bug in the PALETTE hit-test (single-column 25px vs the two-column 32px render) — being fixed next; consider whether the play-grid replica should also be unified.'
+      prose: |-
+        Stage 10 right-click inspect via a held score-display override, gated to editor mode.
+        Genuine tests confirm the block survives right-click and hit points show. Leader
+        reviewed the diff + ran both suites green. Two DRY notes for jck: the play-grid pixel
+        math replica, and a just-surfaced PALETTE hit-test divergence (separate fix incoming).

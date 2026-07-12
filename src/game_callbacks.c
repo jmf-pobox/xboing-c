@@ -20,8 +20,10 @@
 #include "bonus_system.h"
 #include "config_io.h"
 #include "demo_system.h"
+#include "dialogue_system.h"
 #include "editor_system.h"
 #include "game_context.h"
+#include "game_modes.h"
 #include "game_rules.h"
 #include "gun_system.h"
 #include "intro_system.h"
@@ -875,11 +877,12 @@ static void editor_cb_clear_grid(void *ud)
 static int editor_cb_query_cell(int row, int col, editor_cell_t *cell, void *ud)
 {
     const game_ctx_t *ctx = ud;
-    if (!block_system_is_occupied(ctx->block, row, col))
+    block_system_render_info_t info;
+    if (block_system_get_render_info(ctx->block, row, col, &info) != BLOCK_SYS_OK || !info.occupied)
         return 0;
     cell->occupied = 1;
-    cell->block_type = block_system_get_type(ctx->block, row, col);
-    cell->counter_slide = 0; /* Simplified — full counter tracking deferred */
+    cell->block_type = info.random ? RANDOM_BLK : info.block_type;
+    cell->counter_slide = info.counter_slide;
     return 1;
 }
 
@@ -904,19 +907,33 @@ static int editor_cb_load_level(const char *path, void *ud)
     return level_system_load_file(ctx->level, path) == LEVEL_SYS_OK ? 1 : 0;
 }
 
-static int editor_cb_yes_no(const char *message, void *ud)
+/*
+ * Async yes/no dialogue request — editor_system.c cannot block (the
+ * fixed-timestep loop must keep returning every frame), so this pushes
+ * SDL2ST_DIALOGUE and returns immediately.  The answer arrives later via
+ * editor_system_dialogue_result(), routed through mode_dialogue_exit's
+ * editor_dialogue_pending flag (see game_modes.c).  Mirrors the existing
+ * abort/quit/level-set push+open+flag pattern at game_input.c:321-326.
+ */
+static int editor_cb_request_yes_no(const char *message, void *ud)
 {
-    (void)message;
-    (void)ud;
-    /* Always confirm — proper dialogue integration deferred to Phase 6 */
+    game_ctx_t *ctx = ud;
+    if (sdl2_state_push_dialogue(ctx->state) != SDL2ST_OK)
+        return 0;
+    dialogue_system_open(ctx->dialogue, message, DIALOGUE_ICON_TEXT, DIALOGUE_VALIDATION_YES_NO);
+    game_modes_set_editor_dialogue_pending();
     return 1;
 }
 
 /*
  * Reverse mapping: block type → level file character.
  * Inverse of level_system_char_to_block().
+ *
+ * counter_slide selects the '0'-'5' digit for COUNTER_BLK, matching
+ * original/file.c:658-684.  Clamped defensively; callers pass values
+ * already bounded to 0..5 by block_system.
  */
-static char block_type_to_char(int block_type)
+static char block_type_to_char(int block_type, int counter_slide)
 {
     switch (block_type)
     {
@@ -935,7 +952,10 @@ static char block_type_to_char(int block_type)
         case BLACK_BLK:
             return 'w';
         case COUNTER_BLK:
-            return '0';
+        {
+            int slide = counter_slide < 0 ? 0 : (counter_slide > 5 ? 5 : counter_slide);
+            return (char)('0' + slide);
+        }
         case BOMB_BLK:
             return 'X';
         case DEATH_BLK:
@@ -975,6 +995,23 @@ static char block_type_to_char(int block_type)
     }
 }
 
+/*
+ * Resolve the level-file character for (row, col), reading the block's
+ * random flag and counter_slide in one call so a RANDOM_BLK cell saves
+ * '?' (original/file.c:562-609) and a COUNTER_BLK cell saves its real
+ * '0'-'5' digit (original/file.c:658-684) instead of losing both to the
+ * un-annotated resolved color / hardcoded '0'.
+ */
+static char resolve_save_char(const game_ctx_t *ctx, int row, int col)
+{
+    block_system_render_info_t info;
+    if (block_system_get_render_info(ctx->block, row, col, &info) != BLOCK_SYS_OK || !info.occupied)
+        return block_type_to_char(NONE_BLK, 0);
+
+    int effective_type = info.random ? RANDOM_BLK : info.block_type;
+    return block_type_to_char(effective_type, info.counter_slide);
+}
+
 static int editor_cb_save_level(const char *path, void *ud)
 {
     const game_ctx_t *ctx = ud;
@@ -986,16 +1023,15 @@ static int editor_cb_save_level(const char *path, void *ud)
     const char *title = editor_system_get_level_title(ctx->editor);
     fprintf(fp, "%s\n", (title && title[0] != '\0') ? title : "Untitled");
 
-    /* Line 2: time bonus (default 120) */
-    fprintf(fp, "120\n");
+    /* Line 2: time bonus */
+    fprintf(fp, "%d\n", level_system_get_time_bonus(ctx->level));
 
     /* Lines 3-17: 15 rows of 9 characters */
     for (int row = 0; row < 15; row++)
     {
         for (int col = 0; col < 9; col++)
         {
-            int btype = block_system_get_type(ctx->block, row, col);
-            fputc(block_type_to_char(btype), fp);
+            fputc(resolve_save_char(ctx, row, col), fp);
         }
         fputc('\n', fp);
     }
@@ -1005,21 +1041,41 @@ static int editor_cb_save_level(const char *path, void *ud)
 }
 
 /*
- * Simple input dialogue: returns the current editor level number as a string.
- * If no level is loaded (number=0), defaults to level 80.
- * Proper dialogue integration deferred to Phase 6.
+ * Async text/numeric input dialogue request — same non-blocking pattern
+ * as editor_cb_request_yes_no.  numeric_only selects the validation mode
+ * so the dialogue itself filters keystrokes to digits when appropriate
+ * (e.g. level numbers, time bonus), matching the original's per-prompt
+ * icon (docs/specs/2026-07-11-editor-parity.md S1.4 — TEXT_ICON
+ * throughout, no DIALOGUE_ICON_DISK use in any editor flow).
  */
-static const char *editor_cb_input_dialogue(const char *message, int numeric_only, void *ud)
+static int editor_cb_request_input(const char *message, int numeric_only, void *ud)
 {
-    (void)message;
-    (void)numeric_only;
-    const game_ctx_t *ctx = ud;
-    static char buf[16];
-    int num = editor_system_get_level_number(ctx->editor);
-    if (num <= 0 || num > 80)
-        num = 80;
-    snprintf(buf, sizeof(buf), "%d", num);
-    return buf;
+    game_ctx_t *ctx = ud;
+    if (sdl2_state_push_dialogue(ctx->state) != SDL2ST_OK)
+        return 0;
+    dialogue_validation_t validation =
+        numeric_only ? DIALOGUE_VALIDATION_NUMERIC : DIALOGUE_VALIDATION_TEXT;
+    dialogue_system_open(ctx->dialogue, message, DIALOGUE_ICON_TEXT, validation);
+    game_modes_set_editor_dialogue_pending();
+    return 1;
+}
+
+/* Non-sticky transient error display.  The original's genuine ErrorMessage
+ * calls (original/editor.c:163, :382) show briefly rather than persisting;
+ * on file load/save failures the original ShutDowns the process instead
+ * (:193, :864, :918), which the modern port replaces with this transient
+ * message (ADR-062). */
+static void editor_cb_on_error(const char *message, void *ud)
+{
+    game_ctx_t *ctx = ud;
+    int frame = (int)sdl2_state_frame(ctx->state);
+    message_system_set(ctx->message, message, 1, frame);
+}
+
+static void editor_cb_on_set_time(int seconds, void *ud)
+{
+    game_ctx_t *ctx = ud;
+    level_system_set_time_bonus(ctx->level, seconds);
 }
 
 static void editor_cb_on_finish(void *ud)
@@ -1051,8 +1107,10 @@ editor_system_callbacks_t game_callbacks_editor(void)
         .on_message = editor_cb_on_message,
         .on_load_level = editor_cb_load_level,
         .on_save_level = editor_cb_save_level,
-        .on_yes_no_dialogue = editor_cb_yes_no,
-        .on_input_dialogue = editor_cb_input_dialogue,
+        .on_error = editor_cb_on_error,
+        .on_request_yes_no_dialogue = editor_cb_request_yes_no,
+        .on_request_input_dialogue = editor_cb_request_input,
+        .on_set_time = editor_cb_on_set_time,
         .on_finish = editor_cb_on_finish,
         .on_playtest_start = editor_cb_on_playtest_start,
         .on_playtest_end = editor_cb_on_playtest_end,

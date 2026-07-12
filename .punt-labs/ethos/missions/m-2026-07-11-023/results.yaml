@@ -1,0 +1,37 @@
+results:
+    - mission: m-2026-07-11-023
+      round: 1
+      created_at: "2026-07-11T22:06:36Z"
+      author: gjm
+      verdict: pass
+      confidence: 0.95
+      files_changed:
+        - path: tests/test_sdl2_renderer.c
+          added: 183
+          removed: 0
+        - path: tests/test_keybindings.c
+          added: 72
+          removed: 0
+      evidence:
+        - name: '7 unit tests (test_sdl2_renderer.c:333-514): widen, windowed-grows-window (formula), widen-then-restore-exact, noop-same-width, null-ctx, non-positive, fullscreen-no-window-change'
+          status: pass
+        - name: '3 integration tests (test_keybindings.c:365-424) reusing setup_editor: enter->695, exit->575, playtest round trip EDIT/GAME/EDIT/INTRO — via sdl2_state_transition'
+          status: pass
+        - name: 'ctest --test-dir build: 61/61 passed (test_sdl2_renderer 16->23 cases, test_keybindings +3)'
+          status: pass
+        - name: 'ctest --test-dir build-asan: 61/61 passed, zero sanitizer findings'
+          status: pass
+        - name: zero new warnings under -Wall -Wextra -Wpedantic -Werror -Wconversion -Wshadow in both builds
+          status: pass
+        - name: 'characterization proof: git stash push --keep-index of the 6 production files -> test_sdl2_renderer fails to compile (undeclared function x7), 3 keybindings tests fail (width stayed 575 not 695); git stash pop -> 61/61 green restored'
+          status: pass
+        - name: 'git status: only tests/test_sdl2_renderer.c + tests/test_keybindings.c changed; no production code; tests/CMakeLists.txt unchanged (both executables already registered)'
+          status: pass
+      prose: |-
+        10 tests added (7 unit + 3 integration), all reusing existing harness patterns
+        (test_custom_scale style for the renderer, setup_editor fixture for the round
+        trip). Characterization value proven empirically, not just argued: stashing the
+        production fix makes the unit tests fail to link and the integration tests fail
+        the width assertions; restoring it returns 61/61 green. No CMakeLists change
+        needed — test functions added to already-registered executables. Leader
+        reviewed the full test diff before filing this result.

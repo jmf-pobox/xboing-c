@@ -1,0 +1,38 @@
+results:
+    - mission: m-2026-07-12-003
+      round: 1
+      created_at: "2026-07-12T00:56:00Z"
+      author: jdc
+      verdict: pass
+      confidence: 0.88
+      files_changed:
+        - path: src/game_callbacks.c
+          added: 34
+          removed: 8
+        - path: src/editor_system.c
+          added: 6
+          removed: 4
+        - path: tests/test_integration_editor.c
+          added: 70
+          removed: 0
+      evidence:
+        - name: 'editor_cb_query_cell reads via block_system_get_render_info: block_type = info.random ? RANDOM_BLK : info.block_type, counter_slide = info.counter_slide (no hardcoded 0)'
+          status: pass
+        - name: block_type_to_char gained counter_slide param, COUNTER_BLK returns '0'+clamp(0,5) (original/file.c:658-684); RANDOM_BLK case already returns '?'; empty/other cells default '.' unchanged; single caller confirmed (resolve_save_char)
+          status: pass
+        - name: 'resolve_save_char: one get_render_info call, random substitution + slide, so RANDOM_BLK saves ''?'' and COUNTER_BLK saves real digit; unoccupied returns block_type_to_char(NONE_BLK,0)=''.'', identical to pre-fix empty-cell output'
+          status: pass
+        - name: normalize_random_blocks doc-comment-only update (logic still (void)ctx no-op)
+          status: pass
+        - name: 'genuine test test_editor_save_preserves_counter_and_random: seeds COUNTER_BLK slide 3 + RANDOM_BLK via block_system_add (same entry as editor_cb_add_block), confirms seed via get_render_info, drives real EDITOR_KEY_SAVE->editor_cb_save_level, asserts grid[5][2]==''3'' and grid[7][4]==''?'''
+          status: pass
+        - name: pre-fix failure observed for the counter half (48 != 51, '0' vs '3', test_integration_editor.c:444), reverted after; ctest debug 61/61, asan 61/61, zero warnings, no CMake change
+          status: pass
+      open_questions:
+        - Pre-fix demo stopped at the counter assert (cmocka first-failure); jck to confirm the random half ('?' vs resolved 'r') also genuinely guards production, and that the full grid (not just the 2 seeded cells) still round-trips faithfully
+      prose: |-
+        Stage 2: counter-slide + RANDOM_BLK save round-trip via one shared
+        block_system_get_render_info read path. Empty-cell and all other block chars
+        preserved; only the two data-loss paths change. Genuine roundtrip test through
+        the real save. Leader reviewed the diff (confirmed default '.' empty-cell
+        fidelity). jck evaluates format faithfulness against original/file.c.

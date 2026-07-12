@@ -1,0 +1,54 @@
+results:
+    - mission: m-2026-07-11-018
+      round: 1
+      created_at: "2026-07-11T21:49:13Z"
+      author: sjl
+      verdict: pass
+      confidence: 0.9
+      files_changed:
+        - path: include/sdl2_renderer.h
+          added: 26
+          removed: 0
+        - path: src/sdl2_renderer.c
+          added: 25
+          removed: 0
+        - path: src/game_modes.c
+          added: 19
+          removed: 0
+        - path: src/game_render.c
+          added: 17
+          removed: 6
+        - path: src/game_init.c
+          added: 24
+          removed: 2
+        - path: src/sdl2_cli.c
+          added: 2
+          removed: 0
+        - path: Makefile
+          added: 1
+          removed: 1
+      evidence:
+        - name: cmake --preset debug + build (0 warnings under -Werror base set)
+          status: pass
+        - name: 'ctest --test-dir build: 61/61 passed (test_attract_screenshots Disabled, pre-existing)'
+          status: pass
+        - name: cmake --preset asan + build-asan (0 warnings)
+          status: pass
+        - name: 'ctest --test-dir build-asan: 61/61 passed'
+          status: pass
+        - name: 'git status: only 7 write-set files changed; tests/** untouched; no commit'
+          status: pass
+        - name: golden PNG capture (tests/golden/original/editor) — needs live X11, deferred to visual gate
+          status: skip
+      prose: |-
+        All six changes implemented per docs/specs/2026-07-11-editor-window-width.md.
+        Core mechanism (sdl2_renderer_set_logical_width primitive, mode_edit_enter/exit
+        widen/restore 575<->695, render_main_background runtime logical bounds) matches
+        the spec verbatim. Capture-pipeline editor screen threaded through the existing
+        vc_check pre/post pattern (game_init.c), -visual-capture map (sdl2_cli.c), and
+        visual-check screen list (Makefile). Two in-write-set additions beyond the doc's
+        verbatim file list: #include sdl2_renderer.h in game_modes.c (opaque type was
+        only forward-declared), and a pre_edit parameter threaded through vc_check/
+        stub_tick to mirror every other screen's pre/post state sampling. No scoring/
+        physics/level constant touched; PALETTE_X/W unchanged. Leader reviewed the full
+        diff before filing this result.

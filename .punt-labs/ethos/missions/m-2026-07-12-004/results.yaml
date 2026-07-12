@@ -1,0 +1,20 @@
+results:
+    - mission: m-2026-07-12-004
+      round: 1
+      created_at: "2026-07-12T01:30:45Z"
+      author: jdc
+      verdict: escalate
+      confidence: 1
+      files_changed: []
+      evidence:
+        - name: 'write-set under-scoped by the leader: the callback rename in include/editor_system.h forces tests/test_editor_system.c (which sets those stub callbacks) to be edited or it won''t compile — but test_editor_system.c was not in this mission''s declared write-set, so the store refuses to record the result'
+          status: fail
+      open_questions:
+        - Recreate with write-set including tests/test_editor_system.c; the implemented work (correct, ctest 61/61 debug+asan) stays in the tree and is re-recorded under the corrected contract
+      prose: |-
+        Implementation is complete and correct in the working tree (leader verified
+        build + ctest 61/61 debug and asan, zero warnings). Terminating only because the
+        contract's write-set omitted tests/test_editor_system.c, which the header
+        callback rename necessarily cascades into. Leader is recreating stage 3 with the
+        corrected 9-file write-set and re-filing the pass result there. No work is
+        redone.

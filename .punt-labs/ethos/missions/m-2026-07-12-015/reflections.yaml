@@ -1,0 +1,11 @@
+reflections:
+    - round: 1
+      created_at: "2026-07-12T04:04:11Z"
+      author: jck
+      converging: true
+      signals:
+        - 'original has no top-of-play-area level label: DisplayLevelInfo draws into levelWindow (original/level.c:207-233), not playWindow; ''Editing level N'' is messWindow bottom bar (editor.c:874-875)'
+        - level name never persistently displayed (only transient message-bar during n-key, editor.c:964-988) — removal drops no original behavior
+        - 'scope: game_render_editor_palette retains swatches/two-column/Active/draw_panel_border; grep confirms zero remaining level-title/''Level %d'' in game_render.c; stage-7 HUD (game_render_lives) + ''Editing level N'' (editor_system.c:812) intact; 14 deletions render-only editor-only'
+      recommendation: stop
+      reason: 'Removing the redundant top ''Level 1'' text is faithful: the 1996 editor shows no level-title/''Level N'' at the top of playWindow — the level number is a levelWindow HUD draw (DisplayLevelInfo/DrawOutNumber, original/level.c:207-233), the editor identity is ''Editing level N'' in the bottom messWindow (original/editor.c:874-875), and the level name is only transient during the n-key dialogue (:964-988). Nothing lost. Scope clean (swatches/Active/borders/HUD untouched). Leader-verified 61/61. Approve.'

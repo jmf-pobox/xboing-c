@@ -1,0 +1,13 @@
+reflections:
+    - round: 1
+      created_at: "2026-07-12T04:00:39Z"
+      author: jck
+      converging: true
+      signals:
+        - 'ADR-059 async dialogue: EDITOR_STATE_DIALOGUE/pending_action/dialogue_result exist in editor_system.c; all 3 gotchas shipped (game_modes.c:1381 enter-guard, :1528-1530 QUIT-guard, :1413-1414 exit-guard); prompt citations verbatim (editor.c:1039/1056/1086, misc.c:376-398)'
+        - 'ADR-060/061/062 faithful: highlight removal (no 1996 in-list cue, editor.c:256-268/329-369); digit/arrow selectors additive (editor.c:270-305 mouse-only); file-error transient vs ShutDown (editor.c:193/864/918, cites ADR-056); on_error wired game_callbacks.c:1067,1109'
+        - 'spec §1.6 correct: inputWindow fixed at x=92 (stage.c:281-285), never moved; shipped game_render.c:1230-1231 hardcodes bx=92; stage 4 no-op; ''157'' removed'
+        - 'spec §2.4/stage 8 correct: ''- R -'' is placement artifact (blocks.c:1700-1709/2307-2313/2404-2406/1428-1444); shipped render_block_composite block_type-keyed no random param (game_render.c:72-73,150-151,165); reverted'
+        - spec §3.1 vertical centering matches editor.c:339/352/363; §4.2 ShutDown citation correct (editor.c:193/864/918, :163/:382 are the real ErrorMessage); §8 count fixed to four ADRs / three gotchas
+      recommendation: stop
+      reason: ADR-059-062 faithfully record the shipped decisions (verified against src, not just plan); all four spec corrections accurate vs original + committed code; no stale contradiction remains. Approve. Gate 7 documentation complete.

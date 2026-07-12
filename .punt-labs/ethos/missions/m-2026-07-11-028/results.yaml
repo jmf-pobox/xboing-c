@@ -1,0 +1,63 @@
+results:
+    - mission: m-2026-07-11-028
+      round: 1
+      created_at: "2026-07-11T23:09:19Z"
+      author: jdc
+      verdict: pass
+      confidence: 0.88
+      files_changed:
+        - path: docs/specs/2026-07-11-editor-parity.md
+          added: 719
+          removed: 0
+      evidence:
+        - name: 'Async dialogue mechanism specified: on_request_* fire-and-forget callbacks + EDITOR_STATE_DIALOGUE + private pending_action enum + editor_system_dialogue_result resume, following the existing quit_pending/level_pending pattern (game_modes.c:66-89, 1277-1330)'
+          status: pass
+        - name: 'Two integration gotchas caught beyond the audit: mode_edit_enter reset-on-dialogue-pop (guard on sdl2_state_previous != DIALOGUE) and QUIT fallback firing mid-dialogue (also check sdl2_state_current == EDIT)'
+          status: pass
+        - name: 'Save-path fixes concrete: level_system_get_time_bonus for time; block_system_get_render_info carries counter_slide+random in one read so query_cell/save become random+slide aware; block_type_to_char encodes ''0''-''5''; read-time normalization replaces HandleRandomBlocks (flagged for jck)'
+          status: pass
+        - name: 'Render clusters designed: two-column palette geometry cited to original/editor.c:329-369 (kills i<20 cap), Active: at SDL2RGN_EDITOR_TYPE, remove invented highlight, HUD gate + dialogue-overlay coverage, paddle/ball gated behind EDITOR_STATE_TEST'
+          status: pass
+        - name: 12 ordered stages each sized for implement+test with write-set + worker (jdc/sjl) + jck-approval flag; blocker 6 correctly sequenced first (independent); z-spec justified NO; visual plan reuses existing pipeline; 3 ADRs listed
+          status: pass
+        - name: 'Additional drift found during design: PALETTE_ENTRY_H=25 vs PLAY_AREA_H/MAX_ROW; render_block_composite RANDOM_BLK dead-code condition (own stage 8, gameplay-visible)'
+          status: pass
+        - name: 'git status: only docs/specs/2026-07-11-editor-parity.md added; no code; markdownlint clean (macOS host has no linter; verified against config-glob)'
+          status: skip
+      open_questions:
+        - 'jck to sign off: (a) read-time RANDOM_BLK normalization vs the original''s HandleRandomBlocks walk (bytes identical, mechanism differs); (b) removing the in-list highlight vs keeping a faithful one; (c) dialogue prompt wording/icon fidelity'
+      prose: |-
+        Blueprint for full editor parity from the verified audit. Resolves the hard
+        sync-callback/async-modal mismatch with a pending-action sub-machine reusing
+        the codebase's existing dialogue push/resume pattern, and simplifies the
+        RANDOM_BLK round-trip to read-time normalization. 12 stages sized for
+        implement+test missions, blocker 6 (live corruption) first. Leader reviewed the
+        full spec before filing. jck (faithfulness) evaluates next — three items
+        explicitly flagged for its sign-off.
+    - mission: m-2026-07-11-028
+      round: 2
+      created_at: "2026-07-11T23:26:23Z"
+      author: jdc
+      verdict: pass
+      confidence: 0.9
+      files_changed:
+        - path: docs/specs/2026-07-11-editor-parity.md
+          added: 78
+          removed: 20
+      evidence:
+        - name: 'Finding 1 (HUD content-sync) resolved and refined: reading LoadALevel (original/editor.c:826-885) end-to-end showed it does NOT call TurnSpecialsOff (only DoLoadLevel :196-201 does) — corrected the conflation. Split into level-number + timer read-time redirects (editor_system_get_level_number :288 / level_system_get_time_bonus :127, gated to resolved EDIT mode, render-only) + one idempotent special_system_turn_off in mode_edit_enter. Stage 7 write-set -> game_render.c + game_modes.c, re-flagged jck approval: yes'
+          status: pass
+        - name: 'Finding 2 (score-inspect persistence) resolved: two game_ctx_t fields (editor_inspect_active, editor_inspect_value) modeled on attract_level_display precedent (game_context.h:162); button-3 sets them; game_render_score consumes override gated to EDIT mode (no gameplay-HUD leak); verified original/editor.c:547-579 never reverts scoreWindow so no auto-clear. Stage 10 write-set -> game_context.h + game_modes.c + game_render.c, re-flagged jck approval: yes'
+          status: pass
+        - name: '§2.4 wording corrected: ''replicates the original''s own save-path check (original/file.c:562-609), not a deviation''; HandleRandomBlocks clarified as display-only (stage 8), signoff request dropped for save-path, kept for stage 8'
+          status: pass
+        - name: markdownlint-cli2 clean on the spec; only docs/specs/2026-07-11-editor-parity.md changed; no code touched
+          status: pass
+      prose: |-
+        Round-2 revision addresses jck's two findings and corrects a conflation in the
+        review itself (LoadALevel vs DoLoadLevel specials handling), with citations. The
+        HUD fix is read-time redirect + one idempotent specials reset (cleaner than a
+        blanket sync, no editor state leaking into game_ctx); the inspect fix follows the
+        existing attract_level_display override precedent, mode-gated. Leader reviewed the
+        revised §2.4/§3.3/§4.1 and stage flags before filing. jck to confirm faithfulness
+        of the two reworked sections and approve.

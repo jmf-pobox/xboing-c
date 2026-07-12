@@ -1,0 +1,70 @@
+mission_id: m-2026-07-12-005
+status: closed
+type: implement
+created_at: "2026-07-12T01:31:13Z"
+updated_at: "2026-07-12T01:36:47Z"
+closed_at: "2026-07-12T01:36:47Z"
+leader: claude
+worker: jdc
+evaluator:
+    handle: jck
+    pinned_at: "2026-07-12T01:31:13Z"
+    hash: 40cbe1204f644c77e6a26757a9b855e3298be267025e806d425bfdea99054f18
+inputs:
+    ticket: xboing-di8
+write_set:
+    - include/editor_system.h
+    - src/editor_system.c
+    - src/game_callbacks.c
+    - include/game_modes.h
+    - src/game_modes.c
+    - include/level_system.h
+    - src/level_system.c
+    - tests/test_integration_editor.c
+    - tests/test_editor_system.c
+success_criteria:
+    - 'Async mechanism per design §1.3-1.4: on_request_* + EDITOR_STATE_DIALOGUE + pending_action + editor_system_dialogue_result resume; LOAD two-step chain; mouse guards; the 8 original prompt strings reused verbatim'
+    - game_callbacks push+open (DIALOGUE_ICON_TEXT) + editor_dialogue_pending; on_error + on_set_time wired; no other caller of the renamed callbacks broke (grep)
+    - mode_dialogue_exit consumes the pending flag; gotcha (a) enter-guard, gotcha (b) QUIT-fallback-guard, gotcha (c) exit-guard all present; the third is validated by a width-unchanged-across-3-dialogues test
+    - Save/Load/Set-Time/Set-Name/Clear/Quit each open a real modal and resume; unsaved-work confirms actually prompt (no silent auto-yes); cancelled confirm skips the destructive action
+    - Coupled stage-1/2 save tests updated to the async flow driving the REAL dialogue_system chain (no mirror); level_system_set_time_bonus added
+    - ctest debug 61/61 + asan 61/61 green, zero -Werror warnings (leader-verified); only the 9 write-set files changed; no CMake change
+budget:
+    rounds: 3
+    reflection_after_each: true
+current_round: 1
+context: |
+    Editor parity STAGE 3 (re-scoped) — async dialogue mechanism. The work is
+    ALREADY COMPLETE and correct in the working tree from the prior mission
+    m-2026-07-12-004 (closed failed only because its write-set omitted
+    tests/test_editor_system.c, which the callback rename in editor_system.h
+    necessarily cascades into). Leader independently verified: cmake debug+asan
+    rebuilt, ctest 61/61 both, zero -Werror/-Wconversion warnings. This contract
+    re-records that same work with the correct 9-file write-set so the audit trail
+    is honest. Design: docs/specs/2026-07-11-editor-parity.md §1 (full), §2.2, §4.2.
+
+    What was implemented (all in the tree now):
+    - include/editor_system.h: EDITOR_STATE_DIALOGUE; on_request_yes_no_dialogue /
+      on_request_input_dialogue (return nonzero=opened) replacing the sync stubs;
+      editor_system_dialogue_result(ctx, cancelled, input).
+    - src/editor_system.c: private editor_pending_action_t enum + pending_action
+      field; begin_*/finish_* split of load/save/set_time/set_name/QUIT/CLEAR;
+      LOAD two-step chain; EDITOR_STATE_DIALOGUE mouse guards; reset clears pending.
+    - src/game_callbacks.c: editor_cb_request_yes_no/request_input (push
+      SDL2ST_DIALOGUE + dialogue_system_open DIALOGUE_ICON_TEXT + set pending flag);
+      editor_cb_on_error, editor_cb_on_set_time wired in game_callbacks_editor().
+    - include/game_modes.h + src/game_modes.c: editor_dialogue_pending flag +
+      setter; consumed in mode_dialogue_exit -> editor_system_dialogue_result.
+      Gotcha (a): mode_edit_enter reset/widen guarded by previous != SDL2ST_DIALOGUE.
+      Gotcha (b): QUIT fallback also checks sdl2_state_current == SDL2ST_EDIT.
+      Gotcha (c, found during impl, interacts with the committed width fix):
+      mode_edit_exit guarded by if(sdl2_state_is_dialogue) return — sdl2_state_push_dialogue
+      fires mode_edit_exit (in_dialogue already true) narrowing the canvas before the
+      DIALOGUE switch; without the guard the canvas strands narrow after the first
+      dialogue. Regression test asserts width stays 695 across a 3-dialogue round trip.
+    - include/level_system.h + src/level_system.c: level_system_set_time_bonus.
+    - tests/test_integration_editor.c: 9 new integration tests (each flow open+resume
+      via the REAL dialogue chain; both gotchas; cancelled-confirm-skips-destructive)
+      + the stage-1/2 save tests updated to the async flow via resolve_dialogue_submit.
+    - tests/test_editor_system.c: stub callbacks renamed to the async signature +
+      tests updated to call editor_system_dialogue_result after asserting DIALOGUE.

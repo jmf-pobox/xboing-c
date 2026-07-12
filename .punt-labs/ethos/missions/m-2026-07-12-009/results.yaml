@@ -1,0 +1,55 @@
+results:
+    - mission: m-2026-07-12-009
+      round: 1
+      created_at: "2026-07-12T02:31:30Z"
+      author: sjl
+      verdict: pass
+      confidence: 0.85
+      files_changed:
+        - path: src/game_render.c
+          added: 54
+          removed: 30
+      evidence:
+        - name: 'paddle/ball gate (game_render_playfield:405-423): suppress game_render_paddle+game_render_balls when sdl2_state_current==SDL2ST_EDIT and editor state != EDITOR_STATE_TEST; bullets/background/border unconditional; GAME/PAUSE unaffected; play-test still shows them (original/editor.c:206-216 vs :587-621)'
+          status: pass
+        - name: render_block_composite gains random param; if(random) draws '- R -' (original/blocks.c:1702-1708) and returns before the switch; counter/DROP/BULLET overlays keyed off block_type unchanged
+          status: pass
+        - name: 'call sites: game_render_blocks passes info.random (already-fetched render_info, no extra call); palette swatch + Active: preview pass entry->block_type==RANDOM_BLK for the static dedicated random swatch'
+          status: pass
+        - name: 'invariant preserved: info.random set only by block_system_add/set_random for genuine random cells (block_system.c:455-459); no path sets it on non-random cells, so no ''- R -'' on non-random'
+          status: pass
+        - name: no genuine headless test possible (render output not assertable under dummy driver; gate booleans already covered by test_editor_playtest_transition + the render_info.random assertions in existing tests); a gate-logic mirror would be non-genuine (stage-1 lesson) — verification is the Ubuntu visual gate
+          status: skip
+        - name: 'leader-verified: cmake debug+asan rebuilt, ctest 61/61 both, zero -Werror/-Wconversion warnings; only src/game_render.c changed; no CMake change'
+          status: pass
+      open_questions:
+        - 'jck: confirm (1) paddle/ball suppression faithful (editor idle shows neither, play-test shows both); (2) the gameplay-visible RANDOM ''- R -'' overlay in LIVE play is faithful (original/blocks.c:1702-1708) and only fires on genuine random cells; (3) the palette/Active random-swatch overlay preserved'
+      prose: |-
+        Two render-fidelity fixes: paddle/ball suppressed outside editor play-test, and the
+        RANDOM_BLK '- R -' overlay driven by the runtime random flag (was dead code keyed off
+        block_type). Gameplay-visible: random blocks now show '- R -' in live play for the
+        first time. Leader reviewed the diff + ran both suites green. jck evaluates.
+    - mission: m-2026-07-12-009
+      round: 2
+      created_at: "2026-07-12T02:42:40Z"
+      author: sjl
+      verdict: pass
+      confidence: 0.9
+      files_changed:
+        - path: src/game_render.c
+          added: 16
+          removed: 4
+      evidence:
+        - name: 'FIX B fully reverted: render_block_composite back to (ctx,sdl,x,y,block_type,hit_points) no random param; case RANDOM_BLK restored in the switch keyed off block_type; all 3 call sites reverted (game_render_blocks, palette swatch, Active preview) — RANDOM overlay byte-identical to pre-mission, faithful (palette swatch shows ''- R -'', live cells never persistently)'
+          status: pass
+        - name: 'FIX A intact and SOLE change vs b7c74e4: game_render_playfield suppresses paddle/ball only when SDL2ST_EDIT && !EDITOR_STATE_TEST (leader-verified git diff shows exactly this one hunk)'
+          status: pass
+        - name: 'leader-verified: cmake debug+asan rebuilt, ctest 61/61 both, zero -Werror/-Wconversion warnings; only src/game_render.c changed'
+          status: pass
+      open_questions:
+        - 'jck: confirm FIX B is gone (RANDOM overlay restored to the faithful block_type-keyed behavior) and FIX A remains as approved in round 1'
+      prose: |-
+        Round 2: FIX B (the mis-analyzed persistent RANDOM overlay) fully reverted per jck's
+        call-graph finding; FIX A (paddle/ball suppression, approved round 1) is the sole
+        surviving change. Design §2.4/stage 8 mis-analysis recorded on xboing-dq5 for the spec
+        correction. Leader verified diff + both suites green.

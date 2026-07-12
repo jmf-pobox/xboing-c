@@ -31,6 +31,7 @@
 #include "paddle_system.h"
 #include "score_system.h"
 #include "sdl2_font.h"
+#include "sdl2_regions.h"
 #include "sdl2_renderer.h"
 #include "sdl2_state.h"
 #include "sdl2_texture.h"
@@ -404,17 +405,74 @@ void game_render_playfield(const game_ctx_t *ctx)
     /* Render blocks */
     game_render_blocks(ctx);
 
-    /* Render paddle */
-    game_render_paddle(ctx);
+    /* Paddle and ball are suppressed in the editor except during
+     * play-test (RedrawEditorArea, original/editor.c:206-216, never
+     * draws them; SetupPlayTest, original/editor.c:587-621, places
+     * them explicitly for the play-test run).  Gameplay modes
+     * (GAME/PAUSE) are unaffected since sdl2_state_current() there
+     * is never SDL2ST_EDIT. */
+    int suppress_paddle_ball = sdl2_state_current(ctx->state) == SDL2ST_EDIT &&
+                               editor_system_get_state(ctx->editor) != EDITOR_STATE_TEST;
 
-    /* Render balls */
-    game_render_balls(ctx);
+    if (!suppress_paddle_ball)
+    {
+        /* Render paddle */
+        game_render_paddle(ctx);
+
+        /* Render balls */
+        game_render_balls(ctx);
+    }
 
     /* Render bullets and tinks */
     game_render_bullets(ctx);
 
     /* Remove clip rect */
     SDL_RenderSetClipRect(sdl, NULL);
+}
+
+/* =========================================================================
+ * Editor grid overlay
+ * ========================================================================= */
+
+/*
+ * Faint red grid lines over the editable play area, matching
+ * DrawEditorGrid (original/editor.c:139-153):
+ *
+ *   xinc = PLAY_WIDTH / MAX_COL;                     // 495/9  = 55
+ *   yinc = PLAY_HEIGHT / MAX_ROW;                    // 580/18 = 32
+ *   for (x = xinc; x <= PLAY_WIDTH; x += xinc)
+ *       DrawLine(x, 0, x, PLAY_HEIGHT - 4 - ((MAX_ROW - MAX_ROW_EDIT) * yinc), reds[4]);
+ *   for (y = yinc; y <= PLAY_HEIGHT - ((MAX_ROW - MAX_ROW_EDIT) * yinc); y += yinc)
+ *       DrawLine(0, y, PLAY_WIDTH, y, reds[4]);
+ *
+ * MAX_ROW - MAX_ROW_EDIT = 18 - 15 = 3 (the paddle-reserved bottom rows,
+ * EDITOR_MAX_ROW_EDIT from editor_system.h), so vertical lines run from
+ * the top of the play area down to y=480 (580 - 4 - 3*32), and horizontal
+ * lines run at y=32,64,...,480 across the full play width.  Color matches
+ * reds[4] = "#700" (original/init.c:231) -> RGB(0x77, 0x00, 0x00).
+ *
+ * Caller gates this off during play-test (RedrawEditorArea,
+ * original/editor.c:210-211: "if (EditState != EDIT_TEST)").
+ */
+static void game_render_editor_grid(const game_ctx_t *ctx)
+{
+    SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
+
+    int xinc = PLAY_AREA_W / MAX_COL;
+    int yinc = PLAY_AREA_H / MAX_ROW;
+    int reserved_rows = MAX_ROW - EDITOR_MAX_ROW_EDIT;
+    int vert_bottom = PLAY_AREA_H - 4 - reserved_rows * yinc;
+    int horiz_loop_bound = PLAY_AREA_H - reserved_rows * yinc;
+
+    SDL_SetRenderDrawColor(sdl, 0x77, 0x00, 0x00, 255);
+
+    for (int x = xinc; x <= PLAY_AREA_W; x += xinc)
+        SDL_RenderDrawLine(sdl, PLAY_AREA_X + x, PLAY_AREA_Y, PLAY_AREA_X + x,
+                           PLAY_AREA_Y + vert_bottom);
+
+    for (int y = yinc; y <= horiz_loop_bound; y += yinc)
+        SDL_RenderDrawLine(sdl, PLAY_AREA_X, PLAY_AREA_Y + y, PLAY_AREA_X + PLAY_AREA_W,
+                           PLAY_AREA_Y + y);
 }
 
 /* =========================================================================
@@ -559,7 +617,15 @@ void game_render_lives(const game_ctx_t *ctx)
      * coords (original/level.c:210 DisplayLevelNumber → DrawOutNumber at
      * window-local x=260, y=5).  Iterate digits least-significant first
      * so digit_index 0 is the rightmost. */
-    int level = (!ctx->game_active && ctx->attract_level_display > 0) ? ctx->attract_level_display
+    sdl2_state_mode_t effective_mode = sdl2_state_current(ctx->state);
+    if (effective_mode == SDL2ST_DIALOGUE)
+        effective_mode = sdl2_state_saved_mode(ctx->state);
+
+    int level;
+    if (effective_mode == SDL2ST_EDIT)
+        level = editor_system_get_level_number(ctx->editor);
+    else
+        level = (!ctx->game_active && ctx->attract_level_display > 0) ? ctx->attract_level_display
                                                                       : ctx->level_number;
     if (level <= 0)
         level = 1;
@@ -648,7 +714,21 @@ void game_render_ammo_belt(const game_ctx_t *ctx)
 void game_render_score(const game_ctx_t *ctx)
 {
     SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
-    unsigned long score_val = score_system_get(ctx->score);
+
+    /* Editor Button3 (right-click) inspect override: the original's
+     * scoreWindow shows the clicked block's hit points until the next
+     * right-click, with no path that reverts it to the real score
+     * (original/editor.c:547-557).  Gated strictly to editor mode (including
+     * the editor-dialogue overlay, via saved_mode) so it can never leak into
+     * the gameplay HUD even if the flag is never cleared.  Mirrors the
+     * effective-mode pattern in game_render_lives/game_render_timer. */
+    sdl2_state_mode_t effective_mode = sdl2_state_current(ctx->state);
+    if (effective_mode == SDL2ST_DIALOGUE)
+        effective_mode = sdl2_state_saved_mode(ctx->state);
+
+    unsigned long score_val = (effective_mode == SDL2ST_EDIT && ctx->editor_inspect_active)
+                                  ? ctx->editor_inspect_value
+                                  : score_system_get(ctx->score);
 
     score_system_digit_layout_t layout;
     score_system_get_digit_layout(score_val, &layout);
@@ -687,16 +767,27 @@ static void render_main_background(const game_ctx_t *ctx)
     if (tw <= 0 || th <= 0)
         return;
 
-    for (int ty = 0; ty < SDL2R_LOGICAL_HEIGHT; ty += th)
+    /* Query the renderer's *current* logical size rather than the
+     * compile-time SDL2R_LOGICAL_WIDTH/HEIGHT macros — SDL2ST_EDIT
+     * widens the logical canvas at runtime (see
+     * sdl2_renderer_set_logical_width, docs/specs/
+     * 2026-07-11-editor-window-width.md) and the background must
+     * tile across the full widened canvas, not just the original
+     * 575px play/status area. */
+    int logical_w = 0;
+    int logical_h = 0;
+    sdl2_renderer_get_logical_size(ctx->renderer, &logical_w, &logical_h);
+
+    for (int ty = 0; ty < logical_h; ty += th)
     {
-        for (int tx = 0; tx < SDL2R_LOGICAL_WIDTH; tx += tw)
+        for (int tx = 0; tx < logical_w; tx += tw)
         {
             int dw = tw;
             int dh = th;
-            if (tx + dw > SDL2R_LOGICAL_WIDTH)
-                dw = SDL2R_LOGICAL_WIDTH - tx;
-            if (ty + dh > SDL2R_LOGICAL_HEIGHT)
-                dh = SDL2R_LOGICAL_HEIGHT - ty;
+            if (tx + dw > logical_w)
+                dw = logical_w - tx;
+            if (ty + dh > logical_h)
+                dh = logical_h - ty;
             SDL_Rect src = {0, 0, dw, dh};
             SDL_Rect dst = {tx, ty, dw, dh};
             SDL_RenderCopy(sdl, tex.texture, &src, &dst);
@@ -708,65 +799,192 @@ static void render_main_background(const game_ctx_t *ctx)
  * Editor palette rendering — sidebar with block type selection
  * ========================================================================= */
 
-/* Palette renders to the right of the play area */
+/* Palette renders to the right of the play area.
+ *
+ * These constants are the SINGLE shared geometry for both the render loop
+ * (game_render_editor_palette) and mouse hit-testing
+ * (game_render_editor_palette_index_at / game_render_editor_palette_entry_center).
+ * Render and hit-test must never diverge again — if the layout changes,
+ * change it here once. */
 #define PALETTE_X (PLAY_AREA_X + PLAY_AREA_W + 15)
 #define PALETTE_Y PLAY_AREA_Y
-#define PALETTE_ENTRY_H 25
-#define PALETTE_W 100
+#define PALETTE_ROW_PITCH (PLAY_AREA_H / MAX_ROW)
+
+/* Two-column layout (original/editor.c:329-369, SetupBlockWindow).
+ * Column 1 holds indices 0..min(MAX_ROW, MAX_STATIC_BLOCKS)-1; column 2
+ * continues with the remaining static types, then the 5 counter-block
+ * slide variants, matching editor_system_init_palette's fill order. */
+#define PALETTE_COL1_COUNT ((MAX_ROW < MAX_STATIC_BLOCKS) ? MAX_ROW : MAX_STATIC_BLOCKS)
+
+/* Column boundary — mx < this is column 1, mx >= this is column 2. */
+#define PALETTE_COL_DIVIDER_X (PALETTE_X + EDITOR_TOOL_WIDTH / 2)
+
+/* Horizontal center of each column's swatches. */
+#define PALETTE_COL1_CENTER_X (PALETTE_X + EDITOR_TOOL_WIDTH / 4)
+#define PALETTE_COL2_CENTER_X (PALETTE_X + EDITOR_TOOL_WIDTH / 2 + EDITOR_TOOL_WIDTH / 4)
+
+/*
+ * Look up the sprite key for a palette entry, accounting for COUNTER_BLK's
+ * five slide variants (original/editor.c:364: DrawTheBlock(..., COUNTER_BLK,
+ * j, 0, 0) with j=1..5 selecting the digit sprite).
+ */
+static const char *palette_entry_sprite_key(const editor_palette_entry_t *entry)
+{
+    if (entry->block_type == COUNTER_BLK && entry->counter_slide > 0)
+        return sprite_counter_slide_key(entry->counter_slide);
+    return sprite_block_key(entry->block_type);
+}
+
+/*
+ * Draw a 2px red border ring around the outside of rgn, matching the
+ * 2px red border blockWindow/typeWindow got for free from XCreateSimpleWindow
+ * (original/stage.c:273-279: border_width=2, border color=red).  The ring
+ * sits OUTSIDE rgn (expanded by thickness on every side), since the X11
+ * border was drawn outside each window's client area, not overlapping it.
+ */
+static void draw_panel_border(SDL_Renderer *sdl, SDL_Rect rgn, int thickness)
+{
+    SDL_SetRenderDrawColor(sdl, 200, 0, 0, 255);
+
+    int bx = rgn.x - thickness;
+    int by = rgn.y - thickness;
+    int bw = rgn.w + 2 * thickness;
+    int bh = rgn.h + 2 * thickness;
+
+    SDL_Rect top = {bx, by, bw, thickness};
+    SDL_Rect bottom = {bx, by + bh - thickness, bw, thickness};
+    SDL_Rect left = {bx, by, thickness, bh};
+    SDL_Rect right = {bx + bw - thickness, by, thickness, bh};
+    SDL_RenderFillRect(sdl, &top);
+    SDL_RenderFillRect(sdl, &bottom);
+    SDL_RenderFillRect(sdl, &left);
+    SDL_RenderFillRect(sdl, &right);
+}
 
 void game_render_editor_palette(const game_ctx_t *ctx)
 {
     SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
     int count = editor_system_get_palette_count(ctx->editor);
-    int selected = editor_system_get_selected_palette(ctx->editor);
+    int col1_count = PALETTE_COL1_COUNT;
 
-    for (int i = 0; i < count && i < 20; i++) /* Show up to 20 entries */
+    /* blockWindow / typeWindow 2px red borders (original/stage.c:273-279). */
+    draw_panel_border(sdl, sdl2_region_get(SDL2RGN_EDITOR), BORDER_THICKNESS);
+    draw_panel_border(sdl, sdl2_region_get(SDL2RGN_EDITOR_TYPE), BORDER_THICKNESS);
+
+    for (int i = 0; i < count; i++)
     {
         const editor_palette_entry_t *entry = editor_system_get_palette_entry(ctx->editor, i);
         if (!entry)
             continue;
 
-        int ey = PALETTE_Y + i * PALETTE_ENTRY_H;
+        const char *key = palette_entry_sprite_key(entry);
+        if (!key)
+            continue;
 
-        /* Highlight selected entry */
-        if (i == selected)
-        {
-            SDL_SetRenderDrawColor(sdl, 255, 255, 0, 80);
-            SDL_Rect hl = {PALETTE_X - 2, ey - 2, PALETTE_W + 4, PALETTE_ENTRY_H};
-            SDL_RenderFillRect(sdl, &hl);
-        }
+        sdl2_texture_info_t tex;
+        if (sdl2_texture_get(ctx->texture, key, &tex) != SDL2T_OK)
+            continue;
 
-        /* Draw block sprite */
-        const char *key = sprite_block_key(entry->block_type);
-        if (key)
-        {
-            sdl2_texture_info_t tex;
-            if (sdl2_texture_get(ctx->texture, key, &tex) == SDL2T_OK)
-            {
-                SDL_Rect dst = {PALETTE_X, ey, tex.width, tex.height};
-                SDL_RenderCopy(sdl, tex.texture, NULL, &dst);
-            }
-        }
+        int in_col1 = i < col1_count;
+        int row = in_col1 ? i : i - col1_count;
+        int col_base = in_col1 ? PALETTE_COL1_CENTER_X : PALETTE_COL2_CENTER_X;
+        int ex = col_base - tex.width / 2;
+        /* Center each sprite within its row cell (original/editor.c:339:
+         * y = y1 + ((editorRowHeight / 2) - (BlockInfo[i].height / 2))). */
+        int ey = PALETTE_Y + row * PALETTE_ROW_PITCH + (PALETTE_ROW_PITCH / 2 - tex.height / 2);
+
+        SDL_Rect dst = {ex, ey, tex.width, tex.height};
+        SDL_RenderCopy(sdl, tex.texture, NULL, &dst);
 
         /* Composite overlay (DROP digit, RANDOM "- R -", BULLET 4-bullets)
          * shared with game_render_blocks per Copilot review F3.
          * hit_points=1 is a sentinel for editor preview — DROP_BLK shows "1". */
-        render_block_composite(ctx, sdl, PALETTE_X, ey, entry->block_type, 1);
+        render_block_composite(ctx, sdl, ex, ey, entry->block_type, 1);
     }
 
-    /* Editor status text */
-    SDL_Color white = {255, 255, 255, 255};
-    const char *title = editor_system_get_level_title(ctx->editor);
-    if (title)
-        sdl2_font_draw(ctx->font, SDL2F_FONT_COPY, title, PLAY_AREA_X, PLAY_AREA_Y - 15, white);
+    /* "Active:" indicator (original/editor.c:256-268, SetCurrentSymbol) —
+     * the only 1996 selection feedback; no per-swatch in-list highlight. */
+    SDL_Rect type_rgn = sdl2_region_get(SDL2RGN_EDITOR_TYPE);
+    SDL_Color active_label_color = {0, 200, 0, 255};
+    sdl2_font_metrics_t label_m = {0, 0};
+    int label_y = type_rgn.y + type_rgn.h / 2;
+    if (sdl2_font_measure(ctx->font, SDL2F_FONT_DATA, "Active:", &label_m) == SDL2F_OK)
+        label_y -= label_m.height / 2;
+    sdl2_font_draw_shadow(ctx->font, SDL2F_FONT_DATA, "Active:", type_rgn.x + 10, label_y,
+                          active_label_color);
 
-    int level = editor_system_get_level_number(ctx->editor);
-    if (level > 0)
+    int selected = editor_system_get_selected_palette(ctx->editor);
+    const editor_palette_entry_t *active_entry =
+        editor_system_get_palette_entry(ctx->editor, selected);
+    if (active_entry)
     {
-        char buf[32];
-        snprintf(buf, sizeof(buf), "Level %d", level);
-        sdl2_font_draw(ctx->font, SDL2F_FONT_COPY, buf, PLAY_AREA_X + 200, PLAY_AREA_Y - 15, white);
+        const char *akey = palette_entry_sprite_key(active_entry);
+        if (akey)
+        {
+            sdl2_texture_info_t atex;
+            if (sdl2_texture_get(ctx->texture, akey, &atex) == SDL2T_OK)
+            {
+                int ax = type_rgn.x + 65;
+                int ay = type_rgn.y + type_rgn.h / 2 - atex.height / 2;
+                SDL_Rect adst = {ax, ay, atex.width, atex.height};
+                SDL_RenderCopy(sdl, atex.texture, NULL, &adst);
+                render_block_composite(ctx, sdl, ax, ay, active_entry->block_type, 1);
+            }
+        }
     }
+}
+
+/*
+ * Hit-test the editor palette at absolute pixel (mx, my).
+ *
+ * Uses the SAME geometry constants as game_render_editor_palette's render
+ * loop above, so a click can never select a different entry than the one
+ * rendered at that pixel.  The click region is the full row-band within a
+ * column half (not the tight sprite rect) — clicking anywhere in a
+ * swatch's cell selects it, matching the render loop's per-cell layout.
+ *
+ * Returns the palette index at (mx, my), or -1 if outside the palette.
+ */
+int game_render_editor_palette_index_at(const game_ctx_t *ctx, int mx, int my)
+{
+    if (mx < PALETTE_X || mx >= PALETTE_X + EDITOR_TOOL_WIDTH || my < PALETTE_Y)
+        return -1;
+
+    int col1_count = PALETTE_COL1_COUNT;
+    int in_col1 = mx < PALETTE_COL_DIVIDER_X;
+    int row = (my - PALETTE_Y) / PALETTE_ROW_PITCH;
+    int index = in_col1 ? row : col1_count + row;
+
+    if (in_col1 && row >= col1_count)
+        return -1;
+
+    int count = editor_system_get_palette_count(ctx->editor);
+    if (index < 0 || index >= count)
+        return -1;
+
+    return index;
+}
+
+/*
+ * Compute the rendered center (absolute pixel coords) of palette entry
+ * `index`, using the same PALETTE_* constants as the render loop and
+ * game_render_editor_palette_index_at.  Row centering is texture-size
+ * independent — the render loop's ey = row_top + (pitch/2 - tex_h/2), so
+ * ey + tex_h/2 == row_top + pitch/2 regardless of tex_h.  This is the
+ * agreement anchor tests use to prove render and hit-test never diverge.
+ */
+void game_render_editor_palette_entry_center(const game_ctx_t *ctx, int index, int *cx, int *cy)
+{
+    (void)ctx;
+
+    int col1_count = PALETTE_COL1_COUNT;
+    int in_col1 = index < col1_count;
+    int row = in_col1 ? index : index - col1_count;
+
+    if (cx)
+        *cx = in_col1 ? PALETTE_COL1_CENTER_X : PALETTE_COL2_CENTER_X;
+    if (cy)
+        *cy = PALETTE_Y + row * PALETTE_ROW_PITCH + PALETTE_ROW_PITCH / 2;
 }
 
 /* =========================================================================
@@ -911,20 +1129,41 @@ void game_render_messages(const game_ctx_t *ctx)
 
 void game_render_timer(const game_ctx_t *ctx)
 {
-    if (ctx->time_bonus_total <= 0)
-        return; /* No timer for this level */
+    sdl2_state_mode_t effective_mode = sdl2_state_current(ctx->state);
+    if (effective_mode == SDL2ST_DIALOGUE)
+        effective_mode = sdl2_state_saved_mode(ctx->state);
+
+    int seconds_remaining;
+    if (effective_mode == SDL2ST_EDIT)
+    {
+        /* The editor never counts down (it never runs the gameplay tick) --
+         * show the loaded level's full time bonus, statically, matching
+         * DoLoadLevel's timeWindow population (original/editor.c:196-201,
+         * original/file.c:366).  Gate on the editor's own value, not
+         * ctx->time_bonus_total, so a level with no gameplay history yet
+         * still shows its timer. */
+        seconds_remaining = level_system_get_time_bonus(ctx->level);
+        if (seconds_remaining <= 0)
+            return; /* No timer for this level */
+    }
+    else
+    {
+        if (ctx->time_bonus_total <= 0)
+            return; /* No timer for this level */
+        seconds_remaining = ctx->time_remaining;
+    }
 
     /* Format as MM:SS to match legacy DrawLevelTimeBonus */
-    int minutes = ctx->time_remaining / 60;
-    int seconds = ctx->time_remaining % 60;
+    int minutes = seconds_remaining / 60;
+    int seconds = seconds_remaining % 60;
     char buf[16];
     snprintf(buf, sizeof(buf), "%02d:%02d", minutes, seconds);
 
     /* Color thresholds match legacy: <=10s red, <=60s yellow, else green */
     SDL_Color color;
-    if (ctx->time_remaining <= 10)
+    if (seconds_remaining <= 10)
         color = (SDL_Color){255, 50, 50, 255}; /* Red — critical */
-    else if (ctx->time_remaining <= 60)
+    else if (seconds_remaining <= 60)
         color = (SDL_Color){255, 255, 50, 255}; /* Yellow — getting low */
     else
         color = (SDL_Color){50, 255, 50, 255}; /* Green — plenty of time */
@@ -1196,8 +1435,16 @@ void game_render_frame(const game_ctx_t *ctx)
             break;
 
         case SDL2ST_EDIT:
-            /* Editor: show grid background + blocks + palette */
+            /* Editor: show grid background + blocks + palette.
+             * Grid drawn BEFORE blocks (RedrawEditorArea,
+             * original/editor.c:206-216: DrawStageBackground ->
+             * DrawEditorGrid -> RedrawAllBlocks), so block sprites paint
+             * over the grid lines in occupied cells; the grid is visible
+             * only in empty cells, matching the original.  Gated off
+             * during play-test per editor.c:210-211. */
             game_render_background(ctx);
+            if (editor_system_get_state(ctx->editor) != EDITOR_STATE_TEST)
+                game_render_editor_grid(ctx);
             game_render_playfield(ctx);
             game_render_editor_palette(ctx);
             break;
@@ -1216,7 +1463,7 @@ void game_render_frame(const game_ctx_t *ctx)
 
     if (effective == SDL2ST_INTRO || effective == SDL2ST_INSTRUCT || effective == SDL2ST_DEMO ||
         effective == SDL2ST_PREVIEW || effective == SDL2ST_KEYS || effective == SDL2ST_KEYSEDIT ||
-        effective == SDL2ST_HIGHSCORE || effective == SDL2ST_BONUS)
+        effective == SDL2ST_HIGHSCORE || effective == SDL2ST_BONUS || effective == SDL2ST_EDIT)
     {
         game_render_score(ctx);
         game_render_lives(ctx);

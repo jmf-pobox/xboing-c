@@ -1,0 +1,40 @@
+mission_id: m-2026-07-11-022
+status: failed
+type: implement
+created_at: "2026-07-11T21:57:30Z"
+updated_at: "2026-07-11T21:58:23Z"
+closed_at: "2026-07-11T21:58:23Z"
+leader: claude
+worker: gjm
+evaluator:
+    handle: jdc
+    pinned_at: "2026-07-11T21:57:30Z"
+    hash: c08223356d3e6d5aed56e28da477a1aa2707509febfef7c5f62c25871a3e841f
+inputs:
+    ticket: xboing-di8
+write_set:
+    - tests/test_sdl2_renderer.c
+    - tests/CMakeLists.txt
+success_criteria:
+    - 'Unit tests in tests/test_sdl2_renderer.c for sdl2_renderer_set_logical_width: (a) widen -> get_logical_size returns new width, height unchanged; (b) windowed physical window width grew proportionally (aspect-ratio-preserved, style of existing test_custom_scale/test_window_size_default_scale); (c) widen then restore returns the EXACT original window width; (d) no-op call with current width leaves window size byte-identical; (e) NULL ctx and w<=0 return -1'
+    - 'Integration coverage for the SDL2ST_EDIT round trip using the setup_editor fixture: INTRO->EDIT get_logical_size == 695; EDIT->INTRO == 575; EDIT->GAME == 575; GAME->EDIT == 695, via sdl2_state_transition (no keystroke injection). Place with the existing setup_editor fixture; if that file is outside this write-set, report to the leader before expanding scope'
+    - New/changed tests registered via tests/CMakeLists.txt so ctest picks them up
+    - ctest debug green including the new tests; ctest asan green; zero new warnings under the -Werror base set
+    - 'Confirm characterization value: the new tests FAIL against a pre-fix build (state how verified — e.g. temporary local revert of the primitive, reverted after)'
+budget:
+    rounds: 2
+    reflection_after_each: true
+current_round: 1
+context: |
+    TESTS-ONLY mission (worker gjm). Uses the implement archetype because the
+    seeded 'test' archetype constrains write_set to Go globs (*_test.go),
+    unusable for this C repo's tests/test_*.c files — tracked separately as a
+    seed-drift bug. Locks the editor window-width fix (implement mission
+    m-2026-07-11-018, closed) with unit + integration tests per the Verification
+    Plan in docs/specs/2026-07-11-editor-window-width.md. Production code is
+    already implemented in the working tree: sdl2_renderer_set_logical_width
+    (src/sdl2_renderer.c:314), mode_edit_enter/exit widen/restore 575<->695
+    (src/game_modes.c), render_main_background runtime bounds. Tests run headless
+    under SDL_VIDEODRIVER=dummy. Do NOT touch production code (src/**, include/**,
+    Makefile) — if a test reveals a production defect, report it to the leader;
+    do not fix it here.

@@ -161,6 +161,11 @@ typedef struct game_ctx
     /* Attract-mode display overrides (don't affect game state) */
     int attract_level_display; /* 0 = use real level_number */
 
+    /* Editor Button3 (right-click) inspect override for game_render_score.
+     * Gated to SDL2ST_EDIT only -- see game_render_score. */
+    int editor_inspect_active;          /* 0 = show real score */
+    unsigned long editor_inspect_value; /* last-queried hit points */
+
 } game_ctx_t;
 
 #endif /* GAME_CONTEXT_H */

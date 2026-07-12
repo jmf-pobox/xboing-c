@@ -1,0 +1,43 @@
+mission_id: m-2026-07-11-027
+status: failed
+type: implement
+created_at: "2026-07-11T22:46:25Z"
+updated_at: "2026-07-11T22:47:44Z"
+closed_at: "2026-07-11T22:47:44Z"
+leader: claude
+worker: sjl
+evaluator:
+    handle: jdc
+    pinned_at: "2026-07-11T22:46:25Z"
+    hash: c08223356d3e6d5aed56e28da477a1aa2707509febfef7c5f62c25871a3e841f
+inputs:
+    ticket: xboing-di8
+write_set:
+    - tools/capture_screen.c
+    - CMakeLists.txt
+    - Makefile
+success_criteria:
+    - 'New build-time helper tools/capture_screen.c (not installed; mirror the gen_bonus_fixtures pattern at CMakeLists.txt:684-693): usage ''capture_screen <mode> <out.bmp>'' where <mode> maps a name (at minimum ''editor''->SDL2ST_EDIT; also wire the attract modes intro/instruct/demo/keys/keysedit/preview/highscore/bonus/game for reuse) — creates a game context via game_create with -nosound, forces SDL_VIDEODRIVER=offscreen (set via setenv before game_create if not already set), transitions to the mode via sdl2_state_transition, advances a stabilization number of ticks (reuse the sdl2_loop_update / advance pattern), captures via SDL_RenderReadPixels + SDL_SaveBMP to <out.bmp> (reuse the exact readback pattern from tests/test_attract_screenshots.c:68-95), destroys the context, returns 0 on success / non-zero + stderr on failure'
+    - 'CMakeLists.txt: add_executable(capture_screen tools/capture_screen.c) with -Werror strict warnings and the full game link deps needed for game_create (mirror what tests/CMakeLists.txt links for integration tests). Not installed.'
+    - 'Makefile: a phony target ''capture-screen'' (MODE?=editor, OUT?=.tmp/modern-<mode>.bmp) that builds capture_screen and runs it under SDL_VIDEODRIVER=offscreen, creating OUT. Follow the Makefile hygiene rules (.PHONY, hyphenated name, wraps the compound command).'
+    - 'Runs headless on macOS: SDL_VIDEODRIVER=offscreen ./build/capture_screen editor .tmp/modern-editor.bmp produces a 695x720 (editor is widened) BMP with real pixels (non-black); verify the BMP exists and has plausible size, and report its dimensions'
+    - cmake --preset debug + build clean (zero warnings under -Werror); does not break make test (ctest debug 61/61) or any existing target
+    - Do NOT touch src/** production code, tests/**, or docs/** — this is a tool + build wiring only. Do NOT change any editor rendering (that is the separate parity effort).
+budget:
+    rounds: 3
+    reflection_after_each: true
+current_round: 1
+context: |
+    Build testing scaffolding: a reproducible, HEADLESS, macOS-viable modern
+    screen capture so the leader can run its own visual compares against the
+    golden references (screenshots/*.gif) each iteration without a live X11
+    display or a human handing over a screenshot. The blessed X11 + ImageMagick
+    'import' pipeline (docs/TESTING.md Layer 4) cannot capture the game's Cocoa
+    window on macOS. The offscreen framebuffer-readback path CAN: see the
+    capture_and_save helper in tests/test_attract_screenshots.c:68-95
+    (SDL_RenderReadPixels + SDL_SaveBMP under SDL_VIDEODRIVER=offscreen,
+    -nosound to dodge the SDL_mixer teardown crash). This is adequate for STATIC
+    screens like the editor (the docs' offscreen caveats are about fast substate
+    machines + mixer crash + BMP/PNG, none of which block a static editor).
+    Immediate consumer: the editor parity effort (xboing-di8) — capture
+    SDL2ST_EDIT and compare to screenshots/level-editor.gif (695x720).

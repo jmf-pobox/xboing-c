@@ -1,0 +1,31 @@
+results:
+    - mission: m-2026-07-12-001
+      round: 1
+      created_at: "2026-07-12T00:29:08Z"
+      author: jdc
+      verdict: escalate
+      confidence: 1
+      files_changed:
+        - path: src/game_callbacks.c
+          added: 2
+          removed: 2
+        - path: tests/test_editor_roundtrip.c
+          added: 40
+          removed: 0
+      evidence:
+        - name: 'production fix correct: editor_cb_save_level writes level_system_get_time_bonus(ctx->level); verified against the REAL static function via out-of-band scratch harness (pre-fix prints 120 vs real 60 = MISMATCH; post-fix MATCH)'
+          status: pass
+        - name: ctest debug 61/61 + asan 61/61 green
+          status: pass
+        - name: 'test-quality gap: test_editor_roundtrip.c links only level_system, cannot call the static editor_cb_save_level; the added test is a MIRROR of the fixed expression, not a test of the production function — false-confidence coverage, duplicates save logic'
+          status: fail
+      open_questions:
+        - 'Re-scope: write the genuine regression test in tests/test_game_callbacks.c (full-stack via xboing_add_integration_test, zero CMake change) that drives the real editor save path; remove the mirror from test_editor_roundtrip.c. Production fix in src/game_callbacks.c stays.'
+      prose: |-
+        Production fix is correct and stays in the working tree. Terminating this
+        mission because its write-set (test_editor_roundtrip.c) cannot host a genuine
+        test — that file only links level_system, so the static editor_cb_save_level
+        is unreachable and the only test possible there is a mirror of the fixed
+        expression (false confidence, duplicated logic). Leader is recreating stage 1
+        with a corrected write-set that includes tests/test_game_callbacks.c for a
+        real integration test through game_callbacks_editor().

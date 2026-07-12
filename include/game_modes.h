@@ -22,5 +22,6 @@ void game_modes_register(game_ctx_t *ctx);
 void game_modes_set_quit_pending(void);
 void game_modes_set_abort_pending(void);
 void game_modes_set_level_pending(void);
+void game_modes_set_editor_dialogue_pending(void);
 
 #endif /* GAME_MODES_H */

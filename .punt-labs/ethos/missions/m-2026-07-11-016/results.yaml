@@ -1,0 +1,50 @@
+results:
+    - mission: m-2026-07-11-016
+      round: 1
+      created_at: "2026-07-11T20:43:12Z"
+      author: sjl
+      verdict: pass
+      confidence: 0.85
+      files_changed:
+        - path: docs/specs/2026-07-11-editor-window-width.md
+          added: 398
+          removed: 0
+      evidence:
+        - name: design doc exists at the write-set path
+          status: pass
+        - name: entry-widen / exit-restore for SDL2ST_EDIT specified (new sdl2_renderer_set_logical_width, mode_edit_enter/exit)
+          status: pass
+        - name: logical+physical widen in lockstep keeps scale factor unchanged; aspect/letterbox resolved
+          status: pass
+        - name: play grid geometry + on-screen size unchanged; PALETTE_X/W unchanged; panel added on right
+          status: pass
+        - name: restore-on-exit via idempotent primitive + mode_edit_exit; no leak; handles EDIT<->GAME/INTRO
+          status: pass
+        - name: verification plan (gates 4-6 + headless logical-width assertions) and files-to-change listed
+          status: pass
+        - name: cites original/editor.c and modern constants; z-spec confirmed not warranted
+          status: pass
+      open_questions:
+        - 'Secondary bug found: render_main_background uses compile-time SDL2R_LOGICAL_WIDTH macros, not current logical size — the widened panel would render bare black. Fix folded into the implement scope.'
+        - Fullscreen fidelity trade-off (logical-only widen in fullscreen) documented as out of scope for the reported windowed bug.
+    - mission: m-2026-07-11-016
+      round: 2
+      created_at: "2026-07-11T20:49:40Z"
+      author: sjl
+      verdict: pass
+      confidence: 0.9
+      files_changed:
+        - path: docs/specs/2026-07-11-editor-window-width.md
+          added: 4
+          removed: 2
+      evidence:
+        - name: 'jck arithmetic slip fixed: 685/20px -> 695/30px in Layout section'
+          status: pass
+        - name: 'jdc: game_render_ui.c:163,167,967 logical-macro usages documented as out of scope (unreachable from EDIT)'
+          status: pass
+        - name: 'jdc: manual window-height resize during EDIT flagged as the restore edge case in Restore-on-exit'
+          status: pass
+        - name: markdownlint clean; no design changes, doc-accuracy only
+          status: pass
+      open_questions:
+        - DrawEditorGrid parity (original/editor.c:139-152) tracked as separate bead xboing-c40 (pre-existing gap, out of scope).

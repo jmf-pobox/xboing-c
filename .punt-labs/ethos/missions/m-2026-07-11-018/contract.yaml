@@ -1,0 +1,45 @@
+mission_id: m-2026-07-11-018
+status: closed
+type: implement
+created_at: "2026-07-11T21:36:28Z"
+updated_at: "2026-07-11T21:56:45Z"
+closed_at: "2026-07-11T21:56:45Z"
+leader: claude
+worker: sjl
+evaluator:
+    handle: jdc
+    pinned_at: "2026-07-11T21:36:28Z"
+    hash: c08223356d3e6d5aed56e28da477a1aa2707509febfef7c5f62c25871a3e841f
+inputs:
+    ticket: xboing-di8
+write_set:
+    - include/sdl2_renderer.h
+    - src/sdl2_renderer.c
+    - src/game_modes.c
+    - src/game_render.c
+    - src/game_init.c
+    - src/sdl2_cli.c
+    - Makefile
+success_criteria:
+    - 'New primitive sdl2_renderer_set_logical_width(ctx, w): idempotent (no-op when w==current), windowed grows physical window width via new_win_w=(w*win_h)/logical_height BEFORE SDL_RenderSetLogicalSize, fullscreen changes logical only; returns -1 on NULL ctx or w<=0'
+    - mode_edit_enter widens to SDL2R_LOGICAL_WIDTH+EDITOR_TOOL_WIDTH (695); new mode_edit_exit restores SDL2R_LOGICAL_WIDTH (575); .on_exit registered on SDL2ST_EDIT (currently missing at game_modes.c ~1592)
+    - render_main_background tiles using sdl2_renderer_get_logical_size(ctx->renderer,&w,&h) instead of compile-time SDL2R_LOGICAL_WIDTH/HEIGHT macros, so the widened panel gets the tiled space background not bare black
+    - No changes to PALETTE_X/PALETTE_W or any scoring/physics/level constant; play area geometry provably unchanged (scale_x==scale_y preserved)
+    - Capture pipeline registers an 'editor' screen per docs/TESTING.md 4-place checklist (vc name fn + vc_check branch in game_init.c; -visual-capture map in sdl2_cli.c; visual-check screen list in Makefile) so Gate 4 capture is reproducible
+    - make test (ctest debug) green; make asan-test green; zero new warnings under the -Werror base set
+budget:
+    rounds: 3
+    reflection_after_each: true
+current_round: 1
+context: |
+    Implements the approved design at
+    docs/specs/2026-07-11-editor-window-width.md (committed 30c14ab; jdc PASS,
+    jck APPROVE). The editor tool palette (drawn at PALETTE_X=545..649) is
+    clipped by the fixed 575px logical canvas. Fix: mirror original/editor.c:
+    161-164/381-383 by growing logical width AND physical window width in
+    lockstep (575 -> 575+EDITOR_TOOL_WIDTH=695) on editor enter, restoring 575
+    on exit, so the play grid keeps identical on-screen pixel geometry and only
+    a 120px palette panel is added. Read the design doc in full before editing;
+    it is authoritative and includes the implementation sketch, the
+    self-inverting restore formula, and the secondary render_main_background bug.
+    Tests are delegated to a separate gjm test mission — do NOT edit tests/**.

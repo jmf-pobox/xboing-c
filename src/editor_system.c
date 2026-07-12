@@ -28,14 +28,33 @@
  * Internal types
  * ========================================================================= */
 
+/*
+ * Tracks which editor operation is waiting on an async dialogue result.
+ * Set by a begin_* helper right before requesting the dialogue; consumed
+ * by editor_system_dialogue_result()'s switch.  Private to this module —
+ * the integration layer never sees or sets this directly.
+ */
+typedef enum
+{
+    EDITOR_PENDING_NONE,
+    EDITOR_PENDING_QUIT_CONFIRM,
+    EDITOR_PENDING_LOAD_CONFIRM, /* Only used when modified */
+    EDITOR_PENDING_LOAD_INPUT,
+    EDITOR_PENDING_SAVE_INPUT,
+    EDITOR_PENDING_TIME_INPUT,
+    EDITOR_PENDING_NAME_INPUT,
+    EDITOR_PENDING_CLEAR_CONFIRM
+} editor_pending_action_t;
+
 struct editor_system
 {
     editor_system_callbacks_t cb;
     void *user_data;
 
     editor_state_t state;
-    editor_state_t wait_mode; /* State to resume after WAIT */
-    int waiting_frame;        /* Target frame for WAIT */
+    editor_state_t wait_mode;               /* State to resume after WAIT */
+    int waiting_frame;                      /* Target frame for WAIT */
+    editor_pending_action_t pending_action; /* Which op awaits a dialogue */
 
     /* Palette */
     editor_palette_entry_t palette[EDITOR_MAX_PALETTE];
@@ -86,6 +105,14 @@ static int pixel_to_row(int y)
     return y / ROW_HEIGHT;
 }
 
+void editor_system_pixel_to_cell(int play_x, int play_y, int *row, int *col)
+{
+    if (col)
+        *col = pixel_to_col(play_x);
+    if (row)
+        *row = pixel_to_row(play_y);
+}
+
 static int in_editable_bounds(int row, int col)
 {
     return row >= 0 && row < EDITOR_MAX_ROW_EDIT && col >= 0 && col < EDITOR_MAX_COL_EDIT;
@@ -99,11 +126,15 @@ static int in_editable_bounds(int row, int col)
  * RANDOM_BLK so that board transforms operated on RANDOM_BLK values rather
  * than on a resolved concrete type.
  *
- * In this callback-based implementation, editor_cell_t does not expose a
- * "random" flag, and the normalization of random blocks (if needed) is
- * handled by the integration layer via the callback interface / level
- * loading path.  As a result, this function is intentionally a no-op and
- * exists only for API completeness and to mirror the legacy structure.
+ * In this callback-based implementation, query_cell (game_callbacks.c) is
+ * itself random-aware: it reads the block's random flag from
+ * block_system_get_render_info() and reports RANDOM_BLK for the cell's
+ * block_type whenever that flag is set.  Every board transform (flip,
+ * scroll) reads cells exclusively through query_cell, so they already see
+ * RANDOM_BLK rather than a resolved concrete type — the normalization this
+ * function performed in the legacy editor is redundant here by
+ * construction.  It remains a permanent no-op, kept only for API
+ * completeness and to mirror the legacy structure.
  */
 static void normalize_random_blocks(editor_system_t *ctx)
 {
@@ -268,6 +299,7 @@ void editor_system_reset(editor_system_t *ctx)
     if (ctx == NULL)
         return;
     ctx->state = EDITOR_STATE_LEVEL;
+    ctx->pending_action = EDITOR_PENDING_NONE;
     ctx->draw_action = EDITOR_ACTION_NOP;
     ctx->old_col = -1;
     ctx->old_row = -1;
@@ -347,8 +379,10 @@ editor_draw_action_t editor_system_mouse_button(editor_system_t *ctx, int x, int
     if (ctx == NULL)
         return EDITOR_ACTION_NOP;
 
-    /* In play-test mode, mouse is handled by the integration layer */
-    if (ctx->state == EDITOR_STATE_TEST)
+    /* In play-test mode, mouse is handled by the integration layer.
+     * While a dialogue is open, clicks must not leak through to the
+     * grid underneath it. */
+    if (ctx->state == EDITOR_STATE_TEST || ctx->state == EDITOR_STATE_DIALOGUE)
         return EDITOR_ACTION_NOP;
 
     /* Bounds check pixel coordinates */
@@ -407,6 +441,11 @@ editor_draw_action_t editor_system_mouse_button(editor_system_t *ctx, int x, int
 void editor_system_mouse_motion(editor_system_t *ctx, int x, int y)
 {
     if (ctx == NULL)
+        return;
+
+    /* Same guard as editor_system_mouse_button: no drag-drawing while
+     * play-testing or while a dialogue is open over the grid. */
+    if (ctx->state == EDITOR_STATE_TEST || ctx->state == EDITOR_STATE_DIALOGUE)
         return;
 
     if (x < 0 || x >= EDITOR_PLAY_WIDTH || y < 0 || y >= EDITOR_PLAY_HEIGHT)
@@ -703,19 +742,59 @@ void editor_system_clear_grid(editor_system_t *ctx)
  * Keyboard commands
  * ========================================================================= */
 
-static void do_load(editor_system_t *ctx)
+/*
+ * Answer helper for the single-char 'y'/'Y'/'n'/'N' yes/no dialogues.
+ * cancelled (Escape) counts as "no".
+ */
+static int is_yes_answer(int cancelled, const char *input)
+{
+    return !cancelled && input != NULL && (input[0] == 'y' || input[0] == 'Y');
+}
+
+/*
+ * begin_load_input — the second (and only, when unmodified) step of the
+ * LOAD flow: prompt for a level number.  Called directly from
+ * handle_editor_key when the level isn't modified, and again from
+ * editor_system_dialogue_result's LOAD_CONFIRM branch when the player
+ * answers "yes" to the unsaved-work prompt — the one genuine two-step
+ * chain in this state machine (docs/specs/2026-07-11-editor-parity.md S1.3).
+ */
+static void begin_load_input(editor_system_t *ctx)
 {
     char str[80];
 
-    if (ctx->cb.on_input_dialogue == NULL)
+    if (ctx->cb.on_request_input_dialogue == NULL)
         return;
 
     snprintf(str, sizeof(str), "Level range is [1-%d]", EDITOR_MAX_LEVELS);
     show_message(ctx, str, 0);
 
-    const char *input =
-        ctx->cb.on_input_dialogue("Input load level number please.", 1, ctx->user_data);
-    if (input == NULL || input[0] == '\0')
+    if (ctx->cb.on_request_input_dialogue("Input load level number please.", 1, ctx->user_data))
+    {
+        ctx->pending_action = EDITOR_PENDING_LOAD_INPUT;
+        ctx->state = EDITOR_STATE_DIALOGUE;
+    }
+}
+
+static void begin_load_confirm(editor_system_t *ctx)
+{
+    if (ctx->cb.on_request_yes_no_dialogue == NULL)
+        return;
+
+    if (ctx->cb.on_request_yes_no_dialogue("Unsaved work, continue load? [y/n]", ctx->user_data))
+    {
+        ctx->pending_action = EDITOR_PENDING_LOAD_CONFIRM;
+        ctx->state = EDITOR_STATE_DIALOGUE;
+    }
+}
+
+/* Parse/act half of the LOAD flow — the answer to begin_load_input's
+ * dialogue. */
+static void finish_load(editor_system_t *ctx, int cancelled, const char *input)
+{
+    char str[80];
+
+    if (cancelled || input == NULL || input[0] == '\0')
         return;
 
     int num;
@@ -745,19 +824,28 @@ static void do_load(editor_system_t *ctx)
     }
 }
 
-static void do_save(editor_system_t *ctx)
+static void begin_save(editor_system_t *ctx)
 {
     char str[80];
 
-    if (ctx->cb.on_input_dialogue == NULL)
+    if (ctx->cb.on_request_input_dialogue == NULL)
         return;
 
     snprintf(str, sizeof(str), "Level range is [1-%d]", EDITOR_MAX_LEVELS);
     show_message(ctx, str, 0);
 
-    const char *input =
-        ctx->cb.on_input_dialogue("Input save level number please.", 1, ctx->user_data);
-    if (input == NULL || input[0] == '\0')
+    if (ctx->cb.on_request_input_dialogue("Input save level number please.", 1, ctx->user_data))
+    {
+        ctx->pending_action = EDITOR_PENDING_SAVE_INPUT;
+        ctx->state = EDITOR_STATE_DIALOGUE;
+    }
+}
+
+static void finish_save(editor_system_t *ctx, int cancelled, const char *input)
+{
+    char str[80];
+
+    if (cancelled || input == NULL || input[0] == '\0')
         return;
 
     int num;
@@ -794,13 +882,21 @@ static void do_save(editor_system_t *ctx)
     }
 }
 
-static void do_set_time(editor_system_t *ctx)
+static void begin_set_time(editor_system_t *ctx)
 {
-    if (ctx->cb.on_input_dialogue == NULL)
+    if (ctx->cb.on_request_input_dialogue == NULL)
         return;
 
-    const char *input = ctx->cb.on_input_dialogue("Input game time in seconds.", 1, ctx->user_data);
-    if (input == NULL || input[0] == '\0')
+    if (ctx->cb.on_request_input_dialogue("Input game time in seconds.", 1, ctx->user_data))
+    {
+        ctx->pending_action = EDITOR_PENDING_TIME_INPUT;
+        ctx->state = EDITOR_STATE_DIALOGUE;
+    }
+}
+
+static void finish_set_time(editor_system_t *ctx, int cancelled, const char *input)
+{
+    if (cancelled || input == NULL || input[0] == '\0')
         return;
 
     int num;
@@ -819,19 +915,26 @@ static void do_set_time(editor_system_t *ctx)
     }
 }
 
-static void do_set_name(editor_system_t *ctx)
+static void begin_set_name(editor_system_t *ctx)
 {
     char str[80];
-    const char *input;
 
-    if (ctx->cb.on_input_dialogue == NULL)
+    if (ctx->cb.on_request_input_dialogue == NULL)
         return;
 
     snprintf(str, sizeof(str), "Name: %s", ctx->level_title);
     show_message(ctx, str, 0);
 
-    input = ctx->cb.on_input_dialogue("Input new name for level please.", 0, ctx->user_data);
-    if (input == NULL || input[0] == '\0')
+    if (ctx->cb.on_request_input_dialogue("Input new name for level please.", 0, ctx->user_data))
+    {
+        ctx->pending_action = EDITOR_PENDING_NAME_INPUT;
+        ctx->state = EDITOR_STATE_DIALOGUE;
+    }
+}
+
+static void finish_set_name(editor_system_t *ctx, int cancelled, const char *input)
+{
+    if (cancelled || input == NULL || input[0] == '\0')
         return;
 
     if (strlen(input) >= EDITOR_LEVEL_NAME_MAX)
@@ -845,22 +948,38 @@ static void do_set_name(editor_system_t *ctx)
     ctx->modified = 1;
 }
 
+static void begin_quit_confirm(editor_system_t *ctx)
+{
+    if (ctx->cb.on_request_yes_no_dialogue == NULL)
+        return;
+
+    const char *msg =
+        ctx->modified ? "Unsaved work, exit editor? [y/n]" : "Exit the level editor? [y/n]";
+    if (ctx->cb.on_request_yes_no_dialogue(msg, ctx->user_data))
+    {
+        ctx->pending_action = EDITOR_PENDING_QUIT_CONFIRM;
+        ctx->state = EDITOR_STATE_DIALOGUE;
+    }
+}
+
+static void begin_clear_confirm(editor_system_t *ctx)
+{
+    if (ctx->cb.on_request_yes_no_dialogue == NULL)
+        return;
+
+    if (ctx->cb.on_request_yes_no_dialogue("Clear this level? [y/n]", ctx->user_data))
+    {
+        ctx->pending_action = EDITOR_PENDING_CLEAR_CONFIRM;
+        ctx->state = EDITOR_STATE_DIALOGUE;
+    }
+}
+
 static void handle_editor_key(editor_system_t *ctx, editor_key_t key)
 {
     switch (key)
     {
         case EDITOR_KEY_QUIT:
-            if (ctx->modified)
-            {
-                if (ctx->cb.on_yes_no_dialogue != NULL &&
-                    ctx->cb.on_yes_no_dialogue("Unsaved work, exit editor? [y/n]", ctx->user_data))
-                    ctx->state = EDITOR_STATE_FINISH;
-            }
-            else if (ctx->cb.on_yes_no_dialogue != NULL &&
-                     ctx->cb.on_yes_no_dialogue("Exit the level editor? [y/n]", ctx->user_data))
-            {
-                ctx->state = EDITOR_STATE_FINISH;
-            }
+            begin_quit_confirm(ctx);
             break;
 
         case EDITOR_KEY_REDRAW:
@@ -869,28 +988,21 @@ static void handle_editor_key(editor_system_t *ctx, editor_key_t key)
 
         case EDITOR_KEY_LOAD:
             if (ctx->modified)
-            {
-                if (ctx->cb.on_yes_no_dialogue != NULL &&
-                    ctx->cb.on_yes_no_dialogue("Unsaved work, continue load? [y/n]",
-                                               ctx->user_data))
-                    do_load(ctx);
-            }
+                begin_load_confirm(ctx);
             else
-            {
-                do_load(ctx);
-            }
+                begin_load_input(ctx);
             break;
 
         case EDITOR_KEY_SAVE:
-            do_save(ctx);
+            begin_save(ctx);
             break;
 
         case EDITOR_KEY_TIME:
-            do_set_time(ctx);
+            begin_set_time(ctx);
             break;
 
         case EDITOR_KEY_NAME:
-            do_set_name(ctx);
+            begin_set_name(ctx);
             break;
 
         case EDITOR_KEY_PLAYTEST:
@@ -901,12 +1013,7 @@ static void handle_editor_key(editor_system_t *ctx, editor_key_t key)
             break;
 
         case EDITOR_KEY_CLEAR:
-            if (ctx->cb.on_yes_no_dialogue != NULL &&
-                ctx->cb.on_yes_no_dialogue("Clear this level? [y/n]", ctx->user_data))
-            {
-                editor_system_clear_grid(ctx);
-                show_message(ctx, "Clear level", 1);
-            }
+            begin_clear_confirm(ctx);
             break;
 
         case EDITOR_KEY_FLIP_H:
@@ -965,6 +1072,64 @@ void editor_system_key_input(editor_system_t *ctx, editor_key_t key)
         handle_playtest_key(ctx, key);
     else
         handle_editor_key(ctx, key);
+}
+
+void editor_system_dialogue_result(editor_system_t *ctx, int cancelled, const char *input)
+{
+    if (ctx == NULL)
+        return;
+    if (ctx->state != EDITOR_STATE_DIALOGUE)
+        return;
+
+    editor_pending_action_t action = ctx->pending_action;
+    ctx->pending_action = EDITOR_PENDING_NONE;
+
+    /* Default resume state.  LOAD_CONFIRM's "yes" branch below may
+     * override this back to EDITOR_STATE_DIALOGUE by opening the
+     * follow-up level-number input — the one genuine two-step chain
+     * in this state machine. */
+    ctx->state = EDITOR_STATE_NONE;
+
+    switch (action)
+    {
+        case EDITOR_PENDING_QUIT_CONFIRM:
+            if (is_yes_answer(cancelled, input))
+                ctx->state = EDITOR_STATE_FINISH;
+            break;
+
+        case EDITOR_PENDING_LOAD_CONFIRM:
+            if (is_yes_answer(cancelled, input))
+                begin_load_input(ctx);
+            break;
+
+        case EDITOR_PENDING_LOAD_INPUT:
+            finish_load(ctx, cancelled, input);
+            break;
+
+        case EDITOR_PENDING_SAVE_INPUT:
+            finish_save(ctx, cancelled, input);
+            break;
+
+        case EDITOR_PENDING_TIME_INPUT:
+            finish_set_time(ctx, cancelled, input);
+            break;
+
+        case EDITOR_PENDING_NAME_INPUT:
+            finish_set_name(ctx, cancelled, input);
+            break;
+
+        case EDITOR_PENDING_CLEAR_CONFIRM:
+            if (is_yes_answer(cancelled, input))
+            {
+                editor_system_clear_grid(ctx);
+                show_message(ctx, "Clear level", 1);
+            }
+            break;
+
+        case EDITOR_PENDING_NONE:
+        default:
+            break;
+    }
 }
 
 /* =========================================================================

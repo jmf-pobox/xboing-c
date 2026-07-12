@@ -23,6 +23,7 @@
 #include <cmocka.h>
 
 #include "ball_system.h"
+#include "editor_system.h"
 #include "game_callbacks.h"
 #include "game_context.h"
 #include "game_init.h"
@@ -32,6 +33,7 @@
 #include "sdl2_input.h"
 #include "sdl2_loop.h"
 #include "sdl2_audio.h"
+#include "sdl2_renderer.h"
 #include "sdl2_state.h"
 #include "sfx_system.h"
 
@@ -516,6 +518,66 @@ static void test_attract_c_full_cycle_order(void **vstate)
 }
 
 /* =========================================================================
+ * Group 5: Editor window width round-trip (bead xboing-di8)
+ *
+ * mode_edit_enter widens the logical canvas to
+ * SDL2R_LOGICAL_WIDTH + EDITOR_TOOL_WIDTH (695) to reveal the tool
+ * palette; mode_edit_exit restores SDL2R_LOGICAL_WIDTH (575).  Every
+ * transition into or out of EDIT goes through sdl2_state_transition's
+ * on_exit/on_enter pair (src/sdl2_state.c), so this exercises the
+ * production callback path directly — no keystroke injection needed.
+ * See docs/specs/2026-07-11-editor-window-width.md "Verification plan".
+ * ========================================================================= */
+
+static int logical_width(const game_ctx_t *ctx)
+{
+    int w = 0, h = 0;
+    sdl2_renderer_get_logical_size(ctx->renderer, &w, &h);
+    (void)h;
+    return w;
+}
+
+/* Editor entry (setup_editor: PRESENTS -> EDIT) widens to 695. */
+static void test_editor_enter_widens_logical_width(void **vstate)
+{
+    const game_ctx_t *ctx = ((kb_fixture_t *)*vstate)->ctx;
+    assert_int_equal(logical_width(ctx), SDL2R_LOGICAL_WIDTH + EDITOR_TOOL_WIDTH);
+}
+
+/* EDIT -> INTRO restores to 575. */
+static void test_editor_exit_restores_logical_width(void **vstate)
+{
+    game_ctx_t *ctx = ((kb_fixture_t *)*vstate)->ctx;
+    assert_int_equal(logical_width(ctx), SDL2R_LOGICAL_WIDTH + EDITOR_TOOL_WIDTH);
+
+    sdl2_state_transition(ctx->state, SDL2ST_INTRO);
+    assert_int_equal(logical_width(ctx), SDL2R_LOGICAL_WIDTH);
+}
+
+/* Full round trip: INTRO -> EDIT -> GAME (playtest) -> EDIT (playtest end)
+ * -> INTRO, asserting the logical width at every hop. */
+static void test_editor_playtest_round_trip_logical_width(void **vstate)
+{
+    game_ctx_t *ctx = ((kb_fixture_t *)*vstate)->ctx;
+
+    /* setup_editor already performed PRESENTS -> EDIT; confirm widened. */
+    assert_int_equal(logical_width(ctx), SDL2R_LOGICAL_WIDTH + EDITOR_TOOL_WIDTH);
+
+    /* EDIT -> GAME (playtest start): shrinks back to 575, matching
+     * normal gameplay. */
+    sdl2_state_transition(ctx->state, SDL2ST_GAME);
+    assert_int_equal(logical_width(ctx), SDL2R_LOGICAL_WIDTH);
+
+    /* GAME -> EDIT (playtest end): widens back to 695. */
+    sdl2_state_transition(ctx->state, SDL2ST_EDIT);
+    assert_int_equal(logical_width(ctx), SDL2R_LOGICAL_WIDTH + EDITOR_TOOL_WIDTH);
+
+    /* EDIT -> INTRO (finish): restores to 575. */
+    sdl2_state_transition(ctx->state, SDL2ST_INTRO);
+    assert_int_equal(logical_width(ctx), SDL2R_LOGICAL_WIDTH);
+}
+
+/* =========================================================================
  * Test registration
  * ========================================================================= */
 
@@ -573,10 +635,20 @@ int main(void)
         cmocka_unit_test_setup_teardown(test_attract_c_full_cycle_order, setup_attract, teardown),
     };
 
+    const struct CMUnitTest editor_width_tests[] = {
+        cmocka_unit_test_setup_teardown(test_editor_enter_widens_logical_width, setup_editor,
+                                        teardown),
+        cmocka_unit_test_setup_teardown(test_editor_exit_restores_logical_width, setup_editor,
+                                        teardown),
+        cmocka_unit_test_setup_teardown(test_editor_playtest_round_trip_logical_width,
+                                        setup_editor, teardown),
+    };
+
     int rc = 0;
     rc |= cmocka_run_group_tests_name("global keys", global_tests, NULL, NULL);
     rc |= cmocka_run_group_tests_name("mode scoping", scoping_tests, NULL, NULL);
     rc |= cmocka_run_group_tests_name("gameplay keys", gameplay_tests, NULL, NULL);
     rc |= cmocka_run_group_tests_name("attract navigation", attract_tests, NULL, NULL);
+    rc |= cmocka_run_group_tests_name("editor window width", editor_width_tests, NULL, NULL);
     return rc;
 }

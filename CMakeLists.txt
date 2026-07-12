@@ -639,6 +639,7 @@ if(SDL2_FOUND AND SDL2_IMAGE_FOUND AND SDL2_MIXER_FOUND AND SDL2_TTF_FOUND)
         sdl2_audio
         sdl2_input
         sdl2_cursor
+        sdl2_regions
         sdl2_state
         sdl2_loop
         sdl2_cli

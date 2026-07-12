@@ -38,11 +38,12 @@
 
 typedef enum
 {
-    EDITOR_STATE_LEVEL, /* Initial: load default editor level */
-    EDITOR_STATE_NONE,  /* Idle: accepting user input */
-    EDITOR_STATE_TEST,  /* Play-testing the level */
-    EDITOR_STATE_WAIT,  /* Waiting for a target frame */
-    EDITOR_STATE_FINISH /* Shutting down the editor */
+    EDITOR_STATE_LEVEL,    /* Initial: load default editor level */
+    EDITOR_STATE_NONE,     /* Idle: accepting user input */
+    EDITOR_STATE_TEST,     /* Play-testing the level */
+    EDITOR_STATE_WAIT,     /* Waiting for a target frame */
+    EDITOR_STATE_DIALOGUE, /* Waiting for an async dialogue to resolve */
+    EDITOR_STATE_FINISH    /* Shutting down the editor */
 } editor_state_t;
 
 typedef enum
@@ -107,14 +108,18 @@ typedef struct
     /* Called when a fatal error occurs. message: error description. */
     void (*on_error)(const char *message, void *ud);
 
-    /* Called when the editor requests a user input dialogue.
-     * Returns a pointer to the entered string (empty if cancelled).
-     * message: prompt text.  numeric_only: nonzero for digits only. */
-    const char *(*on_input_dialogue)(const char *message, int numeric_only, void *ud);
+    /* Called when the editor wants to open an async user-input dialogue.
+     * The call does not block — the answer arrives later via
+     * editor_system_dialogue_result().  message: prompt text.
+     * numeric_only: nonzero for digits only.  Returns nonzero if the
+     * dialogue was opened, 0 on failure (e.g. already in a dialogue). */
+    int (*on_request_input_dialogue)(const char *message, int numeric_only, void *ud);
 
-    /* Called when the editor requests a yes/no confirmation.
-     * message: prompt text.  Returns nonzero for yes, 0 for no. */
-    int (*on_yes_no_dialogue)(const char *message, void *ud);
+    /* Called when the editor wants to open an async yes/no confirmation.
+     * The call does not block — the answer arrives later via
+     * editor_system_dialogue_result().  message: prompt text.  Returns
+     * nonzero if the dialogue was opened, 0 on failure. */
+    int (*on_request_yes_no_dialogue)(const char *message, void *ud);
 
     /* Called to set the level time bonus display. seconds: time in seconds. */
     void (*on_set_time)(int seconds, void *ud);
@@ -175,6 +180,21 @@ editor_state_t editor_system_get_state(const editor_system_t *ctx);
 /* Reset editor to EDITOR_STATE_LEVEL state. */
 void editor_system_reset(editor_system_t *ctx);
 
+/*
+ * Deliver the result of a previously requested async dialogue
+ * (on_request_yes_no_dialogue / on_request_input_dialogue).
+ *
+ * cancelled: nonzero if the dialogue was cancelled (Escape).
+ * input:     the entered text.  For yes/no dialogues, a single
+ *            'y'/'Y'/'n'/'N' character string.
+ *
+ * No-op unless editor_system_get_state() == EDITOR_STATE_DIALOGUE.
+ * The LOAD flow's confirm-then-input chain may leave the state at
+ * EDITOR_STATE_DIALOGUE again (a new request opened from within this
+ * call) rather than returning to EDITOR_STATE_NONE.
+ */
+void editor_system_dialogue_result(editor_system_t *ctx, int cancelled, const char *input);
+
 /* =========================================================================
  * Palette
  * ========================================================================= */
@@ -226,6 +246,25 @@ editor_draw_action_t editor_system_mouse_button(editor_system_t *ctx, int x, int
  * Called continuously while a button is held.
  */
 void editor_system_mouse_motion(editor_system_t *ctx, int x, int y);
+
+/*
+ * Convert play-area-relative pixel coordinates to a grid row/col.
+ *
+ * play_x, play_y: pixel coordinates within the play window (same origin
+ *                 as editor_system_mouse_button/editor_system_mouse_motion).
+ * row, col:       receive the computed grid position. Not bounds-checked
+ *                 against EDITOR_MAX_ROW_EDIT/EDITOR_MAX_COL_EDIT — callers
+ *                 that need editable-bounds validation must check the
+ *                 output themselves (see editor_system_mouse_button's
+ *                 in_editable_bounds pattern). NULL row or col skips that
+ *                 axis.
+ *
+ * This is the canonical row/col arithmetic used internally by
+ * editor_system_mouse_button/editor_system_mouse_motion, exported so
+ * other call sites (e.g. the right-click inspect handler in
+ * game_modes.c) can't drift from it with a hand-rolled copy.
+ */
+void editor_system_pixel_to_cell(int play_x, int play_y, int *row, int *col);
 
 /* =========================================================================
  * Keyboard commands

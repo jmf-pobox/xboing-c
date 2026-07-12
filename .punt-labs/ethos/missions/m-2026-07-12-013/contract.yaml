@@ -1,0 +1,64 @@
+mission_id: m-2026-07-12-013
+status: closed
+type: implement
+created_at: "2026-07-12T03:29:37Z"
+updated_at: "2026-07-12T03:44:43Z"
+closed_at: "2026-07-12T03:44:43Z"
+leader: claude
+worker: jdc
+evaluator:
+    handle: jck
+    pinned_at: "2026-07-12T03:29:37Z"
+    hash: 40cbe1204f644c77e6a26757a9b855e3298be267025e806d425bfdea99054f18
+inputs:
+    ticket: xboing-di8
+write_set:
+    - src/game_modes.c
+    - src/sdl2_input.c
+    - include/sdl2_input.h
+    - docs/DESIGN.md
+    - xboing.man.in
+    - tests/test_integration_editor.c
+success_criteria:
+    - Shift+left-click erases in the editor (routes to editor_system_mouse_button erase); plain left-click still draws; middle-click erase and right-click inspect unchanged; Shift detected via the input layer (accessor added to sdl2_input if needed)
+    - ADR added to docs/DESIGN.md documenting the modern-input erase affordance (Shift+left-click), naming the constraint (no physical middle button on modern hardware) and citing original/editor.c:521-557 — a deliberate, documented deviation
+    - xboing.man.in LEVEL EDITOR section updated to document Shift+left-click erase in the existing man-page style; the editor section reads coherently in the same style as the rest of the page
+    - 'GENUINE test in test_integration_editor.c: place a block, Shift+left-click it, assert it is erased (cell now unoccupied); plain left-click on an empty cell with the drawing palette selected draws (occupied) — proving Shift toggles erase vs draw. Drive the real mode_edit_update path with the shift modifier set'
+    - cmake --preset debug + build clean (zero -Werror); ctest --test-dir build green; make asan-test green (rebuild build-asan); only the write-set files changed; no CMake change (unless a new test file — none needed here)
+    - markdownlint clean on docs/DESIGN.md (run in CI on this Mac); man page has no groff syntax errors introduced
+budget:
+    rounds: 3
+    reflection_after_each: true
+current_round: 1
+context: |
+    Editor parity — Mac-friendly erase (USER decision: "keep inspect, add a Mac-friendly
+    erase"; "modern computers do not have middle mouse buttons which were physical on Sun
+    workstations"). The original editor mapped left=draw, MIDDLE=erase, right=inspect
+    (original/editor.c:521-557). Stage 10 (commit 938847d) faithfully restored right=inspect
+    and middle=erase, but modern hardware (Mac trackpads, most 2-button setups) has no
+    reliable middle button, so erase is effectively unreachable. This is an accessibility
+    gap the 1996 3-button-workstation model never anticipated.
+
+    DECISION (user-approved direction): keep right-click = inspect (faithful, stage 10);
+    keep middle-click = erase (unchanged, for those who have it); ADD Shift+left-click =
+    erase as the modern, always-reachable affordance. Plain left-click still draws.
+
+    IMPLEMENT:
+    - src/game_modes.c mode_edit_update: when a left-click occurs with SHIFT held, route it
+      to erase (editor_system_mouse_button(..., 2, 1)) instead of draw; plain left-click
+      still draws (button 1). Middle-click (button 2) erase and right-click (button 3)
+      inspect stay exactly as they are. Detect Shift via the input layer — check whether
+      sdl2_input exposes modifier state; if not, add a minimal accessor (SDL_GetModState /
+      KMOD_SHIFT) to src/sdl2_input.c + include/sdl2_input.h. Keep it clean.
+    - docs/DESIGN.md: add an ADR "Editor erase reachable without a middle mouse button".
+      Record: the original's middle-click erase assumed a physical 3-button Sun/X11 mouse;
+      modern trackpads/2-button mice lack it; we ADD Shift+left-click as an erase affordance
+      (middle-click retained, right-click inspect unchanged). Cite original/editor.c:521-557.
+      This is a deliberate modern-input deviation, not an infidelity — name the constraint.
+    - xboing.man.in LEVEL EDITOR section (line ~193-216): update the erase description to
+      document Shift+left-click erase (the man already says middle=erase, right=reports
+      point value; keep that, add the Shift+click erase and note middle-click needs a
+      3-button mouse). Match the existing man-page style exactly (same .RS/.nf/.fi idiom,
+      concise prose).
+    Do NOT touch the grid/palette-border render (separate mission m-2026-07-12-012 on
+    game_render.c), the dialogue, HUD, or palette hit-test.

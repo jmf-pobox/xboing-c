@@ -1,0 +1,37 @@
+mission_id: m-2026-07-11-016
+status: closed
+type: design
+created_at: "2026-07-11T20:35:13Z"
+updated_at: "2026-07-11T20:49:49Z"
+closed_at: "2026-07-11T20:49:49Z"
+leader: claude
+worker: sjl
+evaluator:
+    handle: jdc
+    pinned_at: "2026-07-11T20:35:13Z"
+    hash: c08223356d3e6d5aed56e28da477a1aa2707509febfef7c5f62c25871a3e841f
+inputs:
+    ticket: xboing-di8
+    files:
+        - original/editor.c
+        - original/include/editor.h
+        - include/sdl2_renderer.h
+        - src/sdl2_renderer.c
+        - src/game_render.c
+        - include/editor_system.h
+write_set:
+    - docs/specs/2026-07-11-editor-window-width.md
+success_criteria:
+    - design doc exists at docs/specs/2026-07-11-editor-window-width.md
+    - specifies the entry-widen / exit-restore approach for SDL2ST_EDIT
+    - resolves SDL logical-size vs window-size and aspect-ratio/letterboxing
+    - play grid geometry and on-screen size unchanged; palette fully visible with margin
+    - restore-on-exit behavior specified; no leak into other modes
+    - verification plan (visual gates 4-6 + any headless assertion) and files to change
+    - cites original/editor.c and the modern constants; states whether z-spec is needed
+budget:
+    rounds: 2
+    reflection_after_each: true
+current_round: 2
+context: |
+    Design how to make the SDL2 level editor wide enough for the tool palette, faithful to the original. BUG (xboing-di8): the modern port keeps a fixed SDL2R_LOGICAL_WIDTH=575 (include/sdl2_renderer.h:21); the editor palette is drawn at PALETTE_X = OFFSET_X(35) + GAME_PLAY_WIDTH(495) + 15 = 545 with PALETTE_W=100 and a highlight rect out to x=645 (src/game_render.c:57-61, 712-735), overflowing the 575 logical width by ~70px, so it is clipped. ORIGINAL: on editor entry SetUpEditor widens the main window by EDITOR_TOOL_WIDTH=120 (original/include/editor.h:59) via ResizeMainWindow(oldWidth + EDITOR_TOOL_WIDTH, oldHeight) + SetWindowSizeHints (original/editor.c:161-164), and restores oldWidth on exit (original/editor.c:381-383). The constant EDITOR_TOOL_WIDTH=120 already exists unused in include/editor_system.h:27. The modern renderer uses SDL_RenderSetLogicalSize for letterbox scaling, so widening the logical width changes the aspect ratio/letterboxing — the design must resolve how the play area keeps its geometry and on-screen size while a ~120px palette panel is added on the right, and how the window/logical size are restored on editor exit. z-spec is likely NOT warranted here (deterministic geometry, no state invariant) — state explicitly in the doc whether it is needed. Produce the blueprint at docs/specs/2026-07-11-editor-window-width.md.

@@ -311,6 +311,46 @@ void sdl2_renderer_get_window_size(const sdl2_renderer_t *ctx, int *w, int *h)
     SDL_GetWindowSize(ctx->window, w, h);
 }
 
+int sdl2_renderer_set_logical_width(sdl2_renderer_t *ctx, int new_logical_width)
+{
+    if (ctx == NULL || ctx->window == NULL || ctx->renderer == NULL || ctx->logical_height <= 0 ||
+        new_logical_width <= 0)
+    {
+        return -1;
+    }
+    if (new_logical_width == ctx->logical_width)
+    {
+        return 0;
+    }
+
+    /* Resize the physical window before SDL_RenderSetLogicalSize so the
+     * logical-size call's scale computation reads the updated output size
+     * (ADR-004). Capture the old window size so the operation stays
+     * transactional: if SDL_RenderSetLogicalSize fails, revert the window
+     * so both logical and physical sizing stay unchanged. */
+    int old_win_w = 0;
+    int win_h = 0;
+    bool window_resized = false;
+    if (!ctx->fullscreen)
+    {
+        SDL_GetWindowSize(ctx->window, &old_win_w, &win_h);
+        int new_win_w = (new_logical_width * win_h) / ctx->logical_height;
+        SDL_SetWindowSize(ctx->window, new_win_w, win_h);
+        window_resized = true;
+    }
+
+    if (SDL_RenderSetLogicalSize(ctx->renderer, new_logical_width, ctx->logical_height) != 0)
+    {
+        if (window_resized)
+        {
+            SDL_SetWindowSize(ctx->window, old_win_w, win_h);
+        }
+        return -1;
+    }
+    ctx->logical_width = new_logical_width;
+    return 0;
+}
+
 int sdl2_renderer_save_screenshot(const sdl2_renderer_t *ctx, const char *path)
 {
     if (ctx == NULL || ctx->renderer == NULL || path == NULL)

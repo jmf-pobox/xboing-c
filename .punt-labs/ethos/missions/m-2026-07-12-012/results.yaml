@@ -1,0 +1,30 @@
+results:
+    - mission: m-2026-07-12-012
+      round: 1
+      created_at: "2026-07-12T03:42:00Z"
+      author: sjl
+      verdict: pass
+      confidence: 0.9
+      files_changed:
+        - path: src/game_render.c
+          added: 82
+          removed: 2
+      evidence:
+        - name: 'grid geometry ported from DrawEditorGrid (original/editor.c:139-153): xinc=PLAY_AREA_W/MAX_COL=55, yinc=PLAY_AREA_H/MAX_ROW=32, 3 paddle-reserved rows excluded; vertical x=55..495 y=0..480, horizontal y=32..480 x=0..495; red 0x770000 = reds[4] (original/init.c:231); offset by PLAY_AREA_X/Y'
+          status: pass
+        - name: 'z-order corrected (leader''s contract error): SDL2ST_EDIT dispatch now background -> grid -> playfield (blocks over grid), matching RedrawEditorArea order (original/editor.c:206-216); grid shows only in empty cells; gated off during EDITOR_STATE_TEST (:210-211)'
+          status: pass
+        - name: 2px red borders drawn around SDL2RGN_EDITOR (palette panel) and SDL2RGN_EDITOR_TYPE (Active box) via region rects, matching blockWindow/typeWindow 2px red border (original/stage.c:273-279)
+          status: pass
+        - name: editor-only, render-only; gameplay SDL2ST_GAME/PAUSE untouched; grid coords bounded within the play area so no clip needed
+          status: pass
+        - name: 'leader-verified: ctest debug 61/61 + asan 61/61, zero warnings; only src/game_render.c changed by this mission (game_modes.c/tests dirty from the disjoint concurrent erase mission m-2026-07-12-013)'
+          status: pass
+      open_questions:
+        - 'jck: confirm grid faithful to DrawEditorGrid (geometry + red under blocks, only empty cells), and the 2px red panel/Active-box borders match blockWindow/typeWindow (original/stage.c:273-279). Final pixel look is the user''s macOS screenshot check.'
+      prose: |-
+        Editor grid + palette-panel red borders. Grid ported from DrawEditorGrid, drawn under
+        blocks (z-order corrected after the leader's initial contract said overlay), gated off
+        during play-test; 2px red borders around the palette panel and Active box per the
+        original's blockWindow/typeWindow. Leader reviewed + ran both suites green. jck evaluates
+        faithfulness; final look verified on the user's Mac.

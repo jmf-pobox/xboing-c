@@ -51,6 +51,21 @@ void game_render_border_glow(const game_ctx_t *ctx);
 /* Render the editor palette sidebar. */
 void game_render_editor_palette(const game_ctx_t *ctx);
 
+/*
+ * Hit-test the editor palette at absolute pixel (mx, my). Returns the
+ * palette index at that pixel, or -1 if outside the palette. Uses the
+ * SAME shared geometry as game_render_editor_palette's render loop, so
+ * clicks always select the entry actually drawn at that pixel.
+ */
+int game_render_editor_palette_index_at(const game_ctx_t *ctx, int mx, int my);
+
+/*
+ * Compute the rendered center (absolute pixel coords) of palette entry
+ * `index`, using the same shared geometry as game_render_editor_palette
+ * and game_render_editor_palette_index_at. NULL cx/cy skips that axis.
+ */
+void game_render_editor_palette_entry_center(const game_ctx_t *ctx, int index, int *cx, int *cy);
+
 /* Render the message bar below the play area. */
 void game_render_messages(const game_ctx_t *ctx);
 

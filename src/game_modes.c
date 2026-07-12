@@ -47,6 +47,7 @@
 #include "sdl2_cursor.h"
 #include "sdl2_input.h"
 #include "sdl2_loop.h"
+#include "sdl2_renderer.h"
 #include "sdl2_state.h"
 #include "sfx_system.h"
 #include "special_system.h"
@@ -66,6 +67,7 @@ static int wisdom_pending;
 static int quit_pending;
 static int abort_pending;
 static int level_pending;
+static int editor_dialogue_pending;
 
 /* Stashed when the wisdom dialogue is pushed; consumed by the post-wisdom
  * insert path so personal+global rows agree on score/time/name. */
@@ -85,6 +87,10 @@ void game_modes_set_abort_pending(void)
 void game_modes_set_level_pending(void)
 {
     level_pending = 1;
+}
+void game_modes_set_editor_dialogue_pending(void)
+{
+    editor_dialogue_pending = 1;
 }
 
 /* Returns true when the game started (level loaded).  On a level-load
@@ -1326,6 +1332,18 @@ static void mode_dialogue_exit(sdl2_state_mode_t mode, void *ud)
             }
         }
     }
+
+    /* Editor dialogue result — S/L/T/N/C/Q flows all route through here,
+     * since the destination after every editor dialogue is always
+     * SDL2ST_EDIT (no per-destination logic needed, unlike abort_pending
+     * which must reach mode_game_enter).  See
+     * docs/specs/2026-07-11-editor-parity.md S1.4. */
+    if (editor_dialogue_pending)
+    {
+        editor_dialogue_pending = 0;
+        editor_system_dialogue_result(ctx->editor, dialogue_system_was_cancelled(ctx->dialogue),
+                                      dialogue_system_get_input(ctx->dialogue));
+    }
 }
 
 /* =========================================================================
@@ -1341,10 +1359,71 @@ static void mode_edit_enter(sdl2_state_mode_t mode, void *ud)
     if (ctx->cursor)
         sdl2_cursor_set(ctx->cursor, SDL2CUR_PLUS);
 
-    editor_system_reset(ctx->editor);
-    editor_system_init_palette(ctx->editor, MAX_STATIC_BLOCKS);
-    /* Don't clear blocks here — editor_system's do_load_level handles loading.
-     * The on_load_level callback calls block_system_clear_all before loading. */
+    /* Clear any specials (Killer/Reverse/x2/x4/...) left active from an
+     * abandoned game -- E is reachable mid-game (src/game_input.c) -- so
+     * the editor never shows or plays under leftover special state.
+     * Matches DoLoadLevel's TurnSpecialsOff(display) (original/editor.c:200).
+     * Placed unconditionally, outside the dialogue-resume guard below:
+     * special_system_turn_off is idempotent when specials are already off
+     * (src/special_system.c), so refiring it on every dialogue-close-back-
+     * to-editor is harmless -- unlike the reset/init-palette block, which
+     * genuinely must not re-run on a plain dialogue round-trip. */
+    special_system_turn_off(ctx->special);
+
+    /* sdl2_state_pop_dialogue calls mode_dialogue_exit then the restored
+     * mode's on_enter — and the restored mode for every editor-originated
+     * dialogue (Save/Load/Time/Name/Clear/Quit) is SDL2ST_EDIT, so this
+     * fires on every dialogue close, not just a genuine (re-)entry into
+     * the editor.  Guard the reset/init-palette/canvas-widen block so a
+     * plain Save dialogue round-trip doesn't wipe modified/level_number/
+     * level_title/palette-selection or fight the exit-side skip below.
+     * See docs/specs/2026-07-11-editor-parity.md S1.5(a). */
+    if (sdl2_state_previous(ctx->state) != SDL2ST_DIALOGUE)
+    {
+        /* Widen the canvas to reveal the tool palette, matching the
+         * original's ResizeMainWindow(oldWidth + EDITOR_TOOL_WIDTH, ...)
+         * (original/editor.c:161-164).  See
+         * docs/specs/2026-07-11-editor-window-width.md. */
+        sdl2_renderer_set_logical_width(ctx->renderer, SDL2R_LOGICAL_WIDTH + EDITOR_TOOL_WIDTH);
+
+        editor_system_reset(ctx->editor);
+        editor_system_init_palette(ctx->editor, MAX_STATIC_BLOCKS);
+        /* Don't clear blocks here — editor_system's do_load_level handles
+         * loading.  The on_load_level callback calls block_system_clear_all
+         * before loading. */
+    }
+}
+
+static void mode_edit_exit(sdl2_state_mode_t mode, void *ud)
+{
+    (void)mode;
+    game_ctx_t *ctx = ud;
+
+    /* sdl2_state_push_dialogue calls the CURRENT mode's on_exit before
+     * switching to SDL2ST_DIALOGUE — and it sets in_dialogue=true before
+     * that call, so sdl2_state_is_dialogue() is already true here when
+     * this fire is a dialogue push rather than a genuine exit (quit, or
+     * playtest via SDL2ST_GAME).  Without this guard, every editor
+     * dialogue would narrow the canvas immediately, and mode_edit_enter's
+     * dialogue-resume guard above (which correctly skips re-widening
+     * on a plain dialogue round-trip) would then leave it stranded at
+     * the narrow width for the rest of the session — found tracing the
+     * push/pop call sequence while implementing S1.5(a), not called out
+     * verbatim in the spec text. */
+    if (sdl2_state_is_dialogue(ctx->state))
+        return;
+
+    /* Restore the canvas width, matching the original's
+     * ResizeMainWindow(oldWidth, ...) on editor exit
+     * (original/editor.c:381-383). */
+    sdl2_renderer_set_logical_width(ctx->renderer, SDL2R_LOGICAL_WIDTH);
+
+    /* Hygiene beyond what the original needs: X11 windows are naturally
+     * isolated per mode, but the modern port re-renders every frame from
+     * shared game_ctx_t state, so the Button3 inspect override must not
+     * persist into a later editor session.  See
+     * docs/specs/2026-07-11-editor-parity.md S4.1. */
+    ctx->editor_inspect_active = 0;
 }
 
 static void mode_edit_update(sdl2_state_mode_t mode, void *ud)
@@ -1361,14 +1440,57 @@ static void mode_edit_update(sdl2_state_mode_t mode, void *ud)
     int play_x = mx - PLAY_AREA_X;
     int play_y = my - PLAY_AREA_Y;
 
-    /* Mouse buttons: left=draw, middle or right=erase */
+    /* Mouse buttons: left=draw, middle=erase, right=read-only inspect.
+     * Shift+left=erase too -- middle-click erase (original/editor.c:534-545)
+     * assumed a physical 3-button Sun/X11 mouse; modern trackpads and
+     * 2-button mice can't reach it.  Route the button-1 press through
+     * editor_system_mouse_button's button=2 (erase) case instead of
+     * button=1 (draw) whenever Shift is held.  This sets
+     * ctx->draw_action = EDITOR_ACTION_ERASE, so the unconditional
+     * editor_system_mouse_motion() call below drags-erases continuously,
+     * exactly like a middle-button drag -- no separate motion-path change
+     * needed.  See the "Editor erase reachable without a middle mouse
+     * button" ADR in docs/DESIGN.md. */
     if (sdl2_input_mouse_pressed(ctx->input, 1))
-        editor_system_mouse_button(ctx->editor, play_x, play_y, 1, 1);
+    {
+        if (sdl2_input_shift_held(ctx->input))
+            editor_system_mouse_button(ctx->editor, play_x, play_y, 2, 1);
+        else
+            editor_system_mouse_button(ctx->editor, play_x, play_y, 1, 1);
+    }
     else
         editor_system_mouse_button(ctx->editor, play_x, play_y, 1, 0);
 
-    if (sdl2_input_mouse_pressed(ctx->input, 2) || sdl2_input_mouse_pressed(ctx->input, 3))
+    if (sdl2_input_mouse_pressed(ctx->input, 2))
         editor_system_mouse_button(ctx->editor, play_x, play_y, 2, 1);
+
+    /* Button3 (right-click): read-only inspect, matching original/editor.c:
+     * 547-557 (DisplayScore(scoreWindow, blockP->hitPoints) / 0L, drawAction
+     * = ED_NOP -- never mutates the grid).  Bypasses
+     * editor_system_mouse_button entirely (per
+     * docs/specs/2026-07-11-editor-parity.md S4.1 recommendation b) since
+     * that function's button-3 case is a destructive-draw-state no-op, not
+     * a query path.  Row/col conversion uses editor_system_pixel_to_cell()
+     * -- the same arithmetic editor_system.c's internal pixel_to_col/
+     * pixel_to_row use for draw/erase, exported so this call site can't
+     * drift from theirs.  Out-of-bounds clicks are a no-op, matching the
+     * original's early return before its Button1/2/3 switch
+     * (original/editor.c:498-512) -- the previously inspected value is
+     * left on screen, exactly as scoreWindow is never reverted. */
+    if (sdl2_input_mouse_just_pressed(ctx->input, 3) && play_x >= 0 && play_x < EDITOR_PLAY_WIDTH &&
+        play_y >= 0 && play_y < EDITOR_PLAY_HEIGHT)
+    {
+        int inspect_row = 0, inspect_col = 0;
+        editor_system_pixel_to_cell(play_x, play_y, &inspect_row, &inspect_col);
+
+        if (inspect_row >= 0 && inspect_row < EDITOR_MAX_ROW_EDIT && inspect_col >= 0 &&
+            inspect_col < EDITOR_MAX_COL_EDIT)
+        {
+            ctx->editor_inspect_active = 1;
+            ctx->editor_inspect_value =
+                (unsigned long)block_system_get_hit_points(ctx->block, inspect_row, inspect_col);
+        }
+    }
 
     /* Mouse drag */
     editor_system_mouse_motion(ctx->editor, play_x, play_y);
@@ -1391,10 +1513,20 @@ static void mode_edit_update(sdl2_state_mode_t mode, void *ud)
     if (sdl2_input_just_pressed(ctx->input, SDL2I_QUIT) ||
         sdl2_input_just_pressed(ctx->input, SDL2I_ABORT))
     {
-        /* Try editor's quit flow first (sets state to FINISH) */
+        /* Try editor's quit flow first — a successful request now leaves
+         * the state at EDITOR_STATE_DIALOGUE (not FINISH) while the
+         * confirm dialogue is open. */
         editor_system_key_input(ctx->editor, EDITOR_KEY_QUIT);
-        /* If the editor didn't handle it (state unchanged), force exit */
-        if (editor_system_get_state(ctx->editor) != EDITOR_STATE_FINISH)
+        /* Force exit only when the editor neither opened a dialogue nor
+         * finished on its own — e.g. no on_request_yes_no_dialogue
+         * callback wired.  Requiring the state machine to still be in
+         * SDL2ST_EDIT stops this from killing the dialogue that was
+         * just opened: sdl2_state_current() has already flipped to
+         * SDL2ST_DIALOGUE by the time editor_system_key_input() above
+         * returns (the request callback pushes it synchronously).  See
+         * docs/specs/2026-07-11-editor-parity.md S1.5(b). */
+        if (sdl2_state_current(ctx->state) == SDL2ST_EDIT &&
+            editor_system_get_state(ctx->editor) != EDITOR_STATE_FINISH)
             sdl2_state_transition(ctx->state, SDL2ST_INTRO);
     }
     /* Editor keys match legacy editor.c:handleAllEditorKeys():
@@ -1465,18 +1597,15 @@ static void mode_edit_update(sdl2_state_mode_t mode, void *ud)
         editor_system_select_palette(ctx->editor, (sel - 1 + count) % count);
     }
 
-    /* Palette selection via mouse click on sidebar (x > play area right edge) */
+    /* Palette selection via mouse click on sidebar. Hit-test comes from
+     * game_render_editor_palette_index_at() — the SAME shared geometry the
+     * render loop uses (game_render.c) — so a click always selects the
+     * entry actually drawn at that pixel. */
+    if (sdl2_input_mouse_pressed(ctx->input, 1))
     {
-        int palette_x = PLAY_AREA_X + 495 + 15; /* PALETTE_X from game_render.c */
-        /* cppcheck-suppress variableScope ; kept local to this block for clarity */
-        int palette_entry_h = 25;
-        if (mx > palette_x && sdl2_input_mouse_pressed(ctx->input, 1))
-        {
-            int idx = (my - PLAY_AREA_Y) / palette_entry_h;
-            int count = editor_system_get_palette_count(ctx->editor);
-            if (idx >= 0 && idx < count)
-                editor_system_select_palette(ctx->editor, idx);
-        }
+        int pidx = game_render_editor_palette_index_at(ctx, mx, my);
+        if (pidx >= 0)
+            editor_system_select_palette(ctx->editor, pidx);
     }
 }
 
@@ -1591,6 +1720,7 @@ void game_modes_register(game_ctx_t *ctx)
         sdl2_state_mode_def_t def = {
             .on_enter = mode_edit_enter,
             .on_update = mode_edit_update,
+            .on_exit = mode_edit_exit,
         };
         sdl2_state_register(ctx->state, SDL2ST_EDIT, &def);
     }

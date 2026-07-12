@@ -1,0 +1,41 @@
+results:
+    - mission: m-2026-07-12-013
+      round: 1
+      created_at: "2026-07-12T03:40:05Z"
+      author: jdc
+      verdict: pass
+      confidence: 0.9
+      files_changed:
+        - path: src/game_modes.c
+          added: 18
+          removed: 3
+        - path: docs/DESIGN.md
+          added: 30
+          removed: 0
+        - path: xboing.man.in
+          added: 4
+          removed: 3
+        - path: tests/test_integration_editor.c
+          added: 70
+          removed: 0
+      evidence:
+        - name: 'Shift+left-click erases: button-1 press routed to editor_system_mouse_button(...,2,1) when sdl2_input_shift_held, else draw (1,1); shift-drag erases continuously via the existing draw_action mechanism (motion path unchanged); middle-click erase + right-click inspect untouched'
+          status: pass
+        - name: Shift detected via the EXISTING sdl2_input_shift_held accessor (include/sdl2_input.h:173, already used for Shift+H high scores) — no new input code; sdl2_input.c/.h untouched (git diff empty)
+          status: pass
+        - name: 'ADR-058 ''Editor erase reachable without a middle mouse button'' added to docs/DESIGN.md: cites original/editor.c:534-545, names the modern-hardware constraint, Shift+click added alongside (not replacing) middle-click, right-click inspect unchanged'
+          status: pass
+        - name: 'man page (xboing.man.in LEVEL EDITOR) updated in-style: ''left draws, Shift+left-click erases, right reports point value; middle also erases for 3-button mice'' — matches the file''s Shift+H modifier idiom'
+          status: pass
+        - name: '2 genuine tests via real mode_edit_update: shift-left-click erases a drawn cell; shift-left-drag erases two cells (new tick_with_mouse_button_shift + tick_with_mouse_motion helpers inject real SDL LSHIFT + mouse events)'
+          status: pass
+        - name: 'leader-verified: ctest debug 61/61 + asan 61/61, zero warnings (tree also contains the disjoint m-2026-07-12-012 game_render.c grid/border work — independent feature); only the 4 Mission-B write-set files changed by this mission'
+          status: pass
+      open_questions:
+        - 'jck: confirm the Shift+left-click erase affordance is a reasonable, well-documented modern-input deviation (ADR-058) — not an infidelity — and that middle-click/right-click remain faithful; confirm the man-page editor section reads in the same style as the rest of the page'
+      prose: |-
+        Mac-friendly erase per user decision: Shift+left-click added alongside the retained
+        middle-click erase, right-click inspect unchanged. Reuses the existing shift accessor
+        (no new input code); shift-drag erases via the same draw_action path middle-drag uses.
+        ADR-058 + man-page editor update. Leader reviewed the diff. jck evaluates the input-model
+        deviation + docs.

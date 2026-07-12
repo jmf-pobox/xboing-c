@@ -1,0 +1,14 @@
+reflections:
+    - round: 1
+      created_at: "2026-07-12T02:22:28Z"
+      author: jck
+      converging: true
+      signals:
+        - 'HUD gate: game_render.c:1303-1305 includes effective==SDL2ST_EDIT (effective resolves DIALOGUE->saved_mode), block calls score/lives/messages/timer/specials — matches DoLoadLevel always-mapped windows (original/editor.c:196-201)'
+        - 'level number: game_render_lives redirects to editor_system_get_level_number in EDIT, clamp<=0->1 reproduces DoLoadLevel hardcoded 1 (original/editor.c:198) / LoadALevel num (:869-870)'
+        - 'timer: static level_system_get_time_bonus in editor, bypasses gameplay time_bonus_total guard, no countdown — faithful to SetLevelTimeBonus (original/file.c:366)'
+        - 'specials reset: special_system_turn_off unconditional at mode_edit_enter top, outside dialogue guard, idempotent; SAVING exemption symmetric (original/special.c:90 commented ToggleSaving vs special_system.c:138 saving-not-cleared); SPECIAL_KILLER is the correct test choice'
+        - 'test genuine: drives real sdl2_state_transition->mode_edit_enter, asserts via special_system_is_active'
+        - 'PROCESS NOTE: evaluator''s first pass raised a false blocker (wrong location read); resolved by leader evidence + evaluator self-correction, not a leader override'
+      recommendation: stop
+      reason: APPROVE after re-check. HUD content-sync faithful on all five criteria. jck's initial item-1 blocker was a misread of the render location (it reviewed the per-mode switch case, not the outer HUD shell block); leader pointed it to game_render.c:1303-1305 and jck confirmed SDL2ST_EDIT is in the shared HUD gate. Leader-verified build 61/61 both.
