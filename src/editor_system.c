@@ -105,6 +105,14 @@ static int pixel_to_row(int y)
     return y / ROW_HEIGHT;
 }
 
+void editor_system_pixel_to_cell(int play_x, int play_y, int *row, int *col)
+{
+    if (col)
+        *col = pixel_to_col(play_x);
+    if (row)
+        *row = pixel_to_row(play_y);
+}
+
 static int in_editable_bounds(int row, int col)
 {
     return row >= 0 && row < EDITOR_MAX_ROW_EDIT && col >= 0 && col < EDITOR_MAX_COL_EDIT;

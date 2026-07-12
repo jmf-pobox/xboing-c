@@ -1455,18 +1455,18 @@ static void mode_edit_update(sdl2_state_mode_t mode, void *ud)
      * editor_system_mouse_button entirely (per
      * docs/specs/2026-07-11-editor-parity.md S4.1 recommendation b) since
      * that function's button-3 case is a destructive-draw-state no-op, not
-     * a query path.  Row/col conversion mirrors editor_system.c's
-     * pixel_to_col/pixel_to_row + in_editable_bounds (both file-static,
-     * not exported) using the same public constants those helpers are
-     * built from.  Out-of-bounds clicks are a no-op, matching the
+     * a query path.  Row/col conversion uses editor_system_pixel_to_cell()
+     * -- the same arithmetic editor_system.c's internal pixel_to_col/
+     * pixel_to_row use for draw/erase, exported so this call site can't
+     * drift from theirs.  Out-of-bounds clicks are a no-op, matching the
      * original's early return before its Button1/2/3 switch
      * (original/editor.c:498-512) -- the previously inspected value is
      * left on screen, exactly as scoreWindow is never reverted. */
     if (sdl2_input_mouse_pressed(ctx->input, 3) && play_x >= 0 && play_x < EDITOR_PLAY_WIDTH &&
         play_y >= 0 && play_y < EDITOR_PLAY_HEIGHT)
     {
-        int inspect_col = play_x / (EDITOR_PLAY_WIDTH / EDITOR_MAX_COL_EDIT);
-        int inspect_row = play_y / (EDITOR_PLAY_HEIGHT / MAX_ROW);
+        int inspect_row = 0, inspect_col = 0;
+        editor_system_pixel_to_cell(play_x, play_y, &inspect_row, &inspect_col);
 
         if (inspect_row >= 0 && inspect_row < EDITOR_MAX_ROW_EDIT && inspect_col >= 0 &&
             inspect_col < EDITOR_MAX_COL_EDIT)
@@ -1582,18 +1582,15 @@ static void mode_edit_update(sdl2_state_mode_t mode, void *ud)
         editor_system_select_palette(ctx->editor, (sel - 1 + count) % count);
     }
 
-    /* Palette selection via mouse click on sidebar (x > play area right edge) */
+    /* Palette selection via mouse click on sidebar. Hit-test comes from
+     * game_render_editor_palette_index_at() — the SAME shared geometry the
+     * render loop uses (game_render.c) — so a click always selects the
+     * entry actually drawn at that pixel. */
+    if (sdl2_input_mouse_pressed(ctx->input, 1))
     {
-        int palette_x = PLAY_AREA_X + 495 + 15; /* PALETTE_X from game_render.c */
-        /* cppcheck-suppress variableScope ; kept local to this block for clarity */
-        int palette_entry_h = 25;
-        if (mx > palette_x && sdl2_input_mouse_pressed(ctx->input, 1))
-        {
-            int idx = (my - PLAY_AREA_Y) / palette_entry_h;
-            int count = editor_system_get_palette_count(ctx->editor);
-            if (idx >= 0 && idx < count)
-                editor_system_select_palette(ctx->editor, idx);
-        }
+        int pidx = game_render_editor_palette_index_at(ctx, mx, my);
+        if (pidx >= 0)
+            editor_system_select_palette(ctx->editor, pidx);
     }
 }
 

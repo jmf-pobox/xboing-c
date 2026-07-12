@@ -33,6 +33,7 @@
 #include "editor_system.h"
 #include "game_context.h"
 #include "game_init.h"
+#include "game_render.h"
 #include "level_system.h"
 #include "sdl2_cursor.h"
 #include "sdl2_input.h"
@@ -805,6 +806,67 @@ static void test_editor_right_click_empty_cell_inspects_zero(void **vstate)
 }
 
 /* =========================================================================
+ * Render/click agreement (bead xboing-di8) -- the palette rendered
+ * correctly but clicking selected the WRONG entry because the click
+ * handler (game_modes.c) had its own stale single-column math instead of
+ * sharing the render loop's geometry (game_render.c's PALETTE_* macros).
+ * This test pins render<->click agreement using the REAL production
+ * functions on both sides -- game_render_editor_palette_entry_center()
+ * computes the center from the exact constants the render loop draws
+ * with, and game_render_editor_palette_index_at() is the exact function
+ * game_modes.c's mouse-click handler calls.  No test-local mirror of
+ * either geometry -- this bug class (render and input never verified to
+ * agree) can't recur silently once this test exists.
+ * ========================================================================= */
+
+static void test_editor_palette_click_matches_render(void **vstate)
+{
+    test_fixture_t *f = (test_fixture_t *)*vstate;
+    game_ctx_t *ctx = f->ctx;
+
+    int count = editor_system_get_palette_count(ctx->editor);
+    assert_true(count > 0);
+
+    /* For every palette entry, the pixel at its rendered swatch center
+     * must hit-test back to that same index. */
+    for (int i = 0; i < count; i++)
+    {
+        int cx = -1, cy = -1;
+        game_render_editor_palette_entry_center(ctx, i, &cx, &cy);
+
+        int hit = game_render_editor_palette_index_at(ctx, cx, cy);
+        assert_int_equal(hit, i);
+    }
+}
+
+static void test_editor_palette_click_column_and_bounds(void **vstate)
+{
+    test_fixture_t *f = (test_fixture_t *)*vstate;
+    game_ctx_t *ctx = f->ctx;
+
+    /* Column 1 holds indices 0..min(MAX_ROW, MAX_STATIC_BLOCKS)-1 (same
+     * split editor_system_init_palette fills and game_render_editor_
+     * palette's render loop lays out -- game_render.c PALETTE_COL1_COUNT). */
+    int col1_count = (MAX_ROW < MAX_STATIC_BLOCKS) ? MAX_ROW : MAX_STATIC_BLOCKS;
+    int count = editor_system_get_palette_count(ctx->editor);
+    assert_true(count > col1_count);
+
+    /* Column 1, row 0 -> index 0. */
+    int cx0 = -1, cy0 = -1;
+    game_render_editor_palette_entry_center(ctx, 0, &cx0, &cy0);
+    assert_int_equal(game_render_editor_palette_index_at(ctx, cx0, cy0), 0);
+
+    /* Column 2, row 0 -> index col1_count (first entry past column 1). */
+    int cx1 = -1, cy1 = -1;
+    game_render_editor_palette_entry_center(ctx, col1_count, &cx1, &cy1);
+    assert_int_equal(game_render_editor_palette_index_at(ctx, cx1, cy1), col1_count);
+    assert_true(cx1 > cx0); /* Sanity: column 2 really is to the right */
+
+    /* Outside the palette panel entirely (inside the play area): -1. */
+    assert_int_equal(game_render_editor_palette_index_at(ctx, 0, 0), -1);
+}
+
+/* =========================================================================
  * Test runner
  * ========================================================================= */
 
@@ -853,6 +915,12 @@ int main(void)
         cmocka_unit_test_setup_teardown(test_editor_right_click_inspects_without_erasing,
                                         setup_edit_mode, teardown),
         cmocka_unit_test_setup_teardown(test_editor_right_click_empty_cell_inspects_zero,
+                                        setup_edit_mode, teardown),
+
+        /* Palette render/click agreement (bead xboing-di8) */
+        cmocka_unit_test_setup_teardown(test_editor_palette_click_matches_render, setup_edit_mode,
+                                        teardown),
+        cmocka_unit_test_setup_teardown(test_editor_palette_click_column_and_bounds,
                                         setup_edit_mode, teardown),
     };
 

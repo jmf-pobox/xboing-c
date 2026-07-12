@@ -247,6 +247,25 @@ editor_draw_action_t editor_system_mouse_button(editor_system_t *ctx, int x, int
  */
 void editor_system_mouse_motion(editor_system_t *ctx, int x, int y);
 
+/*
+ * Convert play-area-relative pixel coordinates to a grid row/col.
+ *
+ * play_x, play_y: pixel coordinates within the play window (same origin
+ *                 as editor_system_mouse_button/editor_system_mouse_motion).
+ * row, col:       receive the computed grid position. Not bounds-checked
+ *                 against EDITOR_MAX_ROW_EDIT/EDITOR_MAX_COL_EDIT — callers
+ *                 that need editable-bounds validation must check the
+ *                 output themselves (see editor_system_mouse_button's
+ *                 in_editable_bounds pattern). NULL row or col skips that
+ *                 axis.
+ *
+ * This is the canonical row/col arithmetic used internally by
+ * editor_system_mouse_button/editor_system_mouse_motion, exported so
+ * other call sites (e.g. the right-click inspect handler in
+ * game_modes.c) can't drift from it with a hand-rolled copy.
+ */
+void editor_system_pixel_to_cell(int play_x, int play_y, int *row, int *col);
+
 /* =========================================================================
  * Keyboard commands
  * ========================================================================= */

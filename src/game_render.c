@@ -754,10 +754,29 @@ static void render_main_background(const game_ctx_t *ctx)
  * Editor palette rendering — sidebar with block type selection
  * ========================================================================= */
 
-/* Palette renders to the right of the play area */
+/* Palette renders to the right of the play area.
+ *
+ * These constants are the SINGLE shared geometry for both the render loop
+ * (game_render_editor_palette) and mouse hit-testing
+ * (game_render_editor_palette_index_at / game_render_editor_palette_entry_center).
+ * Render and hit-test must never diverge again — if the layout changes,
+ * change it here once. */
 #define PALETTE_X (PLAY_AREA_X + PLAY_AREA_W + 15)
 #define PALETTE_Y PLAY_AREA_Y
 #define PALETTE_ROW_PITCH (PLAY_AREA_H / MAX_ROW)
+
+/* Two-column layout (original/editor.c:329-369, SetupBlockWindow).
+ * Column 1 holds indices 0..min(MAX_ROW, MAX_STATIC_BLOCKS)-1; column 2
+ * continues with the remaining static types, then the 5 counter-block
+ * slide variants, matching editor_system_init_palette's fill order. */
+#define PALETTE_COL1_COUNT ((MAX_ROW < MAX_STATIC_BLOCKS) ? MAX_ROW : MAX_STATIC_BLOCKS)
+
+/* Column boundary — mx < this is column 1, mx >= this is column 2. */
+#define PALETTE_COL_DIVIDER_X (PALETTE_X + EDITOR_TOOL_WIDTH / 2)
+
+/* Horizontal center of each column's swatches. */
+#define PALETTE_COL1_CENTER_X (PALETTE_X + EDITOR_TOOL_WIDTH / 4)
+#define PALETTE_COL2_CENTER_X (PALETTE_X + EDITOR_TOOL_WIDTH / 2 + EDITOR_TOOL_WIDTH / 4)
 
 /*
  * Look up the sprite key for a palette entry, accounting for COUNTER_BLK's
@@ -775,12 +794,7 @@ void game_render_editor_palette(const game_ctx_t *ctx)
 {
     SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
     int count = editor_system_get_palette_count(ctx->editor);
-
-    /* Two-column layout (original/editor.c:329-369, SetupBlockWindow).
-     * Column 1 holds indices 0..min(MAX_ROW, MAX_STATIC_BLOCKS)-1; column 2
-     * continues with the remaining static types, then the 5 counter-block
-     * slide variants, matching editor_system_init_palette's fill order. */
-    int col1_count = (MAX_ROW < MAX_STATIC_BLOCKS) ? MAX_ROW : MAX_STATIC_BLOCKS;
+    int col1_count = PALETTE_COL1_COUNT;
 
     for (int i = 0; i < count; i++)
     {
@@ -798,8 +812,7 @@ void game_render_editor_palette(const game_ctx_t *ctx)
 
         int in_col1 = i < col1_count;
         int row = in_col1 ? i : i - col1_count;
-        int col_base = in_col1 ? PALETTE_X + EDITOR_TOOL_WIDTH / 4
-                                : PALETTE_X + EDITOR_TOOL_WIDTH / 2 + EDITOR_TOOL_WIDTH / 4;
+        int col_base = in_col1 ? PALETTE_COL1_CENTER_X : PALETTE_COL2_CENTER_X;
         int ex = col_base - tex.width / 2;
         /* Center each sprite within its row cell (original/editor.c:339:
          * y = y1 + ((editorRowHeight / 2) - (BlockInfo[i].height / 2))). */
@@ -858,6 +871,59 @@ void game_render_editor_palette(const game_ctx_t *ctx)
         snprintf(buf, sizeof(buf), "Level %d", level);
         sdl2_font_draw(ctx->font, SDL2F_FONT_COPY, buf, PLAY_AREA_X + 200, PLAY_AREA_Y - 15, white);
     }
+}
+
+/*
+ * Hit-test the editor palette at absolute pixel (mx, my).
+ *
+ * Uses the SAME geometry constants as game_render_editor_palette's render
+ * loop above, so a click can never select a different entry than the one
+ * rendered at that pixel.  The click region is the full row-band within a
+ * column half (not the tight sprite rect) — clicking anywhere in a
+ * swatch's cell selects it, matching the render loop's per-cell layout.
+ *
+ * Returns the palette index at (mx, my), or -1 if outside the palette.
+ */
+int game_render_editor_palette_index_at(const game_ctx_t *ctx, int mx, int my)
+{
+    if (mx < PALETTE_X || mx >= PALETTE_X + EDITOR_TOOL_WIDTH || my < PALETTE_Y)
+        return -1;
+
+    int col1_count = PALETTE_COL1_COUNT;
+    int in_col1 = mx < PALETTE_COL_DIVIDER_X;
+    int row = (my - PALETTE_Y) / PALETTE_ROW_PITCH;
+    int index = in_col1 ? row : col1_count + row;
+
+    if (in_col1 && row >= col1_count)
+        return -1;
+
+    int count = editor_system_get_palette_count(ctx->editor);
+    if (index < 0 || index >= count)
+        return -1;
+
+    return index;
+}
+
+/*
+ * Compute the rendered center (absolute pixel coords) of palette entry
+ * `index`, using the same PALETTE_* constants as the render loop and
+ * game_render_editor_palette_index_at.  Row centering is texture-size
+ * independent — the render loop's ey = row_top + (pitch/2 - tex_h/2), so
+ * ey + tex_h/2 == row_top + pitch/2 regardless of tex_h.  This is the
+ * agreement anchor tests use to prove render and hit-test never diverge.
+ */
+void game_render_editor_palette_entry_center(const game_ctx_t *ctx, int index, int *cx, int *cy)
+{
+    (void)ctx;
+
+    int col1_count = PALETTE_COL1_COUNT;
+    int in_col1 = index < col1_count;
+    int row = in_col1 ? index : index - col1_count;
+
+    if (cx)
+        *cx = in_col1 ? PALETTE_COL1_CENTER_X : PALETTE_COL2_CENTER_X;
+    if (cy)
+        *cy = PALETTE_Y + row * PALETTE_ROW_PITCH + PALETTE_ROW_PITCH / 2;
 }
 
 /* =========================================================================

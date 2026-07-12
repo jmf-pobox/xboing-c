@@ -1,0 +1,45 @@
+results:
+    - mission: m-2026-07-12-011
+      round: 1
+      created_at: "2026-07-12T03:14:50Z"
+      author: sjl
+      verdict: pass
+      confidence: 0.9
+      files_changed:
+        - path: src/game_render.c
+          added: 74
+          removed: 10
+        - path: include/game_render.h
+          added: 15
+          removed: 0
+        - path: src/game_modes.c
+          added: 12
+          removed: 19
+        - path: src/editor_system.c
+          added: 8
+          removed: 0
+        - path: include/editor_system.h
+          added: 19
+          removed: 0
+        - path: tests/test_integration_editor.c
+          added: 68
+          removed: 0
+      evidence:
+        - name: 'single source: PALETTE_X/Y/ROW_PITCH/COL1_COUNT/COL_DIVIDER_X/COL1_CENTER_X/COL2_CENTER_X macros used by BOTH the render loop and the hit-test/center functions (''change it here once'' comment); render loop refactored to use them'
+          status: pass
+        - name: 'game_render_editor_palette_index_at (game_render.h) inverts the two-column geometry: mx bounds + col-divider + row/pitch + index; validates in_col1&&row>=col1_count and index<count; game_modes.c palette click now calls it (old single-column palette_entry_h=25 math deleted)'
+          status: pass
+        - name: 'FIX B: editor_system_pixel_to_cell exported (wraps the existing static pixel_to_col/pixel_to_row), used by game_modes.c right-click inspect; stage-10 replica removed; behavior byte-identical'
+          status: pass
+        - name: 'AGREEMENT TEST (regression guard for this bug class): test_editor_palette_click_matches_render — for every index i, game_render_editor_palette_entry_center(i) then assert index_at(center)==i, using the real production functions (no mirror); plus col1-row0->0, col2-row0->col1_count, outside-panel->-1'
+          status: pass
+        - name: 'leader-verified: cmake debug+asan rebuilt, ctest 61/61 both incl. the agreement tests, zero -Werror/-Wconversion warnings; only the 6 write-set files changed; no CMake change'
+          status: pass
+      open_questions:
+        - 'jdc: verify the hit-test inversion is correct for both columns and all edge rows (col2 row-bound covered by index<count; col1 by row>=col1_count); confirm the agreement test genuinely pins render<->click (uses real functions, all 30 indices); confirm editor_system_pixel_to_cell is byte-identical to the removed replica'
+      prose: |-
+        Fixes the user-reported palette-selection bug: render and click hit-test now derive from
+        ONE shared geometry definition, with a for-every-index agreement test that pins them so
+        they cannot diverge again. Also unifies the play-grid pixel->cell math (jck's DRY rec) via
+        an exported editor_system_pixel_to_cell. Leader reviewed the diff + ran both suites green.
+        jdc evaluates coordinate correctness + the agreement test.

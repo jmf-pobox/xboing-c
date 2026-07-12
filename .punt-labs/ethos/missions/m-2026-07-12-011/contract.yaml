@@ -1,0 +1,71 @@
+mission_id: m-2026-07-12-011
+status: closed
+type: implement
+created_at: "2026-07-12T03:02:47Z"
+updated_at: "2026-07-12T03:20:34Z"
+closed_at: "2026-07-12T03:20:34Z"
+leader: claude
+worker: sjl
+evaluator:
+    handle: jdc
+    pinned_at: "2026-07-12T03:02:47Z"
+    hash: c08223356d3e6d5aed56e28da477a1aa2707509febfef7c5f62c25871a3e841f
+inputs:
+    ticket: xboing-di8
+write_set:
+    - src/game_render.c
+    - include/game_render.h
+    - src/game_modes.c
+    - src/editor_system.c
+    - include/editor_system.h
+    - tests/test_integration_editor.c
+success_criteria:
+    - game_render_editor_palette_index_at(ctx,mx,my) added (declared in game_render.h), using the SAME two-column geometry (PALETTE_X/Y, row pitch PLAY_AREA_H/MAX_ROW, col1_count=min(MAX_ROW,MAX_STATIC_BLOCKS), column divider) as the render loop; render loop and hit-test derive column/row/pitch from one shared definition (constants or a shared entry-rect helper) — they cannot diverge
+    - game_modes.c palette click uses game_render_editor_palette_index_at + editor_system_select_palette; the old single-column palette_entry_h=25 math is deleted
+    - editor_system_pixel_to_cell (or exported pixel_to_col/pixel_to_row) is public in editor_system.h; game_modes.c right-click inspect uses it; the stage-10 play-grid replica is removed; behavior unchanged
+    - 'THE KEY REGRESSION TEST (this class of bug): in test_integration_editor.c, for EVERY palette index i in [0,count), compute i''s rendered swatch center from the shared geometry (or a render-side entry-rect accessor) and assert game_render_editor_palette_index_at(ctx, center_x, center_y) == i. This pins render<->click agreement. Also a couple of concrete cases (click col1 row 0 -> index 0; click col2 row 0 -> index col1_count) and out-of-panel -> -1'
+    - cmake --preset debug + build clean (zero -Werror); ctest --test-dir build green incl. the agreement test; make asan-test green (rebuild build-asan); only the 6 write-set files changed; no CMake change
+    - 'Visual note for the Ubuntu re-run: clicking any swatch (either column) now selects exactly that block; the Active: box + placement reflect the clicked type'
+budget:
+    rounds: 3
+    reflection_after_each: true
+current_round: 1
+context: |
+    USER-REPORTED BUG (highest priority) + jck DRY rec. The user ran the current build:
+    the two-column palette RENDERS correctly, but CLICKING a swatch selects the WRONG
+    block — "what I click on to select and what is selected are completely different."
+
+    ROOT CAUSE: the palette render and the palette click hit-test each encode the palette
+    geometry, and they diverged. The render (game_render_editor_palette, src/game_render.c,
+    stages 5+6) uses TWO columns at row pitch PLAY_AREA_H/MAX_ROW (=32): col1 = indices
+    0..17 centered ~x=575, col2 = 18..29 centered ~x=635. But the click hit-test
+    (src/game_modes.c:1585-1596) still uses the OLD single-column math: palette_entry_h=25,
+    idx = (my - PLAY_AREA_Y) / 25, ignoring the column (x) entirely. So clicks map by y-only
+    at the wrong pitch to col1 indices — totally divergent from what's drawn.
+
+    FIX A (the bug) — single source of truth for the palette geometry. Make the render AND
+    the hit-test derive from ONE geometry definition so they can never diverge again:
+    - In src/game_render.c, promote the palette geometry to named constants/helpers used by
+      BOTH the render loop and a new hit-test function. Add
+      `int game_render_editor_palette_index_at(const game_ctx_t *ctx, int mx, int my)`
+      (declared in include/game_render.h) returning the palette index at absolute (mx,my),
+      or -1 if outside any swatch. It MUST use the exact same column split, row pitch, col1
+      count, and PALETTE_X/Y the render loop uses (col1 if mx left of the column divider
+      PALETTE_X+EDITOR_TOOL_WIDTH/2, else col2; row = (my-PALETTE_Y)/pitch; index = in_col1 ?
+      row : col1_count + row; validate row within its column and index < palette_count).
+      The click region per entry should be the forgiving row-band within the column half
+      (not the tight sprite rect), so a click anywhere on a swatch's cell selects it.
+    - src/game_modes.c: replace the broken single-column hit-test block (1585-1596) with a
+      call to game_render_editor_palette_index_at(ctx, mx, my); if it returns >=0, call
+      editor_system_select_palette. Delete the local palette_entry_h=25 / single-column math.
+
+    FIX B (jck's DRY rec, fold in) — the play-grid pixel->cell math is duplicated: editor_system.c
+    has static pixel_to_col/pixel_to_row (COL_WIDTH/ROW_HEIGHT macros, editor_system.c:24-25,
+    98-106) and stage 10 replicated the identical arithmetic in game_modes.c's right-click
+    inspect. Export ONE canonical helper `void editor_system_pixel_to_cell(int play_x, int
+    play_y, int *row, int *col)` (or expose pixel_to_col/pixel_to_row) from editor_system.h,
+    and use it in game_modes.c's right-click inspect, removing the replica. Keep behavior
+    byte-identical.
+
+    Do NOT change the two-column LAYOUT (jck-approved in 5+6) — only make the hit-test match
+    it. Do NOT touch dialogue/HUD/paddle/RANDOM. This is coordinate-mapping only.
