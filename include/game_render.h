@@ -39,6 +39,15 @@ void game_render_lives(const game_ctx_t *ctx);
 /* Render the ammo belt (bullet strip) in the level panel. */
 void game_render_ammo_belt(const game_ctx_t *ctx);
 
+/*
+ * Pure seam — number of bullets game_render_ammo_belt draws: the raw
+ * gun_system_get_ammo(ctx->gun) count, floored at 0.  No unlimited-ammo
+ * check, no GUN_MAX_AMMO cap — see game_render_ammo_belt_count's
+ * doc comment in game_render.c for why (xboing-65h).  Returns 0 if
+ * ctx or ctx->gun is NULL.
+ */
+int game_render_ammo_belt_count(const game_ctx_t *ctx);
+
 /* Render the EyeDude character. */
 void game_render_eyedude(const game_ctx_t *ctx);
 

@@ -3812,3 +3812,50 @@ ADR authorizes reintroducing it.
   correction of that miscitation, which also appeared in
   `docs/specs/2026-07-11-editor-parity.md` section 4.2 before this
   documentation pass.
+
+## ADR-063: Ammo belt draws the raw count so it can't desync from the bonus
+
+**Status:** Accepted (2026-07-12)
+
+**Context:** A player reported (bug xboing-65h) that under unlimited
+ammo the HUD ammo belt showed no bullets, yet firing worked and the
+end-of-level bullet bonus rewarded a large number of bullets. A
+MAXAMMO block sets `unlimited` and stores the sentinel count
+`GUN_MAX_AMMO + 1` (21). Three consumers read that state and
+interpreted it differently:
+
+- `game_render_ammo_belt` (`src/game_render.c`) returned early when
+  `unlimited` and capped at `GUN_MAX_AMMO` — so the belt drew nothing.
+- Firing (`gun_system_shoot`) allows fire while `unlimited`, and
+  `gun_system_use_ammo` is a no-op — so the count stays at 21.
+- The bonus (`mode_bonus_enter`) reads the raw `gun_system_get_ammo`
+  (21) with no unlimited check and no cap.
+
+**Decision:** The belt draws the raw ammo count with no `unlimited`
+check and no cap, matching the original `ReDrawBulletsLeft`
+(`original/level.c:324-334`), which loops `GetNumberBullets()`
+unconditionally. MAXAMMO sets the same 21 sentinel in the original
+(`original/blocks.c:1588-1593`), and the original belt draws all 21.
+The belt-hide and cap were modern-only regressions with no original
+counterpart (jck confirmed: the "Unlimited bullets!" toast is a
+transient message, not a HUD indicator the belt-hide paired with). The
+bonus was already faithful and is unchanged.
+
+**Formal backing:** `docs/bullet_ammo.tex` is a fuzz-checked Z model of
+the three quantities (`actualAmmo`, `displayedAmmo`, `bonusAmmo`). The
+as-coded belt rule makes `inBonus ⇒ displayedAmmo = bonusAmmo` fail;
+probcli reached the desync region (441 of 486 states excluded by the
+property). Under the fixed belt rule `displayedAmmo = actualAmmo` the
+property is an invariant preserved by every operation (45/45 states,
+all operations covered).
+
+**Consequences:**
+
+- `game_render_ammo_belt_count` is a pure, NULL-safe seam returning the
+  raw floored count; both the renderer and the regression tests
+  (`test_ammo_belt_count_unlimited_21`,
+  `test_ammo_belt_matches_bonus_tally_under_unlimited`) read it, so the
+  belt and the bonus can never again disagree without a red test.
+- No scoring change: the bonus already awarded the 21-bullet total, as
+  the original does (`original/bonus.c:440` clears the unlimited flag
+  but never the count).

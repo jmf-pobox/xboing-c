@@ -72,3 +72,9 @@ docs/specs/*.toc
 docs/specs/*.fuzz
 docs/specs/*.fuzz.json
 docs/specs/*.report.json
+docs/*.pk
+docs/*.tfm
+docs/*.aux
+docs/*.log
+docs/*.fuzz
+docs/*.toc

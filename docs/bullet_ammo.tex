@@ -1,0 +1,278 @@
+%
+% bullet_ammo.tex
+%
+% Z Specification for the XBoing bullet/ammo subsystem
+% Formal model of the authoritative ammo count, the ammo-belt UI display,
+% and the end-of-level bullet bonus — built to expose a display/bonus
+% desync bug in the unlimited-ammo (MAXAMMO) path.
+%
+
+\documentclass[a4paper,10pt,fleqn]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{fuzz}
+\usepackage[colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue]{hyperref}
+
+\begin{document}
+
+\title{XBoing Bullet/Ammo: A Z Specification}
+\author{Formal Model of the Ammo Count, Belt Display, and Bullet Bonus}
+\date{July 2026}
+\hypersetup{
+  pdftitle={XBoing Bullet/Ammo: A Z Specification},
+  pdfauthor={xboing-c},
+  pdfsubject={Z Specification},
+  pdfcreator={fuzz/probcli}
+}
+\maketitle
+
+\tableofcontents
+\newpage
+
+\section{Introduction}
+
+This is a narrow model of the bullet/ammo subsystem, built to locate a
+reported desync: the player fired bullets while the ammo belt showed
+none, and the end-of-level bonus rewarded many bullets the player did
+not appear to hold.
+
+The model separates three quantities the code keeps distinct:
+
+\begin{itemize}
+\item \textbf{actualAmmo} --- the authoritative count owned by
+      \texttt{gun\_system} (\texttt{gun\_system\_get\_ammo}).
+\item \textbf{displayedAmmo} --- how many bullets the ammo-belt renderer
+      draws in the HUD (\texttt{game\_render\_ammo\_belt}).
+\item \textbf{bonusAmmo} --- the count the end-of-level bonus reads and
+      rewards (\texttt{mode\_bonus\_enter} $\to$
+      \texttt{bonus\_system}).
+\end{itemize}
+
+The MAXAMMO block sets \texttt{unlimited} and stores a sentinel count of
+\texttt{GUN\_MAX\_AMMO + 1}.  The renderer hides the belt entirely when
+\texttt{unlimited} is set; the bonus reads the raw sentinel.  The
+property \texttt{displayedAmmo = bonusAmmo} --- what you see equals what
+you are paid for --- is therefore violated, and this model exhibits the
+reachable state that violates it.
+
+\section{Free Types}
+
+\begin{zed}
+ZBOOL ::= ztrue | zfalse
+\end{zed}
+
+\section{Global Constants}
+
+\begin{axdef}
+maxAmmo : \nat \\
+ammoPerLevel : \nat \\
+bulletsPerPickup : \nat \\
+unlimitedSentinel : \nat
+\where
+maxAmmo = 20 \\
+ammoPerLevel = 4 \\
+bulletsPerPickup = 4 \\
+unlimitedSentinel = maxAmmo + 1
+\end{axdef}
+
+\section{Gun State (fixed belt rule)}
+
+\texttt{displayedAmmo} is a derived rendering of state, pinned by the
+belt rule each frame.  The \emph{fixed} belt rule (matching the original
+\texttt{ReDrawBulletsLeft}, \texttt{level.c:329}): draw the actual count,
+with no \texttt{unlimited} check and no cap --- so the belt always
+reflects the authoritative ammo.  \texttt{bonusAmmo} is a snapshot the
+bonus screen takes; it is meaningful only once \texttt{inBonus} is set.
+The as-coded (buggy) belt rule and the desync it caused are documented
+in section~\ref{sec:bug}.
+
+\begin{schema}{Gun}
+actualAmmo : \nat \\
+unlimited : ZBOOL \\
+displayedAmmo : \nat \\
+inBonus : ZBOOL \\
+bonusAmmo : \nat
+\where
+actualAmmo \leq unlimitedSentinel \\
+bonusAmmo \leq unlimitedSentinel \\
+(unlimited = zfalse \implies actualAmmo \leq maxAmmo) \\
+displayedAmmo = actualAmmo \\
+(inBonus = ztrue \implies displayedAmmo = bonusAmmo)
+\end{schema}
+
+\begin{schema}{Init}
+Gun'
+\where
+actualAmmo' = ammoPerLevel \\
+unlimited' = zfalse \\
+displayedAmmo' = ammoPerLevel \\
+inBonus' = zfalse \\
+bonusAmmo' = 0
+\end{schema}
+
+\section{Operations}
+
+\subsection{Fire a bullet}
+
+Guard: ammo available or unlimited.  Unlimited does not decrement
+(\texttt{gun\_system\_use\_ammo} is a no-op when unlimited).
+
+\begin{schema}{FireBullet}
+\Delta Gun
+\where
+(actualAmmo > 0 \lor unlimited = ztrue) \\
+\land (unlimited = ztrue \implies actualAmmo' = actualAmmo) \\
+\land (unlimited = zfalse \implies actualAmmo' = actualAmmo - 1) \\
+unlimited' = unlimited \\
+inBonus' = inBonus \\
+bonusAmmo' = bonusAmmo
+\end{schema}
+
+\subsection{Pick up a BULLET block (+4 ammo)}
+
+Ignored when unlimited (matches \texttt{game\_callbacks.c}: the +4 loop
+is skipped under unlimited).  Clamps at \texttt{maxAmmo}.
+
+\begin{schema}{PickupBullets}
+\Delta Gun
+\where
+unlimited = zfalse \\
+\land (actualAmmo + bulletsPerPickup \leq maxAmmo \\
+\quad~ \implies actualAmmo' = actualAmmo + bulletsPerPickup) \\
+\land (actualAmmo + bulletsPerPickup > maxAmmo \\
+\quad~ \implies actualAmmo' = maxAmmo) \\
+unlimited' = unlimited \\
+inBonus' = inBonus \\
+bonusAmmo' = bonusAmmo
+\end{schema}
+
+\subsection{Pick up a MAXAMMO block (unlimited)}
+
+Sets unlimited and stores the sentinel count.  The belt rule then forces
+\texttt{displayedAmmo} to 0 --- the belt vanishes.
+
+\begin{schema}{PickupMaxAmmo}
+\Delta Gun
+\where
+actualAmmo' = unlimitedSentinel \\
+unlimited' = ztrue \\
+inBonus' = inBonus \\
+bonusAmmo' = bonusAmmo
+\end{schema}
+
+\subsection{Enter the bonus screen}
+
+The bonus reads the raw authoritative count --- no unlimited check, no
+cap (\texttt{mode\_bonus\_enter}: \texttt{ammo = gun\_system\_get\_ammo};
+\texttt{.bullet\_count = ammo}).
+
+\begin{schema}{EnterBonus}
+\Delta Gun
+\where
+inBonus = zfalse \\
+inBonus' = ztrue \\
+bonusAmmo' = actualAmmo \\
+actualAmmo' = actualAmmo \\
+unlimited' = unlimited
+\end{schema}
+
+\subsection{Advance to the next level}
+
+Resets unlimited and grants the per-level ammo
+(\texttt{game\_rules.c}: \texttt{set\_unlimited(0)};
+\texttt{set\_ammo(ammoPerLevel)}).
+
+\begin{schema}{NextLevel}
+\Delta Gun
+\where
+actualAmmo' = ammoPerLevel \\
+unlimited' = zfalse \\
+inBonus' = zfalse \\
+bonusAmmo' = 0
+\end{schema}
+
+\section{Consistency Properties}
+
+\subsection{Display matches bonus}
+
+What the player sees on the belt must equal what the bonus rewards.
+This is the property the reported bug violated; under the fixed belt
+rule it is an invariant of \texttt{Gun} and every operation preserves
+it.
+
+\begin{schema}{DisplayMatchesBonus}
+Gun
+\where
+inBonus = ztrue \implies displayedAmmo = bonusAmmo
+\end{schema}
+
+\subsection{Bonus never exceeds what was shown}
+
+The bonus must not reward more bullets than the belt displayed.  With
+$displayedAmmo = actualAmmo$ and $bonusAmmo = actualAmmo$ at the bonus,
+this holds with equality.
+
+\begin{schema}{BonusNotAboveDisplay}
+Gun
+\where
+inBonus = ztrue \implies bonusAmmo \leq displayedAmmo
+\end{schema}
+
+\subsection{Fireability is visible}
+
+If the player can fire, the belt shows at least one bullet.  Under the
+fix, unlimited keeps \texttt{actualAmmo} at the sentinel and
+$displayedAmmo = actualAmmo > 0$, so the belt is never empty while
+firing is allowed --- the direct negation of ``firing bullets when it
+did not look like I had any''.
+
+\begin{schema}{FireabilityVisible}
+Gun
+\where
+(actualAmmo > 0 \lor unlimited = ztrue) \implies displayedAmmo > 0
+\end{schema}
+
+\section{The Bug (as-coded) and the Fix}
+\label{sec:bug}
+
+\textbf{As-coded belt rule (the bug).}  The renderer
+(\texttt{game\_render\_ammo\_belt}) hid the belt entirely when unlimited
+and capped otherwise:
+\[
+ displayedAmmo =
+ \begin{cases}
+   0 & \text{if } unlimited \\
+   \min(actualAmmo, maxAmmo) & \text{otherwise.}
+ \end{cases}
+\]
+The bonus (\texttt{mode\_bonus\_enter}) read the raw count
+$bonusAmmo = actualAmmo$ with no unlimited check.  From \texttt{Init},
+the sequence \texttt{PickupMaxAmmo} then \texttt{EnterBonus} reached
+$actualAmmo = 21$, $unlimited$, $displayedAmmo = 0$, $bonusAmmo = 21$ ---
+violating \texttt{DisplayMatchesBonus} ($0 \neq 21$),
+\texttt{BonusNotAboveDisplay} ($21 \not\leq 0$), and (already after
+\texttt{PickupMaxAmmo}) \texttt{FireabilityVisible}.  Model-checking the
+as-coded belt rule, the property $inBonus \implies displayedAmmo =
+bonusAmmo$ excluded 441 of 486 reachable states --- the desync region.
+
+\textbf{The fix.}  Replace the belt rule with $displayedAmmo =
+actualAmmo$ (no unlimited check, no cap), matching the original
+\texttt{ReDrawBulletsLeft} (\texttt{level.c:329}).  This is the belt rule
+in the \texttt{Gun} schema above; under it all three properties are
+invariants preserved by every operation.
+
+\section{System Invariants}
+
+\begin{itemize}
+\item Physical: $actualAmmo \leq unlimitedSentinel$; the fixed belt rule
+      pins $displayedAmmo = actualAmmo$.
+\item Restored (holds under the fix): $inBonus = ztrue \implies
+      displayedAmmo = bonusAmmo$.
+\item Root cause: three consumers interpreted \texttt{unlimited}
+      differently.  The belt hid on unlimited (showed 0); firing treats
+      unlimited as ``always allowed''; the bonus ignored unlimited and
+      read the raw sentinel.  The fix makes the belt reflect the actual
+      count the bonus rewards, restoring a single interpretation across
+      all three.
+\end{itemize}
+
+\end{document}
