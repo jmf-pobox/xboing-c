@@ -48,11 +48,14 @@ The model separates three quantities the code keeps distinct:
 \end{itemize}
 
 The MAXAMMO block sets \texttt{unlimited} and stores a sentinel count of
-\texttt{GUN\_MAX\_AMMO + 1}.  The renderer hides the belt entirely when
-\texttt{unlimited} is set; the bonus reads the raw sentinel.  The
-property \texttt{displayedAmmo = bonusAmmo} --- what you see equals what
-you are paid for --- is therefore violated, and this model exhibits the
-reachable state that violates it.
+\texttt{GUN\_MAX\_AMMO + 1}.  In the \emph{as-coded} (buggy) renderer the
+belt hid entirely when \texttt{unlimited} was set while the bonus read the
+raw sentinel, so the property \texttt{displayedAmmo = bonusAmmo} --- what
+you see equals what you are paid for --- was violated at a reachable
+state.  This document models the \emph{fixed} rule
+(\texttt{displayedAmmo = actualAmmo}) and carries that property as an
+invariant the operations preserve; the as-coded rule and the reachable
+violating state it produced are recorded in section~\ref{sec:bug}.
 
 \section{Free Types}
 
