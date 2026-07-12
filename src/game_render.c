@@ -667,18 +667,30 @@ void game_render_lives(const game_ctx_t *ctx)
  * Y center: 43 in levelWindow → absolute y = LEVEL_AREA_Y + 43
  * Top-left: (center_x - 3, center_y - 8) = (x - 3, LEVEL_AREA_Y + 35)
  *
- * Skipped when unlimited ammo is active.
+ * original/level.c:324-334 ReDrawBulletsLeft draws GetNumberBullets()
+ * bullets unconditionally — no unlimited-ammo check, no cap.  MAXAMMO
+ * (original/blocks.c:1588-1593) sets the ammo count to the 21
+ * (GUN_MAX_AMMO+1) sentinel used for the unlimited-ammo bonus, and the
+ * original belt draws all 21.  The belt must draw the same raw count
+ * the end-of-level bullet bonus reads, or the two desync.
  */
-void game_render_ammo_belt(const game_ctx_t *ctx)
+int game_render_ammo_belt_count(const game_ctx_t *ctx)
 {
-    if (gun_system_get_unlimited(ctx->gun))
-        return;
+    if (ctx == NULL || ctx->gun == NULL)
+        return 0;
 
     int ammo_count = gun_system_get_ammo(ctx->gun);
+    if (ammo_count < 0)
+        return 0;
+
+    return ammo_count;
+}
+
+void game_render_ammo_belt(const game_ctx_t *ctx)
+{
+    int ammo_count = game_render_ammo_belt_count(ctx);
     if (ammo_count <= 0)
         return;
-    if (ammo_count > GUN_MAX_AMMO)
-        ammo_count = GUN_MAX_AMMO;
 
     sdl2_texture_info_t btex;
     if (sdl2_texture_get(ctx->texture, SPR_BULLET, &btex) != SDL2T_OK)

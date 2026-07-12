@@ -3812,3 +3812,99 @@ ADR authorizes reintroducing it.
   correction of that miscitation, which also appeared in
   `docs/specs/2026-07-11-editor-parity.md` section 4.2 before this
   documentation pass.
+
+## ADR-063: Ammo belt draws the raw count so it can't desync from the bonus
+
+**Status:** Accepted (2026-07-12)
+
+**Context:** A player reported (bug xboing-65h) that under unlimited
+ammo the HUD ammo belt showed no bullets, yet firing worked and the
+end-of-level bullet bonus rewarded a large number of bullets. A
+MAXAMMO block sets `unlimited` and stores the sentinel count
+`GUN_MAX_AMMO + 1` (21). Three consumers read that state and
+interpreted it differently:
+
+- `game_render_ammo_belt` (`src/game_render.c`) returned early when
+  `unlimited` and capped at `GUN_MAX_AMMO` — so the belt drew nothing.
+- Firing (`gun_system_shoot`) allows fire while `unlimited`, and
+  `gun_system_use_ammo` is a no-op — so the count stays at 21.
+- The bonus (`mode_bonus_enter`) reads the raw `gun_system_get_ammo`
+  (21) with no unlimited check and no cap.
+
+**Decision:** The belt draws the raw ammo count with no `unlimited`
+check and no cap, matching the original `ReDrawBulletsLeft`
+(`original/level.c:324-334`), which loops `GetNumberBullets()`
+unconditionally. MAXAMMO sets the same 21 sentinel in the original
+(`original/blocks.c:1588-1593`), and the original belt draws all 21.
+The belt-hide and cap were modern-only regressions with no original
+counterpart (jck confirmed: the "Unlimited bullets!" toast is a
+transient message, not a HUD indicator the belt-hide paired with). The
+bonus was already faithful and is unchanged.
+
+**Formal backing:** `docs/bullet_ammo.tex` is a fuzz-checked Z model of
+the three quantities (`actualAmmo`, `displayedAmmo`, `bonusAmmo`). The
+as-coded belt rule makes `inBonus ⇒ displayedAmmo = bonusAmmo` fail;
+probcli reached the desync region (441 of 486 states excluded by the
+property). Under the fixed belt rule `displayedAmmo = actualAmmo` the
+property is an invariant preserved by every operation (45/45 states,
+all operations covered).
+
+**Consequences:**
+
+- `game_render_ammo_belt_count` is a pure, NULL-safe seam returning the
+  raw floored count; both the renderer and the regression tests
+  (`test_ammo_belt_count_unlimited_21`,
+  `test_ammo_belt_matches_bonus_tally_under_unlimited`) read it, so the
+  belt and the bonus can never again disagree without a red test.
+- No scoring change: the bonus already awarded the 21-bullet total, as
+  the original does (`original/bonus.c:440` clears the unlimited flag
+  but never the count).
+
+## ADR-064: The level title is single-source across load, edit, and save
+
+**Status:** Accepted (2026-07-12)
+
+**Context:** Loading a level in the editor, changing a block, and saving
+wrote `"Untitled"` over the level's real name (bug xboing-dr1). The
+modern port had split the title into two stores that never synced:
+
+- `level_system` title — loaded from the file (line 1), read by the
+  gameplay/editor HUD message bar.
+- `editor_system.level_title` — set **only** by the manual set-name
+  (`n`) command, read by the save (`editor_cb_save_level`).
+
+Neither `mode_edit_enter` nor `editor_cb_load_level` copied the loaded
+name into `editor_system.level_title`, so it stayed empty and the save
+wrote the `"Untitled"` fallback. Symmetrically, a rename updated only
+`editor_system.level_title`, so the HUD/play-test title
+(`mode_game_enter` reads `level_system_get_title`) went stale.
+
+The 1996 original had **one** `levelTitle` global (`original/level.c:110`):
+the file load wrote it (`original/file.c:345`), set-name edited it
+(`original/editor.c:987`), and save read it — one variable, no staleness
+possible.
+
+**Decision:** Restore the single-source invariant across the two modern
+stores by syncing them at every boundary the original's one global was
+touched:
+
+- **Load → editor:** `editor_system_set_level_title` seeds the editor
+  title from `level_system_get_title` in both `mode_edit_enter` and
+  `editor_cb_load_level`.
+- **Rename → level:** `finish_set_name` fires a new `on_set_name`
+  callback (mirroring `on_set_time`); `editor_cb_on_set_name` calls the
+  new `level_system_set_title` and refreshes the editor message-bar
+  sticky, so a rename is visible everywhere immediately.
+
+**Consequences:**
+
+- Save preserves the real name; rename never leaves a stale title on the
+  HUD or the next save. Verified by `test_editor_save_preserves_real_level_title`
+  and `test_editor_rename_propagates_to_level_system`, which drive the
+  real transition/save and rename chains.
+- The editor's 25-char name cap is unchanged; all 80 shipped level names
+  are ≤ 24 chars, so seeding never truncates real content.
+- A separate, pre-existing bug surfaced during review (xboing-nl4): on
+  return from play-test, `mode_edit_enter`'s reset zeroes the `modified`
+  flag, so the unsaved-work confirm can under-fire. Tracked, not fixed
+  here — it does not affect the title.

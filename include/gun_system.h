@@ -200,7 +200,12 @@ int gun_system_shoot(gun_system_t *ctx, const gun_system_env_t *env);
  * Ammo management
  * ========================================================================= */
 
-/* Set ammo count directly (0..GUN_MAX_AMMO, or above for unlimited). */
+/*
+ * Set ammo count directly, clamped to 0..GUN_MAX_AMMO+1.
+ * GUN_MAX_AMMO+1 (21) is the unlimited sentinel; values above it clamp
+ * down to the sentinel rather than passing through unbounded (guards
+ * against a tampered save inflating render/award counts).
+ */
 void gun_system_set_ammo(gun_system_t *ctx, int count);
 
 /* Add one ammo, clamped at GUN_MAX_AMMO. */

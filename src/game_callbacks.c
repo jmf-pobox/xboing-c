@@ -904,7 +904,17 @@ static int editor_cb_load_level(const char *path, void *ud)
 {
     game_ctx_t *ctx = ud;
     block_system_clear_all(ctx->block);
-    return level_system_load_file(ctx->level, path) == LEVEL_SYS_OK ? 1 : 0;
+    if (level_system_load_file(ctx->level, path) != LEVEL_SYS_OK)
+        return 0;
+
+    /* Seed the editor's own title buffer from the level just loaded so a
+     * save without an intervening rename writes the real title instead of
+     * "Untitled" (original/level.c:110, original/file.c:345 — one shared
+     * levelTitle loaded, edited, and saved). Covers both the initial
+     * editor.data load (EDITOR_STATE_LEVEL -> do_load_level) and explicit
+     * L-key loads — both route through this callback. */
+    editor_system_set_level_title(ctx->editor, level_system_get_title(ctx->level));
+    return 1;
 }
 
 /*
@@ -1078,6 +1088,28 @@ static void editor_cb_on_set_time(int seconds, void *ud)
     level_system_set_time_bonus(ctx->level, seconds);
 }
 
+/*
+ * Propagate a Set Name commit into level_system so the HUD/play-test title
+ * (level_system_get_title) tracks the rename instead of going stale
+ * (original/level.c:110, original/editor.c:987 — the single levelTitle
+ * global that editor.c's rename command edited directly). Also refreshes
+ * the message-bar sticky default so it doesn't keep showing the old name,
+ * mirroring the "- <name> -" format set in mode_edit_enter /
+ * mode_game_enter's SDL2ST_EDIT branch.
+ */
+static void editor_cb_on_set_name(const char *name, void *ud)
+{
+    game_ctx_t *ctx = ud;
+    level_system_set_title(ctx->level, name);
+
+    char msg[80];
+    if (name != NULL && name[0] != '\0')
+        snprintf(msg, sizeof(msg), "- %s -", name);
+    else
+        snprintf(msg, sizeof(msg), "- Untitled -");
+    message_system_set_default(ctx->message, msg);
+}
+
 static void editor_cb_on_finish(void *ud)
 {
     game_ctx_t *ctx = ud;
@@ -1111,6 +1143,7 @@ editor_system_callbacks_t game_callbacks_editor(void)
         .on_request_yes_no_dialogue = editor_cb_request_yes_no,
         .on_request_input_dialogue = editor_cb_request_input,
         .on_set_time = editor_cb_on_set_time,
+        .on_set_name = editor_cb_on_set_name,
         .on_finish = editor_cb_on_finish,
         .on_playtest_start = editor_cb_on_playtest_start,
         .on_playtest_end = editor_cb_on_playtest_end,

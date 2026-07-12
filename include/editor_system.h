@@ -124,6 +124,10 @@ typedef struct
     /* Called to set the level time bonus display. seconds: time in seconds. */
     void (*on_set_time)(int seconds, void *ud);
 
+    /* Called when the Set Name command commits a new level name.
+     * name: the new level title. */
+    void (*on_set_name)(const char *name, void *ud);
+
     /* Called when play-test mode starts. */
     void (*on_playtest_start)(void *ud);
 
@@ -328,5 +332,15 @@ int editor_system_get_level_number(const editor_system_t *ctx);
 
 /* Return the level title buffer (mutable for set-name). */
 const char *editor_system_get_level_title(const editor_system_t *ctx);
+
+/*
+ * Set the level title buffer directly — used to seed the editor's title
+ * from the level that was just loaded (mode_edit_enter, editor_cb_load_level)
+ * so a save without a rename preserves the real title instead of writing
+ * "Untitled" (original/level.c:110 — one levelTitle shared by load/edit/save).
+ * Truncates to EDITOR_LEVEL_NAME_MAX - 1 characters.  NULL ctx or title is
+ * a no-op.
+ */
+void editor_system_set_level_title(editor_system_t *ctx, const char *title);
 
 #endif /* EDITOR_SYSTEM_H */

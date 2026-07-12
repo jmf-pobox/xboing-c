@@ -241,6 +241,55 @@ static void test_set_ammo(void **state)
     gun_system_destroy(ctx);
 }
 
+static void test_set_ammo_clamps_tampered_high_value(void **state)
+{
+    (void)state;
+    stub_state_t s;
+    gun_system_t *ctx = create_test_ctx(&s);
+
+    /* Tampered save could carry an arbitrarily large num_bullets. */
+    gun_system_set_ammo(ctx, 9999);
+    assert_int_equal(gun_system_get_ammo(ctx), GUN_MAX_AMMO + 1);
+
+    gun_system_destroy(ctx);
+}
+
+static void test_set_ammo_clamps_negative_value(void **state)
+{
+    (void)state;
+    stub_state_t s;
+    gun_system_t *ctx = create_test_ctx(&s);
+
+    gun_system_set_ammo(ctx, -5);
+    assert_int_equal(gun_system_get_ammo(ctx), 0);
+
+    gun_system_destroy(ctx);
+}
+
+static void test_set_ammo_preserves_unlimited_sentinel(void **state)
+{
+    (void)state;
+    stub_state_t s;
+    gun_system_t *ctx = create_test_ctx(&s);
+
+    gun_system_set_ammo(ctx, GUN_MAX_AMMO + 1);
+    assert_int_equal(gun_system_get_ammo(ctx), GUN_MAX_AMMO + 1);
+
+    gun_system_destroy(ctx);
+}
+
+static void test_set_ammo_legit_value_unchanged(void **state)
+{
+    (void)state;
+    stub_state_t s;
+    gun_system_t *ctx = create_test_ctx(&s);
+
+    gun_system_set_ammo(ctx, 4);
+    assert_int_equal(gun_system_get_ammo(ctx), 4);
+
+    gun_system_destroy(ctx);
+}
+
 static void test_add_ammo(void **state)
 {
     (void)state;
@@ -1071,6 +1120,10 @@ int main(void)
 
         /* Group 2: Ammo management */
         cmocka_unit_test(test_set_ammo),
+        cmocka_unit_test(test_set_ammo_clamps_tampered_high_value),
+        cmocka_unit_test(test_set_ammo_clamps_negative_value),
+        cmocka_unit_test(test_set_ammo_preserves_unlimited_sentinel),
+        cmocka_unit_test(test_set_ammo_legit_value_unchanged),
         cmocka_unit_test(test_add_ammo),
         cmocka_unit_test(test_add_ammo_clamps_at_max),
         cmocka_unit_test(test_use_ammo),

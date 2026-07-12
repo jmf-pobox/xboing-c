@@ -592,6 +592,155 @@ static void test_editor_save_preserves_counter_and_random(void **vstate)
 }
 
 /* =========================================================================
+ * Level-title seeding on save (bead xboing-dr1)
+ *
+ * Before the fix, editor_system's level_title stayed "" until the user
+ * explicitly renamed via EDITOR_KEY_NAME, so editor_cb_save_level
+ * (src/game_callbacks.c) wrote the "Untitled" fallback over every level
+ * saved without a rename -- clobbering the real title even for a level
+ * that was just loaded with one.  The fix seeds editor_system's
+ * level_title from level_system's title at TWO real production call
+ * sites: mode_edit_enter (src/game_modes.c) on entry to SDL2ST_EDIT, and
+ * editor_cb_load_level (src/game_callbacks.c) on every L-key load.
+ *
+ * This fixture seeds ctx->level's title via level_system_load_file
+ * BEFORE the SDL2ST_EDIT transition, so mode_edit_enter's seed line
+ * (editor_system_set_level_title(ctx->editor, level_system_get_title
+ * (ctx->level))) is exercised against a real, non-empty title --
+ * pinning the actual bug fix rather than a title set some other way.
+ * ========================================================================= */
+
+typedef struct
+{
+    game_ctx_t *ctx;
+    char tmp_levels_dir[300];
+    char *prev_levels_dir; /* heap-owned strdup of caller's prior value, or NULL */
+} pre_edit_save_fixture_t;
+
+static int setup_pre_edit_save(void **vstate)
+{
+    pre_edit_save_fixture_t *f = calloc(1, sizeof(*f));
+    assert_non_null(f);
+
+    const char *existing = getenv("XBOING_LEVELS_DIR");
+    f->prev_levels_dir = existing ? strdup(existing) : NULL;
+
+    snprintf(f->tmp_levels_dir, sizeof(f->tmp_levels_dir),
+             ".tmp/test_integration_editor_preedit_%d", (int)getpid());
+    (void)mkdir(".tmp", 0700);
+    (void)mkdir(f->tmp_levels_dir, 0700);
+    setenv("XBOING_LEVELS_DIR", f->tmp_levels_dir, 1);
+
+    /* No SDL2ST_EDIT transition here -- the test drives it itself, after
+     * seeding ctx->level's title, so mode_edit_enter's seed line sees a
+     * real title instead of the empty string a fresh level_system starts
+     * with. */
+    char *argv[] = {arg_prog, NULL};
+    f->ctx = game_create(1, argv);
+    assert_non_null(f->ctx);
+
+    *vstate = f;
+    return 0;
+}
+
+static int teardown_pre_edit_save(void **vstate)
+{
+    pre_edit_save_fixture_t *f = (pre_edit_save_fixture_t *)*vstate;
+
+    char saved_path[512];
+    snprintf(saved_path, sizeof(saved_path), "%s/level80.data", f->tmp_levels_dir);
+    (void)unlink(saved_path);
+
+    game_destroy(f->ctx);
+    (void)rmdir(f->tmp_levels_dir);
+
+    if (f->prev_levels_dir)
+    {
+        setenv("XBOING_LEVELS_DIR", f->prev_levels_dir, 1);
+        free(f->prev_levels_dir);
+    }
+    else
+    {
+        unsetenv("XBOING_LEVELS_DIR");
+    }
+    free(f);
+    return 0;
+}
+
+static void test_editor_save_preserves_real_level_title(void **vstate)
+{
+    pre_edit_save_fixture_t *f = (pre_edit_save_fixture_t *)*vstate;
+    game_ctx_t *ctx = f->ctx;
+
+    /* Seed ctx->level with a real level file's real title.
+     * levels/level02.data's title is "Genesis II" (line 1). */
+    level_system_status_t status = level_system_load_file(ctx->level, "levels/level02.data");
+    if (status == LEVEL_SYS_ERR_FILE_NOT_FOUND)
+    {
+        skip();
+        return;
+    }
+    assert_int_equal(status, LEVEL_SYS_OK);
+    assert_string_equal(level_system_get_title(ctx->level), "Genesis II");
+
+    /* Drive the REAL SDL2ST_EDIT entry -- mode_edit_enter's seed line
+     * fires here. The subsequent LEVEL->NONE auto-load looks for
+     * <tmp>/editor.data, which doesn't exist; on_load_level
+     * (editor_cb_load_level) fails before reaching its own seed line
+     * (fopen fails first in level_system_load_file), so ctx->level and
+     * the editor's just-seeded title are both left untouched. */
+    sdl2_state_transition(ctx->state, SDL2ST_EDIT);
+    tick_frames(ctx, 5);
+
+    assert_string_equal(editor_system_get_level_title(ctx->editor), "Genesis II");
+
+    /* Drive the real async save path (no rename in between): EDITOR_KEY_SAVE
+     * -> begin_save() -> resolve_dialogue_submit("80") -> finish_save() ->
+     * editor_cb_save_level() -> <tmp>/level80.data. */
+    editor_system_key_input(ctx->editor, EDITOR_KEY_SAVE);
+    assert_int_equal(editor_system_get_state(ctx->editor), EDITOR_STATE_DIALOGUE);
+    resolve_dialogue_submit(ctx, "80");
+    assert_int_equal(sdl2_state_current(ctx->state), SDL2ST_EDIT);
+
+    char saved_path[512];
+    snprintf(saved_path, sizeof(saved_path), "%s/level80.data", f->tmp_levels_dir);
+
+    FILE *fp = fopen(saved_path, "r");
+    assert_non_null(fp);
+
+    char line1[256];
+    assert_non_null(fgets(line1, sizeof(line1), fp));
+    fclose(fp);
+
+    line1[strcspn(line1, "\n")] = '\0';
+    assert_string_equal(line1, "Genesis II");
+    assert_string_not_equal(line1, "Untitled");
+}
+
+/* Rename (EDITOR_KEY_NAME) must propagate into level_system, not just
+ * editor_system's own buffer -- otherwise the HUD/play-test title
+ * (level_system_get_title, read by mode_game_enter's SDL2ST_EDIT branch)
+ * goes stale after a rename.  Drives the REAL async Name dialogue flow:
+ * EDITOR_KEY_NAME -> begin_set_name() -> editor_cb_request_input() ->
+ * resolve_dialogue_submit() -> ... -> editor_system_dialogue_result() ->
+ * finish_set_name() -> ctx->cb.on_set_name == editor_cb_on_set_name()
+ * (src/game_callbacks.c) -> level_system_set_title(ctx->level, name). */
+static void test_editor_rename_propagates_to_level_system(void **vstate)
+{
+    save_fixture_t *f = (save_fixture_t *)*vstate;
+    game_ctx_t *ctx = f->ctx;
+
+    editor_system_key_input(ctx->editor, EDITOR_KEY_NAME);
+    assert_int_equal(editor_system_get_state(ctx->editor), EDITOR_STATE_DIALOGUE);
+
+    resolve_dialogue_submit(ctx, "NewName");
+
+    assert_int_equal(editor_system_get_state(ctx->editor), EDITOR_STATE_NONE);
+    assert_string_equal(editor_system_get_level_title(ctx->editor), "NewName");
+    assert_string_equal(level_system_get_title(ctx->level), "NewName");
+}
+
+/* =========================================================================
  * Async dialogue flows — stage 3 (bead xboing-di8,
  * docs/specs/2026-07-11-editor-parity.md S1.3-1.6, S1.5)
  *
@@ -999,6 +1148,12 @@ int main(void)
         cmocka_unit_test_setup_teardown(test_editor_save_writes_real_time_bonus, setup_edit_save,
                                         teardown_edit_save),
         cmocka_unit_test_setup_teardown(test_editor_save_preserves_counter_and_random,
+                                        setup_edit_save, teardown_edit_save),
+
+        /* Level-title seeding on save/rename (bead xboing-dr1) */
+        cmocka_unit_test_setup_teardown(test_editor_save_preserves_real_level_title,
+                                        setup_pre_edit_save, teardown_pre_edit_save),
+        cmocka_unit_test_setup_teardown(test_editor_rename_propagates_to_level_system,
                                         setup_edit_save, teardown_edit_save),
 
         /* Async dialogue flows (stage 3, bead xboing-di8) */

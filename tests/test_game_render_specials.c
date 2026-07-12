@@ -21,6 +21,7 @@
 #include <cmocka.h>
 
 #include "game_render.h"
+#include "gun_system.h"
 #include "special_system.h"
 
 /* =========================================================================
@@ -341,6 +342,108 @@ static void test_null_ctx_paddle_does_not_crash(void **state)
 }
 
 /* =========================================================================
+ * Group 4: game_render_ammo_belt_count — xboing-65h regression guard
+ * =========================================================================
+ *
+ * game_render_ammo_belt_count(ctx) is the pure seam the ammo-belt renderer
+ * uses to decide how many bullet sprites to draw. It reads
+ * gun_system_get_ammo(ctx->gun) floored at 0, with NO unlimited-ammo check
+ * and NO GUN_MAX_AMMO cap (game_render.c comment, xboing-65h) — the same
+ * raw value mode_bonus_enter (game_modes.c:816) feeds into the end-of-level
+ * bullet bonus. The belt and the bonus MUST render the same count; that is
+ * the invariant these tests pin.
+ *
+ * Only ctx->gun is touched by game_render_ammo_belt_count, so a minimal
+ * stack-allocated game_ctx_t with every other field zeroed is a faithful,
+ * cheap fixture — no need to stand up a full game_create() context here.
+ */
+
+static gun_system_t *make_gun(void)
+{
+    gun_system_status_t gs;
+    gun_system_t *gun = gun_system_create(GAME_PLAY_HEIGHT, NULL, NULL, &gs);
+    assert_non_null(gun);
+    return gun;
+}
+
+/*
+ * Test: ammo == 0 -> belt draws 0 bullets.
+ */
+static void test_ammo_belt_count_zero(void **state)
+{
+    (void)state;
+    gun_system_t *gun = make_gun();
+    gun_system_set_ammo(gun, 0);
+
+    game_ctx_t ctx;
+    memset(&ctx, 0, sizeof(ctx));
+    ctx.gun = gun;
+
+    assert_int_equal(game_render_ammo_belt_count(&ctx), 0);
+
+    gun_system_destroy(gun);
+}
+
+/*
+ * Test: ammo == 4 (GUN_AMMO_PER_LEVEL) -> belt draws 4 bullets.
+ */
+static void test_ammo_belt_count_four(void **state)
+{
+    (void)state;
+    gun_system_t *gun = make_gun();
+    gun_system_set_ammo(gun, 4);
+
+    game_ctx_t ctx;
+    memset(&ctx, 0, sizeof(ctx));
+    ctx.gun = gun;
+
+    assert_int_equal(game_render_ammo_belt_count(&ctx), 4);
+
+    gun_system_destroy(gun);
+}
+
+/*
+ * Test: ammo == GUN_MAX_AMMO (20) -> belt draws 20 bullets.
+ */
+static void test_ammo_belt_count_max(void **state)
+{
+    (void)state;
+    gun_system_t *gun = make_gun();
+    gun_system_set_ammo(gun, GUN_MAX_AMMO);
+
+    game_ctx_t ctx;
+    memset(&ctx, 0, sizeof(ctx));
+    ctx.gun = gun;
+
+    assert_int_equal(game_render_ammo_belt_count(&ctx), GUN_MAX_AMMO);
+
+    gun_system_destroy(gun);
+}
+
+/*
+ * Test: unlimited ammo, count set to GUN_MAX_AMMO + 1 (21, the MAXAMMO
+ * sentinel per original/blocks.c:1588-1593) -> belt draws 21, NOT 0 and
+ * NOT capped at 20. Before the xboing-65h fix, game_render_ammo_belt
+ * treated unlimited specially and the belt drew a different count than
+ * the bonus screen read — this is the exact regression the fix corrects.
+ */
+static void test_ammo_belt_count_unlimited_21(void **state)
+{
+    (void)state;
+    gun_system_t *gun = make_gun();
+    gun_system_set_unlimited(gun, 1);
+    gun_system_set_ammo(gun, GUN_MAX_AMMO + 1);
+
+    game_ctx_t ctx;
+    memset(&ctx, 0, sizeof(ctx));
+    ctx.gun = gun;
+
+    assert_int_equal(game_render_ammo_belt_count(&ctx), GUN_MAX_AMMO + 1);
+
+    gun_system_destroy(gun);
+}
+
+/* =========================================================================
  * Test runner
  * ========================================================================= */
 
@@ -365,6 +468,12 @@ int main(void)
         /* Group 3: NULL-context safety */
         cmocka_unit_test(test_null_ctx_special_does_not_crash),
         cmocka_unit_test(test_null_ctx_paddle_does_not_crash),
+
+        /* Group 4: game_render_ammo_belt_count — xboing-65h regression guard */
+        cmocka_unit_test(test_ammo_belt_count_zero),
+        cmocka_unit_test(test_ammo_belt_count_four),
+        cmocka_unit_test(test_ammo_belt_count_max),
+        cmocka_unit_test(test_ammo_belt_count_unlimited_21),
     };
 
     return cmocka_run_group_tests(tests, NULL, NULL);

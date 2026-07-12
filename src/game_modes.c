@@ -1391,6 +1391,15 @@ static void mode_edit_enter(sdl2_state_mode_t mode, void *ud)
         /* Don't clear blocks here — editor_system's do_load_level handles
          * loading.  The on_load_level callback calls block_system_clear_all
          * before loading. */
+
+        /* Seed the editor's title buffer from whatever level_system
+         * currently holds (e.g. the just-played level when entering from
+         * gameplay) so the message bar/HUD never shows a blank title
+         * during the one-tick window before do_load_level's
+         * editor_cb_load_level reseeds it from editor.data.  Single shared
+         * levelTitle in the original (original/level.c:110); the modern
+         * port mirrors that with two seed points instead of one global. */
+        editor_system_set_level_title(ctx->editor, level_system_get_title(ctx->level));
     }
 }
 

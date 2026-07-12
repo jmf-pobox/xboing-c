@@ -944,6 +944,8 @@ static void finish_set_name(editor_system_t *ctx, int cancelled, const char *inp
     }
 
     snprintf(ctx->level_title, sizeof(ctx->level_title), "%s", input);
+    if (ctx->cb.on_set_name != NULL)
+        ctx->cb.on_set_name(ctx->level_title, ctx->user_data);
     show_message(ctx, "Level name adjusted", 1);
     ctx->modified = 1;
 }
@@ -1162,4 +1164,11 @@ const char *editor_system_get_level_title(const editor_system_t *ctx)
     if (ctx == NULL)
         return "";
     return ctx->level_title;
+}
+
+void editor_system_set_level_title(editor_system_t *ctx, const char *title)
+{
+    if (ctx == NULL || title == NULL)
+        return;
+    snprintf(ctx->level_title, sizeof(ctx->level_title), "%s", title);
 }

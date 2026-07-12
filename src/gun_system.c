@@ -361,6 +361,14 @@ void gun_system_set_ammo(gun_system_t *ctx, int count)
     {
         return;
     }
+    if (count < 0)
+    {
+        count = 0;
+    }
+    else if (count > GUN_MAX_AMMO + 1)
+    {
+        count = GUN_MAX_AMMO + 1;
+    }
     ctx->ammo = count;
 }
 

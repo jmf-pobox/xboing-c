@@ -130,6 +130,13 @@ int level_system_get_time_bonus(const level_system_t *ctx);
  * to adjust the loaded level's time limit before saving. */
 void level_system_set_time_bonus(level_system_t *ctx, int seconds);
 
+/* Set the level title — used by the editor's Set Name command to rename
+ * the loaded level before saving.  Truncates to LEVEL_TITLE_MAX - 1
+ * characters.  NULL ctx or title is a no-op.  Mirrors the original single
+ * levelTitle global (original/level.c:110) that was shared by load, edit,
+ * and save. */
+void level_system_set_title(level_system_t *ctx, const char *title);
+
 /* =========================================================================
  * Utilities (stateless)
  * ========================================================================= */
