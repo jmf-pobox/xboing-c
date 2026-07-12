@@ -1417,6 +1417,13 @@ static void mode_edit_exit(sdl2_state_mode_t mode, void *ud)
      * ResizeMainWindow(oldWidth, ...) on editor exit
      * (original/editor.c:381-383). */
     sdl2_renderer_set_logical_width(ctx->renderer, SDL2R_LOGICAL_WIDTH);
+
+    /* Hygiene beyond what the original needs: X11 windows are naturally
+     * isolated per mode, but the modern port re-renders every frame from
+     * shared game_ctx_t state, so the Button3 inspect override must not
+     * persist into a later editor session.  See
+     * docs/specs/2026-07-11-editor-parity.md S4.1. */
+    ctx->editor_inspect_active = 0;
 }
 
 static void mode_edit_update(sdl2_state_mode_t mode, void *ud)
@@ -1433,14 +1440,42 @@ static void mode_edit_update(sdl2_state_mode_t mode, void *ud)
     int play_x = mx - PLAY_AREA_X;
     int play_y = my - PLAY_AREA_Y;
 
-    /* Mouse buttons: left=draw, middle or right=erase */
+    /* Mouse buttons: left=draw, middle=erase, right=read-only inspect. */
     if (sdl2_input_mouse_pressed(ctx->input, 1))
         editor_system_mouse_button(ctx->editor, play_x, play_y, 1, 1);
     else
         editor_system_mouse_button(ctx->editor, play_x, play_y, 1, 0);
 
-    if (sdl2_input_mouse_pressed(ctx->input, 2) || sdl2_input_mouse_pressed(ctx->input, 3))
+    if (sdl2_input_mouse_pressed(ctx->input, 2))
         editor_system_mouse_button(ctx->editor, play_x, play_y, 2, 1);
+
+    /* Button3 (right-click): read-only inspect, matching original/editor.c:
+     * 547-557 (DisplayScore(scoreWindow, blockP->hitPoints) / 0L, drawAction
+     * = ED_NOP -- never mutates the grid).  Bypasses
+     * editor_system_mouse_button entirely (per
+     * docs/specs/2026-07-11-editor-parity.md S4.1 recommendation b) since
+     * that function's button-3 case is a destructive-draw-state no-op, not
+     * a query path.  Row/col conversion mirrors editor_system.c's
+     * pixel_to_col/pixel_to_row + in_editable_bounds (both file-static,
+     * not exported) using the same public constants those helpers are
+     * built from.  Out-of-bounds clicks are a no-op, matching the
+     * original's early return before its Button1/2/3 switch
+     * (original/editor.c:498-512) -- the previously inspected value is
+     * left on screen, exactly as scoreWindow is never reverted. */
+    if (sdl2_input_mouse_pressed(ctx->input, 3) && play_x >= 0 && play_x < EDITOR_PLAY_WIDTH &&
+        play_y >= 0 && play_y < EDITOR_PLAY_HEIGHT)
+    {
+        int inspect_col = play_x / (EDITOR_PLAY_WIDTH / EDITOR_MAX_COL_EDIT);
+        int inspect_row = play_y / (EDITOR_PLAY_HEIGHT / MAX_ROW);
+
+        if (inspect_row >= 0 && inspect_row < EDITOR_MAX_ROW_EDIT && inspect_col >= 0 &&
+            inspect_col < EDITOR_MAX_COL_EDIT)
+        {
+            ctx->editor_inspect_active = 1;
+            ctx->editor_inspect_value =
+                (unsigned long)block_system_get_hit_points(ctx->block, inspect_row, inspect_col);
+        }
+    }
 
     /* Mouse drag */
     editor_system_mouse_motion(ctx->editor, play_x, play_y);

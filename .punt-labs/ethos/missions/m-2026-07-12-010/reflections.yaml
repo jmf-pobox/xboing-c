@@ -1,0 +1,13 @@
+reflections:
+    - round: 1
+      created_at: "2026-07-12T03:01:01Z"
+      author: jck
+      converging: true
+      signals:
+        - button 3 read-only inspect via block_system_get_hit_points, no editor_system_mouse_button; button 1 draw / button 2 erase unchanged (original/editor.c:521-557)
+        - empty cell -> 0 (block_system.c:907-914); override in game_render_score gated to editor mode + active flag, mode_edit_exit resets (original never reverts scoreWindow until next Button3)
+        - out-of-bounds no-op leaves prior value (original early return editor.c:498-514); one-pixel boundary nit inconsequential
+        - 'tests genuine: real mode_edit_update button-3 path, block survives right-click (not erased), value==hp/0'
+        - 'DRY REC (non-blocking, fold into palette fix): pixel_to_col/pixel_to_row are static (editor_system.c:98-106); game_modes.c replica is byte-identical (uses public constants) — export a shared editor_pixel_to_cell so there is ONE canonical grid-math impl'
+      recommendation: stop
+      reason: 'Right-click inspect faithful to original/editor.c:547-557 on all points: read-only (no grid mutation, bypasses editor_system_mouse_button), empty->0, override gated to SDL2ST_EDIT + editor_inspect_active (no gameplay-HUD leak), mode_edit_exit resets, out-of-bounds no-op. Tests genuine (real tick_with_mouse_button, block survives). Leader-verified 61/61 both. Approve.'

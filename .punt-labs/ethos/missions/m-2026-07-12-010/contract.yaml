@@ -1,0 +1,67 @@
+mission_id: m-2026-07-12-010
+status: closed
+type: implement
+created_at: "2026-07-12T02:44:57Z"
+updated_at: "2026-07-12T03:01:06Z"
+closed_at: "2026-07-12T03:01:06Z"
+leader: claude
+worker: jdc
+evaluator:
+    handle: jck
+    pinned_at: "2026-07-12T02:44:57Z"
+    hash: 40cbe1204f644c77e6a26757a9b855e3298be267025e806d425bfdea99054f18
+inputs:
+    ticket: xboing-di8
+write_set:
+    - src/game_modes.c
+    - include/game_context.h
+    - src/game_render.c
+    - tests/test_integration_editor.c
+success_criteria:
+    - button 3 (right) no longer erases — it queries hit points read-only (block_system_get_hit_points, occupied->hp, empty->0) and sets editor_inspect_active + editor_inspect_value; button 2 (middle) still erases; button 1 still draws
+    - two game_ctx_t fields editor_inspect_active/editor_inspect_value added (modeled on attract_level_display); game_render_score shows editor_inspect_value instead of the real score ONLY when effective mode is SDL2ST_EDIT and editor_inspect_active — never leaks into the gameplay HUD; mode_edit_exit resets the flag
+    - 'matches original/editor.c:547-557: Button3 is read-only (drawAction=ED_NOP), shows hit points, empty cell shows 0; no grid mutation on right-click'
+    - 'GENUINE integration test in test_integration_editor.c: place a block with known hit points, right-click it (drive the real mode_edit_update button-3 path via a synthetic mouse press, as other editor mouse tests do), assert editor_inspect_active==1 and editor_inspect_value==hit points AND the block is still on the grid (not erased); right-click an empty cell -> value 0'
+    - cmake --preset debug + build clean (zero -Werror); ctest --test-dir build green; make asan-test green (rebuild build-asan); only the 4 write-set files changed; no CMake change
+    - 'Visual note for the Ubuntu capture: right-clicking a block shows its hit points in the score window instead of erasing it'
+budget:
+    rounds: 3
+    reflection_after_each: true
+current_round: 1
+context: |
+    Editor parity STAGE 10 — right-click inspect vs erase (design
+    docs/specs/2026-07-11-editor-parity.md §4.1, stage list §5.10; committed ffa9e56;
+    §4.1 was revised in design round 2 to add the held-override persistence jck required).
+    Audit major 4.
+
+    Today mode_edit_update maps BOTH middle (button 2) and right (button 3) mouse to
+    erase (src/game_modes.c:1442-1443: `if (mouse_pressed 2 || mouse_pressed 3)
+    editor_system_mouse_button(..., 2, 1)`). The original's Button3 is READ-ONLY: it
+    shows the clicked block's hit points in the score window and never modifies the grid
+    (original/editor.c:547-557: DisplayScore(scoreWindow, blockP->hitPoints) or 0 if empty,
+    drawAction=ED_NOP). Button1=draw, Button2=erase, Button3=inspect.
+
+    DESIGN §4.1 (recommendation b + persistence):
+    - Split the handler: button 2 (middle) stays erase; button 3 (right) becomes a
+      read-only inspect — do NOT route it through editor_system_mouse_button (the
+      destructive draw-action path). Instead, in mode_edit_update, convert play_x/play_y
+      to (row,col) and query block_system_get_hit_points(ctx->block, row, col) (occupied ->
+      hit points; unoccupied -> 0), matching Button3's two DisplayScore calls.
+    - PERSISTENCE (jck's design-round-2 requirement): game_render_score runs every frame,
+      so a one-shot write is overwritten next frame. Add two game_ctx_t fields modeled on
+      attract_level_display (include/game_context.h:162): `int editor_inspect_active;
+      unsigned long editor_inspect_value;`. Button-3 sets both (active=1, value=hit points).
+      game_render_score consumes the override IN PLACE OF score_system_get(ctx->score)
+      ONLY when the effective mode is SDL2ST_EDIT and editor_inspect_active (gate to editor
+      so it never leaks into the gameplay HUD). Never auto-cleared (original overwrites on
+      each Button3, nothing reverts it) — but reset editor_inspect_active in mode_edit_exit
+      as hygiene so it doesn't persist into a later editor session.
+    - Effective-mode resolution: same pattern as game_render_lives/timer (sdl2_state_current;
+      saved_mode if DIALOGUE).
+
+    Figure out the play_x/play_y -> (row,col) conversion the way the editor already does it
+    (read editor_system_mouse_button / block_system coordinate helpers); reuse an existing
+    helper if one exists rather than hardcoding the grid math.
+
+    Do NOT touch the dialogue, palette, HUD, paddle/ball gate, or RANDOM overlay. This is
+    right-click inspect only.

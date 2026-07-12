@@ -741,6 +741,70 @@ static void test_editor_cancelled_confirm_skips_destructive_action(void **vstate
 }
 
 /* =========================================================================
+ * Right-click inspect vs erase (bead xboing-di8, stage 10,
+ * docs/specs/2026-07-11-editor-parity.md S4.1, major 4)
+ *
+ * original/editor.c:547-557 -- Button3 is read-only: DisplayScore(hitPoints)
+ * / DisplayScore(0L), drawAction = ED_NOP, never touches the grid.  Drives
+ * the REAL mode_edit_update button-3 path via a synthetic SDL_BUTTON_RIGHT
+ * event (tick_with_mouse_button, same helper test_editor_erase_shows_
+ * skull_cursor uses for SDL_BUTTON_MIDDLE), not editor_system_mouse_button
+ * directly -- the inspect logic lives in mode_edit_update, not
+ * editor_system.c.
+ * ========================================================================= */
+
+static void test_editor_right_click_inspects_without_erasing(void **vstate)
+{
+    test_fixture_t *f = (test_fixture_t *)*vstate;
+    game_ctx_t *ctx = f->ctx;
+
+    /* Cell (2,3): play-area (192,80); window coords add PLAY_AREA_X=35 /
+     * PLAY_AREA_Y=60 (game_modes.c), matching
+     * test_editor_erase_shows_skull_cursor's convention. RED_BLK's hit
+     * points (100) don't depend on row -- score_block_hit_points(). */
+    const int row = 2, col = 3;
+    const int wx = 192 + 35, wy = 80 + 60;
+
+    assert_int_equal(block_system_add(ctx->block, row, col, RED_BLK, 0, 0), BLOCK_SYS_OK);
+    int expected_hp = block_system_get_hit_points(ctx->block, row, col);
+    assert_int_equal(expected_hp, 100);
+
+    assert_int_equal(ctx->editor_inspect_active, 0);
+
+    tick_with_mouse_button(ctx, SDL_BUTTON_RIGHT, true, wx, wy);
+
+    assert_int_equal(ctx->editor_inspect_active, 1);
+    assert_int_equal((int)ctx->editor_inspect_value, expected_hp);
+
+    /* Read-only: the block must still be on the grid. */
+    assert_true(block_system_is_occupied(ctx->block, row, col));
+    assert_int_equal(block_system_get_type(ctx->block, row, col), RED_BLK);
+
+    tick_with_mouse_button(ctx, SDL_BUTTON_RIGHT, false, wx, wy);
+    assert_true(block_system_is_occupied(ctx->block, row, col));
+}
+
+static void test_editor_right_click_empty_cell_inspects_zero(void **vstate)
+{
+    test_fixture_t *f = (test_fixture_t *)*vstate;
+    game_ctx_t *ctx = f->ctx;
+
+    /* Cell (4,1): a different, unoccupied cell. col=1 -> x≈1*55+27=82,
+     * row=4 -> y≈4*32+16=144 (same COL_WIDTH/ROW_HEIGHT arithmetic as
+     * test_editor_draw_block's (2,3) comment). */
+    const int row = 4, col = 1;
+    const int wx = 82 + 35, wy = 144 + 60;
+
+    assert_false(block_system_is_occupied(ctx->block, row, col));
+
+    tick_with_mouse_button(ctx, SDL_BUTTON_RIGHT, true, wx, wy);
+
+    assert_int_equal(ctx->editor_inspect_active, 1);
+    assert_int_equal((int)ctx->editor_inspect_value, 0);
+    assert_false(block_system_is_occupied(ctx->block, row, col));
+}
+
+/* =========================================================================
  * Test runner
  * ========================================================================= */
 
@@ -784,6 +848,12 @@ int main(void)
                                         setup_edit_save, teardown_edit_save),
         cmocka_unit_test_setup_teardown(test_editor_cancelled_confirm_skips_destructive_action,
                                         setup_edit_save, teardown_edit_save),
+
+        /* Right-click inspect vs erase (stage 10, bead xboing-di8) */
+        cmocka_unit_test_setup_teardown(test_editor_right_click_inspects_without_erasing,
+                                        setup_edit_mode, teardown),
+        cmocka_unit_test_setup_teardown(test_editor_right_click_empty_cell_inspects_zero,
+                                        setup_edit_mode, teardown),
     };
 
     return cmocka_run_group_tests(tests, NULL, NULL);

@@ -669,7 +669,21 @@ void game_render_ammo_belt(const game_ctx_t *ctx)
 void game_render_score(const game_ctx_t *ctx)
 {
     SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
-    unsigned long score_val = score_system_get(ctx->score);
+
+    /* Editor Button3 (right-click) inspect override: the original's
+     * scoreWindow shows the clicked block's hit points until the next
+     * right-click, with no path that reverts it to the real score
+     * (original/editor.c:547-557).  Gated strictly to editor mode (including
+     * the editor-dialogue overlay, via saved_mode) so it can never leak into
+     * the gameplay HUD even if the flag is never cleared.  Mirrors the
+     * effective-mode pattern in game_render_lives/game_render_timer. */
+    sdl2_state_mode_t effective_mode = sdl2_state_current(ctx->state);
+    if (effective_mode == SDL2ST_DIALOGUE)
+        effective_mode = sdl2_state_saved_mode(ctx->state);
+
+    unsigned long score_val = (effective_mode == SDL2ST_EDIT && ctx->editor_inspect_active)
+                                  ? ctx->editor_inspect_value
+                                  : score_system_get(ctx->score);
 
     score_system_digit_layout_t layout;
     score_system_get_digit_layout(score_val, &layout);
