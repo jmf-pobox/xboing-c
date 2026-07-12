@@ -368,6 +368,84 @@ static void test_editor_save_writes_real_time_bonus(void **vstate)
 }
 
 /* =========================================================================
+ * Editor save path — counter_slide + random preserved (bead xboing-di8,
+ * design stage 2, docs/specs/2026-07-11-editor-parity.md S2.3/S2.4)
+ *
+ * Reuses the setup_edit_save/teardown_edit_save fixture from the
+ * time-bonus test above.  Seeds two grid cells directly via
+ * block_system_add() (the same entry point editor_cb_add_block() uses),
+ * confirms the seed took by reading render_info back, then drives the
+ * REAL save path (EDITOR_KEY_SAVE -> do_save() -> editor_cb_save_level())
+ * and reads the written grid rows back off disk.
+ *
+ * original/file.c:418-440 — counter digit encoding ('0' no counter,
+ * '1'-'5' slide levels).
+ * original/file.c:562-609 — '?' written whenever blockP->random is set,
+ * regardless of the resolved concrete color.
+ * ========================================================================= */
+
+static void test_editor_save_preserves_counter_and_random(void **vstate)
+{
+    save_fixture_t *f = (save_fixture_t *)*vstate;
+    game_ctx_t *ctx = f->ctx;
+
+    const int counter_row = 5, counter_col = 2, counter_slide = 3;
+    const int random_row = 7, random_col = 4;
+
+    /* Seed via the same block_system_add() entry point the editor's
+     * on_add_block callback uses -- block_system_add(..., COUNTER_BLK,
+     * counter_slide, ...) stores counter_slide unconditionally
+     * (src/block_system.c:451); block_system_add(..., RANDOM_BLK, ...)
+     * sets random=1 and resolves block_type to RED_BLK internally
+     * (src/block_system.c:455-459). */
+    assert_int_equal(
+        block_system_add(ctx->block, counter_row, counter_col, COUNTER_BLK, counter_slide, 0),
+        BLOCK_SYS_OK);
+    assert_int_equal(block_system_add(ctx->block, random_row, random_col, RANDOM_BLK, 0, 0),
+                     BLOCK_SYS_OK);
+
+    /* Confirm the seed actually set counter_slide/random before saving --
+     * otherwise a passing test would prove nothing about the save path. */
+    block_system_render_info_t info;
+    assert_int_equal(
+        block_system_get_render_info(ctx->block, counter_row, counter_col, &info), BLOCK_SYS_OK);
+    assert_true(info.occupied);
+    assert_int_equal(info.block_type, COUNTER_BLK);
+    assert_int_equal(info.counter_slide, counter_slide);
+
+    assert_int_equal(block_system_get_render_info(ctx->block, random_row, random_col, &info),
+                     BLOCK_SYS_OK);
+    assert_true(info.occupied);
+    assert_true(info.random);
+
+    /* Drive the real save path: EDITOR_KEY_SAVE -> do_save() (defaults
+     * to level 80 via the dialogue stub) -> editor_cb_save_level(). */
+    editor_system_key_input(ctx->editor, EDITOR_KEY_SAVE);
+
+    char saved_path[512];
+    snprintf(saved_path, sizeof(saved_path), "%s/level80.data", f->tmp_levels_dir);
+
+    FILE *fp = fopen(saved_path, "r");
+    assert_non_null(fp);
+
+    /* Lines 1-2 are title + time bonus; grid rows start at line 3 and
+     * map 1:1 to block grid rows 0..14. */
+    char line[256];
+    assert_non_null(fgets(line, sizeof(line), fp)); /* title */
+    assert_non_null(fgets(line, sizeof(line), fp)); /* time bonus */
+
+    char grid_lines[15][256];
+    for (int row = 0; row < 15; row++)
+    {
+        assert_non_null(fgets(grid_lines[row], sizeof(grid_lines[row]), fp));
+    }
+    fclose(fp);
+
+    assert_int_equal(grid_lines[counter_row][counter_col], '0' + counter_slide);
+    assert_int_equal(grid_lines[random_row][random_col], '?');
+}
+
+/* =========================================================================
  * Test runner
  * ========================================================================= */
 
@@ -386,6 +464,8 @@ int main(void)
         cmocka_unit_test_setup_teardown(test_editor_set_level_name, setup_edit_mode, teardown),
         cmocka_unit_test_setup_teardown(test_editor_save_writes_real_time_bonus, setup_edit_save,
                                         teardown_edit_save),
+        cmocka_unit_test_setup_teardown(test_editor_save_preserves_counter_and_random,
+                                        setup_edit_save, teardown_edit_save),
     };
 
     return cmocka_run_group_tests(tests, NULL, NULL);

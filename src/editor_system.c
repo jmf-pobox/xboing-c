@@ -99,11 +99,15 @@ static int in_editable_bounds(int row, int col)
  * RANDOM_BLK so that board transforms operated on RANDOM_BLK values rather
  * than on a resolved concrete type.
  *
- * In this callback-based implementation, editor_cell_t does not expose a
- * "random" flag, and the normalization of random blocks (if needed) is
- * handled by the integration layer via the callback interface / level
- * loading path.  As a result, this function is intentionally a no-op and
- * exists only for API completeness and to mirror the legacy structure.
+ * In this callback-based implementation, query_cell (game_callbacks.c) is
+ * itself random-aware: it reads the block's random flag from
+ * block_system_get_render_info() and reports RANDOM_BLK for the cell's
+ * block_type whenever that flag is set.  Every board transform (flip,
+ * scroll) reads cells exclusively through query_cell, so they already see
+ * RANDOM_BLK rather than a resolved concrete type — the normalization this
+ * function performed in the legacy editor is redundant here by
+ * construction.  It remains a permanent no-op, kept only for API
+ * completeness and to mirror the legacy structure.
  */
 static void normalize_random_blocks(editor_system_t *ctx)
 {

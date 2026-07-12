@@ -875,11 +875,12 @@ static void editor_cb_clear_grid(void *ud)
 static int editor_cb_query_cell(int row, int col, editor_cell_t *cell, void *ud)
 {
     const game_ctx_t *ctx = ud;
-    if (!block_system_is_occupied(ctx->block, row, col))
+    block_system_render_info_t info;
+    if (block_system_get_render_info(ctx->block, row, col, &info) != BLOCK_SYS_OK || !info.occupied)
         return 0;
     cell->occupied = 1;
-    cell->block_type = block_system_get_type(ctx->block, row, col);
-    cell->counter_slide = 0; /* Simplified — full counter tracking deferred */
+    cell->block_type = info.random ? RANDOM_BLK : info.block_type;
+    cell->counter_slide = info.counter_slide;
     return 1;
 }
 
@@ -915,8 +916,12 @@ static int editor_cb_yes_no(const char *message, void *ud)
 /*
  * Reverse mapping: block type → level file character.
  * Inverse of level_system_char_to_block().
+ *
+ * counter_slide selects the '0'-'5' digit for COUNTER_BLK, matching
+ * original/file.c:658-684.  Clamped defensively; callers pass values
+ * already bounded to 0..5 by block_system.
  */
-static char block_type_to_char(int block_type)
+static char block_type_to_char(int block_type, int counter_slide)
 {
     switch (block_type)
     {
@@ -935,7 +940,10 @@ static char block_type_to_char(int block_type)
         case BLACK_BLK:
             return 'w';
         case COUNTER_BLK:
-            return '0';
+        {
+            int slide = counter_slide < 0 ? 0 : (counter_slide > 5 ? 5 : counter_slide);
+            return (char)('0' + slide);
+        }
         case BOMB_BLK:
             return 'X';
         case DEATH_BLK:
@@ -975,6 +983,24 @@ static char block_type_to_char(int block_type)
     }
 }
 
+/*
+ * Resolve the level-file character for (row, col), reading the block's
+ * random flag and counter_slide in one call so a RANDOM_BLK cell saves
+ * '?' (original/file.c:562-609) and a COUNTER_BLK cell saves its real
+ * '0'-'5' digit (original/file.c:658-684) instead of losing both to the
+ * un-annotated resolved color / hardcoded '0'.
+ */
+static char resolve_save_char(const game_ctx_t *ctx, int row, int col)
+{
+    block_system_render_info_t info;
+    if (block_system_get_render_info(ctx->block, row, col, &info) != BLOCK_SYS_OK ||
+        !info.occupied)
+        return block_type_to_char(NONE_BLK, 0);
+
+    int effective_type = info.random ? RANDOM_BLK : info.block_type;
+    return block_type_to_char(effective_type, info.counter_slide);
+}
+
 static int editor_cb_save_level(const char *path, void *ud)
 {
     const game_ctx_t *ctx = ud;
@@ -994,8 +1020,7 @@ static int editor_cb_save_level(const char *path, void *ud)
     {
         for (int col = 0; col < 9; col++)
         {
-            int btype = block_system_get_type(ctx->block, row, col);
-            fputc(block_type_to_char(btype), fp);
+            fputc(resolve_save_char(ctx, row, col), fp);
         }
         fputc('\n', fp);
     }
