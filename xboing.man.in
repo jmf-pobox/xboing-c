@@ -197,8 +197,9 @@ Press
 built-in level editor. Click a
 block type in the tool bar, then draw into the level: the left mouse button
 draws, Shift+left-click erases, and the right button reports a block's
-point value. Hold and drag any of these for continuous draw/erase. The
-middle button also erases, for mice with a third button; most trackpads and
+point value. Hold and drag while drawing or erasing for continuous action;
+the right button is a single-click inspect. The middle button also erases,
+for mice with a third button; most trackpads and
 two-button mice don't have one, so Shift+left-click is the portable
 binding. You can play-test the level (infinite lives, never ends) and flip
 or scroll the board. Editor keys:

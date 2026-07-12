@@ -1067,7 +1067,7 @@ static void editor_cb_on_error(const char *message, void *ud)
 {
     game_ctx_t *ctx = ud;
     int frame = (int)sdl2_state_frame(ctx->state);
-    message_system_set(ctx->message, message, 0, frame);
+    message_system_set(ctx->message, message, 1, frame);
 }
 
 static void editor_cb_on_set_time(int seconds, void *ud)

@@ -540,7 +540,7 @@ static int logical_width(const game_ctx_t *ctx)
 /* INTRO -> EDIT widens to 695. */
 static void test_editor_enter_widens_logical_width(void **vstate)
 {
-    game_ctx_t *ctx = ((kb_fixture_t *)*vstate)->ctx;
+    const game_ctx_t *ctx = ((kb_fixture_t *)*vstate)->ctx;
     assert_int_equal(logical_width(ctx), SDL2R_LOGICAL_WIDTH + EDITOR_TOOL_WIDTH);
 }
 
