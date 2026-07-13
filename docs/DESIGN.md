@@ -4022,10 +4022,11 @@ during play-test opened the "Exit XBoing?" quit dialogue. The original's
 **3. Attract fake-score no longer leaks (xboing-oyt).**
 `attract_random_display` writes an incrementing fake score into the single
 `score_system` field for an attract-screen flourish (a modern invention).
-It leaked into the editor HUD. `mode_edit_enter` now resets the displayed
-score to 0 (`score_system_set_display(ctx->score, 0)`), matching the
-original's `SetTheScore(0L)` on editor/play-test entry
-(`original/editor.c:603,629`); the real-game path was already covered by
+It leaked into the editor HUD. `mode_edit_enter` now resets the score to 0
+with `score_system_set(ctx->score, 0)` — the `SetTheScore(0L)` equivalent
+(`original/editor.c:603,629`), which resets both the score and the
+extra-life threshold (unlike `set_display`, which is attract-mode-only and
+skips threshold tracking). The real-game path was already covered by
 `start_new_game`'s `score_system_set(0)` (`original/main.c:944`).
 
 **Consequences:** ball-death fidelity (1) changes every real game (one more
