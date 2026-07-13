@@ -2,10 +2,11 @@
  * xboing_paths.h -- System-wide install paths for xboing data files.
  *
  * Asset resolution at runtime tries, in order: $XDG_DATA_DIRS lookup
- * (handles the common /usr and /usr/local prefixes for free), the
- * compile-time XBOING_INSTALLED_*_DIR macros below (safety net for
- * unusual installs), then the cwd-relative source-tree default in
- * each subsystem (dev fallback).
+ * (handles the common /usr and /usr/local prefixes for free), then
+ * $XDG_DATA_HOME, then the compiled XBOING_DATA_DIR install prefix
+ * below (covers install locations absent from $XDG_DATA_DIRS, e.g.
+ * Homebrew's /opt/homebrew on Apple silicon), then the cwd-relative
+ * source-tree default in each subsystem (dev fallback).
  *
  * XBOING_DATA_DIR can be overridden at compile time via -D.  Because
  * the derived macros below use string-literal concatenation (e.g.

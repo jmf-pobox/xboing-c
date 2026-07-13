@@ -45,6 +45,10 @@ typedef struct
     char xboing_levels_dir[PATHS_MAX_PATH];
     char xboing_sound_dir[PATHS_MAX_PATH];
     char xboing_score_file[PATHS_MAX_PATH];
+
+    /* Compiled install-prefix base (XBOING_DATA_DIR), e.g.
+     * "<prefix>/share/xboing".  Read tier below XDG, above cwd. */
+    char install_data_dir[PATHS_MAX_PATH];
 } paths_config_t;
 
 /*
@@ -112,7 +116,8 @@ paths_status_t paths_save_level(const paths_config_t *cfg, char *buf, size_t buf
  * Resolution order:
  *   1. XBOING_LEVELS_DIR env override (cfg->xboing_levels_dir if set)
  *   2. paths_install_data_dir(cfg, "levels")  — XDG_DATA_DIRS lookup
- *   3. cwd-relative "levels"  — dev mode
+ *   3. cfg->install_data_dir/levels  — compiled install prefix (XBOING_DATA_DIR)
+ *   4. cwd-relative "levels"  — dev mode
  *
  * NULL/zero-size args defensively return PATHS_NOT_FOUND.
  */
@@ -139,7 +144,8 @@ paths_status_t paths_levels_dir_writable(const paths_config_t *cfg, char *buf, s
  * Resolution order:
  *   1. XBOING_SOUND_DIR env override (cfg->xboing_sound_dir if set)
  *   2. paths_install_data_dir(cfg, "sounds")  — XDG_DATA_DIRS lookup
- *   3. cwd-relative "sounds"  — dev mode
+ *   3. cfg->install_data_dir/sounds  — compiled install prefix (XBOING_DATA_DIR)
+ *   4. cwd-relative "sounds"  — dev mode
  *
  * No writable counterpart — the editor does not write sounds.
  * NULL/zero-size args defensively return PATHS_NOT_FOUND.

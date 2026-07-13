@@ -4033,3 +4033,61 @@ skips threshold tracking). The real-game path was already covered by
 ball, paddle grows on respawn) — jck (author) approved as faithful to
 `DeadBall`. All three have regression tests, including the corrected
 4-ball / paddle-grow sequence and full-frame Q-in-play-test coverage.
+
+## ADR-068: Asset resolution consults the compiled install prefix
+
+**Status:** Accepted (2026-07-13)
+
+Fresh Homebrew installs on Apple silicon (`/opt/homebrew` prefix)
+launched, played sound, but loaded no level — `Warning: could not find
+level file: level01.data` (`game_init.c:715`). The bug shipped in
+1.0.4/1.0.5/1.0.6.
+
+**Root cause.** Bundled levels install to
+`${CMAKE_INSTALL_DATADIR}/xboing/levels` = `/opt/homebrew/share/xboing/levels`
+(`CMakeLists.txt:74-80`). But `paths.c` resolved assets via a chain that
+never consulted the install prefix: env override → `$XDG_DATA_DIRS` →
+`$XDG_DATA_HOME` → cwd. `/opt/homebrew/share` is in **no** default
+`$XDG_DATA_DIRS` entry (macOS leaves the variable unset; Homebrew does not
+add it), so the bundled levels were unreachable. On Linux the gap is
+invisible because `/usr/share` (Debian) and `/usr/local/share` (Intel
+Homebrew) are both default `$XDG_DATA_DIRS` entries.
+
+Images, fonts, and sounds survived because each bolts on a compile-time
+`XBOING_INSTALLED_*_DIR` fallback at its `game_init.c` call site
+(`:379/398/417`). Levels route solely through the `paths.c` levels API,
+which lacked that tier — `XBOING_INSTALLED_LEVELS_DIR` was defined
+(`xboing_paths.h:38`) but referenced nowhere. Compounding it, the `paths`
+static library was compiled **without** `XBOING_DATA_DIR`, so it saw the
+`xboing_paths.h` header default `/usr/share/xboing`, not the real prefix.
+
+**Decision.** Add the compiled install prefix as an explicit read tier in
+`paths.c`, ranked **after** `$XDG_DATA_HOME` (so a player's editor-saved
+level in `~/.local/share` still shadows the shipped copy) and **before**
+the cwd dev fallback (so a source-tree run still finds `./levels`). The
+prefix is threaded through a new `paths_config_t.install_data_dir` field
+populated once from `XBOING_DATA_DIR` in `paths_init_explicit`, rather than
+reading the macro inline in the resolvers. This keeps the resolvers
+config-pure (no direct macro/`getenv`) and makes the tier unit-testable:
+the struct is transparent, so a test overrides `install_data_dir` to any
+tmp dir. The `paths` target now compiles with the same
+`XBOING_DATA_DIR="${CMAKE_INSTALL_FULL_DATADIR}/xboing"` already on the
+`xboing` executable target, so the baked value is the real install prefix.
+
+**Precedence (unchanged for existing platforms):**
+`XBOING_LEVELS_DIR`/`XBOING_SOUND_DIR` override → `$XDG_DATA_DIRS` →
+`$XDG_DATA_HOME` → compiled install prefix → cwd dev fallback.
+
+**Alternative rejected.** Reading `XBOING_INSTALLED_LEVELS_DIR` inline in
+the resolvers (the shape the images/fonts/sounds call sites use) would fix
+the bug but leave the tier untestable and the resolvers impure. Routing
+images/fonts/sounds through `paths.c` too — collapsing the duplicated
+mechanism — is a larger refactor of currently-working code and is tracked
+separately, not coupled to this release-blocker.
+
+**Consequences:** fresh Apple-silicon Homebrew installs now load levels.
+Linux/Debian and Intel Homebrew are unaffected (they resolve at the
+`$XDG_DATA_DIRS` tier as before; the new tier is belt-and-suspenders
+there). Regression tests pin the positive resolution, a divergence guard
+(empty `install_data_dir` → not found), and the `$XDG_DATA_HOME`-shadows-
+prefix precedence.

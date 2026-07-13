@@ -16,6 +16,8 @@
 #include <sys/stat.h> /* struct stat, stat() */
 #include <unistd.h>   /* issetugid (macOS/BSD secure-env fallback) */
 
+#include "xboing_paths.h"
+
 /* --- Internal helpers ----------------------------------------------------- */
 
 /*
@@ -217,6 +219,9 @@ paths_status_t paths_init_explicit(paths_config_t *cfg, const char *home, const 
             return PATHS_TRUNCATED;
     }
 
+    safe_copy(cfg->install_data_dir, PATHS_MAX_PATH, XBOING_DATA_DIR);
+    strip_trailing_slash(cfg->install_data_dir);
+
     return PATHS_OK;
 }
 
@@ -264,7 +269,19 @@ static paths_status_t resolve_asset(const paths_config_t *cfg, const char *subdi
     if (file_exists(buf))
         return PATHS_OK;
 
-    /* 4. CWD fallback (development mode). */
+    /* 4. Compiled install prefix.  Covers install locations absent from
+     *    $XDG_DATA_DIRS — e.g. Homebrew's /opt/homebrew on Apple silicon.
+     *    On Linux this is redundant with the /usr/share XDG_DATA_DIRS entry. */
+    if (cfg->install_data_dir[0] != '\0')
+    {
+        st = build_path(buf, bufsize, cfg->install_data_dir, subdir, filename, NULL);
+        if (st == PATHS_TRUNCATED)
+            return PATHS_TRUNCATED;
+        if (file_exists(buf))
+            return PATHS_OK;
+    }
+
+    /* 5. CWD fallback (development mode). */
     st = build_path(buf, bufsize, subdir, filename, NULL, NULL);
     if (st == PATHS_TRUNCATED)
         return PATHS_TRUNCATED;
@@ -388,7 +405,22 @@ static paths_status_t resolve_readable_dir(const paths_config_t *cfg, const char
     if (st == PATHS_OK || st == PATHS_TRUNCATED)
         return st;
 
-    /* 3. CWD fallback — development mode (running from the source tree). */
+    /* 3. Compiled install prefix (see resolve_asset). */
+    if (cfg->install_data_dir[0] != '\0')
+    {
+        char probe[PATHS_MAX_PATH];
+        if (build_path(probe, sizeof(probe), cfg->install_data_dir, subdir, NULL, NULL) == PATHS_OK)
+        {
+            DIR *d = opendir(probe);
+            if (d != NULL)
+            {
+                closedir(d);
+                return safe_copy(buf, bufsize, probe) == 0 ? PATHS_OK : PATHS_TRUNCATED;
+            }
+        }
+    }
+
+    /* 4. CWD fallback — development mode (running from the source tree). */
     if (safe_copy(buf, bufsize, cwd_default) != 0)
         return PATHS_TRUNCATED;
     return PATHS_OK;

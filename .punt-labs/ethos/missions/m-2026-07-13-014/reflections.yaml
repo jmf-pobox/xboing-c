@@ -1,0 +1,16 @@
+reflections:
+    - round: 1
+      created_at: "2026-07-13T22:29:01Z"
+      author: jdc
+      converging: true
+      signals:
+        - TC-52/TC-53 fixtures are byte-for-byte identical except for the install_data_dir override (root vs empty string) — confirmed via diff read, not inference
+        - 'Deletion experiment: reverted src/paths.c to HEAD (pre-mission-012, tier absent), rebuilt test_paths, TC-52 (positive) FAILED at test_paths.c:956 as expected; TC-53/TC-54 still passed (correctly, since they don''t require the tier''s presence to hold) — proves TC-52 is the load-bearing regression guard, not a tautology'
+        - 'Fixture isolation confirmed: unique filename install_tier_level.data avoids collision with repo''s real ./levels/level*.data and any real /usr/local/share or /opt/homebrew installs; XDG_DATA_HOME points at an empty mkdtemp dir with no xboing/ subdir; xdg_data_dirs param pinned to /nonexistent/share'
+        - TC-54 precedence layout verified against resolve_asset's build_path(xdg_data_home, xboing, subdir, filename) call — staged path xdg_root/xboing/levels/install_tier_level.data matches exactly, so an XDG miss cannot silently pass by hitting the install tier instead
+        - Assertions use assert_string_equal on full resolved paths (not just status codes) in TC-52 and TC-54, catching right-status/wrong-path regressions
+        - 'Teardown paired: every mkdtemp/mkdir/touch_file has a matching unlink/rmdir in all 3 tests; ASan build clean, no leak reports'
+        - ctest green on both build/ (debug) and build-asan/ (ASan+UBSan) presets for test_paths
+        - Only tests/test_paths.c changed, matching write_set; reused existing file conventions (char root[64], /tmp/test_paths_XXXXXX template, manual mkdir/rmdir teardown) rather than inventing new patterns
+      recommendation: stop
+      reason: 'All 4 success criteria verified directly: (1) positive/negative fixtures are identical except install_data_dir, and a deletion experiment (revert src/paths.c to HEAD, rebuild, rerun) proves TC-52 actually depends on the tier -- it fails without it; (2) fixture isolation holds via unique filename and pinned empty XDG/legacy dirs, no dependency on real /usr/local/share or /opt/homebrew; (3) TC-54''s staged XDG path matches resolve_asset''s build_path layout exactly, ruling out a false-pass via the install tier; (4) all tmp resources paired and ASan-clean; (5) assertions are exact-path, not status-only. ctest is green under both the debug and asan presets. No findings. Approve and close.'

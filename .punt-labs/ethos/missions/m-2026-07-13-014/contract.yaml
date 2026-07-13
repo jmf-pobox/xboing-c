@@ -1,0 +1,37 @@
+mission_id: m-2026-07-13-014
+status: closed
+type: implement
+created_at: "2026-07-13T22:19:31Z"
+updated_at: "2026-07-13T22:30:15Z"
+closed_at: "2026-07-13T22:30:15Z"
+leader: claude
+worker: gjm
+evaluator:
+    handle: jdc
+    pinned_at: "2026-07-13T22:19:31Z"
+    hash: c08223356d3e6d5aed56e28da477a1aa2707509febfef7c5f62c25871a3e841f
+inputs: {}
+write_set:
+    - tests/test_paths.c
+success_criteria:
+    - 'Add regression cases to tests/test_paths.c pinning the compiled-install- prefix read tier added in mission m-2026-07-13-012: resolve_asset and resolve_readable_dir consult cfg->install_data_dir AFTER XDG_DATA_HOME and BEFORE the cwd fallback.'
+    - 'Positive case: stage a tmp dir T with T/levels/level01.data. Call paths_init_explicit with no XBOING_LEVELS_DIR and an XDG_DATA_HOME lacking xboing/levels; then override cfg.install_data_dir = T (struct is transparent). Assert paths_level_file(&cfg,"level01.data",...) == PATHS_OK with the resolved path under T, and paths_levels_dir_readable resolves to T/levels. NOTE the tier builds cfg->install_data_dir/subdir/filename, i.e. T/levels/level01.data — stage exactly that.'
+    - 'Negative/divergence guard: same cfg but cfg.install_data_dir = "" (empty), with XDG and cwd also lacking the level → paths_level_file returns PATHS_NOT_FOUND. Proves the install-prefix tier is load-bearing.'
+    - 'Precedence case: stage BOTH an XDG_DATA_HOME copy (xdg/xboing/levels/ level01.data) AND an install_data_dir copy → resolved path is the XDG_DATA_HOME one (tier 3 shadows tier 4).'
+    - Prefer adding cases to the EXISTING test_paths cmocka group so no tests/CMakeLists.txt change is needed (it is NOT in your write_set). If you must add a new group/registration, STOP and ask the leader to extend the write_set — do not edit outside tests/test_paths.c.
+    - ctest --test-dir build -R test_paths green under debug; also green under the asan preset. No timing assertions, no reliance on real /usr/local/share or /opt/homebrew. Reuse this file's existing tmp-dir mkdtemp/teardown fixture patterns; clean up every tmp dir.
+budget:
+    rounds: 2
+    reflection_after_each: true
+current_round: 1
+context: |-
+    Sibling of implement mission m-2026-07-13-012 (jdc), which added an injectable
+    paths_config_t.install_data_dir read tier to src/paths.c to fix the Apple
+    Silicon Homebrew "level01.data not found" release bug (bead xboing-52j). The
+    fix is unit-testable because install_data_dir is a plain transparent struct
+    field: paths_init_explicit populates it from compiled XBOING_DATA_DIR, and
+    tests overwrite it to any tmp dir. Read tests/test_paths.c first and reuse its
+    tmp-dir staging + paths_init_explicit fixtures. Do NOT modify src/ — the impl
+    is done and evaluated separately. Chartered as 'implement' (not 'test')
+    because this repo's ethos test-archetype write_set glob is Go-flavored and
+    rejects tests/test_paths.c.

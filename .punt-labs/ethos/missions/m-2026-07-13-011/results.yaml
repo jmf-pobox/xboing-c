@@ -1,0 +1,13 @@
+results:
+    - mission: m-2026-07-13-011
+      round: 1
+      created_at: "2026-07-13T21:46:19Z"
+      author: jdc
+      verdict: escalate
+      confidence: 1
+      files_changed: []
+      evidence:
+        - name: Superseded before any worker was spawned; no code written under this contract. Design refined during verification — reuse existing XBOING_DATA_DIR macro instead of a new XBOING_INSTALL_DATADIR, and add an injectable paths_config_t.install_data_dir field for unit-testability. That expands the write_set beyond [CMakeLists.txt, src/paths.c] to include include/paths.h and tests/test_paths.c. Re-chartered as a fresh mission.
+          status: pass
+        - name: 'Root cause verified in source: paths static lib (CMakeLists.txt:594) compiled without XBOING_DATA_DIR (sees header default /usr/share/xboing); resolve_asset/resolve_readable_dir omit any compiled-prefix tier; XBOING_INSTALLED_LEVELS_DIR defined but referenced nowhere in src/.'
+          status: pass

@@ -1,0 +1,56 @@
+mission_id: m-2026-07-13-012
+status: closed
+type: implement
+created_at: "2026-07-13T21:47:13Z"
+updated_at: "2026-07-13T22:25:42Z"
+closed_at: "2026-07-13T22:25:42Z"
+leader: claude
+worker: jdc
+evaluator:
+    handle: gjm
+    pinned_at: "2026-07-13T21:47:13Z"
+    hash: 7349512b3191332fef8a79f56caf962febc697b8444629912da4aa22b9b2efec
+inputs: {}
+write_set:
+    - CMakeLists.txt
+    - src/paths.c
+    - include/paths.h
+    - include/xboing_paths.h
+success_criteria:
+    - 'CMakeLists.txt: add XBOING_DATA_DIR="${CMAKE_INSTALL_FULL_DATADIR}/xboing" to the `paths` static-library target''s target_compile_definitions (line 594, currently only ${XBOING_SECURE_ENV_DEFS}). This is the SAME value already on the xboing executable target (line 632). Without it, paths.c sees the xboing_paths.h header default /usr/share/xboing and the compiled-prefix tier resolves to the wrong place on Homebrew.'
+    - 'include/paths.h: add `char install_data_dir[PATHS_MAX_PATH];` to paths_config_t (after xboing_score_file). Document it as the compiled install prefix base (XBOING_DATA_DIR), i.e. "<prefix>/share/xboing", treated read-only after init like the other fields.'
+    - 'src/paths.c: `#include "xboing_paths.h"` (project header block). In BOTH paths_init and paths_init_explicit, populate cfg->install_data_dir via safe_copy from XBOING_DATA_DIR (compile-time constant; identical in both). Do NOT add a parameter to paths_init_explicit — keep its signature so no caller changes. memset in paths_init_explicit already zeroes the field before the copy.'
+    - 'src/paths.c resolve_asset: insert a new tier AFTER step 3 (XDG_DATA_HOME) and BEFORE step 4 (cwd fallback), guarded by cfg->install_data_dir[0] != 0: build_path(buf, bufsize, cfg->install_data_dir, subdir, filename, NULL); on PATHS_TRUNCATED return it; if file_exists(buf) return PATHS_OK. This fixes the actual level-load bug (paths_level_file -> resolve_asset).'
+    - 'src/paths.c resolve_readable_dir: insert the same tier BETWEEN the paths_install_data_dir (XDG) lookup and the cwd default, guarded by cfg->install_data_dir[0] != 0: build cfg->install_data_dir/subdir into a local probe buffer, opendir() existence check (mirror paths_install_data_dir style); on success safe_copy into buf and return PATHS_OK/PATHS_TRUNCATED. Keep paths_install_data_dir itself unchanged (its documented contract is "search $XDG_DATA_DIRS" only).'
+    - 'Precedence preserved exactly: XBOING_LEVELS_DIR/XBOING_SOUND_DIR override (tier 1) > XDG_DATA_DIRS (tier 2, Linux /usr/share, Intel /usr/local) > XDG_DATA_HOME editor edits (tier 3) > NEW compiled install prefix (tier 4) > cwd dev fallback (tier 5). A user''s edited ~/.local/share level still shadows the shipped copy; a source/dev build (install prefix /usr/local/share not present on disk) still falls through to ./levels.'
+    - 'include/paths.h + include/xboing_paths.h doc: update the levels/sounds-dir resolution-order comments (paths.h ~110-142) and the xboing_paths.h header comment (~1-26) to list the compiled install prefix as an explicit read tier in the correct position, replacing text that documents the buggy order as if intentional.'
+    - 'cmake --preset debug && cmake --build build --target xboing paths: zero warnings under -Werror -Wconversion -Wshadow. ctest --test-dir build stays green (existing test_paths cases unaffected — dev build''s /usr/local/share /xboing/levels does not exist, so behavior is identical to before for them). Only the four write_set files change.'
+budget:
+    rounds: 3
+    reflection_after_each: true
+current_round: 1
+context: |-
+    RELEASE-BLOCKER shipping in 1.0.4/1.0.5/1.0.6: fresh Apple Silicon Homebrew
+    installs (prefix /opt/homebrew) launch, play sound, but load no level —
+    "Warning: could not find level file: level01.data" (game_init.c:715).
+
+    Bundled levels install to ${CMAKE_INSTALL_DATADIR}/xboing/levels =
+    /opt/homebrew/share/xboing/levels (CMakeLists.txt:74-80). But paths.c
+    resolve_asset() and resolve_readable_dir() walk env-override -> XDG_DATA_DIRS
+    -> XDG_DATA_HOME -> cwd and never consult the compiled install prefix.
+    /opt/homebrew/share is in NO XDG_DATA_DIRS entry (macOS leaves it unset;
+    Homebrew doesn't add it). Images/fonts/sounds survive only because
+    game_init.c:379/398/417 bolt on a XBOING_INSTALLED_*_DIR compile-time
+    fallback at their call sites; levels route solely through paths.c which
+    lacks it. XBOING_INSTALLED_LEVELS_DIR is defined (xboing_paths.h:38) but
+    referenced NOWHERE. Compounding it, the `paths` static lib (CMakeLists.txt
+    :594) is compiled WITHOUT XBOING_DATA_DIR, so even reading the macro today
+    yields the header default /usr/share/xboing — hence BOTH the -D and the
+    resolver tiers are required.
+
+    Design chosen over the report's raw-macro sketch: thread the prefix through a
+    new injectable paths_config_t.install_data_dir field (populated once from
+    XBOING_DATA_DIR in the init functions) so the resolvers stay config-pure and
+    the new tier is unit-testable via paths_init_explicit + direct field override.
+    Bead xboing-52j. A sibling `test` mission (gjm) adds the regression test to
+    tests/test_paths.c — do not touch tests here.

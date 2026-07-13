@@ -591,7 +591,9 @@ target_include_directories(paths PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 target_compile_options(paths PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
-target_compile_definitions(paths PRIVATE ${XBOING_SECURE_ENV_DEFS})
+target_compile_definitions(paths PRIVATE
+    ${XBOING_SECURE_ENV_DEFS}
+    XBOING_DATA_DIR="${CMAKE_INSTALL_FULL_DATADIR}/xboing")
 
 # --- sys_priv (setgid-games privilege management) ---------------------------
 add_library(sys_priv STATIC src/sys_priv.c)
