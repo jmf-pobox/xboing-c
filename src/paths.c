@@ -406,7 +406,10 @@ static paths_status_t resolve_readable_dir(const paths_config_t *cfg, const char
     if (st == PATHS_OK || st == PATHS_TRUNCATED)
         return st;
 
-    /* 3. Compiled install prefix (see resolve_asset). */
+    /* 3. Compiled install prefix — an additional read tier tried after the
+     *    XDG_DATA_DIRS lookup (step 2) and before the cwd dev fallback
+     *    (step 4), not a replacement for XDG.  Covers install locations
+     *    absent from XDG_DATA_DIRS (see resolve_asset). */
     if (cfg->install_data_dir[0] != '\0')
     {
         char probe[PATHS_MAX_PATH];

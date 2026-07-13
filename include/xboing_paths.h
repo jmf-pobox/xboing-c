@@ -2,11 +2,15 @@
  * xboing_paths.h -- System-wide install paths for xboing data files.
  *
  * Asset resolution at runtime tries, in order: $XDG_DATA_DIRS lookup
- * (handles the common /usr and /usr/local prefixes for free), then
- * $XDG_DATA_HOME, then the compiled XBOING_DATA_DIR install prefix
- * below (covers install locations absent from $XDG_DATA_DIRS, e.g.
- * Homebrew's /opt/homebrew on Apple silicon), then the cwd-relative
- * source-tree default in each subsystem (dev fallback).
+ * (handles the common /usr and /usr/local prefixes for free), then the
+ * compiled XBOING_DATA_DIR install prefix below (covers install
+ * locations absent from $XDG_DATA_DIRS, e.g. Homebrew's /opt/homebrew
+ * on Apple silicon), then the cwd-relative source-tree default (dev
+ * fallback).  The paths.c level/sound lookup inserts one extra tier —
+ * $XDG_DATA_HOME (the user data dir) — between the $XDG_DATA_DIRS search
+ * and the install prefix, so an editor-saved level shadows the shipped
+ * copy.  The texture/font/audio subsystems (game_init.c) do not consult
+ * $XDG_DATA_HOME; they use $XDG_DATA_DIRS then the compiled prefix.
  *
  * XBOING_DATA_DIR can be overridden at compile time via -D.  Because
  * the derived macros below use string-literal concatenation (e.g.
