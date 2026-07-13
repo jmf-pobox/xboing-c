@@ -286,24 +286,37 @@ void game_rules_ball_died(game_ctx_t *ctx)
     if (ball_system_get_active_count(ctx->ball) > 0)
         return;
 
-    /* No balls left */
-    ctx->lives_left--;
-
-    if (ctx->lives_left <= 0)
+    /* No balls left.
+     *
+     * Play-test: lives never deplete, matching DecExtraLife's
+     * `if (mode != MODE_EDIT) livesLeft--;` no-op (original/level.c:
+     * 346-357).  The original never needed a dedicated flag for this
+     * because `mode` stays MODE_EDIT for the whole editor session,
+     * play-test included (original/main.c:680, editor.c:386) -- so
+     * DeadBall's `livesLeft <= 0` game-over check (original/level.c:
+     * 474-505) can never trip.  The modern port re-enters a genuinely
+     * distinct SDL2ST_GAME mode for play-test, so it needs
+     * ctx->play_test_active to recover the same fact. */
+    if (!ctx->play_test_active)
     {
-        /* Game over.  Don't clear ctx->game_active here — the highscore
-         * mode's on_enter uses it to distinguish real game-over from
-         * attract-cycle entry.  It is cleared by mode_intro_enter when the
-         * game-over highscore returns to the title (ADR-055). */
-        if (ctx->audio)
-            sdl2_audio_play_at_percent(ctx->audio, "game_over", 99);
-        message_system_set(ctx->message, "GAME OVER", 0, 0);
+        ctx->lives_left--;
 
-        sdl2_state_transition(ctx->state, SDL2ST_HIGHSCORE);
-        return;
+        if (ctx->lives_left <= 0)
+        {
+            /* Game over.  Don't clear ctx->game_active here — the highscore
+             * mode's on_enter uses it to distinguish real game-over from
+             * attract-cycle entry.  It is cleared by mode_intro_enter when
+             * the game-over highscore returns to the title (ADR-055). */
+            if (ctx->audio)
+                sdl2_audio_play_at_percent(ctx->audio, "game_over", 99);
+            message_system_set(ctx->message, "GAME OVER", 0, 0);
+
+            sdl2_state_transition(ctx->state, SDL2ST_HIGHSCORE);
+            return;
+        }
     }
 
-    /* Still have lives — reset ball on paddle.
+    /* Still have lives (or play-testing) — reset ball on paddle.
      * Clear reverse here: matches original/level.c:492 — SetReverseOff()
      * inside DeadBall, before ResetBallStart. */
     if (ctx->audio)
@@ -330,8 +343,13 @@ void game_rules_ball_died(game_ctx_t *ctx)
 
 void game_rules_check(game_ctx_t *ctx)
 {
-    /* Level completion: no required blocks remain → go to bonus screen */
-    if (!block_system_still_active(ctx->block))
+    /* Level completion: no required blocks remain → go to bonus screen.
+     * Guarded the same way as game_rules_ball_died's game-over transition
+     * above: clearing the board during play-test must not reach the real
+     * bonus sequence, matching CheckGameRules's mode==MODE_GAME-only call
+     * site (original/main.c:1140-1141) -- CheckGameRules itself is
+     * original/level.c:398-419. */
+    if (!block_system_still_active(ctx->block) && !ctx->play_test_active)
     {
         special_system_turn_off(ctx->special);
         if (ctx->audio)

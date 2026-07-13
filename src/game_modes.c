@@ -219,9 +219,16 @@ static void mode_game_enter(sdl2_state_mode_t mode, void *ud)
 
     sdl2_state_mode_t prev = sdl2_state_previous(ctx->state);
 
-    if (prev == SDL2ST_EDIT)
+    if (ctx->play_test_active && prev == SDL2ST_EDIT)
     {
-        /* Play-test from editor — use existing blocks, just place ball */
+        /* Play-test from editor — use existing blocks, just place ball.
+         * This one-time setup is scoped to the initial EDIT->GAME entry
+         * via prev == SDL2ST_EDIT.  ctx->play_test_active alone is NOT
+         * enough: it persists for the whole play-test session so the
+         * per-tick guards in game_rules (lives/game-over/BONUS) can keep
+         * treating this as a play-test.  Without the prev check, any
+         * GAME->(dialogue/pause)->GAME re-entry during play-test would
+         * re-run this init and reset lives/paddle/balls/ammo mid-session. */
         ctx->attract_level_display = 0;
         ctx->lives_left = 3;
         ctx->game_active = true;
@@ -1374,18 +1381,53 @@ static void mode_edit_enter(sdl2_state_mode_t mode, void *ud)
      * mode's on_enter — and the restored mode for every editor-originated
      * dialogue (Save/Load/Time/Name/Clear/Quit) is SDL2ST_EDIT, so this
      * fires on every dialogue close, not just a genuine (re-)entry into
-     * the editor.  Guard the reset/init-palette/canvas-widen block so a
-     * plain Save dialogue round-trip doesn't wipe modified/level_number/
-     * level_title/palette-selection or fight the exit-side skip below.
-     * See docs/specs/2026-07-11-editor-parity.md S1.5(a). */
-    if (sdl2_state_previous(ctx->state) != SDL2ST_DIALOGUE)
-    {
-        /* Widen the canvas to reveal the tool palette, matching the
-         * original's ResizeMainWindow(oldWidth + EDITOR_TOOL_WIDTH, ...)
-         * (original/editor.c:161-164).  See
-         * docs/specs/2026-07-11-editor-window-width.md. */
+     * the editor.  Guard the reset/init-palette block so a plain Save
+     * dialogue round-trip doesn't wipe modified/level_number/level_title/
+     * palette-selection or fight the exit-side skip below.  See
+     * docs/specs/2026-07-11-editor-parity.md S1.5(a).
+     *
+     * editor_cb_on_playtest_end (docs/specs/2026-07-12-playtest-fidelity.md
+     * S3.5) also lands here on every EDIT->GAME->EDIT play-test round-trip
+     * (P key) — mode_edit_enter fires because the state machine genuinely
+     * re-enters SDL2ST_EDIT, mirroring the original's FinishPlayTest
+     * (original/editor.c:623-645) reloading the board from its own
+     * tempName rather than from editor.data.  editor_system_reset()
+     * zeroes modified/level_number and forces EDITOR_STATE_LEVEL, whose
+     * next tick reloads editor.data from disk (do_load_level) --
+     * exactly the two effects a play-test round-trip must NOT have
+     * (xboing-nl4, xboing-bsz; the board itself was already restored by
+     * editor_cb_on_playtest_end's savegame_system_restore call, S3.5).
+     * ctx->play_test_active still reads true here: it is cleared only
+     * after sdl2_state_transition returns (S3.4), and sdl2_state_transition
+     * calls on_enter synchronously before returning
+     * (src/sdl2_state.c:126-164), so the ordering is safe by
+     * construction, not by timing luck.
+     *
+     * The canvas-widen call below is deliberately NOT part of this
+     * guard -- see the split rationale a few lines down
+     * (docs/specs/2026-07-12-playtest-fidelity.md S2.3/S3.4). */
+    bool from_dialogue = sdl2_state_previous(ctx->state) == SDL2ST_DIALOGUE;
+
+    /* Widen the canvas to reveal the tool palette, matching the
+     * original's ResizeMainWindow(oldWidth + EDITOR_TOOL_WIDTH, ...)
+     * (original/editor.c:161-164).  See
+     * docs/specs/2026-07-11-editor-window-width.md.
+     *
+     * Must run on a play-test return too: the EDIT->GAME transition at
+     * play-test start narrowed the canvas via mode_edit_exit, and
+     * nothing else re-widens it.  If this were folded into the
+     * play-test-gated block below instead, the palette would stay
+     * clipped after the first play-test round-trip (the canvas-widen
+     * gotcha, docs/specs/2026-07-12-playtest-fidelity.md S2.3). */
+    if (!from_dialogue)
         sdl2_renderer_set_logical_width(ctx->renderer, SDL2R_LOGICAL_WIDTH + EDITOR_TOOL_WIDTH);
 
+    /* Reset/reload: skip for a dialogue resume (above) AND a play-test
+     * return (this flag) -- these are independent conditions, not one
+     * merged guard.  See docs/specs/2026-07-12-playtest-fidelity.md
+     * S2.3/S3.4. */
+    if (!from_dialogue && !ctx->play_test_active)
+    {
         editor_system_reset(ctx->editor);
         editor_system_init_palette(ctx->editor, MAX_STATIC_BLOCKS);
         /* Don't clear blocks here — editor_system's do_load_level handles

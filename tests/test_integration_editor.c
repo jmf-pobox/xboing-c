@@ -335,32 +335,91 @@ static void test_editor_clear_grid(void **vstate)
     assert_false(block_system_is_occupied(f->ctx->block, 2, 3));
 }
 
+/*
+ * Play-test round-trip fidelity (docs/specs/2026-07-12-playtest-fidelity.md
+ * S5, xboing-hay/xboing-nl4/xboing-bsz).  Extends the original transition
+ * smoke test with the four regression assertions the fix (Stages 1-3,
+ * m-2026-07-12-024) exists to satisfy:
+ *
+ *   (i)   board edits survive EDIT -> GAME -> EDIT (xboing-bsz) --
+ *         cell (2,3), drawn before play-test, must still be occupied
+ *         after the round-trip, not reloaded from editor.data on disk.
+ *   (ii)  the modified flag survives (xboing-nl4) -- mode_edit_enter's
+ *         reset/reload branch must not fire on a play-test return.
+ *   (iii) level_number and level_title survive the round-trip -- same
+ *         guard, same reset call this would otherwise re-zero.
+ *   (iv)  the editor cursor is restored to SDL2CUR_PLUS on return, and
+ *         SDL2CUR_NONE while play-testing (mode_game_enter's unconditional
+ *         hide) -- proves play-test always exits through
+ *         editor_cb_on_playtest_end rather than a SDL2ST_HIGHSCORE hijack.
+ *
+ * All state is read through the real production accessors
+ * (editor_system_is_modified/get_level_number/get_level_title,
+ * block_system_is_occupied, sdl2_cursor_current) -- no test-local mirror.
+ */
 static void test_editor_playtest_transition(void **vstate)
 {
     test_fixture_t *f = (test_fixture_t *)*vstate;
+    game_ctx_t *ctx = f->ctx;
 
-    /* Draw some blocks so play-test has something */
-    editor_system_select_palette(f->ctx->editor, 0);
-    editor_system_mouse_button(f->ctx->editor, 192, 80, 1, 1);
-    editor_system_mouse_button(f->ctx->editor, 192, 80, 1, 0); /* release */
+    /* Draw a block so play-test has something, and so `modified` is set
+     * before entering play-test -- otherwise the modified-survives
+     * assertion below would pass vacuously (default is already 0). */
+    editor_system_select_palette(ctx->editor, 0);
+    editor_system_mouse_button(ctx->editor, 192, 80, 1, 1);
+    editor_system_mouse_button(ctx->editor, 192, 80, 1, 0); /* release */
+    assert_true(block_system_is_occupied(ctx->block, 2, 3));
+    assert_true(editor_system_is_modified(ctx->editor));
+
+    const int level_number_before = editor_system_get_level_number(ctx->editor);
+    char level_title_before[EDITOR_LEVEL_NAME_MAX];
+    snprintf(level_title_before, sizeof(level_title_before), "%s",
+             editor_system_get_level_title(ctx->editor));
+
+    assert_int_equal(sdl2_cursor_current(ctx->cursor), SDL2CUR_PLUS);
 
     /* Enter play-test mode */
-    editor_system_key_input(f->ctx->editor, EDITOR_KEY_PLAYTEST);
-    assert_int_equal(editor_system_get_state(f->ctx->editor), EDITOR_STATE_TEST);
+    editor_system_key_input(ctx->editor, EDITOR_KEY_PLAYTEST);
+    assert_int_equal(editor_system_get_state(ctx->editor), EDITOR_STATE_TEST);
 
     /* The game state should transition to GAME for play-testing */
-    sdl2_state_mode_t mode = sdl2_state_current(f->ctx->state);
+    sdl2_state_mode_t mode = sdl2_state_current(ctx->state);
     assert_int_equal(mode, SDL2ST_GAME);
 
-    /* Tick some frames in play-test */
-    tick_frames(f->ctx, 50);
+    /* mode_game_enter unconditionally hides the cursor on entering
+     * SDL2ST_GAME (src/game_modes.c) -- same as a real game. */
+    assert_int_equal(sdl2_cursor_current(ctx->cursor), SDL2CUR_NONE);
+
+    /* Tick some frames in play-test -- the board must still show the
+     * drawn block throughout the session (proves play-test uses the
+     * edited board, not a reload from disk). */
+    tick_frames(ctx, 50);
+    assert_true(block_system_is_occupied(ctx->block, 2, 3));
 
     /* Exit play-test */
-    editor_system_key_input(f->ctx->editor, EDITOR_KEY_PLAYTEST);
+    editor_system_key_input(ctx->editor, EDITOR_KEY_PLAYTEST);
 
     /* Editor resets to LEVEL state, needs ticks to reach NONE */
-    tick_frames(f->ctx, 5);
-    assert_int_equal(editor_system_get_state(f->ctx->editor), EDITOR_STATE_NONE);
+    tick_frames(ctx, 5);
+    assert_int_equal(editor_system_get_state(ctx->editor), EDITOR_STATE_NONE);
+
+    /* Real game state must be back in SDL2ST_EDIT, not hijacked into
+     * SDL2ST_HIGHSCORE by a stray lives/game-over transition. */
+    assert_int_equal(sdl2_state_current(ctx->state), SDL2ST_EDIT);
+
+    /* (i) xboing-bsz: board edit survives the round-trip. */
+    assert_true(block_system_is_occupied(ctx->block, 2, 3));
+
+    /* (ii) xboing-nl4: modified flag survives the round-trip. */
+    assert_true(editor_system_is_modified(ctx->editor));
+
+    /* (iii) level_number/level_title survive the round-trip. */
+    assert_int_equal(editor_system_get_level_number(ctx->editor), level_number_before);
+    assert_string_equal(editor_system_get_level_title(ctx->editor), level_title_before);
+
+    /* (iv) xboing-hay: cursor restored to the editor crosshair, not left
+     * hidden by a game-over hijack that skipped mode_edit_enter. */
+    assert_int_equal(sdl2_cursor_current(ctx->cursor), SDL2CUR_PLUS);
 }
 
 static void test_editor_set_level_name(void **vstate)

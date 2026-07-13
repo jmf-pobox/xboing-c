@@ -3908,3 +3908,83 @@ touched:
   return from play-test, `mode_edit_enter`'s reset zeroes the `modified`
   flag, so the unsaved-work confirm can under-fire. Tracked, not fixed
   here — it does not affect the title.
+
+## ADR-065: Editor play-test detection uses a dedicated flag, not previous-mode inference
+
+**Status:** Accepted (2026-07-12)
+
+**Context:** The modern editor play-test runs the real game loop as
+`SDL2ST_GAME` entered from `SDL2ST_EDIT`. Several call sites need to know
+"we are logically still in the editor" to suppress real-game behavior
+during a test: skip lives depletion and game-over (`game_rules_ball_died`),
+skip the level-complete → `SDL2ST_BONUS` transition (`game_rules_check`),
+skip the editor reset/reload on return (`mode_edit_enter`), and route
+Escape back to the editor (`game_input.c`). The 1996 original got this for
+free because `mode` never left `MODE_EDIT` during play-test
+(`original/main.c:680`, `editor.c:386`) — one single-source-of-truth
+variable read everywhere (`DecExtraLife` `level.c:349`, `CheckGameRules`
+call site `main.c:1140`).
+
+**Decision:** Add one `bool game_ctx_t.play_test_active`, set in
+`editor_cb_on_playtest_start` (before the `SDL2ST_GAME` transition) and
+cleared in `editor_cb_on_playtest_end` (after the `SDL2ST_EDIT` transition
+returns). Rejected inferring play-test from `sdl2_state_previous()` /
+`saved_mode()`: the existing `game_input.c` Escape heuristic
+(`previous == SDL2ST_EDIT`) is the cautionary precedent — a single-slot
+value a future inserted mode (dialogue, pause) silently invalidates, as
+`mode_edit_enter`'s own `SDL2ST_DIALOGUE`-only guard bug demonstrated. The
+flag has exactly one setter and one clearer, both reachable only through
+the editor's `P` key, and defaults `false` via `calloc`, so it cannot leak
+into a real game. This is the modern equivalent of the original's
+`mode == MODE_EDIT` invariant.
+
+**Consequences:**
+
+- The lives/game-over/BONUS guards are `if (... && !ctx->play_test_active)`
+  — purely additive, so real games are provably unchanged (verified by
+  regression sibling tests). During play-test the ball respawns on loss
+  and the board can be cleared without ending, matching the original's
+  infinite test harness.
+- `game_input.c`'s Escape shortcut and `mode_game_enter`'s branch were
+  consolidated onto the flag, retiring the fragile previous-mode reads.
+- Because `sdl2_state_transition` runs `on_enter` synchronously, clearing
+  the flag *after* the return transition guarantees `mode_edit_enter`'s
+  guard still reads `true` on the return — by construction, not timing.
+
+## ADR-066: Editor play-test board round-trip uses in-memory savegame capture/restore
+
+**Status:** Accepted (2026-07-12)
+
+**Context:** The original `SetupPlayTest`/`FinishPlayTest`
+(`original/editor.c:587-645`) save the board to a temp file before play
+and reload it after, so a test session's block damage (broken blocks,
+counter decrements, cooldowns) is undone and the editor resumes exactly
+where it was. The modern editor lost this: `mode_edit_enter`'s reset fired
+on return and reloaded `editor.data`, live-wiping the in-progress board and
+the `modified` flag (bugs xboing-nl4 + xboing-bsz, one shared root cause).
+
+**Decision:** Capture the board on play-test entry and restore it on exit
+using the existing pure `savegame_system_capture` / `savegame_system_restore`
+functions into `game_ctx_t` snapshot fields, then split `mode_edit_enter`'s
+guard so the reset/reload is skipped on a play-test return (the snapshot
+already restored the board) while a genuine fresh entry still resets and
+reloads. Rejected a `tempnam()`-based file mirror of the original: it is a
+deprecated, TOCTOU-prone pattern the warning policy guards against, and the
+original needed a file hand-off only to bridge separate global
+re-initialization steps the modern port's single shared
+`game_ctx_t`/`block_system_t` across `EDIT ⇄ GAME` doesn't have.
+
+**Consequences:**
+
+- The snapshot round-trips `occupied`/`block_type`, `COUNTER_BLK`
+  counter/slide, `BLACK_BLK` cooldown, the `RANDOM` flag, and the time
+  bonus — so returning to the editor shows the pre-test board, undoing
+  in-test damage exactly like `FinishPlayTest`.
+- The `modified` flag, `level_number`, and `level_title` survive the
+  round-trip; the tool-palette canvas re-widens and the editor cursor
+  restores on return (the cursor half of xboing-hay, which also depended
+  on removing the game-over hijack).
+- Out of scope, tracked separately: the post- vs pre-decrement game-over
+  off-by-one in `game_rules_ball_died` (xboing-zpr) and the paddle
+  re-expand on respawn — both pre-existing real-game gaps, not play-test
+  specific.

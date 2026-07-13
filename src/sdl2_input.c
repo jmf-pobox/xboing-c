@@ -301,6 +301,15 @@ bool sdl2_input_just_pressed(const sdl2_input_t *ctx, sdl2_input_action_t action
     return ctx->just_pressed[action];
 }
 
+void sdl2_input_consume(sdl2_input_t *ctx, sdl2_input_action_t action)
+{
+    if (ctx == NULL || !is_valid_action(action))
+    {
+        return;
+    }
+    ctx->just_pressed[action] = false;
+}
+
 /* =========================================================================
  * Public API — Mouse queries
  * ========================================================================= */
