@@ -150,6 +150,12 @@ void game_input_global(game_ctx_t *ctx)
             /* Prevents the same-frame mode_edit_update from re-processing
              * the key (xboing-1ir). */
             sdl2_input_consume(ctx->input, SDL2I_PAUSE);
+            /* The transition above already moved the state machine to
+             * SDL2ST_EDIT, so the local `mode` snapshot is stale for the
+             * rest of this frame. Stop here rather than let later
+             * GAME-gated handlers below run against the just-restored
+             * editor board. */
+            return;
         }
         else if (mode == SDL2ST_GAME)
             sdl2_state_transition(ctx->state, SDL2ST_PAUSE);
@@ -338,6 +344,12 @@ void game_input_global(game_ctx_t *ctx)
                 /* Prevents the same-frame mode_edit_update from re-processing
                  * the key (xboing-1ir). */
                 sdl2_input_consume(ctx->input, SDL2I_ABORT);
+                /* The transition above already moved the state machine to
+                 * SDL2ST_EDIT, so the local `mode` snapshot is stale for the
+                 * rest of this frame. Stop here rather than let later
+                 * GAME-gated handlers below run against the just-restored
+                 * editor board. */
+                return;
             }
             else if (sdl2_state_push_dialogue(ctx->state) == SDL2ST_OK)
             {
