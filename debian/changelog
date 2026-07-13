@@ -1,3 +1,19 @@
+xboing (1.0.6-1) unstable; urgency=medium
+
+  * Editor play-test now matches the original: it no longer depletes lives,
+    never triggers game-over or the bonus screen on a cleared test board, and
+    returns to the editor with your in-progress board, level name, and cursor
+    intact. The p and Escape keys end the test cleanly (no window flash or drop
+    to the attract screens); Q is ignored during play-test as in the original.
+  * Fix ball death to match the original: a 3-life game now gives four balls
+    (game-over fires one death later, as in 1996), and the paddle grows back to
+    maximum size after every ball loss — a forgiveness mechanic that had been
+    missing.
+  * Fix the attract-screen score animation leaking a fake score into the editor
+    HUD; the editor now shows a zeroed score on entry.
+
+ -- J Freeman <jmf@pobox.com>  Sun, 12 Jul 2026 19:19:01 -0700
+
 xboing (1.0.5-1) unstable; urgency=medium
 
   * Fix the ammo belt desyncing from the end-of-level bullet bonus under
