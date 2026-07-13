@@ -608,7 +608,7 @@ static void editor_cb_on_playtest_start(void *ud)
     /* Faithful port: original zeroes score for the test session
      * (original/editor.c:603, SetTheScore(0L)) rather than carrying
      * over whatever the editor's incidental score was. */
-    score_system_reset(ctx->score);
+    score_system_set(ctx->score, 0);
 
     sdl2_state_transition(ctx->state, SDL2ST_GAME);
 }
@@ -626,7 +626,7 @@ static void editor_cb_on_playtest_end(void *ud)
      * true. */
     savegame_system_restore(ctx, &ctx->play_test_snapshot_info,
                             &ctx->play_test_snapshot_level);
-    score_system_reset(ctx->score); /* original/editor.c:629-630 */
+    score_system_set(ctx->score, 0); /* original/editor.c:629-630 */
 
     sdl2_state_transition(ctx->state, SDL2ST_EDIT);
 
@@ -658,7 +658,7 @@ pre-test `info` (paddle position/size, gun ammo, ball state, tilts)
 is harmless: none of that is rendered while `EDITOR_STATE_TEST` is
 not active (`src/game_render.c`'s paddle/ball suppression outside
 `EDITOR_STATE_TEST`, per `docs/specs/2026-07-11-editor-parity.md`
-§3.4). The explicit `score_system_reset` calls above are the one
+§3.4). The explicit `score_system_set(..., 0)` calls above are the one
 place this needs a manual override, because the original forces
 score to a **literal** `0` on both ends of play-test rather than
 restoring a captured value, and skipping that would otherwise leave
@@ -677,7 +677,7 @@ session leaves a residual score behind.
   verified no circular dependency, `savegame_io.h` does not include
   `game_context.h`), `src/game_callbacks.c`
   (`editor_cb_on_playtest_start` / `editor_cb_on_playtest_end`: flag
-  set/clear, capture/restore calls, `score_system_reset` calls).
+  set/clear, capture/restore calls, `score_system_set(..., 0)` calls).
 - **Worker:** `jdc`. **jck approval: yes** — introduces the
   mechanism the other two stages depend on; must verify the
   capture/restore timing against a level containing `COUNTER_BLK` and
