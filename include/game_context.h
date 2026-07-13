@@ -5,8 +5,12 @@
  * persistence data.  Passed as void *user_data to every callback
  * in the system.  Created by game_create(), destroyed by game_destroy().
  *
- * No module includes here -- only forward declarations.  This keeps
- * compile times low and avoids circular header dependencies.
+ * Opaque module contexts are forward-declared (no headers pulled in),
+ * which keeps compile times low and avoids circular dependencies.  The
+ * only headers included are for value-type members stored inline in the
+ * struct (config_io, highscore, paths, savegame_io) -- these must be
+ * complete types, and none of them include game_context.h, so there is
+ * no cycle.
  */
 
 #ifndef GAME_CONTEXT_H
