@@ -252,16 +252,17 @@ static void test_editor_entry_clears_active_specials(void **vstate)
     assert_false(special_system_is_active(ctx->special, SPECIAL_KILLER));
 }
 
-/* mode_edit_enter (src/game_modes.c) resets the displayed score to 0 via
- * score_system_set_display(ctx->score, 0), guarding against the attract
+/* mode_edit_enter (src/game_modes.c) resets the score to 0 via
+ * score_system_set(ctx->score, 0), guarding against the attract
  * screen's highscore flourish (attract_random_display,
  * src/game_modes.c:404) leaving a fake incrementing value in the score
  * field when the player enters the editor right after it.  Matches
  * original/editor.c:603 (SetTheScore(0L) on editor entry).  Sets a
- * nonzero display value BEFORE the transition, then drives the REAL
- * SDL2ST_EDIT entry (sdl2_state_transition -> mode_edit_enter), not a
- * direct score_system_set_display(0) call, so the assertion pins the
- * production reset site rather than a test-local mirror of it. */
+ * nonzero display value BEFORE the transition (via set_display, the same
+ * call the attract flourish uses), then drives the REAL SDL2ST_EDIT entry
+ * (sdl2_state_transition -> mode_edit_enter), not a direct
+ * score_system_set(0) call, so the assertion pins the production reset
+ * site rather than a test-local mirror of it. */
 static void test_editor_entry_resets_score_display(void **vstate)
 {
     test_fixture_t *f = (test_fixture_t *)*vstate;
