@@ -3984,7 +3984,52 @@ re-initialization steps the modern port's single shared
   round-trip; the tool-palette canvas re-widens and the editor cursor
   restores on return (the cursor half of xboing-hay, which also depended
   on removing the game-over hijack).
-- Out of scope, tracked separately: the post- vs pre-decrement game-over
-  off-by-one in `game_rules_ball_died` (xboing-zpr) and the paddle
-  re-expand on respawn — both pre-existing real-game gaps, not play-test
-  specific.
+- The post- vs pre-decrement game-over off-by-one in `game_rules_ball_died`
+  (xboing-zpr) and the paddle re-expand on respawn — both pre-existing
+  real-game gaps surfaced during this work — are fixed in ADR-067.
+
+## ADR-067: `DeadBall` fidelity, play-test Q, and score-display leak
+
+**Status:** Accepted (2026-07-12)
+
+Three faithfulness corrections found while dogfooding the editor
+play-test (ADR-065/066), fixed together rather than deferred.
+
+**1. Ball death matches `DeadBall` (xboing-zpr + paddle re-expand).**
+`game_rules_ball_died` decremented lives *then* checked `<= 0`, giving a
+3-life game only 3 balls. The original `DeadBall`
+(`original/level.c:474-505`) checks `livesLeft <= 0` *before* decrementing
+(the decrement lives inside the respawn branch via `DecExtraLife`,
+`level.c:500`), so a 3-life game gets **4 balls** — game-over fires on the
+death that *finds* lives already 0, not the one that brings it there. The
+modern also omitted the paddle re-expand: `DeadBall`'s respawn branch calls
+`ChangePaddleSize(PAD_EXPAND_BLK)` twice (`level.c:496-497`), which
+saturates to `PADDLE_HUGE` (`original/paddle.c:318-357`) — the forgiveness
+mechanic that restores your biggest paddle after every death. Both are now
+in `game_rules_ball_died`: pre-decrement game-over, decrement inside the
+respawn tail, and `paddle_system_set_size(PADDLE_SIZE_HUGE)` on every
+respawn (real game and play-test). The `+2` consolation ammo
+(`original/ball.c:1803-1805`) is unchanged. Play-test still never depletes
+lives or game-overs (the decrement/game-over stay gated on
+`play_test_active`).
+
+**2. Q during play-test does nothing (xboing-3h3).** Q (`SDL2I_QUIT`)
+during play-test opened the "Exit XBoing?" quit dialogue. The original's
+`EDIT_TEST` key switch (`original/editor.c:992-1030`) handles only
+`p`/paddle/shoot and returns before the quit case — Q is swallowed. Added
+`!ctx->play_test_active` to the Q gate. Real-game Q is unchanged.
+
+**3. Attract fake-score no longer leaks (xboing-oyt).**
+`attract_random_display` writes an incrementing fake score into the single
+`score_system` field for an attract-screen flourish (a modern invention).
+It leaked into the editor HUD. `mode_edit_enter` now resets the score to 0
+with `score_system_set(ctx->score, 0)` — the `SetTheScore(0L)` equivalent
+(`original/editor.c:603,629`), which resets both the score and the
+extra-life threshold (unlike `set_display`, which is attract-mode-only and
+skips threshold tracking). The real-game path was already covered by
+`start_new_game`'s `score_system_set(0)` (`original/main.c:944`).
+
+**Consequences:** ball-death fidelity (1) changes every real game (one more
+ball, paddle grows on respawn) — jck (author) approved as faithful to
+`DeadBall`. All three have regression tests, including the corrected
+4-ball / paddle-grow sequence and full-frame Q-in-play-test coverage.

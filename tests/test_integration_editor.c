@@ -35,6 +35,7 @@
 #include "game_init.h"
 #include "game_render.h"
 #include "level_system.h"
+#include "score_system.h"
 #include "sdl2_cursor.h"
 #include "sdl2_input.h"
 #include "sdl2_renderer.h"
@@ -249,6 +250,31 @@ static void test_editor_entry_clears_active_specials(void **vstate)
     tick_frames(ctx, 5);
 
     assert_false(special_system_is_active(ctx->special, SPECIAL_KILLER));
+}
+
+/* mode_edit_enter (src/game_modes.c) resets the score to 0 via
+ * score_system_set(ctx->score, 0), guarding against the attract
+ * screen's highscore flourish (attract_random_display,
+ * src/game_modes.c:404) leaving a fake incrementing value in the score
+ * field when the player enters the editor right after it.  Matches
+ * original/editor.c:603 (SetTheScore(0L) on editor entry).  Sets a
+ * nonzero display value BEFORE the transition (via set_display, the same
+ * call the attract flourish uses), then drives the REAL SDL2ST_EDIT entry
+ * (sdl2_state_transition -> mode_edit_enter), not a direct
+ * score_system_set(0) call, so the assertion pins the production reset
+ * site rather than a test-local mirror of it. */
+static void test_editor_entry_resets_score_display(void **vstate)
+{
+    test_fixture_t *f = (test_fixture_t *)*vstate;
+    game_ctx_t *ctx = f->ctx;
+
+    score_system_set_display(ctx->score, 5);
+    assert_int_equal(score_system_get(ctx->score), 5);
+
+    sdl2_state_transition(ctx->state, SDL2ST_EDIT);
+    tick_frames(ctx, 5);
+
+    assert_int_equal(score_system_get(ctx->score), 0);
 }
 
 static void test_editor_ticking_no_crash(void **vstate)
@@ -1194,6 +1220,8 @@ int main(void)
     const struct CMUnitTest tests[] = {
         cmocka_unit_test_setup_teardown(test_edit_mode_enters, setup_edit_mode, teardown),
         cmocka_unit_test_setup_teardown(test_editor_entry_clears_active_specials, setup_pre_edit,
+                                        teardown),
+        cmocka_unit_test_setup_teardown(test_editor_entry_resets_score_display, setup_pre_edit,
                                         teardown),
         cmocka_unit_test_setup_teardown(test_editor_erase_shows_skull_cursor, setup_edit_mode,
                                         teardown),

@@ -729,6 +729,49 @@ static void test_playtest_escape_full_frame_no_reopen(void **vstate)
 }
 
 /* =========================================================================
+ * Group 8: Q must do nothing during play-test (bead xboing-3h3)
+ *
+ * game_input.c:397-398 guards the SDL2I_QUIT dialogue open with
+ * `!ctx->play_test_active` (comment cites original/editor.c:992-1030 --
+ * EDIT_TEST's key switch only handles p/paddle/shoot and returns before
+ * reaching the Q exit-dialogue case, so the original silently swallows Q
+ * during play-test too).  Drives the same full-frame shape as
+ * test_playtest_p_full_frame_no_restart: ONE begin_frame (inside
+ * inject_key) + game_input_global + sdl2_state_update, no begin_frame in
+ * between, matching src/game_main.c's real per-frame call order.
+ * ========================================================================= */
+
+static void test_playtest_q_full_frame_no_dialogue(void **vstate)
+{
+    game_ctx_t *ctx = ((kb_fixture_t *)*vstate)->ctx;
+
+    editor_system_key_input(ctx->editor, EDITOR_KEY_PLAYTEST);
+    assert_int_equal(sdl2_state_current(ctx->state), SDL2ST_GAME);
+    assert_true(ctx->play_test_active);
+
+    inject_key(ctx, SDL_SCANCODE_Q);
+    game_input_global(ctx);
+    sdl2_state_update(ctx->state);
+
+    assert_int_equal(sdl2_state_current(ctx->state), SDL2ST_GAME);
+    assert_true(ctx->play_test_active);
+}
+
+/* Sibling: a REAL game (play_test_active == false) must still open the
+ * quit confirmation dialogue on Q -- proves the play-test guard didn't
+ * regress ordinary in-game quit. */
+static void test_real_game_q_opens_dialogue(void **vstate)
+{
+    game_ctx_t *ctx = ((kb_fixture_t *)*vstate)->ctx;
+    assert_false(ctx->play_test_active);
+
+    inject_key(ctx, SDL_SCANCODE_Q);
+    game_input_global(ctx);
+
+    assert_int_equal(sdl2_state_current(ctx->state), SDL2ST_DIALOGUE);
+}
+
+/* =========================================================================
  * Test registration
  * ========================================================================= */
 
@@ -810,6 +853,12 @@ int main(void)
                                         teardown),
     };
 
+    const struct CMUnitTest playtest_quit_tests[] = {
+        cmocka_unit_test_setup_teardown(test_playtest_q_full_frame_no_dialogue, setup_editor,
+                                        teardown),
+        cmocka_unit_test_setup_teardown(test_real_game_q_opens_dialogue, setup_game, teardown),
+    };
+
     int rc = 0;
     rc |= cmocka_run_group_tests_name("global keys", global_tests, NULL, NULL);
     rc |= cmocka_run_group_tests_name("mode scoping", scoping_tests, NULL, NULL);
@@ -820,5 +869,7 @@ int main(void)
                                       NULL, NULL);
     rc |= cmocka_run_group_tests_name("playtest full-frame double-fire (xboing-1ir)",
                                       playtest_full_frame_tests, NULL, NULL);
+    rc |= cmocka_run_group_tests_name("playtest quit blocked (xboing-3h3)", playtest_quit_tests,
+                                      NULL, NULL);
     return rc;
 }

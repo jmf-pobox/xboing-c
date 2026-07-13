@@ -389,10 +389,13 @@ void game_input_global(game_ctx_t *ctx)
 
     /* Q: quit with confirmation — original/main.c:864-868.
      * "Exit XBoing you wimp? [y/n]" YesNoDialogue.
-     * Blocked in EDIT (editor has own Q handler) and DIALOGUE
-     * (prevent setting quit_pending during unrelated dialogue). */
+     * Blocked in EDIT (editor has own Q handler), DIALOGUE (prevent
+     * setting quit_pending during unrelated dialogue), and during
+     * play-test — the original EDIT_TEST switch swallows Q entirely
+     * (original/editor.c:992-1030 handles only p/paddle/shoot and
+     * returns before reaching the Q exit-dialogue case). */
     if (sdl2_input_just_pressed(ctx->input, SDL2I_QUIT) && mode != SDL2ST_EDIT &&
-        mode != SDL2ST_DIALOGUE)
+        mode != SDL2ST_DIALOGUE && !ctx->play_test_active)
     {
         if (sdl2_state_push_dialogue(ctx->state) == SDL2ST_OK)
         {
