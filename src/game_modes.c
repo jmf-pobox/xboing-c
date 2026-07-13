@@ -219,15 +219,16 @@ static void mode_game_enter(sdl2_state_mode_t mode, void *ud)
 
     sdl2_state_mode_t prev = sdl2_state_previous(ctx->state);
 
-    if (ctx->play_test_active)
+    if (ctx->play_test_active && prev == SDL2ST_EDIT)
     {
         /* Play-test from editor — use existing blocks, just place ball.
-         * Reads ctx->play_test_active rather than prev == SDL2ST_EDIT --
-         * both are provably equivalent (the only EDIT->GAME transition
-         * in the codebase is editor_cb_on_playtest_start), but driving
-         * both call sites from one flag is single-source-of-truth
-         * hygiene, not a correctness fix.  See
-         * docs/specs/2026-07-12-playtest-fidelity.md S3.1. */
+         * This one-time setup is scoped to the initial EDIT->GAME entry
+         * via prev == SDL2ST_EDIT.  ctx->play_test_active alone is NOT
+         * enough: it persists for the whole play-test session so the
+         * per-tick guards in game_rules (lives/game-over/BONUS) can keep
+         * treating this as a play-test.  Without the prev check, any
+         * GAME->(dialogue/pause)->GAME re-entry during play-test would
+         * re-run this init and reset lives/paddle/balls/ammo mid-session. */
         ctx->attract_level_display = 0;
         ctx->lives_left = 3;
         ctx->game_active = true;
