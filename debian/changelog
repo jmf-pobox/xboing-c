@@ -10,7 +10,7 @@ xboing (1.0.7-1) unstable; urgency=medium
     data dir (so editor-saved levels still take precedence) and before the
     source-tree fallback. Linux and Intel Homebrew are unaffected. (ADR-068.)
 
- -- J Freeman <jmf@pobox.com>  Sun, 13 Jul 2026 15:45:00 -0700
+ -- J Freeman <jmf@pobox.com>  Mon, 13 Jul 2026 15:45:00 -0700
 
 xboing (1.0.6-1) unstable; urgency=medium
 
