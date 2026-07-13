@@ -1148,6 +1148,13 @@ static void editor_cb_on_playtest_end(void *ud)
      * play_test_active guard (game_modes.c) still needs to read
      * true. */
     savegame_system_restore(ctx, &ctx->play_test_snapshot_info, &ctx->play_test_snapshot_level);
+
+    /* savegame_system_restore sets savegame_restored_session=true (correct for a
+     * real save-load: it gates GLOBAL score submission at game_modes.c:1016 and
+     * :1158 as an anti-cheat measure).  The play-test board round-trip reuses that
+     * helper but is NOT a loaded save session, so clear the flag here. */
+    ctx->savegame_restored_session = false;
+
     score_system_set(ctx->score, 0); /* original/editor.c:629-630 */
 
     sdl2_state_transition(ctx->state, SDL2ST_EDIT);
