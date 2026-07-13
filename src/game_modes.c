@@ -1362,6 +1362,17 @@ static void mode_edit_enter(sdl2_state_mode_t mode, void *ud)
     (void)mode;
     game_ctx_t *ctx = ud;
 
+    /* Reset the displayed score to 0.  attract_random_display's
+     * highscore-screen flourish writes a fake incrementing value directly
+     * into the score field via score_system_set_display() -- without this
+     * reset, entering the editor right after that flourish would render
+     * the leftover fake number instead of 0.  Harmless on a play-test
+     * RETURN too: editor_cb_on_playtest_end has already zeroed the score
+     * by the time this runs, so this is a consistent no-op there.  Matches
+     * original/editor.c:603 and :629 (SetTheScore(0L) on editor entry /
+     * play-test exit). */
+    score_system_set_display(ctx->score, 0);
+
     /* Restore cursor for editor interaction */
     if (ctx->cursor)
         sdl2_cursor_set(ctx->cursor, SDL2CUR_PLUS);

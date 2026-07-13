@@ -288,6 +288,13 @@ void game_rules_ball_died(game_ctx_t *ctx)
 
     /* No balls left.
      *
+     * Game-over check happens BEFORE the decrement, matching DeadBall's
+     * `livesLeft <= 0 && GetAnActiveBall() == -1` (original/level.c:482) --
+     * the decrement (DecExtraLife, level.c:500) only runs in the respawn
+     * branch below.  With 3 starting lives this yields 4 balls total:
+     * game-over fires on the death that FINDS lives_left already at 0, not
+     * the one that brings it to 0.
+     *
      * Play-test: lives never deplete, matching DecExtraLife's
      * `if (mode != MODE_EDIT) livesLeft--;` no-op (original/level.c:
      * 346-357).  The original never needed a dedicated flag for this
@@ -297,23 +304,18 @@ void game_rules_ball_died(game_ctx_t *ctx)
      * 474-505) can never trip.  The modern port re-enters a genuinely
      * distinct SDL2ST_GAME mode for play-test, so it needs
      * ctx->play_test_active to recover the same fact. */
-    if (!ctx->play_test_active)
+    if (!ctx->play_test_active && ctx->lives_left <= 0)
     {
-        ctx->lives_left--;
+        /* Game over.  Don't clear ctx->game_active here — the highscore
+         * mode's on_enter uses it to distinguish real game-over from
+         * attract-cycle entry.  It is cleared by mode_intro_enter when
+         * the game-over highscore returns to the title (ADR-055). */
+        if (ctx->audio)
+            sdl2_audio_play_at_percent(ctx->audio, "game_over", 99);
+        message_system_set(ctx->message, "GAME OVER", 0, 0);
 
-        if (ctx->lives_left <= 0)
-        {
-            /* Game over.  Don't clear ctx->game_active here — the highscore
-             * mode's on_enter uses it to distinguish real game-over from
-             * attract-cycle entry.  It is cleared by mode_intro_enter when
-             * the game-over highscore returns to the title (ADR-055). */
-            if (ctx->audio)
-                sdl2_audio_play_at_percent(ctx->audio, "game_over", 99);
-            message_system_set(ctx->message, "GAME OVER", 0, 0);
-
-            sdl2_state_transition(ctx->state, SDL2ST_HIGHSCORE);
-            return;
-        }
+        sdl2_state_transition(ctx->state, SDL2ST_HIGHSCORE);
+        return;
     }
 
     /* Still have lives (or play-testing) — reset ball on paddle.
@@ -333,6 +335,21 @@ void game_rules_ball_died(game_ctx_t *ctx)
     }
 
     paddle_system_set_reverse(ctx->paddle, 0);
+
+    /* Make the paddle the maximum size — original/level.c:496-497,
+     * ChangePaddleSize(PAD_EXPAND_BLK) called twice, which saturates to
+     * HUGE regardless of the paddle's prior size (the two-call idiom just
+     * guarantees SMALL->HUGE in one step; a single set_size call is
+     * equivalent for a 3-step SMALL/MEDIUM/HUGE scale).  Runs on every
+     * respawn, real game and play-test alike. */
+    paddle_system_set_size(ctx->paddle, PADDLE_SIZE_HUGE);
+
+    /* Decrement lives inside the respawn branch, real game only --
+     * DecExtraLife (original/level.c:500), guarded the same way as the
+     * game-over check above. */
+    if (!ctx->play_test_active)
+        ctx->lives_left--;
+
     ball_system_env_t env = game_callbacks_ball_env(ctx);
     ball_system_reset_start(ctx->ball, &env);
 }

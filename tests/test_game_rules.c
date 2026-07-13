@@ -167,7 +167,14 @@ static void test_ball_died_playtest_no_lives_lost_no_game_over(void **vstate)
 }
 
 /* Regression sibling: play_test_active=false must still deplete lives and
- * reach game-over exactly as before this guard was introduced. */
+ * reach game-over exactly as before this guard was introduced.
+ *
+ * The game-over check runs BEFORE the decrement (game_rules_ball_died,
+ * src/game_rules.c:291-319 comment) -- matching DeadBall's
+ * `livesLeft <= 0 && GetAnActiveBall() == -1` (original/level.c:482).  With
+ * 3 starting lives this yields 4 balls total: the death that FINDS
+ * lives_left==1 respawns (decrementing to 0); only the NEXT death, which
+ * finds lives_left already 0, triggers game-over. */
 static void test_ball_died_real_game_lives_lost_game_over(void **vstate)
 {
     fixture_t *f = (fixture_t *)*vstate;
@@ -177,9 +184,62 @@ static void test_ball_died_real_game_lives_lost_game_over(void **vstate)
     ctx->lives_left = 1;
     ball_system_clear_all(ctx->ball);
 
+    /* First death: lives_left (1) > 0 -> respawn branch, not game-over. */
     game_rules_ball_died(ctx);
 
+    assert_int_equal(sdl2_state_current(ctx->state), SDL2ST_GAME);
     assert_int_equal(ctx->lives_left, 0);
+    assert_int_equal(paddle_system_get_size_type(ctx->paddle), PADDLE_SIZE_HUGE);
+
+    /* Second death: lives_left (0) <= 0 -> game-over. */
+    ball_system_clear_all(ctx->ball);
+    game_rules_ball_died(ctx);
+
+    assert_int_equal(sdl2_state_current(ctx->state), SDL2ST_HIGHSCORE);
+}
+
+/* =========================================================================
+ * 4-ball count + paddle re-expand regression (zpr)
+ *
+ * Pins two facts about game_rules_ball_died's respawn branch together:
+ * (1) starting with 3 lives yields exactly 4 balls before game-over (the
+ *     game-over check fires on the death that FINDS lives_left already 0,
+ *     not the one that brings it there -- see the comment above and
+ *     src/game_rules.c:291-306); (2) the paddle is forced back to
+ *     PADDLE_SIZE_HUGE on every respawn regardless of its size going in
+ *     (src/game_rules.c:339-345, ChangePaddleSize(PAD_EXPAND_BLK) x2 in
+ *     original/level.c:496-497).  Each iteration sets the paddle to a
+ *     non-HUGE size first so the HUGE assertion after game_rules_ball_died
+ *     is non-vacuous.
+ * ========================================================================= */
+
+static void test_ball_died_four_balls_paddle_reexpands_each_respawn(void **vstate)
+{
+    fixture_t *f = (fixture_t *)*vstate;
+    game_ctx_t *ctx = f->ctx;
+
+    ctx->play_test_active = false;
+    ctx->lives_left = 3;
+
+    const int expected_lives_after[3] = {2, 1, 0};
+
+    for (int i = 0; i < 3; i++)
+    {
+        paddle_system_set_size(ctx->paddle, PADDLE_SIZE_SMALL);
+        assert_int_equal(paddle_system_get_size_type(ctx->paddle), PADDLE_SIZE_SMALL);
+
+        ball_system_clear_all(ctx->ball);
+        game_rules_ball_died(ctx);
+
+        assert_int_equal(sdl2_state_current(ctx->state), SDL2ST_GAME);
+        assert_int_equal(ctx->lives_left, expected_lives_after[i]);
+        assert_int_equal(paddle_system_get_size_type(ctx->paddle), PADDLE_SIZE_HUGE);
+    }
+
+    /* 4th death: lives_left (0) <= 0 -> game-over. */
+    ball_system_clear_all(ctx->ball);
+    game_rules_ball_died(ctx);
+
     assert_int_equal(sdl2_state_current(ctx->state), SDL2ST_HIGHSCORE);
 }
 
@@ -240,6 +300,8 @@ int main(void)
                                         teardown),
         cmocka_unit_test_setup_teardown(test_ball_died_real_game_lives_lost_game_over, setup,
                                         teardown),
+        cmocka_unit_test_setup_teardown(test_ball_died_four_balls_paddle_reexpands_each_respawn,
+                                        setup, teardown),
         cmocka_unit_test_setup_teardown(test_check_playtest_clears_board_no_bonus_transition,
                                         setup, teardown),
         cmocka_unit_test_setup_teardown(test_check_real_game_clears_board_reaches_bonus, setup,
