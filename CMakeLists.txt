@@ -1,11 +1,11 @@
 cmake_minimum_required(VERSION 3.16)
-project(xboing VERSION 1.0.6 LANGUAGES C)
+project(xboing VERSION 1.0.7 LANGUAGES C)
 include(GNUInstallDirs)
 
 # Release date shown in the man page .TH header.  A fixed ISO date (not a
 # wall-clock value) so builds stay reproducible and mandoc can parse it.
 # Bump on each release.
-set(XBOING_MAN_DATE "2026-07-12")
+set(XBOING_MAN_DATE "2026-07-13")
 
 # Export compile_commands.json for clang-tidy
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -591,7 +591,9 @@ target_include_directories(paths PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 target_compile_options(paths PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
-target_compile_definitions(paths PRIVATE ${XBOING_SECURE_ENV_DEFS})
+target_compile_definitions(paths PRIVATE
+    ${XBOING_SECURE_ENV_DEFS}
+    XBOING_DATA_DIR="${CMAKE_INSTALL_FULL_DATADIR}/xboing")
 
 # --- sys_priv (setgid-games privilege management) ---------------------------
 add_library(sys_priv STATIC src/sys_priv.c)

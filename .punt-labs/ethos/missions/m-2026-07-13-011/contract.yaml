@@ -1,0 +1,28 @@
+mission_id: m-2026-07-13-011
+status: escalated
+type: implement
+created_at: "2026-07-13T02:46:52Z"
+updated_at: "2026-07-13T21:46:25Z"
+closed_at: "2026-07-13T21:46:25Z"
+leader: claude
+worker: jdc
+evaluator:
+    handle: gjm
+    pinned_at: "2026-07-13T02:46:52Z"
+    hash: 7349512b3191332fef8a79f56caf962febc697b8444629912da4aa22b9b2efec
+inputs: {}
+write_set:
+    - CMakeLists.txt
+    - src/paths.c
+success_criteria:
+    - 'CMakeLists.txt: add a compile definition XBOING_INSTALL_DATADIR="${CMAKE_INSTALL_FULL_DATADIR}" (the ABSOLUTE datadir, prefix/share) to the target(s) that compile paths.c (find the existing target_compile_definitions where XBOING_VERSION ~line 633 is set, and the library/target paths.c belongs to). This makes cmake --install (Homebrew std_cmake_args sets CMAKE_INSTALL_PREFIX to the cellar) bake the correct absolute /opt/homebrew/Cellar/.../share path; a plain source build bakes /usr/local/share (harmless — dev falls back to CWD).'
+    - 'src/paths.c: add a resolution step that checks XBOING_INSTALL_DATADIR/xboing/<subdir>[/<filename>] for the installed assets. Add it in resolve_asset AND paths_install_data_dir (the shared install lookup used by resolve_readable_dir) so both per-file (paths_level_file) and per-dir (paths_levels_dir_readable) resolution find it. Placement: AFTER XDG_DATA_HOME (step 3, so a user''s editor-saved level in ~/.local/share still overrides the shipped one) and BEFORE the CWD dev fallback. Guard on XBOING_INSTALL_DATADIR being defined + non-empty.'
+    - 'Result: on a fresh Apple Silicon Homebrew install (no repo CWD, no XDG_DATA_HOME levels, /opt/homebrew not in XDG_DATA_DIRS), paths_level_file finds /opt/homebrew/Cellar/xboing/<ver>/share/xboing/levels/level01.data. `xboing -setup` shows the baked install levels dir, not the relative "levels". Existing behavior preserved: XBOING_LEVELS_DIR override, XDG_DATA_DIRS (Intel /usr/local, Debian /usr/share), XDG_DATA_HOME editor edits, and CWD dev mode all still work in the same priority.'
+    - 'No regression to the source/dev build: with CMAKE_INSTALL_PREFIX=/usr/local (default), XBOING_INSTALL_DATADIR=/usr/local/share; running ./build/xboing from the repo still finds ./levels via the CWD fallback (the baked /usr/local/share/xboing/levels doesn''t exist pre-install). Confirm.'
+    - cmake --preset debug + build zero-warning under -Werror -Wconversion -Wshadow; ctest --test-dir build stays 61/61 (existing path tests); only CMakeLists.txt + src/paths.c change. If include/paths.h needs a new accessor for the baked dir (e.g. for -setup display), note it and I will add it to the write-set.
+budget:
+    rounds: 3
+    reflection_after_each: true
+current_round: 1
+context: |
+    RELEASE BUG (ships in 1.0.6, all Apple Silicon Homebrew installs broken): the game cannot find its installed levels/sounds on a fresh host. paths.c resolves assets via env override -> XDG_DATA_DIRS -> XDG_DATA_HOME -> CWD "./levels". The install goes to ${CMAKE_INSTALL_DATADIR}/xboing/levels (CMakeLists:74-80), i.e. the prefix's share dir (/opt/homebrew/Cellar/xboing/<ver>/share on Apple Silicon). But /opt/homebrew/share is NOT in the default XDG_DATA_DIRS (/usr/local/share:/usr/share), and nothing bakes the actual install path into the binary. So `xboing -setup` shows "Levels dir = levels" (relative), and running from $HOME finds no levels -> level01 unloadable. It only "worked" for us because we ran from the repo (CWD ./levels) or had an XDG_DATA_HOME editor-save of level01. Fix: bake the install datadir at build time and add it to the resolution chain.

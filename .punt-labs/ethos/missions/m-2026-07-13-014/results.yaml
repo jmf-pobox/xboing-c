@@ -1,0 +1,20 @@
+results:
+    - mission: m-2026-07-13-014
+      round: 1
+      created_at: "2026-07-13T22:30:09Z"
+      author: gjm
+      verdict: pass
+      confidence: 0.95
+      files_changed:
+        - path: tests/test_paths.c
+          added: 180
+          removed: 0
+      evidence:
+        - name: Positive — install prefix resolves level file + levels dir (exact-string asserts on <root>/levels/install_tier_level.data and <root>/levels)
+          status: pass
+        - name: Negative/divergence — identical fixture, install_data_dir zeroed → PATHS_NOT_FOUND; unique filename avoids ./levels collision
+          status: pass
+        - name: Precedence — XDG_DATA_HOME copy (xdg/xboing/levels) shadows install-prefix copy; resolves to XDG path
+          status: pass
+        - name: ctest debug + asan green (test_paths 1/1); 3 cases registered in existing Group 8, no CMakeLists change; every mkdtemp/mkdir/touch paired with unlink/rmdir
+          status: pass

@@ -1,0 +1,18 @@
+results:
+    - mission: m-2026-07-13-015
+      round: 1
+      created_at: "2026-07-13T22:41:17Z"
+      author: jdc
+      verdict: pass
+      confidence: 0.97
+      files_changed:
+        - path: src/paths.c
+          added: 9
+          removed: 8
+      evidence:
+        - name: cmake --build build --target paths xboing (-Wall -Wextra -Wpedantic -Werror -Wconversion -Wshadow)
+          status: pass
+        - name: ctest --test-dir build -R test_paths --output-on-failure
+          status: pass
+        - name: git status --porcelain -- src/paths.c (only tracked file modified)
+          status: pass

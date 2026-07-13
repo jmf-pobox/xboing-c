@@ -1,0 +1,33 @@
+mission_id: m-2026-07-13-015
+status: closed
+type: implement
+created_at: "2026-07-13T22:39:17Z"
+updated_at: "2026-07-13T22:50:48Z"
+closed_at: "2026-07-13T22:50:48Z"
+leader: claude
+worker: jdc
+evaluator:
+    handle: gjm
+    pinned_at: "2026-07-13T22:39:17Z"
+    hash: 7349512b3191332fef8a79f56caf962febc697b8444629912da4aa22b9b2efec
+inputs: {}
+write_set:
+    - src/paths.c
+success_criteria:
+    - 'paths_init_explicit: the safe_copy into cfg->install_data_dir must check its return and return PATHS_TRUNCATED on failure, matching every sibling field (home/xdg_data_home/xdg_config_home/xboing_levels_dir/... all do `if (safe_copy(...) != 0) return PATHS_TRUNCATED;`). Keep the subsequent strip_trailing_slash only on the success path.'
+    - 'resolve_readable_dir new install-prefix tier: propagate PATHS_TRUNCATED from build_path instead of only proceeding on == PATHS_OK. Mirror resolve_asset''s pattern: capture the status, `if (st == PATHS_TRUNCATED) return PATHS_TRUNCATED;` then on PATHS_OK do the opendir probe. Do not silently fall through to cwd on truncation.'
+    - 'No behavior change for the normal (non-truncating) case: XBOING_DATA_DIR fits PATHS_MAX_PATH, so install_data_dir populates and both resolvers behave exactly as before this fix. Precedence tiers unchanged.'
+    - 'cmake --build build --target paths xboing: zero warnings under -Werror -Wconversion -Wshadow. ctest --test-dir build -R test_paths green (existing + the Group 8 install-prefix cases). Only src/paths.c changes.'
+budget:
+    rounds: 2
+    reflection_after_each: true
+current_round: 1
+context: |-
+    Copilot review on PR #183 (bead xboing-52j fix) flagged two truncation-
+    handling gaps in the install-prefix tier added by mission m-2026-07-13-012.
+    Both are consistency fixes: the paths.c module's contract is that any path
+    overflow returns PATHS_TRUNCATED (every other field copy does), and
+    resolve_asset already propagates build_path truncation — the two new sites
+    omitted it. Low severity (XBOING_DATA_DIR is a compile-time constant that
+    fits in practice) but correct to fix for consistency. A sibling test mission
+    (gjm) adds a truncation regression case; do not touch tests here.

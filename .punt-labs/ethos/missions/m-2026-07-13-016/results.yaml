@@ -1,0 +1,53 @@
+results:
+    - mission: m-2026-07-13-016
+      round: 1
+      created_at: "2026-07-13T22:45:17Z"
+      author: gjm
+      verdict: pass
+      confidence: 0.95
+      files_changed:
+        - path: tests/test_paths.c
+          added: 55
+          removed: 0
+      evidence:
+        - name: 'install_data_dir filler length: 1023 ''a'' chars (PATHS_MAX_PATH-1); resolve_asset join ''<1023 a''s>/levels/trunc_probe.data'' = 1023+1+6+1+16 = 1047 chars vs 1024-byte buf (1047 >= 1024 -> PATHS_TRUNCATED); resolve_readable_dir join ''<1023 a''s>/levels'' = 1023+1+6 = 1030 chars vs 1024-byte buf (1030 >= 1024 -> PATHS_TRUNCATED)'
+          status: pass
+        - name: cmake --build build --target test_paths && ctest --test-dir build -R test_paths --output-on-failure
+          status: pass
+        - name: cmake --preset asan; cmake --build build-asan --target test_paths && ctest --test-dir build-asan -R test_paths --output-on-failure
+          status: pass
+        - name: 'git status --porcelain scope check: only tests/test_paths.c modified by this worker (src/paths.c diff belongs to sibling mission m-2026-07-13-015, not touched here)'
+          status: pass
+      prose: |
+        Added test_install_prefix_truncated_propagates (TC-55) to Group 8, registered
+        in tests[]. Reuses the paths_init_explicit fixture (valid HOME, empty
+        XDG_DATA_HOME tmp dir, missing XDG_DATA_DIRS entry, no XBOING_LEVELS_DIR) so
+        the install-prefix tier is the one reached by both paths_level_file
+        (resolve_asset tier 4) and paths_levels_dir_readable (resolve_readable_dir
+        tier 3). install_data_dir is overwritten via memset to 1023 'a' characters
+        (PATHS_MAX_PATH-1) plus a NUL terminator -- the maximum that fits the field.
+        That filler length overflows both downstream joins (see evidence line 1 for
+        exact arithmetic), so both resolver calls return PATHS_TRUNCATED. Without
+        mission 015's propagation fix in src/paths.c, both call sites would silently
+        fall through to the cwd tier and return PATHS_NOT_FOUND instead, making the
+        test discriminating. Debug and ASan ctest runs both green; no leaks/errors
+        under ASan+UBSan. Only tests/test_paths.c touched -- tests/CMakeLists.txt
+        was not edited (no registration change needed there, the binary already
+        builds from a glob/list that includes this file's existing target).
+    - mission: m-2026-07-13-016
+      round: 2
+      created_at: "2026-07-13T22:55:16Z"
+      author: gjm
+      verdict: pass
+      confidence: 0.95
+      files_changed:
+        - path: tests/test_paths.c
+          added: 7
+          removed: 4
+      evidence:
+        - name: Comment rewritten to attribute the mission-015 pin only to paths_levels_dir_readable (resolve_readable_dir tier 3); paths_level_file/resolve_asset noted as already-correct since ed25e9e — matches jdc's revert experiment
+          status: pass
+        - name: Comment-only diff — test body, assertions, tests[] registration unchanged; arithmetic lines untouched
+          status: pass
+        - name: ctest -R test_paths green debug + asan (1/1)
+          status: pass

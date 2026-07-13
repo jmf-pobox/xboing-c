@@ -1,3 +1,17 @@
+xboing (1.0.7-1) unstable; urgency=medium
+
+  * Fix fresh Homebrew installs on Apple silicon (M1/M2/M3) launching with
+    no playable level ("could not find level file: level01.data"). The
+    bundled levels install under the Homebrew prefix (/opt/homebrew/share),
+    which is absent from the XDG data-dir search path, and the binary baked
+    no absolute install path — so the shipped levels were unreachable while
+    sound (which had a compile-time fallback) still worked. Asset resolution
+    now consults the compiled install prefix, ranked after the user's XDG
+    data dir (so editor-saved levels still take precedence) and before the
+    source-tree fallback. Linux and Intel Homebrew are unaffected. (ADR-068.)
+
+ -- J Freeman <jmf@pobox.com>  Mon, 13 Jul 2026 15:45:00 -0700
+
 xboing (1.0.6-1) unstable; urgency=medium
 
   * Editor play-test now matches the original: it no longer depletes lives,
