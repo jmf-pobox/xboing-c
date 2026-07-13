@@ -1074,6 +1074,64 @@ static void test_install_prefix_precedence_xdg_wins(void **state)
     rmdir(xdg_root);
 }
 
+/* TC-55: mission m-2026-07-13-015 regression guard — when the install-prefix
+ * join overflows PATHS_MAX_PATH, both resolve_asset (paths_level_file tier 4)
+ * and resolve_readable_dir (paths_levels_dir_readable tier 3) must propagate
+ * PATHS_TRUNCATED instead of silently falling through to the cwd tier.
+ *
+ * install_data_dir is filled to PATHS_MAX_PATH-1 (1023) non-slash 'a'
+ * characters — the maximum that fits in the field alongside its NUL
+ * terminator.  That is long enough to overflow both downstream joins:
+ *   - resolve_asset:        "<1023 a's>/levels/trunc_probe.data" -> 1023 + 1
+ *     + 6 + 1 + 16 = 1047 chars, vs. a 1024-byte buf (build_path's snprintf
+ *     truncation check is `(size_t)n >= bufsize`, so 1047 >= 1024 trips it).
+ *   - resolve_readable_dir: "<1023 a's>/levels" -> 1023 + 1 + 6 = 1030
+ *     chars, vs. the same 1024-byte buf; 1030 >= 1024 also trips it.
+ *
+ * Only resolve_readable_dir (paths_levels_dir_readable, tier 3) is the
+ * assertion that pins mission 015: without that fix it silently fell
+ * through to the cwd tier and returned PATHS_NOT_FOUND (cwd has no
+ * "levels" dir in the test's working directory). resolve_asset
+ * (paths_level_file, tier 4) already propagated PATHS_TRUNCATED before
+ * mission 015 -- correct since the original homebrew-fix commit
+ * (ed25e9e) -- so its assertion below is a valid guard on resolve_asset's
+ * truncation behavior but does not regress if mission 015 is reverted.
+ */
+static void test_install_prefix_truncated_propagates(void **state)
+{
+    (void)state;
+
+    /* Empty XDG_DATA_HOME with no xboing/levels underneath it, and an
+     * XDG_DATA_DIRS entry that misses too — same shape as TC-52/53/54 so
+     * the install-prefix tier is the one actually reached. */
+    char xdg_home[64];
+    char xdg_tmpl[] = "/tmp/test_paths_XXXXXX";
+    assert_non_null(mkdtemp(xdg_tmpl));
+    memcpy(xdg_home, xdg_tmpl, strlen(xdg_tmpl) + 1);
+
+    paths_config_t cfg;
+    paths_status_t init_st = paths_init_explicit(&cfg, "/home/test", xdg_home, NULL,
+                                                 "/nonexistent/share", NULL, NULL, NULL);
+    assert_int_equal(init_st, PATHS_OK);
+
+    /* Overwrite the compiled install-prefix field directly with a filler
+     * long enough that any "/levels/..." join off of it overflows
+     * PATHS_MAX_PATH.  The struct is transparent and this field is the
+     * injection seam by design (see TC-52). */
+    memset(cfg.install_data_dir, 'a', PATHS_MAX_PATH - 1);
+    cfg.install_data_dir[PATHS_MAX_PATH - 1] = '\0';
+
+    char buf[PATHS_MAX_PATH];
+    paths_status_t level_st = paths_level_file(&cfg, "trunc_probe.data", buf, sizeof(buf));
+    assert_int_equal(level_st, PATHS_TRUNCATED);
+
+    char dir_buf[PATHS_MAX_PATH];
+    paths_status_t dir_st = paths_levels_dir_readable(&cfg, dir_buf, sizeof(dir_buf));
+    assert_int_equal(dir_st, PATHS_TRUNCATED);
+
+    rmdir(xdg_home);
+}
+
 /* =========================================================================
  * Test runner
  * ========================================================================= */
@@ -1144,6 +1202,7 @@ int main(void)
         cmocka_unit_test(test_install_prefix_resolves_level_and_dir),
         cmocka_unit_test(test_install_prefix_absent_not_found),
         cmocka_unit_test(test_install_prefix_precedence_xdg_wins),
+        cmocka_unit_test(test_install_prefix_truncated_propagates),
     };
 
     return cmocka_run_group_tests(tests, NULL, NULL);

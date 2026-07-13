@@ -219,7 +219,8 @@ paths_status_t paths_init_explicit(paths_config_t *cfg, const char *home, const 
             return PATHS_TRUNCATED;
     }
 
-    safe_copy(cfg->install_data_dir, PATHS_MAX_PATH, XBOING_DATA_DIR);
+    if (safe_copy(cfg->install_data_dir, PATHS_MAX_PATH, XBOING_DATA_DIR) != 0)
+        return PATHS_TRUNCATED;
     strip_trailing_slash(cfg->install_data_dir);
 
     return PATHS_OK;
@@ -409,14 +410,14 @@ static paths_status_t resolve_readable_dir(const paths_config_t *cfg, const char
     if (cfg->install_data_dir[0] != '\0')
     {
         char probe[PATHS_MAX_PATH];
-        if (build_path(probe, sizeof(probe), cfg->install_data_dir, subdir, NULL, NULL) == PATHS_OK)
+        st = build_path(probe, sizeof(probe), cfg->install_data_dir, subdir, NULL, NULL);
+        if (st == PATHS_TRUNCATED)
+            return PATHS_TRUNCATED;
+        DIR *d = opendir(probe);
+        if (d != NULL)
         {
-            DIR *d = opendir(probe);
-            if (d != NULL)
-            {
-                closedir(d);
-                return safe_copy(buf, bufsize, probe) == 0 ? PATHS_OK : PATHS_TRUNCATED;
-            }
+            closedir(d);
+            return safe_copy(buf, bufsize, probe) == 0 ? PATHS_OK : PATHS_TRUNCATED;
         }
     }
 

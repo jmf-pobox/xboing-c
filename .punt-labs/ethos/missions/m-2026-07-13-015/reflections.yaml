@@ -1,0 +1,14 @@
+reflections:
+    - round: 1
+      created_at: "2026-07-13T22:46:40Z"
+      author: gjm
+      converging: true
+      signals:
+        - 'paths_init_explicit install_data_dir copy matches sibling pattern: if (safe_copy(...) != 0) return PATHS_TRUNCATED; strip_trailing_slash only on success path (src/paths.c:222-224)'
+        - resolve_readable_dir install-prefix tier reuses in-scope st (declared line 405, no shadow), returns PATHS_TRUNCATED on build_path truncation (line 414-415), PATHS_OK-but-missing-dir still falls through to cwd tier (src/paths.c:410-427)
+        - resolve_asset unchanged, already had correct propagation (src/paths.c:237-293) -- confirms fix is consistency-only, no new pattern introduced
+        - 'clean rebuild of paths + xboing target: zero warnings under -Werror -Wconversion -Wshadow'
+        - 'ctest -R test_paths: 1/1 passed'
+        - only src/paths.c in the diff for this mission's write_set; tests/test_paths.c changes belong to the sibling gjm test mission, out of scope here
+      recommendation: stop
+      reason: 'Both Copilot findings fixed exactly per contract: truncation now propagates from paths_init_explicit''s install_data_dir copy and from resolve_readable_dir''s install-prefix build_path call, mirroring resolve_asset''s existing pattern. No new variable/shadowing, no behavior change for the non-truncating case, build and test_paths green. Approving close.'

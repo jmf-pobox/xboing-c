@@ -1,0 +1,25 @@
+reflections:
+    - round: 1
+      created_at: "2026-07-13T22:49:52Z"
+      author: jdc
+      converging: true
+      signals:
+        - ctest -R test_paths green on build (debug) and build-asan
+        - 'revert experiment: stashed src/paths.c back to HEAD (pre-015), rebuilt test_paths, test_install_prefix_truncated_propagates FAILED (0 != 2 at test_paths.c:1126, the paths_levels_dir_readable assertion) -- confirms the case genuinely pins mission-015''s resolve_readable_dir fix'
+        - 'arithmetic verified: install_data_dir filled to PATHS_MAX_PATH-1 (1023) ''a''s + NUL fits the 1024-byte field exactly; resolve_asset join is 1023+1+6+1+16=1047 >= 1024 and resolve_readable_dir join is 1023+1+6=1030 >= 1024, both trip build_path''s (size_t)n >= bufsize check'
+        - 'tier order confirmed: XDG_DATA_DIRS entry /nonexistent/share and mkdtemp''d empty XDG_DATA_HOME both miss on disk, so the install-prefix tier is genuinely the one reached, not an earlier tier short-circuiting'
+        - 'write_set discipline held: only tests/test_paths.c changed by this mission; src/paths.c diff belongs to mission-015 and predates this mission'
+        - 'no leaks: mkdtemp/rmdir paired, no malloc in the new test, ASan binary run standalone shows 56/56 passed with no sanitizer output'
+      recommendation: continue
+      reason: 'Functional criteria met: the test fails when mission-015''s fix is reverted, confirmed empirically via git stash. One finding: the test''s doc comment (lines ~1085-1094) and the contract''s own reasoning both claim that WITHOUT propagation, paths_level_file would also fall through to NOT_FOUND, making both assertions discriminating -- this is factually wrong for the paths_level_file half. resolve_asset''s tier-4 truncation check was already correct since commit ed25e9e (the original homebrew fix), predating mission-015. Revert experiment isolated this: with src/paths.c at HEAD (pre-015), the level_st assertion at line 1122 PASSED; the test only failed at line 1126 (dir_st, the resolve_readable_dir assertion). Only the paths_levels_dir_readable half discriminates 015''s fix; the paths_level_file half is a correct assertion of existing behavior but does not pin 015. Ask gjm to correct the comment so a future reader does not misattribute the regression coverage. Round 2 should be a one-line comment fix, no functional change needed.'
+    - round: 2
+      created_at: "2026-07-13T22:54:29Z"
+      author: jdc
+      converging: true
+      signals:
+        - 'comment-only diff confirmed: git diff tests/test_paths.c shows the same test body, assertions, and tests[] registration as round 1 -- the only change is the doc comment above test_install_prefix_truncated_propagates (~lines 1077-1132)'
+        - 'attribution now correct: comment states only resolve_readable_dir (paths_levels_dir_readable, tier 3) pins mission-015, and explicitly notes resolve_asset (paths_level_file, tier 4) already propagated PATHS_TRUNCATED since the original homebrew-fix commit ed25e9e, matching my round-1 revert-experiment finding verbatim'
+        - 'arithmetic re-verified against include/paths.h: PATHS_MAX_PATH=1024; filler 1023 a-chars + NUL fits the field; join lengths 1047 (resolve_asset) and 1030 (resolve_readable_dir), both >= 1024, unchanged from round 1'
+        - 'ctest --test-dir build -R test_paths: 1/1 Passed'
+      recommendation: stop
+      reason: Round-1 finding fully addressed with a comment-only edit -- no functional change, no new risk introduced. Test still discriminates mission-015's fix (verified empirically in round 1 via git stash revert), doc comment no longer misattributes coverage, build and ctest green. No further rounds needed.
