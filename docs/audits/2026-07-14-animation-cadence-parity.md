@@ -406,3 +406,17 @@ item): `COUNTER_BLK`'s `counterSlide` is decremented purely on-hit in
 both trees — `original/gun.c:328-362` and `src/block_system.c:1079-1106`
 — with no timer / `nextFrame` gating in either. It is event-based, not
 time-based, so there is no animation cadence to compare. No deviation.
+
+## Maintainer correction (2026-07-14): bonus-screen finding RETRACTED
+
+The "bonus screen ~20-30× too slow" finding above is a **false
+positive** and is retracted. The maintainer confirms the bonus-screen
+tally pacing was **hand-tuned to be usable/readable** — the current
+cadence (slower than the 1996 fast attract-tick rate) is an *intentional*
+readability trade-off, documented in
+`docs/specs/2026-06-06-bonus-renderer-rewrite.md`, not an unintended
+deviation. Restoring the original's fast rate would undo that tuning and
+reproduce the "too fast, unreadable" problem already solved. The audit
+mis-read the rewrite spec's "too fast" note as evidence the original
+should be matched verbatim; the correct reading is that the deviation is
+a deliberate, accepted design choice. Bead xboing-725 closed as not-a-bug.
