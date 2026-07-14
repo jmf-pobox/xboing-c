@@ -297,6 +297,22 @@ void block_system_set_black_next_frame(block_system_t *ctx, int row, int col, in
 int block_system_get_random(const block_system_t *ctx, int row, int col);
 void block_system_set_random(block_system_t *ctx, int row, int col, int random);
 
+/*
+ * get_last_frame / set_last_frame let a caller override the expiry frame
+ * `block_system_add` assigns (frame + BLOCK_INFINITE_DELAY by default).
+ * Used by the mid-play bonus/special spawner (game_rules.c) to give a
+ * spawned block a finite BONUS_LENGTH lifetime, matching
+ * original/blocks.c:1079,1111 (AddSpecialBlock/AddBonusBlock set
+ * `blockP->lastFrame = frame + BONUS_LENGTH`) instead of the infinite
+ * default meant for ordinary level blocks.
+ *
+ * get_last_frame returns 0 if ctx is NULL or (row, col) is out of bounds.
+ * set_last_frame is a no-op on the same conditions.  Neither requires the
+ * cell to be occupied — the caller is expected to check occupancy itself.
+ */
+int block_system_get_last_frame(const block_system_t *ctx, int row, int col);
+void block_system_set_last_frame(block_system_t *ctx, int row, int col, int last_frame);
+
 /* =========================================================================
  * Collision detection — designed as ball_system callbacks
  *

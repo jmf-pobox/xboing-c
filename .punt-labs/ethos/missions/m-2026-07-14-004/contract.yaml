@@ -1,0 +1,35 @@
+mission_id: m-2026-07-14-004
+status: closed
+type: implement
+created_at: "2026-07-14T04:22:46Z"
+updated_at: "2026-07-14T04:43:58Z"
+closed_at: "2026-07-14T04:43:58Z"
+leader: claude
+worker: gjm
+evaluator:
+    handle: jdc
+    pinned_at: "2026-07-14T04:22:46Z"
+    hash: c08223356d3e6d5aed56e28da477a1aa2707509febfef7c5f62c25871a3e841f
+inputs: {}
+write_set:
+    - tests/test_game_rules.c
+success_criteria:
+    - Add regression cases to tests/test_game_rules.c pinning the mid-play special/bonus spawn throttle restored in mission m-2026-07-14-002. Read the file first to reuse its existing game_ctx fixture/harness for driving game_rules_check (or the smallest seam that exercises try_spawn_bonus via game_rules_check).
+    - 'Test ONE-AT-A-TIME: drive many ticks of game_rules_check on a loaded level and assert the grid never holds more than ONE spawned mid-play bonus/special block at a time (BONUS_BLK/BONUSX2/BONUSX4/PAD_SHRINK/PAD_EXPAND/MULTIBALL/ REVERSE/MGUN/WALLOFF/EXTRABALL/DEATH). Before the fix this count grew unbounded; the assertion must fail if bonus_block_active is not honored. Seed the RNG deterministically (srand fixed) so the sequence is reproducible.'
+    - 'Test EXPIRY: after a spawn, advance >= BONUS_LENGTH (1500) frames without hitting the block and assert the spawned cell is cleared (block_system no longer occupied at that cell) and bonus_block_active is false — matching the original HandlePendingSpecials lifetime. If practical, also assert that once it expires a NEW special can spawn later (throttle re-arms).'
+    - 'Test RE-ARM GUARD (if reachable from the harness): assert next_bonus_frame is not rescheduled while bonus_block_active is true (the interval starts only after the special clears). If the static internals aren''t observable, cover this indirectly via the one-at-a-time count over a long run.'
+    - Register any new test functions in the existing test_game_rules runner array (no tests/CMakeLists.txt change — not in write_set; test_game_rules is already registered). If registration is impossible without editing outside tests/test_game_rules.c, STOP and tell the leader. No timing/wall-clock assertions; deterministic seed; asan-clean; tear down any fixtures.
+    - ctest --test-dir build -R test_game_rules green under debug AND asan. The new cases must genuinely fail if the m-002 throttle is reverted (reason about this; the leader may run the RED check).
+budget:
+    rounds: 2
+    reflection_after_each: true
+current_round: 2
+context: |-
+    Regression tests for the special-spawn throttle fix (m-2026-07-14-002): the
+    original keeps ONE mid-play special on the grid at a time (bonus_block_active
+    gate + !active re-arm) and expires it after BONUS_LENGTH=1500 frames
+    (original/main.c:970-1119, blocks.c:1079,1173-1186). The bug was unbounded
+    accumulation of harmful specials (level 1 too hard). The fix lives in
+    src/game_rules.c try_spawn_bonus + game_rules_check. Pin the restored
+    behavior so it can't regress. tests/test_game_rules.c already exists and is
+    registered — add to it.

@@ -1,0 +1,30 @@
+mission_id: m-2026-07-14-003
+status: closed
+type: implement
+created_at: "2026-07-14T04:20:04Z"
+updated_at: "2026-07-14T04:31:33Z"
+closed_at: "2026-07-14T04:31:33Z"
+leader: claude
+worker: jdc
+evaluator:
+    handle: gjm
+    pinned_at: "2026-07-14T04:20:04Z"
+    hash: 7349512b3191332fef8a79f56caf962febc697b8444629912da4aa22b9b2efec
+inputs: {}
+write_set:
+    - src/game_modes.c
+success_criteria:
+    - 'In start_new_game (src/game_modes.c, near line 114-115 where ctx->bonus_block_active=false and ctx->next_bonus_frame=0 are already reset), also reset the three new spawn-tracking fields added by mission m-2026-07-14-002: ctx->bonus_row = 0; ctx->bonus_col = 0; ctx->bonus_type = NONE_BLK; — matching the identical reset in game_rules_next_level (game_rules.c:363-367) so no stale spawned-cell coordinates survive a new game. NONE_BLK is already available via the block headers included by game_modes.c (verify the include; if NONE_BLK is not in scope, include the right header — still within this one file).'
+    - No other behavior change. cmake --build build zero-warning under -Werror -Wconversion -Wshadow; ctest --test-dir build stays green (61). Only src/game_modes.c changes.
+budget:
+    rounds: 1
+    reflection_after_each: true
+current_round: 1
+context: |-
+    Sibling of m-2026-07-14-002 (special-spawn throttle fix). jck's faithfulness
+    review approved the throttle restore but flagged that start_new_game
+    (game_modes.c) resets only two of the five bonus-spawn fields; the three new
+    ones (bonus_row/col/type) must be reset there too for consistency with
+    game_rules_next_level. Inert today (reads are gated by bonus_block_active)
+    but a pinned reset-discipline requirement. game_modes.c was outside m-002's
+    write_set, so this trivial completion is chartered separately.

@@ -1,0 +1,26 @@
+reflections:
+    - round: 1
+      created_at: "2026-07-14T04:38:31Z"
+      author: jdc
+      converging: true
+      signals:
+        - tests/test_game_rules.c is the only tracked file changed under tests/ (git diff master --stat -- tests/); test_game_rules is already registered via xboing_add_integration_test(test_game_rules) at tests/CMakeLists.txt:650 -- no CMakeLists.txt edit needed or made.
+        - All 3 new tests use a fixed srand seed (12345u, 777u, 42u respectively) and a cleared grid (block_system_clear_all) so every occupied cell observed can only originate from try_spawn_bonus -- genuinely distinguishes spawned specials from level blocks.
+        - 'test_spawn_throttle_one_at_a_time is non-vacuous: it asserts spawn_events >= 1 (a rising-edge occupancy counter) alongside max_concurrent <= 1, so the invariant cannot pass on a run with zero spawns.'
+        - test_spawn_throttle_expires_and_rearms and test_spawn_throttle_no_reschedule_while_active both assert found==true before checking their real invariant, so they cannot pass vacuously either.
+        - 'RED proof #1 (surgical 2-line revert of only the schedule guard, changing ''if (ctx->next_bonus_frame == 0 && !ctx->bonus_block_active)'' to ''if (ctx->next_bonus_frame == 0)'' and dropping the added ''ctx->next_bonus_frame == 0 ||'' term): 2 of 3 tests failed (expires_and_rearms: bonus_block_active not false; no_reschedule_while_active: next_bonus_frame 2722 != 0). test_spawn_throttle_one_at_a_time PASSED under this narrow revert -- root cause: the second branch''s own ''|| ctx->bonus_block_active'' check, present before and after m-002, independently blocks a second spawn while a block is active, so this one line cannot produce more than 1 concurrent spawn by itself. This is a real gap in that one test against that one narrow mutant, not a defect in the fix under test.'
+        - 'RED proof #2 (faithful reproduction of the actual m-002 root cause per its closed contract: bonus_block_active was read as the gate but set true nowhere, plus infinite default block lifetime -- commented out the ctx->bonus_block_active = true / bonus_row / bonus_col / bonus_type / block_system_set_last_frame assignment in the placed_row>=0 block): all 3 new tests FAILED -- one_at_a_time: max_concurrent <= 1 is not true (confirmed unbounded accumulation, the exact historical bug); expires_and_rearms: found is not true; no_reschedule_while_active: found is not true (both correctly, since bonus_block_active is never armed). Restored src/game_rules.c byte-for-byte afterward, confirmed via diff against the pre-mutation copy.'
+        - 'Both debug and ASan+UBSan builds green after restore: ctest --test-dir build -R test_game_rules Passed 1.81s; ctest --test-dir build-asan -R test_game_rules Passed 2.11s, no sanitizer findings.'
+        - gjm's reported RED proof (revert src/game_rules.c wholesale, all 3 fail) is consistent with what I independently reproduced via a full git stash of the fix files (compile failure, since bonus_row/bonus_col/get_last_frame no longer exist) -- a stronger but less surgical signal than my line-level mutant.
+      recommendation: continue
+      reason: 'Core deliverable is sound: deterministic, non-vacuous, scoped correctly to tests/test_game_rules.c with no other files touched, and debug+ASan both green. One gap found: test_spawn_throttle_one_at_a_time does not fail against the narrow mutant that removes only the !ctx->bonus_block_active schedule-guard term -- it is caught only by the other two tests and by the full-revert/root-cause mutant. Recommend gjm add one more round to either strengthen test_spawn_throttle_one_at_a_time against that specific narrow mutant, or explicitly document in the test file comment that the guard-only regression is covered by test_spawn_throttle_no_reschedule_while_active (intentional split) rather than leaving it implicit.'
+    - round: 2
+      created_at: "2026-07-14T04:43:54Z"
+      author: jdc
+      converging: true
+      signals:
+        - 'Round-1 finding fully addressed: test_spawn_throttle_one_at_a_time now carries a per-tick invariant (bonus_block_active => next_bonus_frame==0) that independently fails the narrow re-arm-only mutant'
+        - Coverage partition documented; the three tests jointly RED-prove all three restored throttle mechanisms (spawn gate, BONUS_LENGTH lifetime, re-arm guard)
+        - debug + asan green; scope confined to tests/test_game_rules.c
+      recommendation: stop
+      reason: Test coverage now catches both the historical root cause and the narrow re-arm regression independently; documented and deterministic. Approving close.

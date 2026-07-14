@@ -1,0 +1,13 @@
+reflections:
+    - round: 1
+      created_at: "2026-07-14T04:24:44Z"
+      author: gjm
+      converging: true
+      signals:
+        - git diff src/game_modes.c shows exactly the pinned three-line reset (bonus_row=0, bonus_col=0, bonus_type=NONE_BLK) plus a two-line WHY comment citing game_rules.c:363-367 -- matches success_criteria verbatim
+        - 'NONE_BLK (block_types.h:14, #define NONE_BLK -2) is in scope via block_system.h, already included at game_modes.c:24 -- no new include needed, contract''s fallback clause not triggered'
+        - git diff --stat confirms src/game_modes.c is the only file touched by this mission's write_set on the branch (other modified files belong to sibling mission m-2026-07-14-002, outside this write_set)
+        - 'cmake --build build --target xboing: zero warnings, zero errors under -Werror -Wconversion -Wshadow'
+        - 'ctest --test-dir build: 61/61 passed (61 non-disabled tests), matches the pinned count in success_criteria'
+      recommendation: stop
+      reason: 'Change matches the contract byte-for-byte: three fields reset, NONE_BLK resolves without new includes, no other behavior change, build clean, tests green at the pinned count. Trivial and correct -- approve.'

@@ -1,0 +1,21 @@
+results:
+    - mission: m-2026-07-14-006
+      round: 1
+      created_at: "2026-07-14T12:42:52Z"
+      author: jdc
+      verdict: pass
+      confidence: 0.95
+      files_changed:
+        - path: src/game_rules.c
+          added: 4
+          removed: 4
+        - path: tests/test_game_rules.c
+          added: 19
+          removed: 8
+      evidence:
+        - name: 'Fix 1: removed local #define BONUS_LENGTH; use shared BLOCK_BONUS_LENGTH (block_system.h:58); citation comment kept'
+          status: pass
+        - name: 'Fix 2: expiry loop bounded to min(wait, BLOCK_BONUS_LENGTH+200) with early-exit + assert_true(cleared); regression now fails fast (~1700 ticks) not ~10M; removed unused THROTTLE_BONUS_LENGTH dup'
+          status: pass
+        - name: debug + asan build zero-warning; ctest -R test_game_rules green both; 3 throttle tests still pass and RED-prove (value-identical changes); only 2 write_set files
+          status: pass
