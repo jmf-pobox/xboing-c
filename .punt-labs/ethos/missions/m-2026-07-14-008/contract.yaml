@@ -1,0 +1,33 @@
+mission_id: m-2026-07-14-008
+status: closed
+type: report
+created_at: "2026-07-14T13:13:39Z"
+updated_at: "2026-07-14T13:30:11Z"
+closed_at: "2026-07-14T13:30:11Z"
+leader: claude
+worker: jck
+evaluator:
+    handle: jdc
+    pinned_at: "2026-07-14T13:13:39Z"
+    hash: c08223356d3e6d5aed56e28da477a1aa2707509febfef7c5f62c25871a3e841f
+inputs: {}
+write_set:
+    - docs/audits/2026-07-14-key-command-parity.md
+success_criteria:
+    - 'Produce docs/audits/2026-07-14-key-command-parity.md: an original-vs-modern comparison of KEY COMMANDS / input bindings. Build a table of every key the original handles (grep original/ for the X keysym switches — handleGameKeys, handleIntroKeys, handleExitKeys, editor keys, dialogue keys, global keys) and the modern equivalent (src/game_input.c, sdl2_input, editor/dialogue key handling), and compare row by row. Cite original/<file>.c:<line> and src/<file>.c:<line> per row.'
+    - 'Cover at least: paddle move left/right, ball launch (space), fire bullet, pause (p), tilt (t/nudge), quit (q), sound toggle, control toggle (mouse/keyboard, G), speed up/down, new game, boss key, screenshot/grab, the attract-cycle advance key, editor keys (draw/erase/save/load/set-time/ set-name/clear/quit/tool-select), and dialogue keys (enter/escape/backspace/ digits). For each: original key+action -> modern key+action -> MATCH / MISSING / REMAPPED / WRONG-MODE / WRONG-CADENCE (edge vs held).'
+    - Note this is a CONFIRM pass — prior work (ADR-051..ADR-053 and others) already addressed keys and CLI args. Confirm those hold and surface any residual gap. Pay attention to edge-triggered (just_pressed, once per frame, game_input_global) vs held (per tick, game_input_update) correctness — a just_pressed handler in per-tick code multi-fires. For every deviation, cross-check docs/DESIGN.md ADRs (intentional+cited vs undocumented gap).
+    - Analysis only — no code changes. Ranked deviation table; end with "Recommended follow-up beads" (frame findings as CANDIDATES pending maintainer verification, not confirmed bugs). markdownlint-clean, single H1.
+budget:
+    rounds: 1
+    reflection_after_each: true
+current_round: 1
+context: |-
+    Overnight audit flight, audit 4 of 4 (final). Scope: key-command / input
+    binding parity vs the 1996 original — which key does what, in which mode, at
+    what cadence (edge vs held). NOT code structure. This is a CONFIRM pass: the
+    maintainer says keys and CLI args were already worked on (ADR-051..053 etc.),
+    so expect mostly MATCH; surface any residual gap. jck reads original/ first
+    (the X keysym switch statements), cites original/<file>.c:<line>. Findings are
+    CANDIDATES for the maintainer to verify, not a fix queue. jdc peer-reviews the
+    bindings against the modern input code + ADRs. Bead xboing-c-ikz.
