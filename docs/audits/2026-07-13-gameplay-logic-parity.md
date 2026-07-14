@@ -374,3 +374,30 @@ difficulty needs a playtest to confirm.
    original's `PADDLE_VEL / (PADDLE_ANIMATE_DELAY * tick_interval)`
    formula, the same way `src/ball_math.c`/ADR-045 already has
    coverage for ball speed.
+
+## Post-audit correction (2026-07-14): specials was NOT a match
+
+The "Specials" section above marked the special/bonus behavior a
+`MATCH`. That was wrong. It examined the special *flags* (killer,
+no-walls, etc.) and the `rand()%27` distribution, but did not examine
+the mid-play *spawn throttle*.
+
+After the maintainer clarified that the level-1 hazards appear
+dynamically ("adding blocks in holes"), a focused investigation found
+the real root cause of the level-1 difficulty: the modern spawner
+(`src/game_rules.c` `try_spawn_bonus`) dropped both of the original's
+throttles (`original/main.c:970-1071`, `blocks.c:1079,1173-1186`):
+
+- `bonus_block_active` was read as the one-at-a-time gate but set
+  `true` nowhere, so specials spawned every `~rand()%2000` frames
+  unconditionally; and
+- spawned blocks got `last_frame = frame + BLOCK_INFINITE_DELAY`, so
+  they never auto-expired.
+
+Harmful specials (shrink / reverse / walloff / death) therefore
+accumulated without bound — worst on level 1's mostly-empty grid. This
+is the actual "level 1 too hard" cause, not the paddle-speed deviation
+(finding #1), which stands as a separate, real, but secondary control
+issue. Fixed under ADR-069 / PR #184 (faithful restore, jck-approved,
+RED-proven regression tests). This correction supersedes the "Specials"
+`MATCH` verdict above.
