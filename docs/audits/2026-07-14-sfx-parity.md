@@ -45,7 +45,7 @@ inventing a sound.
 | BOMB_BLK hit | `bomb@50` — `original/blocks.c:772` | `bomb@50` — `src/block_sound.c:12` | MATCH |
 | BULLET_BLK hit | `ammo@30` — `blocks.c:776` | `ammo@30` — `block_sound.c:14` | MATCH |
 | MAXAMMO_BLK hit | `ammo@70` — `blocks.c:780` | `ammo@70` — `block_sound.c:16` | MATCH |
-| RED/GREEN/BLUE/TAN/PURPLE/YELLOW/COUNTER/RANDOM/DROP hit | `touch@99` — `blocks.c:792` | `touch@99` — `block_sound.c:26` | MATCH |
+| RED/GREEN/BLUE/TAN/PURPLE/YELLOW/COUNTER/RANDOM/DROP hit | `touch@99` — `original/blocks.c:792` | `touch@99` — `src/block_sound.c:26` | MATCH |
 | ROAMER_BLK hit | `ouch@99` — `blocks.c:796` | `ouch@99` — `block_sound.c:28` | MATCH |
 | EXTRABALL_BLK hit | `ddloo@99` — `blocks.c:800` | `ddloo@99` — `block_sound.c:30` | MATCH |
 | MGUN_BLK hit | `mgun@99` — `blocks.c:804` | `mgun@99` — `block_sound.c:32` | MATCH |

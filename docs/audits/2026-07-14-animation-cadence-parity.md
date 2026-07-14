@@ -273,7 +273,7 @@ Tracing the mode-dispatch code shows this premise is false:
   returning to `MODE_GAME`, where `speed` becomes live again.
   This `SetGameSpeed(SLOW_SPEED)`-then-`FAST_SPEED` idiom is used
   identically and just as inertly in `presents.c:687`,
-  `highscore.c:494`, `editor.c:396`, and `preview.c:170` — none of
+  `original/highscore.c:494`, `original/editor.c:396`, and `original/preview.c:170` — none of
   which are `MODE_GAME` either. It is a codebase-wide pattern, not
   something special to `bonus.c`.
 - `DoBonus()` (`original/main.c:1401-1403`) is dispatched from the

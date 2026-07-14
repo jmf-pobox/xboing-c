@@ -54,7 +54,7 @@ tick interval is `usleep(speed * 300)` in `sleepSync`
 (`original/main.c:155-160`). At startup `SetUserSpeed(5)` is called
 twice (`original/init.c:529`, `original/init.c:916`), setting
 `userDelay = 5` and `speedLevel = 5` in lockstep — **not** the
-`userDelay=1`/`speedLevel=5` static initializers in `main.c:115,120`,
+`userDelay=1`/`speedLevel=5` static initializers in `original/main.c:115,120`,
 which are overridden before the first frame. This gives
 `speed = 5*5 = 25` → `usleep(7500us)` per main-loop iteration, and
 because `BALL_FRAME_RATE=5`, the ball's *position* only updates every
