@@ -134,9 +134,15 @@ frame; held keys → `game_input_update` per tick; a `just_pressed`
 handler in per-tick code multi-fires").
 
 - **All edge-triggered global keys** (P, S, A, G, H/h, +/-, I, Q, C,
-  Space, W, 1-9 speed) live in `game_input_global`
-  (`src/game_input.c:130-462`), called exactly once per visual frame
-  from `game_main.c:150`. No multi-fire risk found.
+  W, 1-9 speed, and the *attract*-screen Space) live in
+  `game_input_global` (`src/game_input.c:130-462`), called exactly once
+  per visual frame from `game_main.c:150`. No multi-fire risk in these.
+  **Exception:** the *in-game* ball-launch Space (`SDL2I_START`,
+  `input_launch_ball`, `src/game_input.c:70-79`) is read in
+  `game_input_update` (per-tick), not `game_input_global`, so it can
+  multi-fire at high warp with a sticky paddle — see the peer-review
+  addendum below (Deviation, candidate). The "no multi-fire" conclusion
+  applies to the global keys, not to the in-game launch.
 - **Held paddle-direction keys** (Left/J, Right/L) live in
   `input_update_paddle`, called from `game_input_update`
   (`src/game_input.c:88-97`), itself called from `mode_game_update`

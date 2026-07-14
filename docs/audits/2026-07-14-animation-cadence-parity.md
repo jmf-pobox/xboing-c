@@ -351,7 +351,7 @@ capture pipeline (`docs/TESTING.md` Layer 4).
 | # | Finding | Severity | Original citation | Modern citation | Player-visible feel impact |
 |---|---|---|---|---|---|
 | 1 | `ROAMER_BLK`/`DROP_BLK` never move — sprite-only animation, no relocation | HIGH | `original/blocks.c:1364-1474` | `src/block_system.c:604-646` (no movement call site anywhere in `src/`) | Roamer/drop blocks are inert set-dressing instead of a moving threat/obstacle. Levels using these types play materially easier and look wrong. |
-| 2 | Bonus-screen line/step delay constants derived from a false "bonus screen ticks at game speed" premise | HIGH (needs runtime confirmation) | `original/main.c:1746-1749,1876-1879`, `original/level.c:416`, `original/bonus.c:258` et al. | `include/bonus_system.h:30-65` | Modern bonus tally is likely ~20-30× slower than the true original; readability was gained by trading away fidelity, undocumented as a deliberate call. |
+| 2 | ~~Bonus-screen line/step delay constants derived from a false premise~~ **RETRACTED — see Maintainer correction below** | ~~HIGH~~ NOT A BUG | `original/main.c:1746-1749`, `original/level.c:416` | `include/bonus_system.h:30-65` | Retracted: the modern pacing is *intentional* hand-tuning for readability (`docs/specs/2026-06-06-bonus-renderer-rewrite.md`), not an unintended deviation. Bead xboing-725 closed as not-a-bug. |
 | 3 | BorderGlow ambient animation now runs during live `MODE_GAME`/`SDL2ST_GAME`, exclusively an attract-screen effect in the original | HIGH | `original/sfx.c:324-359` + 7 attract-only call sites, zero calls in `original/main.c:926-1478` | `src/game_modes.c:315`, `src/game_render.c:1426-1433` | A pulsing red/green border now decorates actual gameplay that a 1995 player never saw. Always-on, highly visible. |
 | 4 | `DEATH_BLK` wink rhythm: uniform 500-tick 5-step cycle replaces a 1000-tick idle-then-blink rhythm; the 4th frame becomes visible | MEDIUM | `original/blocks.c:1313-1334,2395-2398` | `src/block_system.c:626-629` | The pirate-face block blinks twice as often, with no pause, and shows a frame the original never revealed. |
 | 5 | `BONUS_BLK`/`BONUSX2_BLK`/`BONUSX4_BLK` coin-spin direction reversed (rate is correct) | LOW | `original/blocks.c:1204-1207` | `src/block_system.c:619-624` | Cosmetic mirror-image spin; same period, same readability. |
@@ -377,13 +377,11 @@ block-explosion cadence (§1d, §1e).
    timing and the eye-frame/movement-direction coupling from
    `original/blocks.c:1364-1474` verbatim. This is the highest-value
    fix — it restores a missing mechanic, not just a cadence.
-2. **Re-derive the bonus-screen pacing constants** against the
-   `MODE_BONUS` fast-tick reality (§6), or explicitly log an ADR in
-   `docs/DESIGN.md` documenting readability-over-fidelity as a
-   deliberate, approved trade for this one screen. Capture an
-   empirical frame-timestamped recording of `original/xboing`'s
-   bonus screen to pin the true wall-clock duration before changing
-   the constants either way.
+2. ~~**Re-derive the bonus-screen pacing constants**~~ **RETRACTED.**
+   The maintainer confirmed the bonus-screen pacing is intentional
+   hand-tuning for readability (`docs/specs/2026-06-06-bonus-renderer-
+   rewrite.md`), not an unintended deviation — see the Maintainer
+   correction below. No action; bead xboing-725 closed as not-a-bug.
 3. **Scope `BorderGlow` back to attract/menu modes only.** Either
    gate the `sfx_system_update_glow()` call and
    `game_render_border_glow()` draw to non-`SDL2ST_GAME` modes, or
