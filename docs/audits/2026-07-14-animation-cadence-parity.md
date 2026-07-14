@@ -115,7 +115,7 @@ Modern: `bp->bonus_slide = (frame / BLOCK_DEATH_DELAY1) % 5;`
 (`src/block_system.c:626-629`) is a **uniform** 5-step rotation, 100
 ticks per step, 500-tick period (3.75 s) — exactly **half** the
 original period, with **no idle hold** and with the previously
-invisible 4th frame now visible for 100 ticks every cycle. A 1995
+invisible 4th frame now visible for 100 ticks every cycle. A 1996
 player would notice the pirate-face block now "winks" twice as often
 with no pause between blinks and an extra frame the original never
 showed.
@@ -200,7 +200,7 @@ glow (overwrites static red border)") as well as the equivalent
 `SDL2ST_DIALOGUE`-over-`SDL2ST_GAME` branch
 (`src/game_render.c:1386-1393`). **The pulsing red/green ambient
 border glow now animates continuously during actual gameplay** — an
-effect a 1995 player would only ever have seen on the title,
+effect a 1996 player would only ever have seen on the title,
 instructions, keys, high-score, demo, or preview screens, never
 while playing. `SFX_GLOW_FRAME_INTERVAL=40` and `SFX_GLOW_STEPS=7`
 are numerically correct (`include/sfx_system.h:33-34`); the defect
@@ -352,7 +352,7 @@ capture pipeline (`docs/TESTING.md` Layer 4).
 |---|---|---|---|---|---|
 | 1 | `ROAMER_BLK`/`DROP_BLK` never move — sprite-only animation, no relocation | HIGH | `original/blocks.c:1364-1474` | `src/block_system.c:604-646` (no movement call site anywhere in `src/`) | Roamer/drop blocks are inert set-dressing instead of a moving threat/obstacle. Levels using these types play materially easier and look wrong. |
 | 2 | ~~Bonus-screen line/step delay constants derived from a false premise~~ **RETRACTED — see Maintainer correction below** | ~~HIGH~~ NOT A BUG | `original/main.c:1746-1749`, `original/level.c:416` | `include/bonus_system.h:30-65` | Retracted: the modern pacing is *intentional* hand-tuning for readability (`docs/specs/2026-06-06-bonus-renderer-rewrite.md`), not an unintended deviation. Bead xboing-725 closed as not-a-bug. |
-| 3 | BorderGlow ambient animation now runs during live `MODE_GAME`/`SDL2ST_GAME`, exclusively an attract-screen effect in the original | HIGH | `original/sfx.c:324-359` + 7 attract-only call sites, zero calls in `original/main.c:926-1478` | `src/game_modes.c:315`, `src/game_render.c:1426-1433` | A pulsing red/green border now decorates actual gameplay that a 1995 player never saw. Always-on, highly visible. |
+| 3 | BorderGlow ambient animation now runs during live `MODE_GAME`/`SDL2ST_GAME`, exclusively an attract-screen effect in the original | HIGH | `original/sfx.c:324-359` + 7 attract-only call sites, zero calls in `original/main.c:926-1478` | `src/game_modes.c:315`, `src/game_render.c:1426-1433` | A pulsing red/green border now decorates actual gameplay that a 1996 player never saw. Always-on, highly visible. |
 | 4 | `DEATH_BLK` wink rhythm: uniform 500-tick 5-step cycle replaces a 1000-tick idle-then-blink rhythm; the 4th frame becomes visible | MEDIUM | `original/blocks.c:1313-1334,2395-2398` | `src/block_system.c:626-629` | The pirate-face block blinks twice as often, with no pause, and shows a frame the original never revealed. |
 | 5 | `BONUS_BLK`/`BONUSX2_BLK`/`BONUSX4_BLK` coin-spin direction reversed (rate is correct) | LOW | `original/blocks.c:1204-1207` | `src/block_system.c:619-624` | Cosmetic mirror-image spin; same period, same readability. |
 | 6 | `ATTRACT_FRAME_MULTIPLIER=6` is a reasoned estimate, not a measured value (true ratio ≈6.25-8.33×) | LOW | `original/misc.c:102-108`, `original/main.c:1746-1749` | `src/game_modes.c:390` | Attract-screen animations run a few to ~25% slower than the true original; not gameplay-affecting. |

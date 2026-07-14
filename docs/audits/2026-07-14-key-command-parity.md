@@ -81,7 +81,7 @@ truth key→action→mode table. Mapped each row to
 | Key | Original action | Modern key | Modern action | Verdict |
 |-----|------------------|------------|----------------|---------|
 | space | `QuickFinish` — skip splash | Space | `presents_system_skip` | MATCH |
-| q / Q | shutdown | Q | quit dialogue path — presents is not in the `is_attract` allowlist for the Q exclusion list (mode != EDIT/DIALOGUE/play-test), so Q reaches the same confirm-quit as elsewhere | MATCH in effect (both exit the game on Q); minor procedural difference — original shuts down immediately with no confirmation from PRESENTS specifically, modern always confirms. Low severity, not flagged as a ranked deviation (a confirm dialogue before quitting is strictly safer, not a feel change a 1995 player would object to) |
+| q / Q | shutdown | Q | quit dialogue path — presents is not in the `is_attract` allowlist for the Q exclusion list (mode != EDIT/DIALOGUE/play-test), so Q reaches the same confirm-quit as elsewhere | MATCH in effect (both exit the game on Q); minor procedural difference — original shuts down immediately with no confirmation from PRESENTS specifically, modern always confirms. Low severity, not flagged as a ranked deviation (a confirm dialogue before quitting is strictly safer, not a feel change a 1996 player would object to) |
 
 ### Dialogue keys (`original/dialogue.c` `handleDialogueKeys` / `validateDialogueKeys`)
 
