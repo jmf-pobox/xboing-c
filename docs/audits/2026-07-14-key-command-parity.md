@@ -176,9 +176,12 @@ handler in per-tick code multi-fires").
 | 4 | `Delete` key does not trigger dialogue backspace; only `Backspace` is wired. Original aliases `XK_Delete` and `XK_BackSpace` to the same action. | Low | `original/dialogue.c:327-328` | `src/game_main.c:130-132` (only `SDLK_BACKSPACE`) | **UNDOCUMENTED** | Negligible — Backspace is the standard modern text-deletion key; Delete-as-backspace was a period X11/Sun-keyboard convenience unlikely to be muscle memory for a modern player |
 | 5 (cross-reference, not re-derived here) | Paddle keyboard speed is 2.0x the original's real px/s (533 vs 267 px/s at default game speed) — `PADDLE_ANIMATE_DELAY` gate dropped, but `PADDLE_VELOCITY` only halved (10→4) instead of quartered (10→2.5→2). Directly relevant to this audit's "paddle move L/R (held)" row. | High (already tracked) | `original/paddle.c:180-193`, `original/main.c:962-963` | `include/paddle_system.h:49`, `src/game_input.c:43-64` | **UNDOCUMENTED** — already found and ranked in `docs/audits/2026-07-13-gameplay-logic-parity.md` finding #1; still unresolved as of this audit (`PADDLE_VELOCITY` is still `4`) | Confirmed open; not re-litigated here, just cross-referenced since it falls squarely inside this audit's "paddle move L/R held" scope |
 
-No other deviations found. Every other row in the comparison tables
-above is a confirmed MATCH or a documented, approved deviation
-(ADR-053 title-space redesign, ADR-058 shift-click erase).
+No other deviations found in the comparison tables above (aside from
+the additional candidate the peer review surfaced — the in-game
+Space/ball-launch multi-fire at high warp, documented in the
+peer-review addendum below). Every other row is a confirmed MATCH or a
+documented, approved deviation (ADR-053 title-space redesign, ADR-058
+shift-click erase).
 
 ## Confirmed Matching (summary)
 
