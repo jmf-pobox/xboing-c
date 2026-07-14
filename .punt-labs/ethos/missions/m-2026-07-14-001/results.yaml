@@ -1,0 +1,24 @@
+results:
+    - mission: m-2026-07-14-001
+      round: 1
+      created_at: "2026-07-14T03:50:30Z"
+      author: jck
+      verdict: pass
+      confidence: 0.82
+      files_changed:
+        - path: docs/audits/2026-07-13-gameplay-logic-parity.md
+          added: 210
+          removed: 0
+      evidence:
+        - name: Block types, scoring, lives/ball-death, level completion, bonus sequence, specials, ammo — all MATCH original (cited)
+          status: pass
+        - name: Ball launch speed (leading level-1 suspect) MATCHES exactly — SetUserSpeed(5), BALL_FRAME_RATE gate, SPEED_ALPHA[5]=11.00 per ADR-045; ~293 px/s both trees
+          status: pass
+        - name: Level-1 special-effects hypothesis NOT supported — level01.data has zero dynamic/hazard blocks; no special-effect timing to misfire
+          status: pass
+        - name: 'DEVIATION (undocumented): paddle keyboard speed 2x too fast — 533 px/s modern vs 267 px/s original; original gated PADDLE_VEL=10 behind PADDLE_ANIMATE_DELAY=5, modern removed gate but only halved to 4 (should be 2). Global, all levels. ADR-017 undocumented + prose says ''10'' contradicting shipped 4'
+          status: pass
+        - name: 'Doc-only inaccuracies: ADR-045 ''1467 px/sec'' should be ~293 px/sec; ADR-017 ''PADDLE_VELOCITY (10)'' should be 4'
+          status: pass
+        - name: Every deviation cross-checked against docs/DESIGN.md ADRs; markdownlint-clean single-H1 report written
+          status: pass

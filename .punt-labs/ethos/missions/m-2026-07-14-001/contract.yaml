@@ -1,0 +1,34 @@
+mission_id: m-2026-07-14-001
+status: closed
+type: report
+created_at: "2026-07-14T03:34:31Z"
+updated_at: "2026-07-14T03:56:13Z"
+closed_at: "2026-07-14T03:56:13Z"
+leader: claude
+worker: jck
+evaluator:
+    handle: gjm
+    pinned_at: "2026-07-14T03:34:31Z"
+    hash: 7349512b3191332fef8a79f56caf962febc697b8444629912da4aa22b9b2efec
+inputs: {}
+write_set:
+    - docs/audits/2026-07-13-gameplay-logic-parity.md
+success_criteria:
+    - 'Produce docs/audits/2026-07-13-gameplay-logic-parity.md: a systematic original-vs-modern comparison of GAME LOGIC AND RULES (not code structure). Cover block types + point values + hit-counts + behaviors, ball physics (speed, trig paddle bounce, velocity clamping, DIST_BASE), scoring (x2 at 25 blocks, x4 at 15 blocks, bonus values, extra life every 100k), lives + ball-death, level-completion rules, the bonus sequence, killer and other specials, ammo/bullets, paddle sizing. Cite original/<file>.c:<line> and the modern src/<file>.c:<line> for every claim.'
+    - 'SPECIAL FOCUS section: is level 1 harder in the modern port than the original, and why? Investigate ball speed / launch speed, per-level speed scaling, special-effect timing/behavior, block spawn/animation gating, and anything that would make level 1 feel harder. level01.data is byte-identical to the original, so layout is not the cause — look at physics/effect/timing behavior. State a concrete hypothesis backed by cited code, or state that no difficulty-affecting deviation was found.'
+    - 'For EVERY deviation found, cross-check docs/DESIGN.md ADRs: is it documented as intentional (cite the ADR number) or an undocumented gap (candidate bug)? Produce a ranked table of undocumented deviations with severity and the original/modern citations.'
+    - The report is analysis only — do NOT change any src/ or game behavior. End with a short "Recommended follow-up beads" list for undocumented deviations worth fixing.
+budget:
+    rounds: 1
+    reflection_after_each: true
+current_round: 1
+context: |-
+    Overnight audit flight (audit 1 of 4). Maintainer's sense is the game is very
+    close to the original but suspects level 1 is too hard, possibly due to
+    special effects. Scope is GAME LOGIC AND RULES parity vs original/, NOT code
+    structure and NOT pixel/screenshot fidelity (done separately). Prior work
+    already covered key commands and CLI args. jck is the vision-keeper: read
+    original/ first, cite original/<file>.c:<line>. Constants are canonical
+    (MAX_BALLS=5, grid 18x9, paddle 40/50/70, DIST_BASE=30, scoring values).
+    The report is the deliverable; a peer reviewer (gjm) verifies every claim
+    against the actual code and the ADRs afterward. Bead xboing-c-ywd.
