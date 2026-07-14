@@ -398,3 +398,11 @@ block-explosion cadence (§1d, §1e).
    direction** to match the original's countdown, and/or measure the
    true `ATTRACT_FRAME_MULTIPLIER` ratio with a timing capture
    instead of the current round-number estimate.
+
+## Addendum: COUNTER_BLK slide is event-driven (N/A for cadence)
+
+For completeness (the mission named "counter-block slide" as a cadence
+item): `COUNTER_BLK`'s `counterSlide` is decremented purely on-hit in
+both trees — `original/gun.c:328-362` and `src/block_system.c:1079-1106`
+— with no timer / `nextFrame` gating in either. It is event-based, not
+time-based, so there is no animation cadence to compare. No deviation.
