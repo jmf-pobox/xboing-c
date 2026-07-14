@@ -4,6 +4,13 @@
 **Auditor:** jck (Justin C. Kibell), mission `m-2026-07-14-007`
 **Evaluator:** sjl
 
+> **Note on `src/` line numbers:** modern citations are as-of the audit
+> date. The mid-play throttle fix (ADR-069, merged after this audit began)
+> shifted many lines in `src/game_rules.c` and `src/game_modes.c`, so some
+> `src/...:N` numbers below may be off by a few to ~100 lines. The
+> event→sound mappings, verdicts, and `original/` citations are the durable
+> content; verify the exact `src/` line at fix time.
+
 ## Scope
 
 This audit covers *audio* sound-effect parity only: does the modern
@@ -94,15 +101,15 @@ inventing a sound.
 
 | Event | Original | Modern | Verdict |
 |-------|----------|--------|---------|
-| Level timer reaches 0 (countdown warning) | `buzzer@70` — `level.c:143-148` (`DecLevelTimeBonus`) | **No call anywhere in `src/`** | **MISSING** |
+| Level timer reaches 0 (countdown warning) | `buzzer@70` — `original/level.c:143-148` (`DecLevelTimeBonus`) | **No countdown-warning call in `src/`** (the `buzzer` sample is only played at new-game start — see below) | **MISSING** |
 | Level complete (all required blocks cleared) | `applause@70` — `level.c:413` | `applause@70` — `game_rules.c:373` | MATCH |
 | New rank-1 in the GLOBAL high-score table ("boing master") | `youagod@99` — `level.c:437`, ranking always read from GLOBAL table (`highscore.c:622-628`) | `youagod@99` — `game_modes.c:1080`, explicitly gated on the GLOBAL table (`hs_global`) | MATCH |
 | Game over (lives exhausted) | `game_over@99` — `level.c:458` | `game_over@99` — `game_rules.c:314` | MATCH |
 | Ball lost, lives remain (respawn) | `balllost@99` — `level.c:477` | `balllost@99` — `game_rules.c:325` | MATCH |
 | Level file missing/corrupt, forces game end | Original: `ShutDown()` → `exit()`, no sound, process terminates (`file.c` `SetupStage`) | `game_over@99` — `game_rules.c:200,223`, then routes to HIGHSCORE instead of exiting. Documented deviation: **ADR-044** in `docs/DESIGN.md` | EXTRA, but **documented and approved** |
-| New game start (space from INTRO/HIGHSCORE/etc.) | Silent — `main.c:539-552` (`handleIntroKeys`, `XK_space` case has no `playSoundFile`) | `buzzer@70` — `game_modes.c:188` (`start_new_game`) | **EXTRA / WRONG-TRIGGER** (undocumented — no ADR) |
+| New game start (space from INTRO/HIGHSCORE/etc.) | Silent — `main.c:539-552` (`handleIntroKeys`, `XK_space` case has no `playSoundFile`) | `buzzer@70` — `src/game_modes.c:193` (`start_new_game`) | **EXTRA / WRONG-TRIGGER** (undocumented — no ADR) |
 | `Q` key, confirmed quit ("Exit XBoing you wimp?" → yes) | `game_over@100` — `main.c:714-715` (`handleExitKeys`), then `exit()` | Silent — confirmed quit pushes `SDL_QUIT` (`game_modes.c:1295-1306`) which `game_main.c:99-101` handles with no audio call | **MISSING** (also a volume divergence: original used 100%, distinct from the 99% "game over" used elsewhere) |
-| Random bonus-block spawn rolls "dynamite" (1 of 27 possible spawns, `case 25`) | Silent at spawn — `main.c:1072-1103` calls `SetExplodeAllType()` (`blocks.c:1001-1054`), which only flags one block `explodeAll=True` and draws an overlay icon; it has no `playSoundFile` call. The `bomb@50` sample is reserved exclusively for a distinct, level-authored `BOMB_BLK` tile type being hit (`blocks.c:771-772`) | `bomb@50` — `game_rules.c:160` (`try_spawn_bonus`, the `roll == 25` branch) | **EXTRA / WRONG-TRIGGER** (undocumented — no ADR; also misappropriates a sample reserved for an unrelated block type) |
+| Random bonus-block spawn rolls "dynamite" (1 of 27 possible spawns, `case 25`) | Silent at spawn — `main.c:1072-1103` calls `SetExplodeAllType()` (`blocks.c:1001-1054`), which only flags one block `explodeAll=True` and draws an overlay icon; it has no `playSoundFile` call. The `bomb@50` sample is reserved exclusively for a distinct, level-authored `BOMB_BLK` tile type being hit (`blocks.c:771-772`) | `bomb@50` — `src/game_rules.c:242` (`try_spawn_bonus`, the `roll == 25` branch) | **EXTRA / WRONG-TRIGGER** (undocumented — no ADR; also misappropriates a sample reserved for an unrelated block type) |
 | Extra life awarded (100,000-pt threshold) | Silent — `level.c:359-368` (`AddExtraLife`) only sets a status message | Silent — `score_system.c` / `game_callbacks.c:187` only increments `lives_left` | MATCH (both silent) |
 | Board tilt (manual `T` or auto-tilt) | Silent — `ball.c:490-503` (`DoBoardTilt`), `main.c:451-473` | Silent — `game_input.c:297-316` | MATCH (both silent) |
 | `A` key, audio on/off toggle | Silent — `main.c:396-422` (`handleSoundKey`) | Silent — `game_input.c:197-210` | MATCH (both silent) |
@@ -164,8 +171,8 @@ inventing a sound.
 
 | # | Severity | Deviation | Citations | Player-audible impact | ADR? |
 |---|----------|-----------|-----------|------------------------|------|
-| 1 | **HIGH** | `buzzer@70` fires on every new-game start (an event the original never made noise for) instead of on level-timer expiry (an event the modern port never makes noise for at all) | Original: `original/level.c:143-148`. Modern spurious trigger: `src/game_modes.c:188` (`start_new_game`). Modern missing trigger: no call in `src/game_modes.c:318-333` (the timer-countdown tick) | Every single new game now opens with an unexplained warning-buzzer chime the 1996 player never heard. Conversely, the countdown timer's actual "time is running out" audio cue — a real gameplay signal — never sounds, so players get zero audio warning before the level-bonus timer hits zero. | None found |
-| 2 | **HIGH** | `bomb@50` fires whenever the periodic random bonus-spawn rolls "dynamite" (case 25 of 27); the original is silent at that moment and reserves `bomb@50` exclusively for a real `BOMB_BLK` tile being hit | Original silent path: `original/main.c:1072-1103` → `original/blocks.c:1001-1054` (`SetExplodeAllType`). Original's real trigger for `bomb@50`: `original/blocks.c:771-772`. Modern: `src/game_rules.c:160` | Roughly 1-in-27 bonus spawns (every ~15-60s of play, per `BONUS_SEED`) plays `bomb@50` where the original is silent. (Correction per sjl review: the modern dynamite case immediately clears every matching-color block in the same tick — `src/game_rules.c:145-160` → `block_system_clear` — so the sound accompanies a real mass-clear, not "nothing exploding"; the deviation is that the *original* is silent at this event and reserves `bomb@50` for a real `BOMB_BLK` tile hit.) | None found |
+| 1 | **HIGH** | `buzzer@70` fires on every new-game start (an event the original never made noise for) instead of on level-timer expiry (an event the modern port never makes noise for at all) | Original: `original/level.c:143-148`. Modern spurious trigger: `src/src/game_modes.c:193` (`start_new_game`). Modern missing trigger: no call in `src/game_modes.c:318-333` (the timer-countdown tick) | Every single new game now opens with an unexplained warning-buzzer chime the 1996 player never heard. Conversely, the countdown timer's actual "time is running out" audio cue — a real gameplay signal — never sounds, so players get zero audio warning before the level-bonus timer hits zero. | None found |
+| 2 | **HIGH** | `bomb@50` fires whenever the periodic random bonus-spawn rolls "dynamite" (case 25 of 27); the original is silent at that moment and reserves `bomb@50` exclusively for a real `BOMB_BLK` tile being hit | Original silent path: `original/main.c:1072-1103` → `original/blocks.c:1001-1054` (`SetExplodeAllType`). Original's real trigger for `bomb@50`: `original/blocks.c:771-772`. Modern: `src/src/game_rules.c:242` | Roughly 1-in-27 bonus spawns (every ~15-60s of play, per `BONUS_SEED`) plays `bomb@50` where the original is silent. (Correction per sjl review: the modern dynamite case immediately clears every matching-color block in the same tick — `src/src/game_rules.c:224-242` → `block_system_clear` — so the sound accompanies a real mass-clear, not "nothing exploding"; the deviation is that the *original* is silent at this event and reserves `bomb@50` for a real `BOMB_BLK` tile hit.) | None found |
 | 3 | **MEDIUM** | Confirmed `Q`-quit never plays `game_over@100` before exit | Original: `original/main.c:714-715` (`handleExitKeys`), reached via `original/main.c:864-868`. Modern: `src/game_modes.c:1295-1306` (pushes `SDL_QUIT`), `src/game_main.c:99-101` (handles it silently) | Audible impact is muted by the window closing almost immediately afterward, but the original always gave a distinct 100%-volume sting on confirmed quit that the modern port drops entirely — including its unique volume (100%, vs. 99% everywhere else `game_over` plays). | None found |
 
 Everything else audited — all 17 block-type hit sounds, all paddle/wall/ball-ball physics sounds, all 4 gun sounds, all 3 dialogue sounds, all 10 bonus-tally-sequence sounds, all 13 attract-cycle screen-transition sounds, all 6 editor sounds, and all 4 global-key sounds — is a byte-for-byte trigger/volume match, including one case (`DYNAMITE_BLK`) where the modern port faithfully reproduces an original bug (a dead, unreachable case in `PlaySoundForBlock`) rather than silently "fixing" it.
@@ -174,13 +181,13 @@ Everything else audited — all 17 block-type hit sounds, all paddle/wall/ball-b
 
 1. **Fix `buzzer` mistrigger and missing timer-expiry cue.** Remove
    the `sdl2_audio_play_at_percent(ctx->audio, "buzzer", 70)` call
-   from `start_new_game()` (`src/game_modes.c:188`) and add it to the
+   from `start_new_game()` (`src/src/game_modes.c:193`) and add it to the
    level-timer countdown path (`src/game_modes.c:318-333`) at the
    moment `ctx->time_remaining` transitions from 1 to 0, matching
    `original/level.c:143-148`.
 2. **Remove the spurious `bomb` sound from the dynamite bonus-spawn
    roll.** Delete the `sdl2_audio_play_at_percent(ctx->audio, "bomb",
-   50)` call in `src/game_rules.c:160` (`try_spawn_bonus`, `roll ==
+   50)` call in `src/src/game_rules.c:242` (`try_spawn_bonus`, `roll ==
    25` branch). The original's `SetExplodeAllType` is silent at spawn
    time; no replacement sound is needed for parity.
 3. **Restore the quit-confirmation sting.** Play `game_over@100`
