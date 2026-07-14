@@ -32,6 +32,9 @@
 
 /* Legacy bonus spawning constants */
 #define BONUS_SEED 2000
+/* original/include/blocks.h:73 — lifetime (in frames) of a spawned
+ * mid-play bonus/special block before it expires unhit. */
+#define BONUS_LENGTH 1500
 
 /* =========================================================================
  * Find a random empty cell in the block grid
@@ -63,15 +66,46 @@ static int find_random_empty_cell(const block_system_t *block, int *out_row, int
 
 static void try_spawn_bonus(game_ctx_t *ctx, int frame)
 {
-    /* Schedule next bonus if not yet scheduled */
-    if (ctx->next_bonus_frame == 0)
+    /* Expire or release the tracked bonus/special cell BEFORE scheduling
+     * or spawning a new one.  Port of HandlePendingSpecials
+     * (original/blocks.c:1167-1186), called once per tick against the
+     * one cell the original tracks via the bonusRow/bonusCol globals. */
+    if (ctx->bonus_block_active)
+    {
+        int row = ctx->bonus_row;
+        int col = ctx->bonus_col;
+
+        if (!block_system_is_occupied(ctx->block, row, col) ||
+            block_system_get_type(ctx->block, row, col) != ctx->bonus_type)
+        {
+            /* Player destroyed or picked it up — bonusBlock is cleared
+             * on finalize/pickup at original/blocks.c:1604, 1622, 1631,
+             * 1838.  The cell itself was already handled by that path;
+             * do not touch the grid here. */
+            ctx->bonus_block_active = false;
+        }
+        else if (frame >= block_system_get_last_frame(ctx->block, row, col))
+        {
+            /* Lifetime elapsed with no hit — original/blocks.c:1173-1184. */
+            block_system_clear(ctx->block, row, col);
+            ctx->bonus_block_active = false;
+        }
+    }
+
+    /* Schedule next bonus if not yet scheduled.  Guarded by
+     * !bonus_block_active (original/main.c:970) so the BONUS_SEED
+     * interval only starts counting once the current special has
+     * cleared — without this guard a spawn's countdown could complete
+     * while a previous special is still on the board. */
+    if (ctx->next_bonus_frame == 0 && !ctx->bonus_block_active)
     {
         ctx->next_bonus_frame = frame + (rand() % BONUS_SEED);
         return;
     }
 
-    /* Not time yet */
-    if (frame < ctx->next_bonus_frame || ctx->bonus_block_active)
+    /* Not time yet, or a special is still active (original/main.c:974
+     * `nextBonusFrame <= frame && bonusBlock == False`) */
+    if (ctx->next_bonus_frame == 0 || frame < ctx->next_bonus_frame || ctx->bonus_block_active)
         return;
 
     /* Find an empty cell */
@@ -82,6 +116,14 @@ static void try_spawn_bonus(game_ctx_t *ctx, int frame)
         return;
     }
 
+    /* Recorded only when a case below actually places a persistent
+     * bonus/special block — cases 25 (dynamite) and 26 (eyedude) don't
+     * call AddSpecialBlock/AddBonusBlock in the original, so they leave
+     * this unset and bonus_block_active is not raised. */
+    int placed_row = -1;
+    int placed_col = -1;
+    int placed_type = NONE_BLK;
+
     /* Pick a bonus type — exact probability distribution from legacy */
     int roll = rand() % 27;
 
@@ -89,62 +131,102 @@ static void try_spawn_bonus(game_ctx_t *ctx, int frame)
     {
         /* Cases 0-7: normal bonus block (8/27 chance) */
         block_system_add(ctx->block, row, col, BONUS_BLK, 0, frame);
+        placed_row = row;
+        placed_col = col;
+        placed_type = BONUS_BLK;
     }
     else if (roll <= 11)
     {
         /* Cases 8-11: x2 bonus (4/27 chance) */
         if (!special_system_is_active(ctx->special, SPECIAL_X2_BONUS))
+        {
             block_system_add(ctx->block, row, col, BONUSX2_BLK, 0, frame);
+            placed_row = row;
+            placed_col = col;
+            placed_type = BONUSX2_BLK;
+        }
     }
     else if (roll <= 13)
     {
         /* Cases 12-13: x4 bonus (2/27 chance) */
         if (!special_system_is_active(ctx->special, SPECIAL_X4_BONUS))
+        {
             block_system_add(ctx->block, row, col, BONUSX4_BLK, 0, frame);
+            placed_row = row;
+            placed_col = col;
+            placed_type = BONUSX4_BLK;
+        }
     }
     else if (roll <= 15)
     {
         /* Cases 14-15: paddle shrink (2/27) */
         block_system_add(ctx->block, row, col, PAD_SHRINK_BLK, 3, frame);
+        placed_row = row;
+        placed_col = col;
+        placed_type = PAD_SHRINK_BLK;
     }
     else if (roll <= 17)
     {
         /* Cases 16-17: paddle expand (2/27) */
         block_system_add(ctx->block, row, col, PAD_EXPAND_BLK, 3, frame);
+        placed_row = row;
+        placed_col = col;
+        placed_type = PAD_EXPAND_BLK;
     }
     else if (roll == 18)
     {
         /* Case 18: multiball (1/27) */
         block_system_add(ctx->block, row, col, MULTIBALL_BLK, 3, frame);
+        placed_row = row;
+        placed_col = col;
+        placed_type = MULTIBALL_BLK;
     }
     else if (roll == 19)
     {
         /* Case 19: reverse (1/27) */
         block_system_add(ctx->block, row, col, REVERSE_BLK, 3, frame);
+        placed_row = row;
+        placed_col = col;
+        placed_type = REVERSE_BLK;
     }
     else if (roll <= 21)
     {
         /* Cases 20-21: machine gun (2/27) */
         block_system_add(ctx->block, row, col, MGUN_BLK, 3, frame);
+        placed_row = row;
+        placed_col = col;
+        placed_type = MGUN_BLK;
     }
     else if (roll == 22)
     {
         /* Case 22: wall off (1/27) */
         block_system_add(ctx->block, row, col, WALLOFF_BLK, 3, frame);
+        placed_row = row;
+        placed_col = col;
+        placed_type = WALLOFF_BLK;
     }
     else if (roll == 23)
     {
         /* Case 23: extra ball (1/27) */
         block_system_add(ctx->block, row, col, EXTRABALL_BLK, 0, frame);
+        placed_row = row;
+        placed_col = col;
+        placed_type = EXTRABALL_BLK;
     }
     else if (roll == 24)
     {
         /* Case 24: death block (1/27) */
         block_system_add(ctx->block, row, col, DEATH_BLK, 3, frame);
+        placed_row = row;
+        placed_col = col;
+        placed_type = DEATH_BLK;
     }
     else if (roll == 25)
     {
-        /* Case 25: dynamite — clear all blocks of a random color */
+        /* Case 25: dynamite — clear all blocks of a random color.
+         * Does not add a persistent block (SetExplodeAllType,
+         * original/blocks.c:1072-1113 territory but no AddBonusBlock/
+         * AddSpecialBlock call) — bonus_block_active stays false. */
         static const int dyn_types[] = {YELLOW_BLK, BLUE_BLK,    RED_BLK,  PURPLE_BLK,
                                         TAN_BLK,    COUNTER_BLK, GREEN_BLK};
         int target = dyn_types[rand() % 7];
@@ -161,8 +243,23 @@ static void try_spawn_bonus(game_ctx_t *ctx, int frame)
     }
     else
     {
-        /* Case 26 (final): start eyedude */
+        /* Case 26 (final): start eyedude — no persistent block either
+         * (original/main.c:1115-1118 calls ChangeEyeDudeMode, not
+         * AddSpecialBlock). */
         eyedude_system_set_state(ctx->eyedude, EYEDUDE_STATE_RESET);
+    }
+
+    if (placed_row >= 0)
+    {
+        /* One-at-a-time gate + finite lifetime — original/blocks.c:
+         * 1075,1079 (AddSpecialBlock) and 1107,1111 (AddBonusBlock) set
+         * bonusBlock=True and lastFrame=frame+BONUS_LENGTH only when a
+         * block was actually placed. */
+        ctx->bonus_block_active = true;
+        ctx->bonus_row = placed_row;
+        ctx->bonus_col = placed_col;
+        ctx->bonus_type = placed_type;
+        block_system_set_last_frame(ctx->block, placed_row, placed_col, frame + BONUS_LENGTH);
     }
 
     ctx->next_bonus_frame = 0;
@@ -260,9 +357,14 @@ void game_rules_next_level(game_ctx_t *ctx)
     gun_system_set_unlimited(ctx->gun, 0);
     gun_system_set_ammo(ctx->gun, GUN_AMMO_PER_LEVEL);
 
-    /* Reset bonus spawning state */
+    /* Reset bonus spawning state.  bonus_row/col/type are stale once
+     * bonus_block_active is false — reset alongside so no leftover cell
+     * from the previous level's grid is misread on the next spawn. */
     ctx->bonus_block_active = false;
     ctx->next_bonus_frame = 0;
+    ctx->bonus_row = 0;
+    ctx->bonus_col = 0;
+    ctx->bonus_type = NONE_BLK;
 
     /* Reset BONUS_BLK pickup counter — original calls ResetNumberBonus
      * during level load (original/file.c:328-333).  Without this the

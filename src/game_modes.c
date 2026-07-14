@@ -113,6 +113,11 @@ static bool start_new_game(game_ctx_t *ctx)
     ctx->paused_seconds = 0;
     ctx->bonus_block_active = false;
     ctx->next_bonus_frame = 0;
+    /* Mirror game_rules_next_level's reset (src/game_rules.c:363-367) —
+     * no stale spawned-cell coordinates carried into a new game. */
+    ctx->bonus_row = 0;
+    ctx->bonus_col = 0;
+    ctx->bonus_type = NONE_BLK;
     ctx->user_tilts = 0;
     ctx->bonus_count = 0;
 

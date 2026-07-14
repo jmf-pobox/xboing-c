@@ -1,0 +1,49 @@
+results:
+    - mission: m-2026-07-14-002
+      round: 1
+      created_at: "2026-07-14T04:14:47Z"
+      author: jdc
+      verdict: pass
+      confidence: 0.92
+      files_changed:
+        - path: src/game_rules.c
+          added: 109
+          removed: 7
+        - path: include/block_system.h
+          added: 16
+          removed: 0
+        - path: src/block_system.c
+          added: 16
+          removed: 0
+        - path: include/game_context.h
+          added: 10
+          removed: 0
+      evidence:
+        - name: Re-arm guard (next_bonus_frame==0 && !bonus_block_active) added — original/main.c:970
+          status: pass
+        - name: 'One-at-a-time gate: bonus_block_active + bonus_row/col/type set only when a case actually places a block (0-24); dynamite/eyedude excluded'
+          status: pass
+        - name: Finite lifetime last_frame=frame+BONUS_LENGTH(1500) via new block_system_get/set_last_frame; block_system_add default unchanged for other callers
+          status: pass
+        - name: 'Expire/clear ports HandlePendingSpecials (blocks.c:1167-1186): destroyed/collected -> clear flag only; lifetime elapsed -> clear cell + flag'
+          status: pass
+        - name: 'Reset discipline: game_rules_next_level resets bonus_row/col/type; game_modes.c untouched (fields inert while flag false)'
+          status: pass
+        - name: rand()%27, BONUS_SEED, point values, layouts unchanged
+          status: pass
+        - name: debug + asan builds zero-warning under -Werror -Wconversion -Wshadow; ctest 61/61 both; only 4 write_set files
+          status: pass
+    - mission: m-2026-07-14-002
+      round: 2
+      created_at: "2026-07-14T04:32:03Z"
+      author: jdc
+      verdict: pass
+      confidence: 0.95
+      files_changed: []
+      evidence:
+        - name: No changes to m-002 write_set files in round 2 — round-1 throttle implementation (game_rules.c, block_system.c/.h, game_context.h) stands as jck-approved
+          status: pass
+        - name: The sole round-1 finding (start_new_game reset of bonus_row/col/type, in game_modes.c outside this write_set) resolved by sibling mission m-2026-07-14-003, gjm-approved and closed
+          status: pass
+        - name: Behavior pinned by regression tests in m-2026-07-14-004 (RED-proven); debug+asan 61->64 tests green
+          status: pass

@@ -134,6 +134,16 @@ typedef struct game_ctx
     /* Bonus spawning state (from main.c:handleGameMode) */
     bool bonus_block_active; /* True while a bonus block is on the grid */
     int next_bonus_frame;    /* Frame at which next bonus block may spawn */
+    /* Cell + type of the currently-active spawned bonus/special block.
+     * Mirrors original/main.c's `bonusRow`/`bonusCol` globals, populated
+     * by AddBonusBlock/AddSpecialBlock (original/blocks.c:1084-1085,
+     * 1116-1117).  bonus_type lets try_spawn_bonus (game_rules.c) tell
+     * "player destroyed/collected it" (type at the cell no longer
+     * matches) apart from "still waiting to expire".  Only meaningful
+     * while bonus_block_active is true. */
+    int bonus_row;
+    int bonus_col;
+    int bonus_type;
 
     /* Timer state */
     int time_bonus_total; /* Total time bonus from level file (seconds) */
