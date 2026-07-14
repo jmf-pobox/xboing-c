@@ -1171,6 +1171,22 @@ void block_system_set_random(block_system_t *ctx, int row, int col, int random)
     bp->random = random ? 1 : 0;
 }
 
+int block_system_get_last_frame(const block_system_t *ctx, int row, int col)
+{
+    if (ctx == NULL || row < 0 || row >= MAX_ROW || col < 0 || col >= MAX_COL)
+        return 0;
+
+    return ctx->blocks[row][col].last_frame;
+}
+
+void block_system_set_last_frame(block_system_t *ctx, int row, int col, int last_frame)
+{
+    if (ctx == NULL || row < 0 || row >= MAX_ROW || col < 0 || col >= MAX_COL)
+        return;
+
+    ctx->blocks[row][col].last_frame = last_frame;
+}
+
 /* =========================================================================
  * Utility
  * ========================================================================= */

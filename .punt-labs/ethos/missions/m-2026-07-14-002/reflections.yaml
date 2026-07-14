@@ -1,0 +1,23 @@
+reflections:
+    - round: 1
+      created_at: "2026-07-14T04:19:56Z"
+      author: jck
+      converging: true
+      signals:
+        - 'THROTTLE 1 verified: bonus_block_active set true only when block_system_add succeeds for cases 0-24, never dynamite(25)/eyedude(26) — matches original/blocks.c:1075,1107'
+        - 'THROTTLE 2 verified: block_system_set_last_frame(frame+BONUS_LENGTH=1500) only on the spawned cell; block_system_add default unchanged for level blocks — original/blocks.c:1079,1111, blocks.h:73'
+        - 'CLEAR gate verified: destroy/collect clears flag without grid mutation (original/blocks.c:1604,1622,1631,1838); expiry frame>=last_frame -> block_system_clear (HandlePendingSpecials original/blocks.c:1173-1184)'
+        - rand()%27 boundaries, SHOTS_TO_KILL_SPECIAL=3, BONUS_SEED=2000 unchanged; no point values or layouts touched
+        - 'GAP (pinned bullet): game_modes.c:114-115 start_new_game resets bonus_block_active/next_bonus_frame but NOT bonus_row/col/type, unlike game_rules.c:363-367. Inert under the flag gate but a literal miss; 3-line fix. game_modes.c was outside m-002 write_set — spun into sibling mission.'
+      recommendation: continue
+      reason: Core throttle restore (gate + finite lifetime + clear) is faithful and fixes the level-1 swarm; approved on the merits. One pinned reset-discipline bullet unmet in game_modes.c (outside this mission's write_set) — resolved via a sibling implement mission, after which m-002 closes.
+    - round: 2
+      created_at: "2026-07-14T04:31:45Z"
+      author: jck
+      converging: true
+      signals:
+        - Round-1 throttle logic (bonus_block_active gate, !active re-arm, BONUS_LENGTH lifetime, destroy/expire clear) approved as faithful to original/main.c:970-1119 + blocks.c:1079,1173-1186 — unchanged since round 1
+        - 'The one open finding (start_new_game not resetting bonus_row/col/type, game_modes.c outside m-002 write_set) resolved in sibling mission m-2026-07-14-003 (jdc), gjm-approved: all five spawn fields now reset in both start_new_game and game_rules_next_level'
+        - Regression tests added in m-2026-07-14-004 (gjm) pin one-at-a-time, expiry+re-arm, and no-reschedule-while-active; RED-proven (reverting src/game_rules.c fails all three)
+      recommendation: stop
+      reason: Throttle restore is faithful and complete; the reset-discipline gap is closed via m-003 and behavior is pinned by m-004. Approving close of the gameplay fix.

@@ -4091,3 +4091,60 @@ Linux/Debian and Intel Homebrew are unaffected (they resolve at the
 there). Regression tests pin the positive resolution, a divergence guard
 (empty `install_data_dir` → not found), and the `$XDG_DATA_HOME`-shadows-
 prefix precedence.
+
+## ADR-069: Mid-play special-block spawner is throttled like the original
+
+**Status:** Accepted (2026-07-14)
+
+The maintainer reported level 1 playing far harder than the 1996
+original — a stream of wall / reverse-paddle / kill-ball / shrink-paddle
+blocks appearing in the empty grid holes mid-play. `level01.data` is
+byte-identical to the original, so the level layout was not the cause.
+
+**Root cause.** The original sprinkles one bonus/special block into an
+empty cell during play (`original/main.c:970-1071`,
+`AddSpecialBlock`/`AddBonusBlock` in `original/blocks.c`), throttled two
+ways: (1) **one at a time** — a spawn sets `bonusBlock = True` and the
+next is neither scheduled nor placed until it clears (`main.c:970,974`);
+(2) **auto-expiry** — each spawned block gets
+`lastFrame = frame + BONUS_LENGTH` (1500 frames) and is cleared when it
+lapses (`blocks.c:1079,1173-1186`). So the original shows a single
+transient special every ~15-25 s, ~22% of them nuisances.
+
+The modern port (`src/game_rules.c` `try_spawn_bonus`) copied the
+`rand()%27` distribution and `BONUS_SEED=2000` but dropped **both**
+throttles: `ctx->bonus_block_active` was read as the one-at-a-time gate
+but set `true` nowhere, and spawned blocks got
+`last_frame = frame + BLOCK_INFINITE_DELAY` (`block_system.c:452`) so
+they never expired. Result: harmful specials spawned on a fixed timer and
+accumulated without bound — worst on level 1's mostly-empty grid.
+
+**Decision.** Restore the original throttle exactly (a faithful fix, not
+a redesign):
+
+- Set `bonus_block_active = true` and record the spawned cell
+  (`bonus_row`/`bonus_col`/`bonus_type`) only when a case actually places
+  a block (the `rand()%27` cases 0-24; dynamite and eyedude place no
+  persistent block and are excluded, matching the original).
+- Gate the `next_bonus_frame` re-arm on `!bonus_block_active`
+  (`main.c:970`) so the `BONUS_SEED` interval starts only after the
+  current special clears.
+- Give the spawned block `last_frame = frame + BONUS_LENGTH` via a new
+  `block_system_set_last_frame`; each tick, expire it when
+  `frame >= last_frame` (clear the cell) or release the gate without
+  touching the grid when the player destroyed/collected it — porting
+  `HandlePendingSpecials` and the `bonusBlock = False` finalize points
+  (`blocks.c:1173-1186,1604-1838`).
+
+The `rand()%27` distribution, `BONUS_SEED`, point values, and level
+layouts are unchanged. jck (original author) verified the restored rhythm
+matches 1996 feel.
+
+**Consequences:** at most one transient special on the grid at a time,
+appearing on the original cadence and vanishing after `BONUS_LENGTH` if
+unhit — level 1 plays as designed. Regression tests
+(`tests/test_game_rules.c`) pin the one-at-a-time gate, the
+`BONUS_LENGTH` expiry + re-arm, and the `!bonus_block_active` re-arm
+guard, each RED-proven against the corresponding mutant. This supersedes
+the initial "specials: MATCH" line in the 2026-07-13 gameplay-logic
+audit, which examined the special *flags* and missed the spawn throttle.

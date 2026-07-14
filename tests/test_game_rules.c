@@ -34,10 +34,12 @@
 #include "ball_system.h"
 #include "ball_types.h"
 #include "block_system.h"
+#include "block_types.h"
 #include "game_context.h"
 #include "game_init.h"
 #include "game_rules.h"
 #include "paddle_system.h"
+#include "sdl2_input.h"
 #include "sdl2_state.h"
 
 /* =========================================================================
@@ -285,6 +287,230 @@ static void test_check_real_game_clears_board_reaches_bonus(void **vstate)
 }
 
 /* =========================================================================
+ * Special-spawn throttle regression (m-2026-07-14-002 restore)
+ *
+ * Pins the one-at-a-time gate and finite lifetime of try_spawn_bonus
+ * (static in src/game_rules.c, driven every SDL2ST_GAME tick via
+ * game_rules_check -> mode_game_update, src/game_modes.c:345).  Before
+ * the restore, the schedule-next-spawn branch did not check
+ * ctx->bonus_block_active (`if (ctx->next_bonus_frame == 0)` with no
+ * `!ctx->bonus_block_active` term), so a new spawn interval could
+ * elapse -- and place a second special block -- while the previous one
+ * was still on the grid, unhit.  These tests drive game_rules_check
+ * indirectly through sdl2_state_update (mode_game_update calls it once
+ * per tick) with a fixed rand() seed for reproducibility.
+ *
+ * ctx->play_test_active=true is used purely as a test seam here: it
+ * suppresses game_rules_check's level-complete/bonus transition
+ * (src/game_rules.c:471, `!block_system_still_active(...) &&
+ * !ctx->play_test_active`) so an intentionally-emptied grid does not
+ * end the run early -- try_spawn_bonus itself does not read this flag.
+ *
+ * Coverage is deliberately partitioned across the three restored
+ * mechanisms in try_spawn_bonus (src/game_rules.c:67-266), not
+ * merged into one test:
+ *
+ *   - test_spawn_throttle_one_at_a_time pins the historical root
+ *     cause: unbounded accumulation of concurrent spawns.  It also
+ *     re-asserts the no-reschedule-while-active invariant
+ *     (next_bonus_frame == 0 whenever bonus_block_active) on every
+ *     tick of its own 8000-tick run, so it independently fails
+ *     against a narrow mutant that restores only the max-concurrency
+ *     guard (line 108's `|| ctx->bonus_block_active`) but drops the
+ *     re-arm guard at line 100 -- the concurrency check alone
+ *     (max_concurrent <= 1) does not, because line 108 still blocks a
+ *     second physical placement even when line 100's guard is
+ *     mutated away.
+ *   - test_spawn_throttle_expires_and_rearms pins the BONUS_LENGTH
+ *     lifetime (expiry clears the cell) and confirms a later spawn
+ *     still occurs after expiry (re-arm happens at all).
+ *   - test_spawn_throttle_no_reschedule_while_active pins the
+ *     `!bonus_block_active` guard at line 100 in isolation, over a
+ *     tighter window scoped to exactly the active interval.
+ *
+ * Together the three (now with the added invariant folded into the
+ * first) cover all three restored mechanisms; the sibling tests exist
+ * independently of the folded invariant so a narrower failure still
+ * localizes to a single, specifically-named test.
+ * ========================================================================= */
+
+/* src/game_rules.c BONUS_SEED -- max frames try_spawn_bonus waits before
+ * attempting a spawn once armed. */
+#define THROTTLE_BONUS_SEED 2000
+
+static void throttle_tick(game_ctx_t *ctx)
+{
+    sdl2_input_begin_frame(ctx->input);
+    sdl2_state_update(ctx->state);
+}
+
+/* Counts occupied cells in the whole grid.  Tests in this section start
+ * from a fully-cleared grid and never launch a ball or fire the gun, so
+ * every occupied cell observed afterward was placed by try_spawn_bonus. */
+static int throttle_count_occupied(const block_system_t *block)
+{
+    int count = 0;
+    for (int r = 0; r < MAX_ROW; r++)
+    {
+        for (int c = 0; c < MAX_COL; c++)
+        {
+            if (block_system_is_occupied(block, r, c))
+                count++;
+        }
+    }
+    return count;
+}
+
+static void test_spawn_throttle_one_at_a_time(void **vstate)
+{
+    fixture_t *f = (fixture_t *)*vstate;
+    game_ctx_t *ctx = f->ctx;
+
+    srand(12345u);
+    ctx->play_test_active = true;
+    block_system_clear_all(ctx->block);
+    assert_int_equal(throttle_count_occupied(ctx->block), 0);
+
+    int max_concurrent = 0;
+    int prev_count = 0;
+    int spawn_events = 0;
+
+    for (int i = 0; i < 8000; i++)
+    {
+        throttle_tick(ctx);
+
+        /* play_test_active must keep us in GAME mode regardless of grid
+         * state for the whole run -- a premature transition would mean
+         * the harness itself broke, not the throttle under test. */
+        assert_int_equal(sdl2_state_current(ctx->state), SDL2ST_GAME);
+
+        int count = throttle_count_occupied(ctx->block);
+        if (count > max_concurrent)
+            max_concurrent = count;
+        if (count > prev_count)
+            spawn_events++;
+        prev_count = count;
+
+        /* Re-arm guard, checked here too (not just in the dedicated
+         * sibling test): while a spawn is active, next_bonus_frame must
+         * stay at the sentinel 0 (src/game_rules.c:100). A mutant that
+         * drops the `&& !ctx->bonus_block_active` term reschedules on
+         * the very next tick after a placement -- deterministically,
+         * regardless of the rand() stream -- so this catches it here
+         * even though max_concurrent<=1 alone does not. */
+        if (ctx->bonus_block_active)
+            assert_int_equal(ctx->next_bonus_frame, 0);
+    }
+
+    /* Core anti-regression: before the throttle restore this could grow
+     * past 1 (schedule-next-spawn ran without checking bonus_block_active).
+     */
+    assert_true(max_concurrent <= 1);
+    /* Non-vacuous: prove spawns actually happened in this run, or the
+     * assertion above proves nothing. BONUS_SEED=2000 max initial wait
+     * guarantees at least one spawn attempt well within 8000 ticks. */
+    assert_true(spawn_events >= 1);
+}
+
+static void test_spawn_throttle_expires_and_rearms(void **vstate)
+{
+    fixture_t *f = (fixture_t *)*vstate;
+    game_ctx_t *ctx = f->ctx;
+
+    srand(777u);
+    ctx->play_test_active = true;
+    block_system_clear_all(ctx->block);
+
+    /* Tick until the first spawn lands. THROTTLE_BONUS_SEED=2000 bounds
+     * the wait; give generous headroom for the case-25/26 rolls that
+     * consume a cycle without placing a block. */
+    int found = 0;
+    int spawn_row = -1;
+    int spawn_col = -1;
+    for (int i = 0; i < THROTTLE_BONUS_SEED * 4 && !found; i++)
+    {
+        throttle_tick(ctx);
+        if (ctx->bonus_block_active)
+        {
+            found = 1;
+            spawn_row = ctx->bonus_row;
+            spawn_col = ctx->bonus_col;
+        }
+    }
+    assert_true(found);
+    assert_true(block_system_is_occupied(ctx->block, spawn_row, spawn_col));
+
+    int expiry_frame = block_system_get_last_frame(ctx->block, spawn_row, spawn_col);
+
+    /* Tick past the recorded expiry frame -- try_spawn_bonus clears the
+     * cell and drops bonus_block_active on the first tick where
+     * frame >= expiry_frame (src/game_rules.c:87-92). Bound the loop at
+     * BLOCK_BONUS_LENGTH + margin: if a future regression restores
+     * BLOCK_INFINITE_DELAY (9999999) as the spawned lifetime, this loop
+     * must fail fast via the assertion below instead of spinning ~10M
+     * iterations. */
+    int frame = (int)sdl2_state_frame(ctx->state);
+    int wait_needed = expiry_frame - frame + 2;
+    int wait_bound = BLOCK_BONUS_LENGTH + 200;
+    int wait_ticks = wait_needed < wait_bound ? wait_needed : wait_bound;
+
+    int cleared = 0;
+    for (int i = 0; i < wait_ticks; i++)
+    {
+        throttle_tick(ctx);
+        if (!block_system_is_occupied(ctx->block, spawn_row, spawn_col) && !ctx->bonus_block_active)
+        {
+            cleared = 1;
+            break;
+        }
+    }
+
+    assert_true(cleared);
+    assert_false(block_system_is_occupied(ctx->block, spawn_row, spawn_col));
+    assert_false(ctx->bonus_block_active);
+
+    /* Re-arm: a later spawn must still occur after expiry. */
+    int rearmed = 0;
+    for (int i = 0; i < THROTTLE_BONUS_SEED * 4 && !rearmed; i++)
+    {
+        throttle_tick(ctx);
+        if (ctx->bonus_block_active)
+            rearmed = 1;
+    }
+    assert_true(rearmed);
+}
+
+static void test_spawn_throttle_no_reschedule_while_active(void **vstate)
+{
+    fixture_t *f = (fixture_t *)*vstate;
+    game_ctx_t *ctx = f->ctx;
+
+    srand(42u);
+    ctx->play_test_active = true;
+    block_system_clear_all(ctx->block);
+
+    int found = 0;
+    for (int i = 0; i < THROTTLE_BONUS_SEED * 4 && !found; i++)
+    {
+        throttle_tick(ctx);
+        if (ctx->bonus_block_active)
+            found = 1;
+    }
+    assert_true(found);
+
+    /* Guard under test: `if (ctx->next_bonus_frame == 0 &&
+     * !ctx->bonus_block_active)` (src/game_rules.c:100) -- while the
+     * spawn is still active, next_bonus_frame must stay at 0 (the
+     * sentinel try_spawn_bonus leaves it at after every cycle,
+     * src/game_rules.c:265), never getting a premature reschedule. */
+    for (int i = 0; i < 50 && ctx->bonus_block_active; i++)
+    {
+        assert_int_equal(ctx->next_bonus_frame, 0);
+        throttle_tick(ctx);
+    }
+}
+
+/* =========================================================================
  * Main
  * ========================================================================= */
 
@@ -305,6 +531,12 @@ int main(void)
         cmocka_unit_test_setup_teardown(test_check_playtest_clears_board_no_bonus_transition,
                                         setup, teardown),
         cmocka_unit_test_setup_teardown(test_check_real_game_clears_board_reaches_bonus, setup,
+                                        teardown),
+
+        /* Special-spawn throttle regression (m-2026-07-14-002 restore) */
+        cmocka_unit_test_setup_teardown(test_spawn_throttle_one_at_a_time, setup, teardown),
+        cmocka_unit_test_setup_teardown(test_spawn_throttle_expires_and_rearms, setup, teardown),
+        cmocka_unit_test_setup_teardown(test_spawn_throttle_no_reschedule_while_active, setup,
                                         teardown),
     };
 

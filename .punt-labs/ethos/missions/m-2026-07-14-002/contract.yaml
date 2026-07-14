@@ -1,0 +1,43 @@
+mission_id: m-2026-07-14-002
+status: closed
+type: implement
+created_at: "2026-07-14T04:05:40Z"
+updated_at: "2026-07-14T04:32:09Z"
+closed_at: "2026-07-14T04:32:09Z"
+leader: claude
+worker: jdc
+evaluator:
+    handle: jck
+    pinned_at: "2026-07-14T04:05:40Z"
+    hash: 40cbe1204f644c77e6a26757a9b855e3298be267025e806d425bfdea99054f18
+inputs: {}
+write_set:
+    - src/game_rules.c
+    - src/block_system.c
+    - include/block_system.h
+    - include/game_context.h
+success_criteria:
+    - 'Restore the original mid-play special/bonus spawn THROTTLE. Root cause: the modern try_spawn_bonus (src/game_rules.c:64-169) copied the original''s rand()%27 distribution and BONUS_SEED=2000 but broke BOTH of the original''s throttles, so specials spawn every ~rand()%2000 frames unconditionally and never disappear, swarming the empty holes (original/main.c:970-1071 only ever has ONE special on the grid, auto-expiring after BONUS_LENGTH).'
+    - THROTTLE 1 (one-at-a-time gate). ctx->bonus_block_active is read as the gate (game_rules.c:74) but is set true NOWHERE. Set ctx->bonus_block_active=true whenever try_spawn_bonus actually ADDS a bonus/special block to the grid (cases 0-24 that call block_system_add and succeed — NOT the dynamite case 25 or eyedude case 26, and NOT the x2/x4 cases when they skip because the bonus is already active). Record the spawned cell in new ctx->bonus_row/ctx->bonus_col (include/game_context.h). Mirrors original/blocks.c:1075 (bonusBlock=True in AddSpecialBlock/AddBonusBlock).
+    - 'THROTTLE 2 (BONUS_LENGTH lifetime). The original special/bonus block auto- expires: lastFrame=frame+BONUS_LENGTH (1500), cleared by HandlePendingSpecials when frame>=lastFrame (original/blocks.c:1079,1173-1176). The modern block_system_add sets last_frame=frame+BLOCK_INFINITE_DELAY (block_system.c :452) so spawned specials never expire. Give the spawned bonus/special block a finite last_frame=frame+BONUS_LENGTH (define BONUS_LENGTH 1500 in game_rules.c). Add a minimal block_system API to set/query a block''s last_frame (e.g. block_system_set_last_frame / block_system_get_last_frame) if none exists — keep the API small and documented in block_system.h.'
+    - 'CLEAR the gate. Each tick (in game_rules_check, before try_spawn_bonus), when bonus_block_active is true, check the tracked (bonus_row,bonus_col): (a) if that cell no longer holds the spawned bonus/special block (player destroyed or collected it — occupied==false or type changed), set bonus_block_active =false and next_bonus_frame=0 (re-arm scheduling); (b) else if frame >= that block''s last_frame, EXPIRE it — block_system_clear the cell, then bonus_block_active=false and next_bonus_frame=0. This ports the original''s "bonusBlock=False on destroy (blocks.c:1604,1622,1631,1838) or on expiry (blocks.c:1173-1176)".'
+    - 'Faithfulness (jck gate): the visible result must match the original — at most ONE spawned bonus/special block on the grid at a time, appearing on the BONUS_SEED cadence and vanishing after BONUS_LENGTH if not hit. Do NOT change the rand()%27 distribution, BONUS_SEED, block point values, or any level''s layout. Cite original lines in comments where behavior is restored.'
+    - 'Reset discipline: bonus_row/bonus_col reset alongside bonus_block_active in all the places next_bonus_frame/bonus_block_active are already reset (game_rules.c:264-265, game_modes.c:114-115). No dangling stale cell across level change / new game / ball death.'
+    - 'cmake --preset debug && cmake --build build: zero warnings under -Werror -Wconversion -Wshadow. Full ctest --test-dir build stays green. Do NOT write tests in this mission (a sibling gjm test mission covers regression tests) — but the build and existing suite must pass. Only the four write_set files change.'
+budget:
+    rounds: 3
+    reflection_after_each: true
+current_round: 2
+context: |-
+    Root cause of the maintainer's "level 1 is too hard" report, found during the
+    overnight audit flight and confirmed with the maintainer: mid-play special/
+    bonus blocks spawn into empty grid holes with NO throttle. The original
+    (original/main.c:970-1071 + blocks.c AddSpecialBlock/HandlePendingSpecials)
+    keeps exactly one on the grid at a time and auto-expires it after
+    BONUS_LENGTH=1500 frames; ~22% of spawns are harmful (shrink/reverse/walloff/
+    death). The modern port dropped both throttles (dead bonus_block_active gate +
+    infinite lifetime), so harmful specials accumulate without bound — most
+    visible on level 1's mostly-empty grid. This is a faithful RESTORE of the
+    original, not a redesign. jck (original author) is the evaluator and must
+    confirm the restored behavior matches 1996 feel. P1 bead filed. Deliver as a
+    branch for maintainer review; do not merge (gameplay change needs sign-off).

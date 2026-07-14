@@ -1,0 +1,41 @@
+results:
+    - mission: m-2026-07-14-004
+      round: 1
+      created_at: "2026-07-14T04:30:56Z"
+      author: gjm
+      verdict: pass
+      confidence: 0.95
+      files_changed:
+        - path: tests/test_game_rules.c
+          added: 184
+          removed: 0
+      evidence:
+        - name: cmake --build build --target test_game_rules
+          status: pass
+        - name: ctest --test-dir build -R test_game_rules
+          status: pass
+        - name: cmake --build build-asan --target test_game_rules
+          status: pass
+        - name: ctest --test-dir build-asan -R test_game_rules
+          status: pass
+        - name: 'regression proof: reverted src/game_rules.c to pre-throttle-fix (git stash), rebuilt, ran test_game_rules -- all 3 new tests (test_spawn_throttle_one_at_a_time, test_spawn_throttle_expires_and_rearms, test_spawn_throttle_no_reschedule_while_active) failed as expected; restored fix (git stash pop), reran, all 10 tests pass'
+          status: pass
+        - name: 'scope check: git status --porcelain shows only tests/test_game_rules.c touched by this mission (other modified files belong to sibling missions m-2026-07-14-002/003)'
+          status: pass
+    - mission: m-2026-07-14-004
+      round: 2
+      created_at: "2026-07-14T04:43:50Z"
+      author: gjm
+      verdict: pass
+      confidence: 0.96
+      files_changed:
+        - path: tests/test_game_rules.c
+          added: 20
+          removed: 2
+      evidence:
+        - name: Coverage-partition doc comment added above the three throttle tests (one-at-a-time=spawn gate; expires_and_rearms=lifetime+re-arm; no_reschedule=re-arm guard)
+          status: pass
+        - name: test_spawn_throttle_one_at_a_time strengthened with per-tick invariant bonus_block_active => next_bonus_frame==0; RED-proven against the narrow re-arm mutant (fails at test_game_rules.c:408), src/game_rules.c restored byte-for-byte
+          status: pass
+        - name: debug + asan green; only tests/test_game_rules.c touched
+          status: pass

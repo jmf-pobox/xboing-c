@@ -1,0 +1,14 @@
+reflections:
+    - round: 1
+      created_at: "2026-07-14T12:46:42Z"
+      author: gjm
+      converging: true
+      signals:
+        - 'src/game_rules.c: local #define BONUS_LENGTH removed; sole use site (frame + BLOCK_BONUS_LENGTH at try_spawn_bonus) now references the shared BLOCK_BONUS_LENGTH=1500 (include/block_system.h:58); citation comment (original/include/blocks.h:73) retained adjacent to the use'
+        - 'tests/test_game_rules.c: expiry loop in test_spawn_throttle_expires_and_rearms bounded to min(expiry_frame-frame+2, BLOCK_BONUS_LENGTH+200)=1700 max iterations, with early-exit on clear and assert_true(cleared) -- confirmed frame increments 1/tick (src/sdl2_state.c:237) so 200-tick margin over the 1500-frame window is not tight/flaky'
+        - 'mutant re-run: temporarily changed try_spawn_bonus to set last_frame = frame + BLOCK_INFINITE_DELAY (9999999, simulating the historical infinite-lifetime regression); rebuilt and ran test_game_rules -- test_spawn_throttle_expires_and_rearms failed in 2.2s wall time on ''cleared is not true'' at tests/test_game_rules.c:468, not a ~10M-tick hang. Reverted the mutant back to BLOCK_BONUS_LENGTH afterward and confirmed the working-tree diff matched the pre-mutant state exactly (git diff src/game_rules.c) before rebuilding GREEN again'
+        - 'debug build: cmake --build build --target test_game_rules -- zero warnings; ctest --test-dir build -R test_game_rules -- Passed (10/10 subtests)'
+        - 'asan build: cmake --build build-asan --target test_game_rules -- zero warnings; ctest --test-dir build-asan -R test_game_rules -- Passed'
+        - git status --porcelain -- src tests shows only the two write_set files modified; no other tracked files touched
+      recommendation: stop
+      reason: Both Copilot findings addressed with value-identical, behavior-preserving changes. BONUS_LENGTH is fully removed in favor of the shared BLOCK_BONUS_LENGTH constant (same value, single use site, citation preserved). The expiry-loop bound is generous enough (200-frame margin on a 1-frame-per-tick counter) to avoid flakiness on the real 1500-frame expiry window, while still failing fast (assertion within ~1700 ticks) against the exact regression it guards -- verified by directly reintroducing the historical infinite-lifetime bug as a mutant and observing the test fail in 2.2s instead of hanging. Debug and ASan builds both green, zero warnings. Only the two write_set files changed. Accept.
