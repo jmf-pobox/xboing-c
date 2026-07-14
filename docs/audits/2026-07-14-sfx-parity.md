@@ -27,8 +27,10 @@ shake, border glow, fade) and contains no `playSoundFile` calls.
    WRONG-SOUND / WRONG-TRIGGER / VOLUME-MISMATCH.
 5. Checked `docs/DESIGN.md` for an ADR on every divergence found.
 
-56 original `playSoundFile` call sites were matched against the
-modern tree. 3 genuine deviations were found; the remainder are
+The original's `playSoundFile` call sites (84 raw calls, ~75 distinct
+event rows after collapsing repeated literal calls such as the 9-tone
+bonus ladder) were matched against the modern tree. 3 genuine
+deviations were found; the remainder are
 faithful 1:1 ports, including one place where the original itself is
 silent by omission (unmapped `DYNAMITE_BLK` in `PlaySoundForBlock`)
 and the modern port correctly reproduces that silence rather than
@@ -163,7 +165,7 @@ inventing a sound.
 | # | Severity | Deviation | Citations | Player-audible impact | ADR? |
 |---|----------|-----------|-----------|------------------------|------|
 | 1 | **HIGH** | `buzzer@70` fires on every new-game start (an event the original never made noise for) instead of on level-timer expiry (an event the modern port never makes noise for at all) | Original: `original/level.c:143-148`. Modern spurious trigger: `src/game_modes.c:188` (`start_new_game`). Modern missing trigger: no call in `src/game_modes.c:318-333` (the timer-countdown tick) | Every single new game now opens with an unexplained warning-buzzer chime the 1995 player never heard. Conversely, the countdown timer's actual "time is running out" audio cue — a real gameplay signal — never sounds, so players get zero audio warning before the level-bonus timer hits zero. | None found |
-| 2 | **HIGH** | `bomb@50` fires whenever the periodic random bonus-spawn rolls "dynamite" (case 25 of 27); the original is silent at that moment and reserves `bomb@50` exclusively for a real `BOMB_BLK` tile being hit | Original silent path: `original/main.c:1072-1103` → `original/blocks.c:1001-1054` (`SetExplodeAllType`). Original's real trigger for `bomb@50`: `original/blocks.c:771-772`. Modern: `src/game_rules.c:160` | Roughly 1-in-27 bonus spawns (every ~15-60s of play, per `BONUS_SEED`) now plays an explosion sound with nothing visibly exploding — the flagged block only shows a small overlay icon until it is later hit. Confusing, unearned audio cue. | None found |
+| 2 | **HIGH** | `bomb@50` fires whenever the periodic random bonus-spawn rolls "dynamite" (case 25 of 27); the original is silent at that moment and reserves `bomb@50` exclusively for a real `BOMB_BLK` tile being hit | Original silent path: `original/main.c:1072-1103` → `original/blocks.c:1001-1054` (`SetExplodeAllType`). Original's real trigger for `bomb@50`: `original/blocks.c:771-772`. Modern: `src/game_rules.c:160` | Roughly 1-in-27 bonus spawns (every ~15-60s of play, per `BONUS_SEED`) plays `bomb@50` where the original is silent. (Correction per sjl review: the modern dynamite case immediately clears every matching-color block in the same tick — `src/game_rules.c:145-160` → `block_system_clear` — so the sound accompanies a real mass-clear, not "nothing exploding"; the deviation is that the *original* is silent at this event and reserves `bomb@50` for a real `BOMB_BLK` tile hit.) | None found |
 | 3 | **MEDIUM** | Confirmed `Q`-quit never plays `game_over@100` before exit | Original: `original/main.c:714-715` (`handleExitKeys`), reached via `original/main.c:864-868`. Modern: `src/game_modes.c:1295-1306` (pushes `SDL_QUIT`), `src/game_main.c:99-101` (handles it silently) | Audible impact is muted by the window closing almost immediately afterward, but the original always gave a distinct 100%-volume sting on confirmed quit that the modern port drops entirely — including its unique volume (100%, vs. 99% everywhere else `game_over` plays). | None found |
 
 Everything else audited — all 17 block-type hit sounds, all paddle/wall/ball-ball physics sounds, all 4 gun sounds, all 3 dialogue sounds, all 10 bonus-tally-sequence sounds, all 13 attract-cycle screen-transition sounds, all 6 editor sounds, and all 4 global-key sounds — is a byte-for-byte trigger/volume match, including one case (`DYNAMITE_BLK`) where the modern port faithfully reproduces an original bug (a dead, unreachable case in `PlaySoundForBlock`) rather than silently "fixing" it.
