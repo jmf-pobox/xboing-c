@@ -1,3 +1,16 @@
+xboing (1.0.8-1) unstable; urgency=medium
+
+  * Fix level 1 (and every level) playing far harder than the 1996 original:
+    mid-play special blocks — reverse-paddle, kill-ball, walls-off,
+    paddle-shrink — spawned into the empty grid holes with no throttle and
+    never disappeared, so hazards accumulated without bound. The original
+    keeps at most one such special on the board at a time and expires it
+    after a fixed lifetime; both throttles were missing and are now restored
+    faithfully (one-at-a-time gate + auto-expiry). The random spawn mix,
+    scoring, and level layouts are unchanged. (ADR-069.)
+
+ -- J Freeman <jmf@pobox.com>  Tue, 14 Jul 2026 07:45:00 -0700
+
 xboing (1.0.7-1) unstable; urgency=medium
 
   * Fix fresh Homebrew installs on Apple silicon (M1/M2/M3) launching with
