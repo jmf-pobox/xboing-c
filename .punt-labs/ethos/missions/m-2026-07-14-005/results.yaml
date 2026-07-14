@@ -1,0 +1,24 @@
+results:
+    - mission: m-2026-07-14-005
+      round: 1
+      created_at: "2026-07-14T05:00:52Z"
+      author: jck
+      verdict: pass
+      confidence: 0.85
+      files_changed:
+        - path: docs/audits/2026-07-14-animation-cadence-parity.md
+          added: 232
+          removed: 0
+      evidence:
+        - name: 'HIGH: ROAMER_BLK/DROP_BLK never relocate — modern only cycles sprite frame; original moves them on a 300-1300 tick schedule (blocks.c:1364-1474). Missing mechanic, not just cadence.'
+          status: pass
+        - name: 'HIGH (needs runtime confirm): bonus-screen pacing constants assume 7.5ms gameplay tick but MODE_BONUS runs on the ~1ms attract tick; modern tally likely 20-30x too slow.'
+          status: pass
+        - name: 'HIGH: BorderGlow renders during live SDL2ST_GAME (mode_game_update) — original calls it only from attract/menu screens, never handleGameMode.'
+          status: pass
+        - name: 'MEDIUM: DEATH_BLK wink rhythm — modern uniform 5-step 500-tick vs original 700-tick hold + 3-tick blink, 1000-tick period.'
+          status: pass
+        - name: 'LOW: BONUS_BLK spin direction reversed (rate correct); ATTRACT_FRAME_MULTIPLIER=6 is an estimate (true ~6.25-8.33x).'
+          status: pass
+        - name: 'Confirmed MATCH: ball move/anim rates, EyeDude cadence, paddle size-change anim, SHAKE/FADE/BLIND/SHATTER/STATIC SFX, block-explosion cadence. ADR cross-check + ranked table + follow-up beads included.'
+          status: pass

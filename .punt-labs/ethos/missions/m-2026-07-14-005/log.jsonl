@@ -1,0 +1,3 @@
+{"ts":"2026-07-14T04:47:54Z","event":"create","actor":"claude","details":{"evaluator":"jdc","ticket":"","worker":"jck"}}
+{"ts":"2026-07-14T05:00:52Z","event":"result","actor":"jck","details":{"confidence":0.85,"evidence_entries":6,"files_changed":1,"round":1,"verdict":"pass"}}
+{"ts":"2026-07-14T12:30:41Z","event":"reflect","actor":"jdc","details":{"converging":true,"recommendation":"continue","round":1,"signal_count":8}}

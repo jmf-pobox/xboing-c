@@ -1,0 +1,34 @@
+mission_id: m-2026-07-14-005
+status: open
+type: report
+created_at: "2026-07-14T04:47:54Z"
+updated_at: "2026-07-14T04:47:54Z"
+leader: claude
+worker: jck
+evaluator:
+    handle: jdc
+    pinned_at: "2026-07-14T04:47:54Z"
+    hash: c08223356d3e6d5aed56e28da477a1aa2707509febfef7c5f62c25871a3e841f
+inputs: {}
+write_set:
+    - docs/audits/2026-07-14-animation-cadence-parity.md
+success_criteria:
+    - 'Produce docs/audits/2026-07-14-animation-cadence-parity.md: an original-vs- modern comparison of ANIMATION SPEED and per-state CADENCE (game behavior/ timing, not code structure, not pixel fidelity). Cover: block animation frame rates and per-type delays (BONUS_DELAY, DEATH_DELAY1/2, ROAM_EYES_ DELAY, ROAM_DELAY, counter-block slide, explosion frame cadence), ball animation (BALL_FRAME_RATE, BIRTH_FRAME_RATE), eye-dude cadence, paddle animation, the bonus-screen line cadence, and the attract-mode ATTRACT_FRAME_MULTIPLIER (6x) compensation. Cite original/<file>.c:<line> and src/<file>.c:<line> for every claim, and trace each delay constant to its #define in both trees.'
+    - 'Anchor everything to the frame/tick cadence: the original main loop iterates at ~7.5ms (SetUserSpeed(5) -> usleep 7500, original/misc.c) and increments `frame` once per iteration; the modern fixed-timestep loop (ADR-013) uses a matching tick interval. Confirm whether each animation advances at the same real-world rate, or faster/slower. Flag any per-state animation that runs at a different cadence than the original (which would change feel/difficulty).'
+    - For EVERY deviation, cross-check docs/DESIGN.md ADRs (intentional + cited, or undocumented gap). Note that the mid-play special SPAWN cadence itself was just audited and fixed under ADR-069 (do not re-litigate the spawn throttle; focus on the ANIMATION cadence of blocks/effects once on screen). Produce a ranked table of undocumented cadence deviations with severity and citations.
+    - Analysis only — no code changes. End with a "Recommended follow-up beads" list. markdownlint-clean, single H1, blank lines around lists/tables/fences.
+budget:
+    rounds: 1
+    reflection_after_each: true
+current_round: 1
+context: |-
+    Overnight audit flight, audit 2 of 4 (after gameplay-logic, which found and
+    fixed the special-spawn throttle bug = the level-1 difficulty root cause,
+    ADR-069/PR#184). Scope: animation SPEED and per-state CADENCE parity vs the
+    1996 original — the rate at which blocks/effects/eye-dude/ball/paddle animate
+    and state machines advance, NOT code structure, NOT pixel fidelity, NOT the
+    spawn throttle (already handled). jck reads original/ first, cites
+    original/<file>.c:<line>. Timing constants are the crux; trace each to its
+    #define. The maintainer's sense is the game is very close to the original.
+    jdc peer-reviews the report against the code + ADRs afterward. Bead
+    xboing-c-dza.
