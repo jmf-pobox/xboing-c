@@ -32,9 +32,9 @@
 
 /* Legacy bonus spawning constants */
 #define BONUS_SEED 2000
-/* original/include/blocks.h:73 — lifetime (in frames) of a spawned
- * mid-play bonus/special block before it expires unhit. */
-#define BONUS_LENGTH 1500
+/* Bonus/special block lifetime (in frames) before it expires unhit —
+ * BLOCK_BONUS_LENGTH (include/block_system.h), citing
+ * original/include/blocks.h:73. */
 
 /* =========================================================================
  * Find a random empty cell in the block grid
@@ -259,7 +259,7 @@ static void try_spawn_bonus(game_ctx_t *ctx, int frame)
         ctx->bonus_row = placed_row;
         ctx->bonus_col = placed_col;
         ctx->bonus_type = placed_type;
-        block_system_set_last_frame(ctx->block, placed_row, placed_col, frame + BONUS_LENGTH);
+        block_system_set_last_frame(ctx->block, placed_row, placed_col, frame + BLOCK_BONUS_LENGTH);
     }
 
     ctx->next_bonus_frame = 0;

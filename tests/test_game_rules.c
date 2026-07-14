@@ -334,12 +334,6 @@ static void test_check_real_game_clears_board_reaches_bonus(void **vstate)
  * localizes to a single, specifically-named test.
  * ========================================================================= */
 
-/* original/include/blocks.h:73 (mirrored at src/game_rules.c:37) --
- * lifetime in frames of a spawned mid-play bonus/special block before it
- * expires unhit.  Not exported via game_rules.h; duplicated here as the
- * test's own fixed reference point, not a re-derivation of production
- * behavior. */
-#define THROTTLE_BONUS_LENGTH 1500
 /* src/game_rules.c BONUS_SEED -- max frames try_spawn_bonus waits before
  * attempting a spawn once armed. */
 #define THROTTLE_BONUS_SEED 2000
@@ -450,11 +444,28 @@ static void test_spawn_throttle_expires_and_rearms(void **vstate)
 
     /* Tick past the recorded expiry frame -- try_spawn_bonus clears the
      * cell and drops bonus_block_active on the first tick where
-     * frame >= expiry_frame (src/game_rules.c:87-92). */
+     * frame >= expiry_frame (src/game_rules.c:87-92). Bound the loop at
+     * BLOCK_BONUS_LENGTH + margin: if a future regression restores
+     * BLOCK_INFINITE_DELAY (9999999) as the spawned lifetime, this loop
+     * must fail fast via the assertion below instead of spinning ~10M
+     * iterations. */
     int frame = (int)sdl2_state_frame(ctx->state);
-    for (int i = 0; i <= expiry_frame - frame + 1; i++)
-        throttle_tick(ctx);
+    int wait_needed = expiry_frame - frame + 2;
+    int wait_bound = BLOCK_BONUS_LENGTH + 200;
+    int wait_ticks = wait_needed < wait_bound ? wait_needed : wait_bound;
 
+    int cleared = 0;
+    for (int i = 0; i < wait_ticks; i++)
+    {
+        throttle_tick(ctx);
+        if (!block_system_is_occupied(ctx->block, spawn_row, spawn_col) && !ctx->bonus_block_active)
+        {
+            cleared = 1;
+            break;
+        }
+    }
+
+    assert_true(cleared);
     assert_false(block_system_is_occupied(ctx->block, spawn_row, spawn_col));
     assert_false(ctx->bonus_block_active);
 

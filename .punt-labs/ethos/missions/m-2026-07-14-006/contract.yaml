@@ -1,0 +1,31 @@
+mission_id: m-2026-07-14-006
+status: closed
+type: implement
+created_at: "2026-07-14T12:38:55Z"
+updated_at: "2026-07-14T12:47:22Z"
+closed_at: "2026-07-14T12:47:22Z"
+leader: claude
+worker: jdc
+evaluator:
+    handle: gjm
+    pinned_at: "2026-07-14T12:38:55Z"
+    hash: 7349512b3191332fef8a79f56caf962febc697b8444629912da4aa22b9b2efec
+inputs: {}
+write_set:
+    - src/game_rules.c
+    - tests/test_game_rules.c
+success_criteria:
+    - 'src/game_rules.c: remove the local `#define BONUS_LENGTH 1500` and use the existing shared constant BLOCK_BONUS_LENGTH (include/block_system.h:58, also 1500, already in scope via the block_system.h include) everywhere the code currently references BONUS_LENGTH. Single source of truth — avoids the two drifting apart. Keep the citation comment (original/include/blocks.h:73) near the use or on the BLOCK_BONUS_LENGTH definition if clearer. Addresses Copilot finding on PR #184.'
+    - 'tests/test_game_rules.c: cap the expiry-test loop (around line 456) so it cannot spin ~10M ticks if a future regression restores the infinite lifetime (BLOCK_INFINITE_DELAY=9999999). Instead of ticking blindly up to the block''s recorded last_frame, bound the loop to a sane maximum (e.g. BLOCK_BONUS_LENGTH plus a small margin) and assert the block was cleared within that bound — so a regression FAILS fast (assertion) rather than hanging. Preserve the test''s intent (special expires after BONUS_LENGTH). Addresses Copilot finding on PR #184.'
+    - cmake --build build zero-warning under -Werror -Wconversion -Wshadow; ctest --test-dir build -R test_game_rules green (debug); asan green. Only the two write_set files change. The three throttle regression tests still pass and still RED-prove against their mutants (behavior unchanged).
+budget:
+    rounds: 2
+    reflection_after_each: true
+current_round: 1
+context: |-
+    Two Copilot review findings on PR #184 (special-spawn throttle fix). Both
+    valid, both minor: (1) BONUS_LENGTH in game_rules.c duplicates the existing
+    BLOCK_BONUS_LENGTH=1500 in block_system.h (drift risk) — use the shared
+    constant; (2) the expiry test loops up to the block's last_frame, which would
+    be ~10M ticks if the infinite-lifetime bug ever regressed — cap it so the
+    test fails fast instead of hanging. No behavior change to the fix itself.
