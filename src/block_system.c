@@ -753,16 +753,26 @@ void block_system_update_movement(block_system_t *ctx, int frame,
                 continue;
             }
 
-            /* ROAMER_BLK: eye timer + move timer (original/blocks.c:1364-1421). */
+            /* ROAMER_BLK: eye timer + move timer (original/blocks.c:1364-1421).
+             * The original checks `== frame`; this port checks `frame >=`
+             * instead. Level-loaded blocks are added with a hardcoded
+             * frame=0 (game_callbacks.c, game_init.c), so a timer scheduled
+             * as next_frame = 0 + delay can land before the first update
+             * tick actually runs under the modern fixed-timestep loop,
+             * and an exact `==` match would then never fire. `>=` fires
+             * once on the first tick the schedule is due and each handler
+             * reschedules to a future frame before returning, so there is
+             * no double-fire. Matches the ball timer convention in
+             * ball_system.c (e.g. lines 405, 845, 890). */
             if (bp->block_type == ROAMER_BLK)
             {
-                if (bp->next_frame == frame)
+                if (frame >= bp->next_frame)
                 {
                     /* Eye timer fires: reroll gaze direction. */
                     bp->next_frame = frame + (rand() % BLOCK_ROAM_EYES_DELAY) + 50;
                     bp->bonus_slide = rand() % 5;
                 }
-                else if (bp->last_frame == frame)
+                else if (frame >= bp->last_frame)
                 {
                     /* Move timer fires: every firing attempts a real move
                      * (jck ruling, round 2 — original/blocks.c:1377 maps
@@ -821,16 +831,22 @@ void block_system_update_movement(block_system_t *ctx, int frame,
              * 1445).  The random flag is NEVER cleared here — it keeps
              * re-morphing forever until the block is destroyed, matching
              * the original which only ever touches blockType/bonusSlide/
-             * nextFrame inside this branch. */
-            if (bp->random && bp->next_frame == frame)
+             * nextFrame inside this branch. Checks `frame >=` rather than
+             * the original's `==`: level-loaded blocks start at hardcoded
+             * frame=0, so next_frame=1 can be skipped by an exact match
+             * once the update loop's frame counter is already past 1 —
+             * see the ROAMER_BLK comment above for the full rationale. */
+            if (bp->random && frame >= bp->next_frame)
             {
                 bp->block_type = get_random_block_type();
                 bp->bonus_slide = 0;
                 bp->next_frame = frame + (rand() % BLOCK_RANDOM_DELAY) + 300;
             }
 
-            /* DROP_BLK: single drop timer (original/blocks.c:1447-1474). */
-            if (bp->drop && bp->next_frame == frame)
+            /* DROP_BLK: single drop timer (original/blocks.c:1447-1474).
+             * `frame >=` rather than the original's `==` — same hardcoded
+             * frame=0 level-load hazard as ROAMER_BLK/RANDOM_BLK above. */
+            if (bp->drop && frame >= bp->next_frame)
             {
                 if (check_adjacent(ctx, r + 1, c, balls, nballs))
                 {

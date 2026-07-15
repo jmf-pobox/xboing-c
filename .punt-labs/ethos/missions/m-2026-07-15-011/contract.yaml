@@ -1,0 +1,35 @@
+mission_id: m-2026-07-15-011
+status: closed
+type: implement
+created_at: "2026-07-15T17:22:49Z"
+updated_at: "2026-07-15T17:55:20Z"
+closed_at: "2026-07-15T17:55:20Z"
+leader: claude
+worker: jdc
+evaluator:
+    handle: jck
+    pinned_at: "2026-07-15T17:22:49Z"
+    hash: 40cbe1204f644c77e6a26757a9b855e3298be267025e806d425bfdea99054f18
+inputs: {}
+write_set:
+    - src/block_system.c
+success_criteria:
+    - 'Fix a latent timing bug: block_system_update_movement gates the roamer eye timer (block_system.c:759), roamer move timer (:765), RANDOM morph (:825), and DROP move (:833) on `X == frame` (exact match, ported literally from the original). In the modern port this MISSES the trigger whenever the state frame does not land exactly on the scheduled value. It manifests badly for level-loaded RANDOM blocks: block_system_add is called at level load with a HARDCODED frame=0 (src/game_callbacks.c:862, src/game_init.c:1213), so a RANDOM block''s first morph is scheduled at next_frame=0+1=1, but the first block update runs at a state frame already > 1, so `1 == frame` never holds and the block never morphs (no reschedule). Roamers mostly work only because their initial windows are 50-1300 frames out.'
+    - Change all four checks from `X == frame` to `frame >= X` (i.e. `frame >= bp->next_frame` / `frame >= bp->last_frame`). This matches the modern port's documented skipped-frame-defense convention (ball_system.c:405, 845,890 use `env->frame >= b->nextFrame`; .claude/rules/tests.md notes ball transitions use >= not == "defensive against skipped frames"). On fire, each handler already reschedules next_frame/last_frame to a future frame, so `>=` fires exactly once then waits — no double-fire, and iteration-safety is preserved (a moved/morphed block's fresh future timer keeps frame >= X false for the rest of the tick).
+    - 'Verify the fix resolves the reported symptom by reasoning: a RANDOM block added at frame 0 (next_frame=1) now morphs on the first update where frame >= 1 (immediately), then reschedules to frame+rand%BLOCK_RANDOM_DELAY +300 and keeps morphing. Confirm roamer/drop still behave (they fire at or just after their scheduled frame, same or one tick later than before — imperceptible). Update the comments that cite the original''s == to note the modern >= adaptation and why (hardcoded frame=0 load path + fixed-timestep).'
+    - cmake --preset debug && cmake --build build zero-warning under -Werror -Wconversion -Wshadow. Full ctest --test-dir build green (the existing roamer/drop/random tests drive frames contiguously so they still pass; a sibling gjm mission adds a test that reproduces the load-at-frame-0/ update-later case). Only src/block_system.c changes.
+budget:
+    rounds: 2
+    reflection_after_each: true
+current_round: 1
+context: |-
+    Follow-up correctness fix on fix/audit-findings-batch. Maintainer could not
+    see RANDOM_BLK morphing in the real game. Root cause: level blocks are added
+    with a hardcoded frame=0, so a RANDOM block's first morph is scheduled at
+    next_frame=1, but the `== frame` check misses it (state frame is already past
+    1 when block updates run) and it never reschedules -> stuck static. The four
+    block-movement timers (roamer eye/move, random morph, drop) were ported with
+    the original's literal `== frame`; the modern fixed-timestep port must use
+    `>= frame` (its own convention, ball_system.c). jck approved the == earlier as
+    faithful, but it's a latent modern-frame-model bug; this corrects it. RANDOM
+    is the case that exposed it; roamers/drops get hardened too.
