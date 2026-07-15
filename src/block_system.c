@@ -633,10 +633,10 @@ void block_system_advance_animations(block_system_t *ctx, int frame)
                     bp->bonus_slide = (frame / BLOCK_EXTRABALL_DELAY) % 2;
                     break;
 
-                /* ROAMER_BLK's bonus_slide (eye direction) is driven by
-                 * the rand()-scheduled eye timer in
-                 * block_system_update_movement, not a deterministic
-                 * cycle — see original/blocks.c:1364-1373. */
+                    /* ROAMER_BLK's bonus_slide (eye direction) is driven by
+                     * the rand()-scheduled eye timer in
+                     * block_system_update_movement, not a deterministic
+                     * cycle — see original/blocks.c:1364-1373. */
 
                 default:
                     break;
