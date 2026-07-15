@@ -4173,8 +4173,9 @@ block but were dead state.
 rand-scheduled timers — an eye timer (`ROAM_EYES_DELAY=300`) that
 re-rolls the eye/direction, and a move timer (`ROAM_DELAY=1000`) that
 hops one cell in the current direction if the target passes the adjacency
-check (in bounds; empty; not exploding; off the bottom two rows; no ball
-in the cell), else waits. Drop blocks descend one row on a `DROP_DELAY`
+check (in bounds; empty; not exploding; off the bottom three rows
+(destination row r rejected when r+1 >= MAX_ROW-2); no ball in the
+cell), else waits. Drop blocks descend one row on a `DROP_DELAY`
 (1000) timer under the same check. A single forward scan with
 future-scheduled timers on relocated blocks guarantees a block moves at
 most once per tick.

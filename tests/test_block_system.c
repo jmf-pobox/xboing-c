@@ -767,8 +767,9 @@ static void test_drop_descends_and_blocked(void **state)
     block_system_destroy(ctx);
 }
 
-/* TC-40: A DROP_BLK whose destination row falls within the bottom two
- * rows (paddle clearance) never descends, even with a free cell below —
+/* TC-40: A DROP_BLK whose destination row falls within the bottom three
+ * rows (r >= MAX_ROW-3, i.e. 15-17; paddle clearance) never descends,
+ * even with a free cell below —
  * the (row + 1) >= MAX_ROW - 2 guard in check_adjacent() (where `row` is
  * the candidate destination row) rejects the move unconditionally.
  * MAX_ROW - 2 == 16, so a DROP_BLK at row 14 (destination row 15) is the

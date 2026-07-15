@@ -704,7 +704,9 @@ static int check_adjacent(const block_system_t *ctx, int row, int col,
         return 0;
     }
 
-    /* Keeps moving blocks out of the bottom two rows, off the paddle
+    /* Rejects a destination row r when (row + 1) >= MAX_ROW - 2, i.e.
+     * r >= MAX_ROW - 3 — the bottom three rows (15-17 when MAX_ROW=18) —
+     * keeping moving blocks clear of the paddle
      * (original/blocks.c:1236-1237). */
     if ((row + 1) >= (MAX_ROW - 2))
     {
