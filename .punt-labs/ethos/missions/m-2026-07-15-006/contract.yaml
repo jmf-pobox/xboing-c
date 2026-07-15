@@ -1,0 +1,34 @@
+mission_id: m-2026-07-15-006
+status: closed
+type: implement
+created_at: "2026-07-15T12:29:22Z"
+updated_at: "2026-07-15T12:34:38Z"
+closed_at: "2026-07-15T12:34:38Z"
+leader: claude
+worker: jdc
+evaluator:
+    handle: sjl
+    pinned_at: "2026-07-15T12:29:22Z"
+    hash: 6e9cff4a44bb5c1e609fa0325724f1fc68fa150978992c79738f868815a3f17f
+inputs: {}
+write_set:
+    - src/game_modes.c
+success_criteria:
+    - Fix the buzzer SFX trigger to match the original. REMOVE the spurious buzzer@70 played on new-game start (src/game_modes.c:192-193 in start_new_game) — the original's handleIntroKeys space->new-game path (original/main.c:534-552) plays NO sound. Maintainer confirmed the spurious buzzer by ear.
+    - 'ADD the real "time''s up" buzzer cue that is currently MISSING. The original plays buzzer@70 exactly ONCE, when the level time bonus decrements to 0 (original/level.c:132-149 DecLevelTimeBonus: `if (timeBonus == 0) playSoundFile("buzzer", 70)`). In the modern timer countdown (src/game_modes.c:351-362), after `ctx->time_remaining--`, play buzzer@70 when `ctx->time_remaining == 0` (guarded by `if (ctx->audio)` like other audio calls). It must fire only once (the decrement only reaches 0 once, and the `if (time_remaining > 0)` guard stops further decrements), not every tick. Cite original/level.c:143-147.'
+    - No other behavior change. Do not touch other sounds, the timer math, or non-buzzer logic. cmake --preset debug && cmake --build build zero-warning under -Werror -Wconversion -Wshadow; ctest --test-dir build stays green; only src/game_modes.c changes.
+budget:
+    rounds: 2
+    reflection_after_each: true
+current_round: 1
+context: |-
+    Third fix on the fix/audit-findings-batch branch (after BorderGlow and
+    roamer/drop). SFX-parity audit finding (docs/audits/2026-07-14-sfx-parity.md,
+    sjl-evaluated): the modern port plays buzzer@70 on every new-game start (an
+    event the original is silent for) and NEVER plays the original's real buzzer
+    cue — the level countdown timer hitting zero (original/level.c:143-147).
+    Maintainer confirmed the spurious new-game buzzer by ear. Two-part fix in one
+    file: remove the wrong trigger, add the missing one. sjl (SFX-mapping domain,
+    audited this) gates faithfulness. Audio triggers aren't in the unit-test
+    harness; maintainer verifies by ear. bomb-on-dynamite and Q-quit-sting are
+    separate SFX findings, deliberately OUT of scope here.

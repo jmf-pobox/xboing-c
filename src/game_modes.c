@@ -189,8 +189,8 @@ static bool start_new_game(game_ctx_t *ctx)
     ball_system_env_t env = game_callbacks_ball_env(ctx);
     ball_system_reset_start(ctx->ball, &env);
 
-    if (ctx->audio)
-        sdl2_audio_play_at_percent(ctx->audio, "buzzer", 70);
+    /* No sound on new-game start — the original is silent here
+     * (original/main.c:534-552). */
 
     return true;
 }
@@ -358,6 +358,9 @@ static void mode_game_update(sdl2_state_mode_t mode, void *ud)
         {
             ctx->timer_frame_acc -= ticks_per_sec;
             ctx->time_remaining--;
+            if (ctx->time_remaining == 0 && ctx->audio)
+                sdl2_audio_play_at_percent(ctx->audio, "buzzer",
+                                           70); /* time's up — original/level.c:143-147 */
         }
     }
 
