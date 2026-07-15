@@ -1,0 +1,33 @@
+mission_id: m-2026-07-15-008
+status: closed
+type: implement
+created_at: "2026-07-15T13:04:49Z"
+updated_at: "2026-07-15T13:12:43Z"
+closed_at: "2026-07-15T13:12:43Z"
+leader: claude
+worker: gjm
+evaluator:
+    handle: jdc
+    pinned_at: "2026-07-15T13:04:49Z"
+    hash: c08223356d3e6d5aed56e28da477a1aa2707509febfef7c5f62c25871a3e841f
+inputs: {}
+write_set:
+    - tests/test_block_system.c
+success_criteria:
+    - Add regression cases to tests/test_block_system.c pinning the RANDOM_BLK morph restored in mission m-2026-07-15-007. A RANDOM_BLK is converted on add to RED_BLK with random=1, next_frame=frame+1; the per-tick block_system_update_movement then morphs its block_type to a random real type (RED/BLUE/GREEN/TAN/YELLOW/PURPLE/BULLET — get_random_block_type, rand()%8) every ~300-800 frames (BLOCK_RANDOM_DELAY=500), keeping random=1 so it re-morphs forever. Seed rand deterministically (srand fixed).
+    - 'MORPHS: add a RANDOM_BLK, drive block_system_update_movement across enough frames for the first morph timer to fire, assert block_system_get_type at that cell became a real color/bullet type (in the get_random_block_type set) and is still occupied. (Before the fix it stayed static RED forever.)'
+    - 'KEEPS MORPHING: over a long run assert the cell''s block_type takes on >= 2 DISTINCT values (it re-morphs; random flag never clears). Assert on "changed at least twice / visited >=2 distinct types", not exact frames — robust to seed. block_system_get_random at the cell stays 1 throughout.'
+    - 'A NON-random block does NOT morph: add a normal RED_BLK (not RANDOM_BLK), drive the same frames, assert its type never changes.'
+    - Register new test function(s) in the existing tests[] runner (no tests/CMakeLists.txt change — already registered). ctest -R test_block_system green under debug AND asan. Deterministic seed; asan-clean; free fixtures. The morph tests must FAIL if block_system_update_movement's morph branch were reverted to a no-op (reason about it / do a scratch RED check).
+budget:
+    rounds: 2
+    reflection_after_each: true
+current_round: 1
+context: |-
+    Regression tests for the RANDOM_BLK ("?") morph restoration (mission
+    m-2026-07-15-007, jdc/jck-approved). Sibling to the roamer/drop tests
+    (TC-35..40) already in tests/test_block_system.c — reuse the same fixtures
+    and add-block helpers. The morph lives in block_system_update_movement
+    (src/block_system.c), the same function the roamer/drop tests drive.
+    get_random_block_type is static (not exported) — test the OBSERVABLE effect
+    (block_type changes over time) via block_system_get_type, not the helper.

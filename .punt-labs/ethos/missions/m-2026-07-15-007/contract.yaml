@@ -1,0 +1,36 @@
+mission_id: m-2026-07-15-007
+status: closed
+type: implement
+created_at: "2026-07-15T12:57:16Z"
+updated_at: "2026-07-15T13:04:24Z"
+closed_at: "2026-07-15T13:04:24Z"
+leader: claude
+worker: jdc
+evaluator:
+    handle: jck
+    pinned_at: "2026-07-15T12:57:16Z"
+    hash: 40cbe1204f644c77e6a26757a9b855e3298be267025e806d425bfdea99054f18
+inputs: {}
+write_set:
+    - src/block_system.c
+    - include/block_system.h
+success_criteria:
+    - 'Restore RANDOM_BLK ("?") morphing, missing from the modern port. On add, block_system_add already converts RANDOM_BLK to RED_BLK with random=1 and next_frame=frame+1 (block_system.c:455-459, matching original AddNewBlock), but nothing ever morphs it — so a "?" block is a static red block. Port the morph handler from original/blocks.c:1427-1445: when a block has random==1 and its morph timer fires, change block_type to a random real type and reschedule.'
+    - 'Morph handler (original/blocks.c:1427-1445): in the per-tick block update (add to block_system_update_movement, the function that already scans blocks for roamer/drop — the original does random-morph in the SAME HandlePendingAnimations loop right after the roamer case), for each block with bp->random: if the morph timer has fired (bp->next_frame reached), set bp->block_type = GetRandomType() (see below), bp->bonus_slide = 0, and reschedule bp->next_frame = frame + (rand() % RANDOM_DELAY) + 300. KEEP bp->random = 1 so it keeps re-morphing (the original does NOT clear it — blocks.c:1436 changes blockType only). RANDOM_DELAY=500 (original/include/ blocks.h:78; add BLOCK_RANDOM_DELAY in include/block_system.h, cite it).'
+    - 'GetRandomType port (original/blocks.c:1121-1165, called with blankBlock= False at blocks.c:1436): returns rand()%8 -> 0:RED_BLK, 1:BLUE_BLK, 2:GREEN_BLK, 3:TAN_BLK, 4:YELLOW_BLK, 5:PURPLE_BLK, 6:BULLET_BLK, 7:YELLOW_BLK (blankBlock=False so case 7 is YELLOW, not NONE). Add a small helper (e.g. static int get_random_block_type(void)) mirroring this exactly; the morph uses it. A "?" can legitimately become an ammo (BULLET) block — faithful.'
+    - 'Faithfulness (jck gate): a "?" block visibly CHANGES type/color periodically (~every 300-800 ticks) until destroyed, and when hit scores/behaves as its current type. It keeps morphing (never settles). The initial red appearance + near-immediate first morph (next_frame=frame+1) is preserved. Do NOT change other block types, point values, roamer/drop, or the mid-play spawner''s separate dynamite. Cite original lines in comments. Use rand() timers (seedable).'
+    - 'Watch interactions: confirm morphing a required color block to another required color type does not corrupt the required-block count / level- complete logic (both source and target are normal required colors, or bullet which the original also allows). Note any block_system invariant that reads block_type and could be surprised by it changing under it (e.g. explosions, still-active count) and confirm it stays correct.'
+    - cmake --preset debug && cmake --build build zero-warning under -Werror -Wconversion -Wshadow. Full ctest --test-dir build green. Only the two write_set files change. Do NOT write tests here (a sibling gjm mission adds them) — but build + existing suite must pass.
+budget:
+    rounds: 3
+    reflection_after_each: true
+current_round: 1
+context: |-
+    Fourth fix on fix/audit-findings-batch (after BorderGlow, roamer/drop,
+    buzzer). Sibling missing-mechanic to roamer/drop: the "?" (RANDOM_BLK) block
+    is supposed to periodically morph into a random block type
+    (original/blocks.c:1427-1445 via GetRandomType), but the modern port sets the
+    random flag and never acts on it, so "?" blocks are static red. Restore the
+    morph in the same per-tick handler (block_system_update_movement) added for
+    roamer/drop (ADR-070). Maintainer asked for it explicitly. jck (author) gates
+    faithfulness; a sibling gjm mission adds regression tests. RANDOM_DELAY=500.

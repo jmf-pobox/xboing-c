@@ -650,6 +650,36 @@ void block_system_advance_animations(block_system_t *ctx, int frame)
  * ========================================================================= */
 
 /*
+ * Port of GetRandomType(blankBlock=False) (original/blocks.c:1121-1165).
+ * Returns a random ordinary block type for RANDOM_BLK's morph cycle.
+ * Case 7 returns YELLOW_BLK rather than NONE_BLK because blankBlock is
+ * False here — a morphing "?" block never turns into empty space.
+ */
+static int get_random_block_type(void)
+{
+    switch (rand() % 8)
+    {
+        case 0:
+            return RED_BLK;
+        case 1:
+            return BLUE_BLK;
+        case 2:
+            return GREEN_BLK;
+        case 3:
+            return TAN_BLK;
+        case 4:
+            return YELLOW_BLK;
+        case 5:
+            return PURPLE_BLK;
+        case 6:
+            return BULLET_BLK;
+        case 7:
+        default:
+            return YELLOW_BLK;
+    }
+}
+
+/*
  * Port of CheckAdjacentBlocks() (original/blocks.c:1220-1256).  Returns
  * nonzero iff a ROAMER_BLK/DROP_BLK may move INTO (row, col): in bounds,
  * unoccupied, not exploding, at least two rows clear of the paddle, and
@@ -784,6 +814,19 @@ void block_system_update_movement(block_system_t *ctx, int frame,
                         bp->last_frame = frame + (rand() % BLOCK_ROAM_DELAY) + 300;
                     }
                 }
+            }
+
+            /* RANDOM_BLK morph: cycles the block's visible type on a
+             * timer, independent of block_type (original/blocks.c:1427-
+             * 1445).  The random flag is NEVER cleared here — it keeps
+             * re-morphing forever until the block is destroyed, matching
+             * the original which only ever touches blockType/bonusSlide/
+             * nextFrame inside this branch. */
+            if (bp->random && bp->next_frame == frame)
+            {
+                bp->block_type = get_random_block_type();
+                bp->bonus_slide = 0;
+                bp->next_frame = frame + (rand() % BLOCK_RANDOM_DELAY) + 300;
             }
 
             /* DROP_BLK: single drop timer (original/blocks.c:1447-1474). */

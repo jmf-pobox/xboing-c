@@ -1,0 +1,14 @@
+reflections:
+    - round: 1
+      created_at: "2026-07-15T13:04:23Z"
+      author: jck
+      converging: true
+      signals:
+        - 'get_random_block_type() matches GetRandomType(blankBlock=False): rand()%8 -> RED,BLUE,GREEN,TAN,YELLOW,PURPLE,BULLET,YELLOW (original/blocks.c:1121-1165).'
+        - 'Morph fires on bp->random && next_frame==frame: block_type=get_random_block_type(), bonus_slide=0, reschedule frame+rand%500+300; random NEVER cleared -> re-morphs forever (original/blocks.c:1428-1444).'
+        - BLOCK_RANDOM_DELAY=500 matches RANDOM_DELAY (original/include/blocks.h:78). Ordering roamer->random->drop matches original/blocks.c.
+        - 'Initial add unchanged: RANDOM_BLK->RED, random=1, next_frame=frame+1 (matches original AddNewBlock).'
+        - still_active reads block_type live, BULLET non-required in both trees — a morphing '?' transiently changing the required count is faithful 1996 behavior, not a bug.
+        - 'Scope clean: no point-value/other-block/roamer/drop/buzzer/dynamite changes; only src/block_system.c.'
+      recommendation: stop
+      reason: Faithful restoration of the RANDOM_BLK morph (original/blocks.c:1427-1445 + GetRandomType) — a '?' now changes color/type ~every 300-800 ticks (can become ammo), never settles, scores as current type. No deviation, no ADR needed. Approved.

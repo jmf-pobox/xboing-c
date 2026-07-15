@@ -795,6 +795,143 @@ static void test_drop_bottom_guard_blocks_move(void **state)
 }
 
 /* =========================================================================
+ * Group 12: RANDOM_BLK ("?") morph cycle (mission m-2026-07-15-007,
+ * original/blocks.c:1427-1445).  A RANDOM_BLK is converted on add to
+ * RED_BLK with random=1 and next_frame=frame+1; block_system_update_movement
+ * then re-rolls its visible block_type every ~300-800 frames
+ * (BLOCK_RANDOM_DELAY=500) forever, without ever clearing the random flag.
+ * ========================================================================= */
+
+/* A morph target is any of the ordinary block types get_random_block_type()
+ * can produce (original/blocks.c:1121-1165 GetRandomType(blankBlock=False)).
+ * BULLET_BLK included; NONE_BLK is never a target since blankBlock=False. */
+static int is_morph_target_type(int block_type)
+{
+    switch (block_type)
+    {
+        case RED_BLK:
+        case BLUE_BLK:
+        case GREEN_BLK:
+        case TAN_BLK:
+        case YELLOW_BLK:
+        case PURPLE_BLK:
+        case BULLET_BLK:
+            return 1;
+        default:
+            return 0;
+    }
+}
+
+/* TC-41: A RANDOM_BLK morphs to a different visible type at least once
+ * over a run long enough to cross the first morph window.  The add call
+ * itself sets block_type to RED_BLK, so we don't assert "!= RED" after
+ * a single step — we track every observed type across the run and
+ * require that something other than the immediate post-add RED_BLK was
+ * seen, proving the morph branch actually executed. */
+static void test_random_block_morphs(void **state)
+{
+    (void)state;
+    srand(555);
+    block_system_t *ctx = make_ctx();
+
+    const int r0 = 6;
+    const int c0 = 2;
+    block_system_add(ctx, r0, c0, RANDOM_BLK, 0, 0);
+    assert_int_equal(block_system_get_type(ctx, r0, c0), RED_BLK);
+
+    int saw_other_type = 0;
+    for (int frame = 1; frame <= 2000; frame++)
+    {
+        block_system_update_movement(ctx, frame, NULL, 0);
+
+        int t = block_system_get_type(ctx, r0, c0);
+        assert_int_equal(block_system_is_occupied(ctx, r0, c0), 1);
+        assert_true(is_morph_target_type(t));
+
+        if (t != RED_BLK)
+        {
+            saw_other_type = 1;
+        }
+    }
+
+    assert_int_equal(saw_other_type, 1);
+
+    block_system_destroy(ctx);
+}
+
+/* TC-42: A RANDOM_BLK keeps morphing across many windows — at least two
+ * distinct block_type values are observed over a long run — and the
+ * random flag stays set (1) the entire time, never cleared. */
+static void test_random_block_keeps_morphing(void **state)
+{
+    (void)state;
+    srand(777);
+    block_system_t *ctx = make_ctx();
+
+    const int r0 = 10;
+    const int c0 = 6;
+    block_system_add(ctx, r0, c0, RANDOM_BLK, 0, 0);
+
+    int distinct_types[8];
+    int distinct_count = 0;
+    int last_type = block_system_get_type(ctx, r0, c0);
+    distinct_types[distinct_count++] = last_type;
+
+    for (int frame = 1; frame <= 8000; frame++)
+    {
+        block_system_update_movement(ctx, frame, NULL, 0);
+
+        assert_int_equal(block_system_get_random(ctx, r0, c0), 1);
+
+        int t = block_system_get_type(ctx, r0, c0);
+        if (t != last_type)
+        {
+            int known = 0;
+            for (int i = 0; i < distinct_count; i++)
+            {
+                if (distinct_types[i] == t)
+                {
+                    known = 1;
+                    break;
+                }
+            }
+            if (!known && distinct_count < 8)
+            {
+                distinct_types[distinct_count++] = t;
+            }
+            last_type = t;
+        }
+    }
+
+    assert_true(distinct_count >= 2);
+
+    block_system_destroy(ctx);
+}
+
+/* TC-43: An ordinary (non-RANDOM) block never morphs, however long the
+ * grid is driven — the random flag is 0 and block_type never changes. */
+static void test_non_random_block_never_morphs(void **state)
+{
+    (void)state;
+    srand(999);
+    block_system_t *ctx = make_ctx();
+
+    const int r0 = 4;
+    const int c0 = 7;
+    block_system_add(ctx, r0, c0, RED_BLK, 0, 0);
+    assert_int_equal(block_system_get_random(ctx, r0, c0), 0);
+
+    for (int frame = 1; frame <= 8000; frame++)
+    {
+        block_system_update_movement(ctx, frame, NULL, 0);
+        assert_int_equal(block_system_get_type(ctx, r0, c0), RED_BLK);
+        assert_int_equal(block_system_get_random(ctx, r0, c0), 0);
+    }
+
+    block_system_destroy(ctx);
+}
+
+/* =========================================================================
  * Test runner
  * ========================================================================= */
 
@@ -856,6 +993,11 @@ int main(void)
         cmocka_unit_test(test_roamer_moves_repeatedly),
         cmocka_unit_test(test_drop_descends_and_blocked),
         cmocka_unit_test(test_drop_bottom_guard_blocks_move),
+
+        /* Group 12: RANDOM_BLK morph cycle */
+        cmocka_unit_test(test_random_block_morphs),
+        cmocka_unit_test(test_random_block_keeps_morphing),
+        cmocka_unit_test(test_non_random_block_never_morphs),
     };
 
     return cmocka_run_group_tests(tests, NULL, NULL);
