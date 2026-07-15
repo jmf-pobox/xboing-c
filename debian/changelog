@@ -1,3 +1,25 @@
+xboing (1.0.9-1) unstable; urgency=medium
+
+  * Restore several 1996 block behaviours that were missing or wrong in the
+    SDL2 port:
+    - Roamer and drop blocks move across the grid again — roamers wander to
+      adjacent empty cells and drops descend, instead of only animating in
+      place. (ADR-070.)
+    - RANDOM ("?") blocks cycle through block types again instead of sitting
+      frozen. The per-block movement/morph timers now fire reliably under
+      the modern fixed-timestep loop (they were keyed on an exact frame
+      match that a level-loaded block could skip).
+    - A roamer, drop, or RANDOM block that is mid-explosion is no longer
+      relocated or morphed by the movement pass, which could abort the
+      explosion's scoring.
+  * Fix the play-area border: the red/green pulse belongs to the attract
+    screens only. In-game the border is a steady red, turning green while
+    the walls-off special is active, matching the original.
+  * Fix the buzzer sounding on new-game start; it now plays only when the
+    level time bonus runs out, as in the original.
+
+ -- J Freeman <jmf@pobox.com>  Wed, 15 Jul 2026 14:15:00 -0700
+
 xboing (1.0.8-1) unstable; urgency=medium
 
   * Fix level 1 (and every level) playing far harder than the 1996 original:
