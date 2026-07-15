@@ -931,6 +931,76 @@ static void test_non_random_block_never_morphs(void **state)
     block_system_destroy(ctx);
 }
 
+/* TC-44: A RANDOM_BLK added exactly as level load does — hardcoded
+ * frame=0, so next_frame = 0 + 1 = 1 — still morphs when the update loop
+ * starts well past that first scheduled frame.  This reproduces the real
+ * game's gap: level load always passes frame=0 to block_system_add, but
+ * by the time block_system_update_movement first runs, the game's state
+ * frame counter is already past 1.  Under the old `bp->next_frame ==
+ * frame` gate this exact-match is skipped forever and the block stays
+ * static RED_BLK.  Starting the loop at frame=100 (not contiguously from
+ * 0) is the whole point of this test — TC-41/42 drive frames 1,2,3,...
+ * contiguously from the add and would pass under == by accident. */
+static void test_random_block_morphs_when_loaded_at_frame0(void **state)
+{
+    (void)state;
+    srand(4242);
+    block_system_t *ctx = make_ctx();
+
+    const int r0 = 9;
+    const int c0 = 5;
+
+    /* Mirror level load exactly: frame=0 hardcoded regardless of the
+     * game's actual current frame. */
+    block_system_add(ctx, r0, c0, RANDOM_BLK, 0, 0);
+    assert_int_equal(block_system_get_type(ctx, r0, c0), RED_BLK);
+    assert_int_equal(block_system_get_random(ctx, r0, c0), 1);
+
+    int distinct_types[8];
+    int distinct_count = 0;
+    int last_type = block_system_get_type(ctx, r0, c0);
+    distinct_types[distinct_count++] = last_type;
+
+    /* Start well past the block's initial next_frame (1) — the gap the
+     * real game exhibits between level load and the first update tick. */
+    for (int frame = 100; frame <= 8100; frame++)
+    {
+        block_system_update_movement(ctx, frame, NULL, 0);
+
+        assert_int_equal(block_system_is_occupied(ctx, r0, c0), 1);
+        assert_int_equal(block_system_get_random(ctx, r0, c0), 1);
+
+        int t = block_system_get_type(ctx, r0, c0);
+        assert_true(is_morph_target_type(t));
+
+        if (t != last_type)
+        {
+            int known = 0;
+            for (int i = 0; i < distinct_count; i++)
+            {
+                if (distinct_types[i] == t)
+                {
+                    known = 1;
+                    break;
+                }
+            }
+            if (!known && distinct_count < 8)
+            {
+                distinct_types[distinct_count++] = t;
+            }
+            last_type = t;
+        }
+    }
+
+    /* Under the bug (`== frame`), next_frame=1 never matches frame>=100
+     * and this stays at 1 (only the post-add RED_BLK seen).  The fix
+     * (`>= frame`) catches up on the very first update call and keeps
+     * re-morphing, so at least two distinct types are observed. */
+    assert_true(distinct_count >= 2);
+
+    block_system_destroy(ctx);
+}
+
 /* =========================================================================
  * Test runner
  * ========================================================================= */
@@ -998,6 +1068,7 @@ int main(void)
         cmocka_unit_test(test_random_block_morphs),
         cmocka_unit_test(test_random_block_keeps_morphing),
         cmocka_unit_test(test_non_random_block_never_morphs),
+        cmocka_unit_test(test_random_block_morphs_when_loaded_at_frame0),
     };
 
     return cmocka_run_group_tests(tests, NULL, NULL);

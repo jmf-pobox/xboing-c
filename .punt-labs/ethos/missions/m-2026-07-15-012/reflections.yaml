@@ -1,0 +1,15 @@
+reflections:
+    - round: 1
+      created_at: "2026-07-15T20:14:27Z"
+      author: jdc
+      converging: true
+      signals:
+        - 'Non-contiguous & discriminating: TC-44 adds RANDOM_BLK via block_system_add(ctx, r0, c0, RANDOM_BLK, 0, 0) — frame=0, matching the exact level-load call sites (game_callbacks.c:862, game_init.c:1213, both hardcode frame=0). This sets bp->next_frame = frame + 1 = 1 (src/block_system.c:459). The update loop begins at frame=100 (not 0 or 1), so it is genuinely non-contiguous with the add and reproduces the real-game gap between level load (frame=0) and the first update tick (frame well past 1).'
+        - 'RED-proof performed live, not reasoned about: reverted src/block_system.c:839 from `bp->random && frame >= bp->next_frame` to `bp->random && bp->next_frame == frame`, rebuilt test_block_system (debug preset), ran ctest -R test_block_system. Result: test_random_block_morphs_when_loaded_at_frame0 FAILS with ''distinct_count >= 2 is not true'' at tests/test_block_system.c:999 (block stuck at RED_BLK, only 1 distinct type observed), while test_random_block_morphs (TC-41), test_random_block_keeps_morphing (TC-42), and test_non_random_block_never_morphs (TC-43) all still PASS. This is exactly the predicted differential — confirms TC-44 is the discriminating test the others are not.'
+        - 'Fix restored byte-for-byte: `git diff --stat src/block_system.c` after restoring the `>=` gate produces no output — file is identical to HEAD. src/block_system.c is outside this mission''s write_set and is confirmed unmodified in the final state.'
+        - 'Robustness: srand(4242) deterministic; assertions are on invariants (is_morph_target_type(t), distinct_count >= 2) not exact frames; block_system_destroy(ctx) called; registered via cmocka_unit_test(test_random_block_morphs_when_loaded_at_frame0) in tests[] (no CMakeLists.txt change, per contract).'
+        - 'Scope: `git status --short -- tests/ src/` shows only tests/test_block_system.c modified (+71 lines, 0 removed) — no other file in tests/ or src/ touched.'
+        - 'Both presets green: ctest --test-dir build -R test_block_system → 3/3 passed (debug, with fix). ctest --test-dir build-asan -R test_block_system → 3/3 passed (asan, with fix).'
+        - Optional ROAMER/DROP non-contiguous guard (criterion 3, marked optional/skippable) was not added. Contract explicitly allows skipping it ('skip if it complicates the seed logic') — not a blocker.
+      recommendation: stop
+      reason: 'All mandatory success criteria met and independently verified: TC-44 is non-contiguous and discriminating by construction (frame=0 add / next_frame=1 / update starts at frame=100), the RED-proof was executed (not just reasoned about) and produced the exact predicted failure while TC-41/42/43 stayed green, the fix was restored byte-identical to HEAD, and both debug and asan presets pass. The optional ROAMER/DROP guard was explicitly optional and its omission does not block close.'

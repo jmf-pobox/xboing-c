@@ -1,0 +1,35 @@
+mission_id: m-2026-07-15-012
+status: closed
+type: implement
+created_at: "2026-07-15T20:09:49Z"
+updated_at: "2026-07-15T20:14:47Z"
+closed_at: "2026-07-15T20:14:47Z"
+leader: claude
+worker: gjm
+evaluator:
+    handle: jdc
+    pinned_at: "2026-07-15T20:09:49Z"
+    hash: c08223356d3e6d5aed56e28da477a1aa2707509febfef7c5f62c25871a3e841f
+inputs: {}
+write_set:
+    - tests/test_block_system.c
+success_criteria:
+    - Add regression case(s) to tests/test_block_system.c that reproduce the load-at-frame-0/update-later bug fixed in mission m-2026-07-15-011 (the == frame -> frame >= X change). The existing roamer/drop/random tests (TC-35 ..TC-43) all add a block and then drive block_system_update_movement with frames CONTIGUOUS from the add, so exact == matched and they never caught the bug. The new test must NOT drive contiguously from the add.
+    - 'RANDOM non-contiguous case: add a RANDOM_BLK via block_system_add with frame=0 (exactly how level load calls it — game_callbacks.c:862/game_init.c :1213 pass 0), which schedules next_frame=1. Then drive block_system_update_movement starting at a frame ALREADY PAST 1 (e.g. begin the loop at frame=100 and increment), simulating the real game where the state frame is well past 1 by the first block update. Assert the block still MORPHS (block_type changes to a valid morph target and keeps changing over the run). With the old `== frame` this would stay stuck at RED forever; with the `>= frame` fix it morphs on the first update where frame>=1. This is the discriminating test.'
+    - If practical/cheap, add the same non-contiguous guard for a level-loaded ROAMER or DROP (add at frame=0, update starting well past its initial window, assert it still eventually fires/moves) — optional but nice; skip if it complicates the seed logic.
+    - 'Register in the existing tests[] runner (no tests/CMakeLists.txt change). Deterministic srand; assert on invariants (morphed / >=2 distinct types), not exact frames; asan-clean; free fixtures. RED-prove: reverting the fix (frame >= bp->next_frame -> bp->next_frame == frame) must make this new test FAIL while the old contiguous tests still pass — reason about it or do a scratch check.'
+    - ctest --test-dir build -R test_block_system green under debug AND asan. Only tests/test_block_system.c changes.
+budget:
+    rounds: 2
+    reflection_after_each: true
+current_round: 1
+context: |-
+    Pin the ==->>= block-timer fix (mission m-2026-07-15-011). Root cause the
+    existing tests missed: level blocks are added with a hardcoded frame=0, so a
+    RANDOM block's first morph is at next_frame=1; under the old `== frame` the
+    real game's state frame was already past 1 at the first block update, so it
+    never matched and the block stayed static. The existing TC-41/42 drove frames
+    contiguously from the add (frame 0,1,2...) so == matched frame 1 and they
+    passed despite the bug. The new test must start the update loop at a frame
+    well past the block's initial next_frame to reproduce the real-game gap.
+    block_system_update_movement(ctx, frame, balls, nballs) in src/block_system.c.
