@@ -1,0 +1,27 @@
+reflections:
+    - round: 1
+      created_at: "2026-07-15T04:22:37Z"
+      author: jck
+      converging: true
+      signals:
+        - 'Adjacency check MATCH (original/blocks.c:1220-1256): bounds, !occupied, !exploding, (r+1)<MAX_ROW-2, no-ball-in-cell via X2COL/Y2ROW; ball .active semantics identical.'
+        - 'Roamer cadence MATCH: eye frame+rand%300+50, move-fail reschedule frame+rand%1000+300 (blocks.c:1371,1418).'
+        - 'Drop cadence MATCH: success frame+rand%1000+200, fixed fail frame+1000 (blocks.c:1459,1471).'
+        - 'Iteration safety MATCH: implicit min-offset timer guard prevents double-move, same mechanism as original; no explicit flag needed.'
+        - 'Scope CLEAN: rand() not frame%N; RANDOM_BLK untouched; no point-value or other-block changes.'
+        - 'RULING: original d=bonusSlide+1 stale-fallthrough at d==5 is an unintentional C scoping bug (r1/c1 declared once at function scope) — correctly NOT reproduced. BUT jdc''s 0/4=no-move drops ~1/5 of move-timer firings (~20% less wander on level 3''s 9 roamers), a perceptible pacing regression. Original effectively attempts a move every firing.'
+      recommendation: continue
+      reason: 'Everything except the direction mapping is faithful and approved. Round 2: make every move-timer firing attempt a real move (no silent no-op), keeping the clean order-independent mapping (no shared stale r1/c1). Map the 5 rolled eye values to directions matching the original''s bonusSlide directions — 0=LEFT(0,-1), 1=RIGHT(0,+1), 2=UP(-1,0), 3=DOWN(+1,0) — and wrap 4→LEFT (same as 0) to replace the stale-variable case deterministically. Document the deviation (dropped-bug + frequency-preserving wrap) in a code comment and an ADR in docs/DESIGN.md.'
+    - round: 2
+      created_at: "2026-07-15T04:30:58Z"
+      author: jck
+      converging: true
+      signals:
+        - 'Direction map MATCH: bonus_slide 0-4 -> L,R,U,D,L-wrap; 0-3 identical to original/blocks.c:1377-1399; 4 wraps to L not the stale r1/c1 fallthrough. No no-move branch reachable.'
+        - 'Move frequency preserved: every move-timer firing attempts a real move — fixes the round-1 ~20% wander deficit.'
+        - Blocked-roamer wait unchanged (check_adjacent + reschedule frame+rand%ROAM_DELAY+300).
+        - Eye sprite rand()%5 on eye timer, consumed later by move switch — faithful to blocks.c:1372,1377.
+        - 'Round-1 approvals unchanged: adjacency, cadences, iteration safety, seam.'
+        - 'Outstanding non-blocking: docs/DESIGN.md ADR (round-1 ask) to be added by leader before PR Gate 7; build/tests to be confirmed by leader/CI.'
+      recommendation: stop
+      reason: Round-2 direction mapping is faithful and preserves move frequency without reproducing the stale-variable bug; all round-1 findings satisfied. Approved pending the leader adding the ADR and confirming build/CI green.

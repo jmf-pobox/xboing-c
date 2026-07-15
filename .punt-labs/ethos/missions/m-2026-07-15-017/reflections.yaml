@@ -1,0 +1,12 @@
+reflections:
+    - round: 1
+      created_at: "2026-07-15T21:02:09Z"
+      author: jck
+      converging: true
+      signals:
+        - All three sites reworded 'bottom two rows' -> 'bottom three rows (15-17 with MAX_ROW=18)'; guard (row+1) >= (MAX_ROW-2) byte-identical to original/blocks.c:1236 — code faithful, only prose corrected.
+        - 'PROSE ONLY: no code/asserts/guard changed in src/block_system.c, tests/test_block_system.c, or docs/DESIGN.md.'
+        - 'New wording accurate: rejects r when r+1 >= MAX_ROW-2, i.e. r >= MAX_ROW-3 = rows 15,16,17. Citations to original/blocks.c:1236-1237 preserved.'
+        - Verified via Read of the three cited ranges + repo-wide grep for the stale phrase (zero hits in src/tests/docs). No Bash in evaluator role; narrow 3-file write_set.
+      recommendation: stop
+      reason: Documentation-accuracy fix only. The adjacency guard is unchanged and faithful to the original; the prose now correctly describes it (bottom three rows / r >= MAX_ROW-3). Approved.

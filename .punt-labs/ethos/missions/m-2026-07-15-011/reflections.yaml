@@ -1,0 +1,13 @@
+reflections:
+    - round: 1
+      created_at: "2026-07-15T17:55:11Z"
+      author: jck
+      converging: true
+      signals:
+        - 'All four gates now frame >= X: roamer eye (769), roamer move else-if (775), RANDOM morph (839), DROP (849); no stray == frame (only in a provenance comment). Roamer if/else-if eye-priority preserved (matches original/blocks.c:1365,1374).'
+        - 'No double-fire: each handler reschedules to a strictly future frame on fire (roamer eye +rand%300+50, move-fail +rand%1000+300, RANDOM +rand%500+300, drop-fail +DROP_DELAY); >= fires once then waits.'
+        - 'RANDOM bug real+fixed: level-load hardcoded frame=0 (game_callbacks.c:862, game_init.c:1213) -> next_frame=1 unreachable by == once state frame>1; >= fires on first update and re-morphs.'
+        - 'Feel preserved: contiguous-frame case >= and == agree at the scheduled frame; only delta is the previously-broken skipped-exact-frame case now firing one tick later instead of never. Matches ball_system.c:405,845,890 precedent.'
+        - Comments updated with citations (original/blocks.c, game_callbacks.c:862, game_init.c:1213, ball_system.c). Only src/block_system.c; jdc reports build zero-warning + ctest 61/61.
+      recommendation: stop
+      reason: 'Faithful modern-constraint adaptation (==->>=): fixes the RANDOM-block stall caused by the hardcoded frame=0 load path under the fixed-timestep loop, aligns with the port''s own ball_system convention, preserves roamer/drop cadence + eye/move priority. Approved.'

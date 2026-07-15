@@ -1,0 +1,49 @@
+results:
+    - mission: m-2026-07-15-016
+      round: 1
+      created_at: "2026-07-15T20:50:10Z"
+      author: gjm
+      verdict: pass
+      confidence: 0.95
+      files_changed:
+        - path: tests/test_block_system.c
+          added: 99
+          removed: 0
+      evidence:
+        - name: 'RED-proof: guard removed (src/block_system.c `if (bp->exploding) continue;` -> `if (0 && bp->exploding) continue;`), rebuilt, ctest -R test_block_system -- both new tests fail: test_exploding_random_block_not_morphed_or_cleared fails at tests/test_block_system.c:1053 (1 != 0, block_type morphed away from RED_BLK under explosion); test_exploding_roamer_block_not_moved_or_cleared fails at tests/test_block_system.c:1092 (0 != 1, blocks_exploding dropped from 1 to 0 after an un-guarded successful move called clear_entry)'
+          status: pass
+        - name: src/block_system.c restored byte-for-byte (git checkout --); git diff --stat src/block_system.c empty
+          status: pass
+        - name: cmake --build build --target test_block_system && ctest --test-dir build -R test_block_system --output-on-failure
+          status: pass
+        - name: cmake --build build-asan --target test_block_system && ctest --test-dir build-asan -R test_block_system --output-on-failure (ASan+UBSan clean)
+          status: pass
+        - name: git status --porcelain -- tests/test_block_system.c src/block_system.c -- only tests/test_block_system.c modified
+          status: pass
+      prose: |
+        Added Group 13 to tests/test_block_system.c: two regression tests for
+        the `if (bp->exploding) continue;` guard jdc added to
+        block_system_update_movement (src/block_system.c:763).
+
+        test_exploding_random_block_not_morphed_or_cleared: adds a RANDOM_BLK
+        with frame=0 (morph timer due at frame 1), arms its explosion via the
+        public block_system_explode, then calls block_system_update_movement
+        at frame=100 (well past the due timer). Asserts blocks_exploding count,
+        occupancy, and block_type are all unchanged, and render_info.exploding
+        is still 1.
+
+        test_exploding_roamer_block_not_moved_or_cleared: adds a ROAMER_BLK at
+        an interior cell with all four neighbors free (same seed/cell/bound as
+        the existing passing test_roamer_moves_to_free_neighbor, which proves
+        this exact setup relocates within 3000 frames when NOT exploding), arms
+        its explosion, then drives block_system_update_movement for 3000 frames
+        asserting every tick that blocks_exploding, occupancy, and block_type
+        never change.
+
+        RED-proof: with the guard replaced by `if (0 && bp->exploding)`
+        (functionally removed, no unused-variable/-Werror fallout), both new
+        tests fail exactly as predicted -- the RANDOM_BLK's type morphs away
+        from RED_BLK, and the ROAMER_BLK's blocks_exploding count drops from 1
+        to 0 (clear_entry fired on an un-guarded successful move). Restored
+        src/block_system.c via `git checkout --`; diff is empty. Guard back in
+        place, both tests pass green under debug ctest and ASan+UBSan ctest.

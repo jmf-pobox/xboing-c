@@ -4148,3 +4148,58 @@ unhit — level 1 plays as designed. Regression tests
 guard, each RED-proven against the corresponding mutant. This supersedes
 the initial "specials: MATCH" line in the 2026-07-13 gameplay-logic
 audit, which examined the special *flags* and missed the spawn throttle.
+
+## ADR-070: Roamer and drop blocks move; direction mapping drops a 1996 bug
+
+**Status:** Accepted (2026-07-15)
+
+The maintainer verified that `ROAMER_BLK` and `DROP_BLK` blocks never
+moved in the modern port — a roamer only blinked its eyes in place, and
+drop blocks never descended, even with a free adjacent cell (confirmed
+by editing a level to isolate a roamer with space). The 1996 original
+moves them: roamers wander to adjacent empty cells and drop blocks fall
+one row at a time.
+
+**Root cause.** `block_system_advance_animations` only computed a sprite
+frame for `ROAMER_BLK` and had no `DROP_BLK` case; the whole movement
+handler from `original/blocks.c` (`HandlePendingAnimations`, roamer
+`:1364-1421`, drop `:1448-1474`, `CheckAdjacentBlocks` `:1220-1256`) was
+never ported. The `next_frame`/`last_frame`/`drop` fields existed on each
+block but were dead state.
+
+**Decision.** Port the movement handler faithfully into a new
+`block_system_update_movement`, called once per tick from
+`mode_game_update` with the live ball positions. A roamer runs two
+rand-scheduled timers — an eye timer (`ROAM_EYES_DELAY=300`) that
+re-rolls the eye/direction, and a move timer (`ROAM_DELAY=1000`) that
+hops one cell in the current direction if the target passes the adjacency
+check (in bounds; empty; not exploding; off the bottom three rows
+(destination row r rejected when r+1 >= MAX_ROW-2); no ball in the
+cell), else waits. Drop blocks descend one row on a `DROP_DELAY`
+(1000) timer under the same check. A single forward scan with
+future-scheduled timers on relocated blocks guarantees a block moves at
+most once per tick.
+
+**Deliberate deviation from the original.** The 1996 move-direction line
+is `d = bonusSlide + 1` (`original/blocks.c:1377`); `bonusSlide == 4`
+produces `d == 5`, which falls through the `switch` to a `default` that
+leaves the direction offsets `r1`/`c1` at **stale values from a
+previously-processed block** (they are declared once at function scope).
+That is an accidental C scoping bug — scan-order-dependent, effectively
+undefined — not a design choice, so it is **not reproduced**. Instead the
+five rolled values map to real directions: `0→left, 1→right, 2→up,
+3→down` (matching the original for `0-3`) and `4→left` (wrapped onto `0`).
+This preserves the original's key property — **every move-timer firing
+attempts a real move** (an earlier cut that treated the neutral value as
+"no move" cut roamer mobility ~20% on dense levels, which the author
+rejected as a perceptible pacing regression) — while dropping the
+undefined stale-variable behavior. The eye-sprite/move-direction
+one-frame offset in the original is not preserved bit-for-bit: the eye
+frame re-rolls far more often than the move timer fires, so the
+correlation is imperceptible in play (author's ruling).
+
+**Consequences:** roamers wander and drops descend on ~15 levels that use
+them, restoring the intended difficulty; both stay off the bottom two
+rows and never spawn onto a ball. jck (author) approved the port and the
+direction-mapping deviation as faithful-in-spirit. Regression tests pin
+the movement, the adjacency constraints, and the blocked-waits behavior.

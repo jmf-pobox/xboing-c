@@ -564,6 +564,541 @@ static void test_savegame_accessors_unoccupied(void **state)
 }
 
 /* =========================================================================
+ * Group 11: ROAMER_BLK / DROP_BLK movement (mission m-2026-07-15-003,
+ * ADR-070).  Ports original/blocks.c:1364-1421 (ROAMER_BLK eye + move
+ * timers) and :1447-1474 (DROP_BLK drop timer), gated by the adjacency
+ * check at :1220-1256 (CheckAdjacentBlocks).
+ * ========================================================================= */
+
+/* Scan the grid for a ROAMER_BLK cell.  Returns 1 and writes the position
+ * to *out_r and *out_c if found, 0 if the grid has no ROAMER_BLK left. */
+static int find_roamer(const block_system_t *ctx, int *out_r, int *out_c)
+{
+    for (int r = 0; r < MAX_ROW; r++)
+    {
+        for (int c = 0; c < MAX_COL; c++)
+        {
+            if (block_system_get_type(ctx, r, c) == ROAMER_BLK)
+            {
+                *out_r = r;
+                *out_c = c;
+                return 1;
+            }
+        }
+    }
+    return 0;
+}
+
+/* TC-35: A lone ROAMER_BLK with all four neighbors free relocates to an
+ * orthogonal neighbor within a bounded number of frames. */
+static void test_roamer_moves_to_free_neighbor(void **state)
+{
+    (void)state;
+    srand(12345);
+    block_system_t *ctx = make_ctx();
+
+    const int r0 = 8;
+    const int c0 = 4;
+    block_system_add(ctx, r0, c0, ROAMER_BLK, 0, 0);
+
+    int moved = 0;
+    int new_r = -1;
+    int new_c = -1;
+    for (int frame = 1; frame <= 3000 && !moved; frame++)
+    {
+        block_system_update_movement(ctx, frame, NULL, 0);
+
+        if (block_system_get_type(ctx, r0, c0) != ROAMER_BLK)
+        {
+            moved = 1;
+            assert_int_equal(find_roamer(ctx, &new_r, &new_c), 1);
+        }
+    }
+
+    assert_int_equal(moved, 1);
+
+    /* Moved to an orthogonal (4-connected) neighbor, not a diagonal or a
+     * multi-cell jump. */
+    int dr = abs(new_r - r0);
+    int dc = abs(new_c - c0);
+    assert_true((dr == 1 && dc == 0) || (dr == 0 && dc == 1));
+
+    /* Original cell vacated. */
+    assert_int_equal(block_system_is_occupied(ctx, r0, c0), 0);
+
+    block_system_destroy(ctx);
+}
+
+/* TC-36: A ROAMER_BLK boxed in on all four orthogonal sides never leaves
+ * its cell, however many move-timer windows elapse.  Also exercises the
+ * grid-edge (out-of-bounds) rejection: the roamer sits at (0, 0) where
+ * left/up are out of bounds and right/down are occupied, so all four
+ * candidate directions are rejected — the two edge sides as off-grid, the
+ * two interior sides as filled. */
+static void test_roamer_boxed_in_never_moves(void **state)
+{
+    (void)state;
+    srand(2468);
+    block_system_t *ctx = make_ctx();
+
+    block_system_add(ctx, 0, 0, ROAMER_BLK, 0, 0);
+    block_system_add(ctx, 0, 1, RED_BLK, 0, 0); /* right neighbor: occupied */
+    block_system_add(ctx, 1, 0, RED_BLK, 0, 0); /* down neighbor: occupied */
+    /* Left/up are out of bounds — no block needed to reject them. */
+
+    for (int frame = 1; frame <= 5000; frame++)
+    {
+        block_system_update_movement(ctx, frame, NULL, 0);
+        assert_int_equal(block_system_get_type(ctx, 0, 0), ROAMER_BLK);
+    }
+
+    block_system_destroy(ctx);
+}
+
+/* TC-37: A ROAMER_BLK with exactly one free orthogonal neighbor, and a
+ * ball occupying that neighbor's grid cell, never moves — the ball
+ * adjacency check in check_adjacent() rejects the only otherwise-legal
+ * destination.  Coordinate mapping matches check_adjacent(): ball_col =
+ * x / col_width, ball_row = y / row_height (original/blocks.c:179-180
+ * X2COL/Y2ROW), so a ball at (col * COL_WIDTH, row * ROW_HEIGHT) maps
+ * exactly to grid cell (row, col). */
+static void test_roamer_blocked_by_ball_in_only_free_cell(void **state)
+{
+    (void)state;
+    srand(13579);
+    block_system_t *ctx = make_ctx();
+
+    const int r0 = 8;
+    const int c0 = 4;
+    block_system_add(ctx, r0, c0, ROAMER_BLK, 0, 0);
+    block_system_add(ctx, r0 - 1, c0, RED_BLK, 0, 0); /* up: occupied */
+    block_system_add(ctx, r0 + 1, c0, RED_BLK, 0, 0); /* down: occupied */
+    block_system_add(ctx, r0, c0 - 1, RED_BLK, 0, 0); /* left: occupied */
+    /* right (r0, c0 + 1) is the only free neighbor. */
+
+    block_system_ball_pos_t balls[1];
+    balls[0].active = 1;
+    balls[0].x = (c0 + 1) * COL_WIDTH;
+    balls[0].y = r0 * ROW_HEIGHT;
+
+    for (int frame = 1; frame <= 5000; frame++)
+    {
+        block_system_update_movement(ctx, frame, balls, 1);
+        assert_int_equal(block_system_get_type(ctx, r0, c0), ROAMER_BLK);
+    }
+
+    /* The ball-occupied cell never received the roamer. */
+    assert_int_equal(block_system_get_type(ctx, r0, c0 + 1), NONE_BLK);
+
+    block_system_destroy(ctx);
+}
+
+/* TC-38: A lone ROAMER_BLK with open space in every direction relocates
+ * repeatedly over a long run.  A regression to "0/4 directions attempt a
+ * move" (round-2 fix, ADR-070) would show up here as zero or one
+ * relocation instead of several. */
+static void test_roamer_moves_repeatedly(void **state)
+{
+    (void)state;
+    srand(97531);
+    block_system_t *ctx = make_ctx();
+
+    int cur_r = 9;
+    int cur_c = 4;
+    block_system_add(ctx, cur_r, cur_c, ROAMER_BLK, 0, 0);
+
+    int move_count = 0;
+    for (int frame = 1; frame <= 30000; frame++)
+    {
+        block_system_update_movement(ctx, frame, NULL, 0);
+
+        if (block_system_get_type(ctx, cur_r, cur_c) != ROAMER_BLK)
+        {
+            assert_int_equal(find_roamer(ctx, &cur_r, &cur_c), 1);
+            move_count++;
+        }
+    }
+
+    /* Robust to the specific seed: assert "moved repeatedly", not an exact
+     * count. */
+    assert_true(move_count >= 3);
+
+    block_system_destroy(ctx);
+}
+
+/* TC-39: A DROP_BLK with a free cell below descends one row; the source
+ * cell is cleared and the destination is a fresh DROP_BLK.  A second
+ * DROP_BLK whose cell below is permanently occupied never moves. */
+static void test_drop_descends_and_blocked(void **state)
+{
+    (void)state;
+    srand(24680);
+    block_system_t *ctx = make_ctx();
+
+    /* Column 2: free cell below — expected to descend. */
+    block_system_add(ctx, 5, 2, DROP_BLK, 0, 0);
+
+    /* Column 3: cell below permanently occupied — expected to stay put. */
+    block_system_add(ctx, 5, 3, DROP_BLK, 0, 0);
+    block_system_add(ctx, 6, 3, RED_BLK, 0, 0);
+
+    /* Stop at the first descent of the column-2 block.  Looping further
+     * would let the freshly-placed DROP_BLK at (6, 2) roll its own timer
+     * and descend again, which is a correct-but-confounding second move
+     * for this assertion (it only cares about "descends once"). */
+    int moved = 0;
+    for (int frame = 1; frame <= 2500 && !moved; frame++)
+    {
+        block_system_update_movement(ctx, frame, NULL, 0);
+        if (!block_system_is_occupied(ctx, 5, 2))
+        {
+            moved = 1;
+        }
+    }
+    assert_int_equal(moved, 1);
+
+    /* Descended: old cell clear, new cell holds a fresh DROP_BLK. */
+    assert_int_equal(block_system_get_type(ctx, 6, 2), DROP_BLK);
+
+    /* Blocked: DROP_BLK never moved, blocking RED_BLK untouched. */
+    assert_int_equal(block_system_get_type(ctx, 5, 3), DROP_BLK);
+    assert_int_equal(block_system_get_type(ctx, 6, 3), RED_BLK);
+
+    block_system_destroy(ctx);
+}
+
+/* TC-40: A DROP_BLK whose destination row falls within the bottom three
+ * rows (r >= MAX_ROW-3, i.e. 15-17; paddle clearance) never descends,
+ * even with a free cell below —
+ * the (row + 1) >= MAX_ROW - 2 guard in check_adjacent() (where `row` is
+ * the candidate destination row) rejects the move unconditionally.
+ * MAX_ROW - 2 == 16, so a DROP_BLK at row 14 (destination row 15) is the
+ * boundary case: 15 + 1 == 16 >= MAX_ROW - 2. */
+static void test_drop_bottom_guard_blocks_move(void **state)
+{
+    (void)state;
+    srand(11223);
+    block_system_t *ctx = make_ctx();
+
+    const int r0 = 14;
+    const int c0 = 5;
+    block_system_add(ctx, r0, c0, DROP_BLK, 0, 0);
+    /* Cell below is free — the guard alone must block the move. */
+
+    for (int frame = 1; frame <= 2500; frame++)
+    {
+        block_system_update_movement(ctx, frame, NULL, 0);
+        assert_int_equal(block_system_get_type(ctx, r0, c0), DROP_BLK);
+    }
+
+    assert_int_equal(block_system_is_occupied(ctx, r0 + 1, c0), 0);
+
+    block_system_destroy(ctx);
+}
+
+/* =========================================================================
+ * Group 12: RANDOM_BLK ("?") morph cycle (mission m-2026-07-15-007,
+ * original/blocks.c:1427-1445).  A RANDOM_BLK is converted on add to
+ * RED_BLK with random=1 and next_frame=frame+1; block_system_update_movement
+ * then re-rolls its visible block_type every ~300-800 frames
+ * (BLOCK_RANDOM_DELAY=500) forever, without ever clearing the random flag.
+ * ========================================================================= */
+
+/* A morph target is any of the ordinary block types get_random_block_type()
+ * can produce (original/blocks.c:1121-1165 GetRandomType(blankBlock=False)).
+ * BULLET_BLK included; NONE_BLK is never a target since blankBlock=False. */
+static int is_morph_target_type(int block_type)
+{
+    switch (block_type)
+    {
+        case RED_BLK:
+        case BLUE_BLK:
+        case GREEN_BLK:
+        case TAN_BLK:
+        case YELLOW_BLK:
+        case PURPLE_BLK:
+        case BULLET_BLK:
+            return 1;
+        default:
+            return 0;
+    }
+}
+
+/* TC-41: A RANDOM_BLK morphs to a different visible type at least once
+ * over a run long enough to cross the first morph window.  The add call
+ * itself sets block_type to RED_BLK, so we don't assert "!= RED" after
+ * a single step — we track every observed type across the run and
+ * require that something other than the immediate post-add RED_BLK was
+ * seen, proving the morph branch actually executed. */
+static void test_random_block_morphs(void **state)
+{
+    (void)state;
+    srand(555);
+    block_system_t *ctx = make_ctx();
+
+    const int r0 = 6;
+    const int c0 = 2;
+    block_system_add(ctx, r0, c0, RANDOM_BLK, 0, 0);
+    assert_int_equal(block_system_get_type(ctx, r0, c0), RED_BLK);
+
+    int saw_other_type = 0;
+    for (int frame = 1; frame <= 2000; frame++)
+    {
+        block_system_update_movement(ctx, frame, NULL, 0);
+
+        int t = block_system_get_type(ctx, r0, c0);
+        assert_int_equal(block_system_is_occupied(ctx, r0, c0), 1);
+        assert_true(is_morph_target_type(t));
+
+        if (t != RED_BLK)
+        {
+            saw_other_type = 1;
+        }
+    }
+
+    assert_int_equal(saw_other_type, 1);
+
+    block_system_destroy(ctx);
+}
+
+/* TC-42: A RANDOM_BLK keeps morphing across many windows — at least two
+ * distinct block_type values are observed over a long run — and the
+ * random flag stays set (1) the entire time, never cleared. */
+static void test_random_block_keeps_morphing(void **state)
+{
+    (void)state;
+    srand(777);
+    block_system_t *ctx = make_ctx();
+
+    const int r0 = 10;
+    const int c0 = 6;
+    block_system_add(ctx, r0, c0, RANDOM_BLK, 0, 0);
+
+    int distinct_types[8];
+    int distinct_count = 0;
+    int last_type = block_system_get_type(ctx, r0, c0);
+    distinct_types[distinct_count++] = last_type;
+
+    for (int frame = 1; frame <= 8000; frame++)
+    {
+        block_system_update_movement(ctx, frame, NULL, 0);
+
+        assert_int_equal(block_system_get_random(ctx, r0, c0), 1);
+
+        int t = block_system_get_type(ctx, r0, c0);
+        if (t != last_type)
+        {
+            int known = 0;
+            for (int i = 0; i < distinct_count; i++)
+            {
+                if (distinct_types[i] == t)
+                {
+                    known = 1;
+                    break;
+                }
+            }
+            if (!known && distinct_count < 8)
+            {
+                distinct_types[distinct_count++] = t;
+            }
+            last_type = t;
+        }
+    }
+
+    assert_true(distinct_count >= 2);
+
+    block_system_destroy(ctx);
+}
+
+/* TC-43: An ordinary (non-RANDOM) block never morphs, however long the
+ * grid is driven — the random flag is 0 and block_type never changes. */
+static void test_non_random_block_never_morphs(void **state)
+{
+    (void)state;
+    srand(999);
+    block_system_t *ctx = make_ctx();
+
+    const int r0 = 4;
+    const int c0 = 7;
+    block_system_add(ctx, r0, c0, RED_BLK, 0, 0);
+    assert_int_equal(block_system_get_random(ctx, r0, c0), 0);
+
+    for (int frame = 1; frame <= 8000; frame++)
+    {
+        block_system_update_movement(ctx, frame, NULL, 0);
+        assert_int_equal(block_system_get_type(ctx, r0, c0), RED_BLK);
+        assert_int_equal(block_system_get_random(ctx, r0, c0), 0);
+    }
+
+    block_system_destroy(ctx);
+}
+
+/* TC-44: A RANDOM_BLK added exactly as level load does — hardcoded
+ * frame=0, so next_frame = 0 + 1 = 1 — still morphs when the update loop
+ * starts well past that first scheduled frame.  This reproduces the real
+ * game's gap: level load always passes frame=0 to block_system_add, but
+ * by the time block_system_update_movement first runs, the game's state
+ * frame counter is already past 1.  Under the old `bp->next_frame ==
+ * frame` gate this exact-match is skipped forever and the block stays
+ * static RED_BLK.  Starting the loop at frame=100 (not contiguously from
+ * 0) is the whole point of this test — TC-41/42 drive frames 1,2,3,...
+ * contiguously from the add and would pass under == by accident. */
+static void test_random_block_morphs_when_loaded_at_frame0(void **state)
+{
+    (void)state;
+    srand(4242);
+    block_system_t *ctx = make_ctx();
+
+    const int r0 = 9;
+    const int c0 = 5;
+
+    /* Mirror level load exactly: frame=0 hardcoded regardless of the
+     * game's actual current frame. */
+    block_system_add(ctx, r0, c0, RANDOM_BLK, 0, 0);
+    assert_int_equal(block_system_get_type(ctx, r0, c0), RED_BLK);
+    assert_int_equal(block_system_get_random(ctx, r0, c0), 1);
+
+    int distinct_types[8];
+    int distinct_count = 0;
+    int last_type = block_system_get_type(ctx, r0, c0);
+    distinct_types[distinct_count++] = last_type;
+
+    /* Start well past the block's initial next_frame (1) — the gap the
+     * real game exhibits between level load and the first update tick. */
+    for (int frame = 100; frame <= 8100; frame++)
+    {
+        block_system_update_movement(ctx, frame, NULL, 0);
+
+        assert_int_equal(block_system_is_occupied(ctx, r0, c0), 1);
+        assert_int_equal(block_system_get_random(ctx, r0, c0), 1);
+
+        int t = block_system_get_type(ctx, r0, c0);
+        assert_true(is_morph_target_type(t));
+
+        if (t != last_type)
+        {
+            int known = 0;
+            for (int i = 0; i < distinct_count; i++)
+            {
+                if (distinct_types[i] == t)
+                {
+                    known = 1;
+                    break;
+                }
+            }
+            if (!known && distinct_count < 8)
+            {
+                distinct_types[distinct_count++] = t;
+            }
+            last_type = t;
+        }
+    }
+
+    /* Under the bug (`== frame`), next_frame=1 never matches frame>=100
+     * and this stays at 1 (only the post-add RED_BLK seen).  The fix
+     * (`frame >= next_frame`) catches up on the very first update call and
+     * keeps re-morphing, so at least two distinct types are observed. */
+    assert_true(distinct_count >= 2);
+
+    block_system_destroy(ctx);
+}
+
+/* =========================================================================
+ * Group 13: exploding-block movement/morph guard (mission m-2026-07-15-016)
+ *
+ * block_system_update_movement skips exploding cells entirely (the
+ * `if (bp->exploding) continue;` guard, src/block_system.c:763). Without
+ * it, an occupied+exploding RANDOM/ROAMER/DROP block whose timer is due
+ * gets morphed/moved out from under the explosion animation, and a
+ * successful ROAMER/DROP move calls clear_entry() -- decrementing
+ * ctx->blocks_exploding and vacating the cell before the explosion
+ * finalize callback (block_system_update_explosions) ever fires,
+ * silently dropping the scoring/finalize side effect for that block.
+ * ========================================================================= */
+
+/* TC-45: An occupied+exploding RANDOM_BLK whose morph timer is due is
+ * neither morphed nor uncounted by block_system_update_movement -- the
+ * exploding guard must run before the RANDOM_BLK morph branch. */
+static void test_exploding_random_block_not_morphed_or_cleared(void **state)
+{
+    (void)state;
+    srand(31415);
+    block_system_t *ctx = make_ctx();
+
+    const int r0 = 6;
+    const int c0 = 3;
+
+    /* frame=0 -> next_frame = 0 + 1 = 1, so the morph timer is already due
+     * by the time update_movement is called at frame=100 below. */
+    block_system_add(ctx, r0, c0, RANDOM_BLK, 0, 0);
+    assert_int_equal(block_system_get_type(ctx, r0, c0), RED_BLK);
+
+    block_system_status_t st = block_system_explode(ctx, r0, c0, 0);
+    assert_int_equal(st, BLOCK_SYS_OK);
+
+    int before = block_system_get_exploding_count(ctx);
+    assert_int_equal(before, 1);
+    int type_before = block_system_get_type(ctx, r0, c0);
+
+    block_system_update_movement(ctx, 100, NULL, 0);
+
+    /* Exploding count untouched -- the RANDOM_BLK morph branch never
+     * calls clear_entry itself, but this is the definitive "did the
+     * guard run" signal for the sibling ROAMER/DROP branches that do. */
+    assert_int_equal(block_system_get_exploding_count(ctx), before);
+
+    /* Still occupied, still the pre-morph type -- the
+     * `if (bp->exploding) continue;` guard must skip the whole movement
+     * body, including the RANDOM_BLK morph branch below it. */
+    assert_int_equal(block_system_is_occupied(ctx, r0, c0), 1);
+    assert_int_equal(block_system_get_type(ctx, r0, c0), type_before);
+
+    block_system_render_info_t info;
+    block_system_get_render_info(ctx, r0, c0, &info);
+    assert_int_equal(info.exploding, 1);
+
+    block_system_destroy(ctx);
+}
+
+/* TC-46: An occupied+exploding ROAMER_BLK with a free orthogonal neighbor
+ * is never relocated by block_system_update_movement, however many
+ * move-timer windows elapse -- and ctx->blocks_exploding never drops.
+ * Same seed (12345), same origin cell (8, 4), and the same 3000-frame
+ * bound as test_roamer_moves_to_free_neighbor, which proves this exact
+ * setup relocates well within the loop when the block is NOT exploding.
+ * Without the exploding guard, the successful move's clear_entry() call
+ * would both vacate the cell and decrement blocks_exploding out from
+ * under the pending explosion -- silently skipping the finalize scoring
+ * callback. */
+static void test_exploding_roamer_block_not_moved_or_cleared(void **state)
+{
+    (void)state;
+    srand(12345);
+    block_system_t *ctx = make_ctx();
+
+    const int r0 = 8;
+    const int c0 = 4;
+    block_system_add(ctx, r0, c0, ROAMER_BLK, 0, 0);
+
+    block_system_status_t st = block_system_explode(ctx, r0, c0, 0);
+    assert_int_equal(st, BLOCK_SYS_OK);
+
+    int before = block_system_get_exploding_count(ctx);
+    assert_int_equal(before, 1);
+
+    for (int frame = 1; frame <= 3000; frame++)
+    {
+        block_system_update_movement(ctx, frame, NULL, 0);
+
+        assert_int_equal(block_system_get_exploding_count(ctx), before);
+        assert_int_equal(block_system_is_occupied(ctx, r0, c0), 1);
+        assert_int_equal(block_system_get_type(ctx, r0, c0), ROAMER_BLK);
+    }
+
+    block_system_destroy(ctx);
+}
+
+/* =========================================================================
  * Test runner
  * ========================================================================= */
 
@@ -617,6 +1152,24 @@ int main(void)
         cmocka_unit_test(test_get_black_next_frame_wrong_type),
         cmocka_unit_test(test_get_random_roundtrip),
         cmocka_unit_test(test_savegame_accessors_unoccupied),
+
+        /* Group 11: ROAMER_BLK / DROP_BLK movement */
+        cmocka_unit_test(test_roamer_moves_to_free_neighbor),
+        cmocka_unit_test(test_roamer_boxed_in_never_moves),
+        cmocka_unit_test(test_roamer_blocked_by_ball_in_only_free_cell),
+        cmocka_unit_test(test_roamer_moves_repeatedly),
+        cmocka_unit_test(test_drop_descends_and_blocked),
+        cmocka_unit_test(test_drop_bottom_guard_blocks_move),
+
+        /* Group 12: RANDOM_BLK morph cycle */
+        cmocka_unit_test(test_random_block_morphs),
+        cmocka_unit_test(test_random_block_keeps_morphing),
+        cmocka_unit_test(test_non_random_block_never_morphs),
+        cmocka_unit_test(test_random_block_morphs_when_loaded_at_frame0),
+
+        /* Group 13: exploding-block movement/morph guard */
+        cmocka_unit_test(test_exploding_random_block_not_morphed_or_cleared),
+        cmocka_unit_test(test_exploding_roamer_block_not_moved_or_cleared),
     };
 
     return cmocka_run_group_tests(tests, NULL, NULL);

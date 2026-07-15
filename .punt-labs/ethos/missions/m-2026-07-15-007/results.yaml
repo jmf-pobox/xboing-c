@@ -1,0 +1,22 @@
+results:
+    - mission: m-2026-07-15-007
+      round: 1
+      created_at: "2026-07-15T13:02:22Z"
+      author: jdc
+      verdict: pass
+      confidence: 0.95
+      files_changed:
+        - path: src/block_system.c
+          added: 43
+          removed: 0
+      evidence:
+        - name: 'get_random_block_type() ports GetRandomType(blankBlock=False): rand()%8 -> RED,BLUE,GREEN,TAN,YELLOW,PURPLE,BULLET,YELLOW (original/blocks.c:1121-1165)'
+          status: pass
+        - name: 'Morph in block_system_update_movement, between ROAMER and DROP handling (matches original ordering blocks.c:1427-1445): bp->random && next_frame fired -> block_type=get_random_block_type(), bonus_slide=0, next_frame=frame+rand%BLOCK_RANDOM_DELAY+300; random stays 1 (re-morphs forever)'
+          status: pass
+        - name: BLOCK_RANDOM_DELAY=500 already in block_system.h:62 (cites blocks.h:78); no header change needed
+          status: pass
+        - name: still_active reads block_type live (no cached count) -> morph between required colors/BULLET can't desync level-complete; BULLET morph target = ammo pickup, same path as authored bullet
+          status: pass
+        - name: 'Harness: RANDOM_BLK morphs RED->YELLOW(f1)->BLUE(f550)->GREEN(f1008), random flag stays 1. Build+asan zero-warning; ctest 61/61 both; only src/block_system.c changed'
+          status: pass

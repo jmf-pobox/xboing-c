@@ -1,0 +1,36 @@
+mission_id: m-2026-07-15-001
+status: closed
+type: implement
+created_at: "2026-07-15T03:40:26Z"
+updated_at: "2026-07-15T03:56:15Z"
+closed_at: "2026-07-15T03:56:15Z"
+leader: claude
+worker: jdc
+evaluator:
+    handle: jck
+    pinned_at: "2026-07-15T03:40:26Z"
+    hash: 40cbe1204f644c77e6a26757a9b855e3298be267025e806d425bfdea99054f18
+inputs: {}
+write_set:
+    - src/game_modes.c
+    - src/game_render.c
+success_criteria:
+    - 'Scope the animated BorderGlow OUT of live gameplay, matching the original (BorderGlow is called only from the 7 attract/menu screens, NEVER from handleGameMode; gameplay shows the STATIC red border only). Remove the three gameplay glow sites: (1) the update call sfx_system_update_glow at src/game_modes.c:320 inside mode_game_update; (2) the draw game_render_border_glow(ctx) at src/game_render.c:1433 in the `case SDL2ST_GAME: case SDL2ST_PAUSE:` branch; (3) the draw game_render_border_glow(ctx) at src/game_render.c:1390 in the DIALOGUE-over- GAME/PAUSE sub-branch (case SDL2ST_GAME/PAUSE under SDL2ST_DIALOGUE''s saved mode). Leave the attract/menu glow update calls (game_modes.c:446,509,571, 622,657,712,774,899,1246) and their screen renderers untouched — those modes SHOULD glow.'
+    - The static red playfield border MUST still render during gameplay (it is drawn by game_render_playfield/background BEFORE the glow overlay — see the comment at game_render.c:1432 "overwrites static red border" and the border draw around :380). After removing the glow, gameplay shows the static red border, not a missing/black border. Verify by reading the playfield border draw and confirming it is independent of game_render_border_glow.
+    - Confirm nothing else during gameplay depends on the glow state being updated (grep for other readers of the glow between the removed update and any gameplay draw). If something does, note it; otherwise removing the update is safe.
+    - 'cmake --preset debug && cmake --build build: zero warnings under -Werror -Wconversion -Wshadow. Full ctest --test-dir build stays green. Only the two write_set files change. Cite original/ (sfx.c BorderGlow + the 7 attract call sites; handleGameMode having none) in the code comments where behavior is restored.'
+budget:
+    rounds: 2
+    reflection_after_each: true
+current_round: 2
+context: |-
+    First fix on the fix/audit-findings-batch branch (more audit-finding fixes
+    will follow on the same branch). Maintainer verified live: the modern port
+    shows the animated BorderGlow during gameplay, which the 1996 original never
+    did (BorderGlow is an attract/menu-only effect; gameplay has a static red
+    border). Audit-2 finding (docs/audits/2026-07-14-animation-cadence-parity.md,
+    jdc-confirmed): mode_game_update calls sfx_system_update_glow (game_modes.c:
+    320) and game_render draws game_render_border_glow in the SDL2ST_GAME and
+    dialogue-over-game paths (game_render.c:1390,1433). Restore original scoping.
+    jck (author) evaluates faithfulness — is the gameplay border static red with
+    no pulse, as in 1996. Do NOT PR yet; the branch collects more fixes first.

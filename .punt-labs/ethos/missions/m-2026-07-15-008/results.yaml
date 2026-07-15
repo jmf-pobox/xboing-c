@@ -1,0 +1,20 @@
+results:
+    - mission: m-2026-07-15-008
+      round: 1
+      created_at: "2026-07-15T13:08:33Z"
+      author: gjm
+      verdict: pass
+      confidence: 0.95
+      files_changed:
+        - path: tests/test_block_system.c
+          added: 142
+          removed: 0
+      evidence:
+        - name: 'TC-41 morphs: RANDOM_BLK becomes a valid morph target (RED/BLUE/GREEN/TAN/YELLOW/PURPLE/BULLET), observes a type other than post-add RED'
+          status: pass
+        - name: 'TC-42 keeps morphing: 8000-frame run observes >=2 distinct block_types; get_random stays 1 throughout (re-morphs, flag never clears)'
+          status: pass
+        - name: TC-43 non-random RED_BLK never changes type over same run; get_random stays 0 (branch correctly gated)
+          status: pass
+        - name: 'RED proof: gating morph branch with if(0 && ...) fails TC-41/42 (0!=1, distinct>=2 false), TC-43 still green; reverted, tree clean. ctest debug+asan green; only tests/test_block_system.c changed'
+          status: pass

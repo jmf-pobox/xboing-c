@@ -1,0 +1,20 @@
+results:
+    - mission: m-2026-07-15-011
+      round: 1
+      created_at: "2026-07-15T17:53:14Z"
+      author: jdc
+      verdict: pass
+      confidence: 0.93
+      files_changed:
+        - path: src/block_system.c
+          added: 23
+          removed: 7
+      evidence:
+        - name: 'Four timer gates changed == frame -> frame >= X: roamer eye (769), roamer move else-if (775), RANDOM morph (839), DROP (849); roamer if/else-if eye-priority preserved; no stray == left'
+          status: pass
+        - name: 'Comments updated to explain modern >= adaptation: level-load hardcoded frame=0 (game_callbacks.c:862, game_init.c:1213) makes RANDOM first-morph next_frame=1 unmatchable by == once state frame>1; matches ball_system.c:405,845,890 convention'
+          status: pass
+        - name: Each handler reschedules to a future frame on fire -> >= fires once then waits, no double-fire; iteration safety preserved
+          status: pass
+        - name: RANDOM added at frame 0 now morphs on first update (frame>=1) and reschedules+re-morphs; roamer/drop fire at-or-just-after schedule (imperceptible). Build zero-warning; ctest 61/61; only src/block_system.c changed
+          status: pass

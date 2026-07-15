@@ -1,0 +1,14 @@
+reflections:
+    - round: 1
+      created_at: "2026-07-15T12:34:04Z"
+      author: sjl
+      converging: true
+      signals:
+        - src/game_modes.c:189-193 — spurious buzzer@70 on new-game start removed, replaced with comment citing original/main.c:534-552 (handleIntroKeys space->MODE_GAME plays no sound). Confirmed no sound plays on new-game start.
+        - src/game_modes.c:361-363 — buzzer@70 added inside the timer countdown, firing exactly when ctx->time_remaining == 0, guarded by ctx->audio, cites original/level.c:143-147 (DecLevelTimeBonus). Matches original trigger condition (timeBonus decrements 0->buzz).
+        - 'Fire-once verified: the whole countdown block is gated by `if (ctx->time_remaining > 0)` (game_modes.c:351); once time_remaining hits 0 the block is skipped on all subsequent ticks, so the buzzer check at line 361 cannot re-fire. grep across src/ confirms mode_game_update:360-362 is the ONLY buzzer call site in the codebase (previously two: start_new_game and nowhere for timeout).'
+        - 'No collateral: git diff src/game_modes.c shows only the two hunks (buzzer removal + buzzer addition); no other sound, no timer-math change. All other time_remaining writes (game_modes.c:629/636 demo-mode reset, game_modes.c:168 level start, game_rules.c:331 level-advance reset, game_callbacks.c:279-280 TIMER_BLK +20s) are direct assignments/increments outside the mode_game_update decrement path and do not touch the buzzer block, matching original semantics (DecLevelTimeBonus is the sole buzzer trigger site in original/level.c too).'
+        - 'Build/tests: cmake --build build has 0 stale objects (all targets already built clean, -Werror -Wconversion -Wshadow enforced by existing CMakeLists warning flags); ctest --test-dir build: 61/61 passed (test 62 is the documented always-DISABLED offscreen screenshot test, not a fixture regression).'
+        - 'Edge case (zero-time-bonus level): a level whose time_bonus_total starts at 0 never enters the `time_remaining > 0` block, so time_remaining never decrements and the buzzer never fires — matching original/level.c:134 (`if (timeBonus > 0)` guards the decrement AND the buzz check), where a 0-start level likewise never buzzes. Behavior is faithful.'
+      recommendation: stop
+      reason: 'Both success criteria are met exactly: spurious new-game buzzer removed (matches original/main.c:534-552 silence), real time''s-up buzzer@70 added at the single decrement-to-zero point (matches original/level.c:143-147), fires exactly once, no other code path touches time_remaining through the buzzer block, zero-start levels correctly never buzz (matches original''s `timeBonus > 0` guard). Diff scoped to src/game_modes.c only; 61/61 tests green. Approve.'

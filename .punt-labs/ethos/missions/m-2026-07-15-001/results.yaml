@@ -1,0 +1,49 @@
+results:
+    - mission: m-2026-07-15-001
+      round: 1
+      created_at: "2026-07-15T03:46:22Z"
+      author: jdc
+      verdict: pass
+      confidence: 0.95
+      files_changed:
+        - path: src/game_modes.c
+          added: 3
+          removed: 1
+        - path: src/game_render.c
+          added: 12
+          removed: 8
+      evidence:
+        - name: Removed gameplay glow update (game_modes.c:320) + both gameplay draws (game_render.c:1433 SDL2ST_GAME/PAUSE, :1390 dialogue-over-game); attract/menu glow untouched
+          status: pass
+        - name: 'Static red border survives: game_render_playfield draws SDL_SetRenderDrawColor(200,0,0) at game_render.c:385, independent of the glow'
+          status: pass
+        - name: No gameplay-reachable reader of glow state; game_render_border_glow only called from attract/menu (game_render_ui.c:77,646,1265)
+          status: pass
+        - name: Build zero-warning -Werror -Wconversion -Wshadow; ctest 61/61; only the two write_set files
+          status: pass
+        - name: 'LEADER NOTE (regression found post-result): removing the glow ALSO dropped the green-when-no-walls border. Original/special.c:133-148 ToggleWallsOn sets play border STATIC green on no-walls, STATIC red otherwise — a real wall-state signal. Round 2 must restore a STATIC red/green-by-wall-state gameplay border (no pulse).'
+          status: fail
+    - mission: m-2026-07-15-001
+      round: 2
+      created_at: "2026-07-15T03:56:03Z"
+      author: jdc
+      verdict: pass
+      confidence: 0.95
+      files_changed:
+        - path: src/game_render.c
+          added: 24
+          removed: 11
+        - path: src/game_modes.c
+          added: 3
+          removed: 1
+      evidence:
+        - name: game_render_playfield border now static green (0,200,0,255) when SPECIAL_NO_WALLS active, red (200,0,0,255) otherwise — matches original/special.c:141,146; no pulse/intensity
+          status: pass
+        - name: One fix covers GAME/PAUSE, dialogue-over-game, and EDIT paths (all render via game_render_playfield); editor stays red (specials turned off on editor entry)
+          status: pass
+        - name: No game_render_border_glow call remains in gameplay paths; glow update absent from mode_game_update; attract glow (9 update sites + game_render_ui.c:77,646,1265) untouched
+          status: pass
+        - name: Leader fixed stale comment at game_render.c:1058 (glow advanced by attract handlers, not mode_game_update)
+          status: pass
+        - name: cmake build zero-warning -Werror -Wconversion -Wshadow; ctest full suite green (61/61, test_attract_screenshots disabled); only the two write_set files changed
+          status: pass

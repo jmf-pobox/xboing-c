@@ -1,0 +1,32 @@
+mission_id: m-2026-07-15-017
+status: closed
+type: implement
+created_at: "2026-07-15T20:59:43Z"
+updated_at: "2026-07-15T21:02:12Z"
+closed_at: "2026-07-15T21:02:12Z"
+leader: claude
+worker: jdc
+evaluator:
+    handle: jck
+    pinned_at: "2026-07-15T20:59:43Z"
+    hash: 40cbe1204f644c77e6a26757a9b855e3298be267025e806d425bfdea99054f18
+inputs: {}
+write_set:
+    - src/block_system.c
+    - tests/test_block_system.c
+    - docs/DESIGN.md
+success_criteria:
+    - 'Fix a Copilot review finding (PR #187, 3 sites): comments/doc say the adjacency guard keeps moving blocks out of the "bottom two rows", but the guard `(row + 1) >= (MAX_ROW - 2)` rejects destination rows r where r >= MAX_ROW-3 — i.e. rows 15,16,17 (the bottom THREE rows) when MAX_ROW=18. The CODE is correct and FAITHFUL to original/blocks.c:1236-1237 (identical `(r+1) >= (MAX_ROW-2)`); only the prose is inaccurate. WORDING ONLY — do not change the guard or any code/logic.'
+    - 'Site 1 src/block_system.c (~707, check_adjacent comment): reword "bottom two rows" to accurately state the guard rejects a destination row r when (row+1) >= MAX_ROW-2, i.e. r >= MAX_ROW-3 (rows 15-17 with MAX_ROW=18), keeping blocks clear of the paddle. Keep the original/blocks.c:1236-1237 citation.'
+    - 'Site 2 tests/test_block_system.c (~770, TC-40 header comment): change "within the bottom two rows" to "within the bottom three rows (r >= MAX_ROW-3, i.e. 15-17; paddle clearance)". Keep the `(row+1) >= MAX_ROW-2` explanation. No test code/asserts change.'
+    - 'Site 3 docs/DESIGN.md (~4177, ADR-070 adjacency summary): change "off the bottom two rows" to "off the bottom three rows (destination row r rejected when r+1 >= MAX_ROW-2)".'
+    - cmake --build build stays zero-warning (comment-only in src); ctest --test-dir build -R test_block_system green; markdownlint clean on DESIGN.md if runnable. Only the three write_set files change, all wording-only.
+budget:
+    rounds: 1
+    reflection_after_each: true
+current_round: 1
+context: |-
+    PR #187 review round 3. Copilot flagged the same "bottom two rows" wording in three
+    places (src comment, test comment, ADR). The guard actually blocks the bottom THREE
+    rows (15-17) and is faithful to original/blocks.c:1236. Fix the prose to match the code;
+    no logic change. jck evaluates (it already reviewed this guard's faithfulness).

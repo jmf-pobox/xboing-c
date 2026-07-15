@@ -1,0 +1,24 @@
+results:
+    - mission: m-2026-07-15-017
+      round: 1
+      created_at: "2026-07-15T21:00:57Z"
+      author: jdc
+      verdict: pass
+      confidence: 0.98
+      files_changed:
+        - path: src/block_system.c
+          added: 4
+          removed: 2
+        - path: tests/test_block_system.c
+          added: 3
+          removed: 2
+        - path: docs/DESIGN.md
+          added: 3
+          removed: 2
+      evidence:
+        - name: '3 sites reworded bottom two -> bottom three rows: src check_adjacent comment (rejects r when r+1>=MAX_ROW-2, i.e. r>=MAX_ROW-3, rows 15-17), TC-40 header, ADR-070 summary; keeps original/blocks.c:1236-1237 citation'
+          status: pass
+        - name: 'Prose-only: git diff shows no code/assert/guard lines changed; guard (row+1)>=(MAX_ROW-2) untouched and faithful to original'
+          status: pass
+        - name: cmake --build build zero-warning; ctest -R test_block_system 3/3 green; only the three write_set files changed
+          status: pass
