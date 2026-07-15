@@ -222,15 +222,86 @@ void block_system_update_explosions(block_system_t *ctx, int frame, block_system
  * Advance per-block animation slides for animated block types based on the
  * current frame counter.  Updates `bonus_slide` for BONUSX2/X4/BONUS_BLK
  * (4-frame cycle, BLOCK_BONUS_DELAY interval), DEATH_BLK (5-frame cycle,
- * BLOCK_DEATH_DELAY1 interval), EXTRABALL_BLK (2-frame cycle,
- * BLOCK_EXTRABALL_DELAY interval), and ROAMER_BLK (5-direction cycle,
- * BLOCK_ROAM_EYES_DELAY interval).
+ * BLOCK_DEATH_DELAY1 interval), and EXTRABALL_BLK (2-frame cycle,
+ * BLOCK_EXTRABALL_DELAY interval).
+ *
+ * ROAMER_BLK's bonus_slide (eye direction) is NOT cycled here — it is
+ * driven by the rand()-scheduled eye timer in block_system_update_movement,
+ * matching original/blocks.c:1364-1373.
  *
  * Call once per game tick (typically from game_modes after gun_system_update).
  * Without this, sprite_block_animated_key sees a static bonus_slide=0 and
  * all animated blocks render as frame 1 forever.
  */
 void block_system_advance_animations(block_system_t *ctx, int frame);
+
+/*
+ * Ball position snapshot for the ROAMER_BLK / DROP_BLK movement adjacency
+ * check (original/blocks.c:1239-1252).  `active` mirrors the original
+ * BALL.active flag semantics: true for any ball slot in use (any
+ * ballState), not just the BALL_ACTIVE state.  `x`/`y` are ball center
+ * coordinates in the same units as the original balls[i].ballx/bally
+ * (i.e. ball_system_get_render_info's x/y, or ball_system_get_position).
+ */
+typedef struct
+{
+    int active;
+    int x;
+    int y;
+} block_system_ball_pos_t;
+
+/*
+ * Per-tick driver for ROAMER_BLK / DROP_BLK grid movement.
+ *
+ * Ports original/blocks.c:1364-1421 (ROAMER_BLK eye + move timers) and
+ * original/blocks.c:1447-1474 (DROP_BLK drop timer), gated by the
+ * adjacency check at original/blocks.c:1220-1256 (CheckAdjacentBlocks):
+ * a block may move into (r, c) iff (r, c) is in bounds, unoccupied, not
+ * exploding, at least two rows clear of the paddle
+ * ((r + 1) < MAX_ROW - 2), and no active ball currently occupies (r, c).
+ *
+ * ROAMER_BLK: the eye timer (next_frame) fires at BLOCK_ROAM_EYES_DELAY
+ * cadence, rerolling the gaze sprite (bonus_slide = rand() % 5, cosmetic
+ * only).  The move timer (last_frame) fires at BLOCK_ROAM_DELAY cadence
+ * and *always* attempts to relocate one cell (jck ruling, round 2):
+ * bonus_slide 0=L, 1=R, 2=U, 3=D, 4=L (wrap).  Every value maps to a real
+ * direction — there is no neutral/no-move case — matching the
+ * original's move *frequency* at original/blocks.c:1377
+ * (`d = blockP->bonusSlide + 1`), which also attempts a move on every
+ * firing, but whose 0/5 cases fall through a stale r1/c1 left over from
+ * a prior block's move (a bug this port does not reproduce; the
+ * eyes-face-the-move-direction correlation is cosmetic only and not
+ * preserved). A successful move places a fresh ROAMER_BLK (fresh timers,
+ * via block_system_add) at the destination and clears the source; a
+ * blocked move (adjacency check fails) reschedules the move timer.
+ *
+ * DROP_BLK: the drop timer (next_frame) fires at BLOCK_DROP_DELAY
+ * cadence, attempting to relocate one cell straight down.  Success
+ * places a fresh DROP_BLK one row down and clears the source; failure
+ * reschedules the drop timer BLOCK_DROP_DELAY ticks out (fixed, not
+ * randomized — matches original/blocks.c:1471).
+ *
+ * `balls`/`nballs` supply the live ball positions for the adjacency
+ * check.  block_system has no dependency on ball_system (ADR-016), so
+ * the caller (game_modes.c) snapshots ball_system_get_render_info() into
+ * a block_system_ball_pos_t array and passes it in.  Pass nballs=0 (or
+ * balls=NULL) if no balls are in play.
+ *
+ * Iteration safety: the grid is scanned once, top-to-bottom /
+ * left-to-right, mutating in place — exactly like the single forward
+ * pass in original/blocks.c:1266-1268 (HandlePendingAnimations).  A block
+ * that moves this tick is placed via block_system_add, whose ROAMER/DROP
+ * init always schedules the next timer at least frame+50 (ROAMER eye) or
+ * frame+200 (DROP) in the future.  So even when the destination cell is
+ * scanned again later in the same pass (a rightward or downward move),
+ * its timers cannot equal `frame` again this tick — a block moves at
+ * most once per call. Leftward/upward moves land on cells the scan has
+ * already passed and won't be revisited until the next tick.
+ *
+ * Call once per game tick, after block_system_advance_animations.
+ */
+void block_system_update_movement(block_system_t *ctx, int frame,
+                                  const block_system_ball_pos_t *balls, int nballs);
 
 /*
  * Handle a bullet hit on the block at (row, col).

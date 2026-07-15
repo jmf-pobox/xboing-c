@@ -1,0 +1,41 @@
+mission_id: m-2026-07-15-003
+status: closed
+type: implement
+created_at: "2026-07-15T04:08:02Z"
+updated_at: "2026-07-15T04:31:04Z"
+closed_at: "2026-07-15T04:31:04Z"
+leader: claude
+worker: jdc
+evaluator:
+    handle: jck
+    pinned_at: "2026-07-15T04:08:02Z"
+    hash: 40cbe1204f644c77e6a26757a9b855e3298be267025e806d425bfdea99054f18
+inputs: {}
+write_set:
+    - src/block_system.c
+    - include/block_system.h
+    - src/game_modes.c
+success_criteria:
+    - Restore ROAMER_BLK and DROP_BLK grid MOVEMENT, missing from the modern port (block_system_advance_animations only cycles the sprite; nothing relocates the block). Port original/blocks.c HandlePendingAnimations roamer (1364-1421) + drop (1448-1474) + CheckAdjacentBlocks (1220-1256). The block's next_frame/last_frame/drop fields already exist (block_system.c:461-469) but are unused — use them for the move timers.
+    - 'ROAMER movement (original/blocks.c:1364-1421): the roamer has an EYE timer and a MOVE timer. On the eye timer, randomize the eye direction (rand()%5: 0=neutral,1=L,2=R,3=U,4=D — the bonus_slide sprite frame) and reschedule eye timer = frame + rand()%ROAM_EYES_DELAY + 50. On the MOVE timer (last_frame), compute direction d = eye_dir (1=L:(0,-1), 2=R:(0,+1), 3=U:(-1,0), 4=D:(+1,0); 0 or 5 = no move) and, if the target cell passes the adjacency check, MOVE: place a ROAMER at (r+dr,c+dc) with fresh timers and CLEAR the old cell; else reschedule move timer = frame + rand()%ROAM_DELAY + 300. Move direction must follow the current eye direction, matching the original. ROAM_EYES_DELAY=300, ROAM_DELAY=1000 (original/include/blocks.h :81-82; modern BLOCK_ROAM_EYES_DELAY exists — add BLOCK_ROAM_DELAY if needed).'
+    - 'DROP movement (original/blocks.c:1448-1474): a DROP_BLK (drop flag true), on its drop timer (next_frame), moves DOWN one row (r+1,c) if that cell passes the adjacency check — place DROP at (r+1,c) with next_frame = frame + rand()%DROP_DELAY + 200, clear the old cell; else reschedule next_frame = frame + DROP_DELAY. DROP_DELAY=1000 (original/include/blocks.h:79).'
+    - 'Adjacency check (port CheckAdjacentBlocks, original/blocks.c:1220-1256): target (r,c) is a legal move destination iff: in bounds (0<=r<MAX_ROW, 0<=c<MAX_COL); the cell is NOT occupied and NOT exploding; (r+1) < (MAX_ROW-2) (keeps moving blocks out of the bottom two rows / off the paddle); and NO active ball currently occupies cell (r,c). The ball check needs live ball positions — thread them from mode_game_update (ctx->ball) to the block movement update; choose the cleanest seam (a new block_system_update_movement(ctx, frame, ball_positions[], n) called from game_modes.c near the existing block_system_advance_animations call at :303, OR extend the signature). Convert ball x/y to (row,col) with the same grid mapping the port already uses.'
+    - 'ITERATION SAFETY (critical): the movement scan mutates the grid (adds at the destination, clears the source) while iterating r,c. A block must move AT MOST ONCE per tick — a roamer moving right/down into a not-yet-visited cell must not be re-processed and moved again in the same pass. Guard this explicitly (e.g. a moved-this-tick marker, or a two-phase collect-then-apply, or scan order + a per-tick guard). State the mechanism in the result.'
+    - 'FAITHFULNESS (jck gate): on levels with roamers (e.g. level 3, 9 roamers) the blocks now WANDER to adjacent empty cells over time (not just blink eyes); drop blocks descend; both stay out of the bottom 2 rows and never spawn onto a ball. Cadence/constraints match the original. Do NOT change block point values, other block types, or non-roamer/drop behavior. Cite original lines in comments. Use rand() for the timers (matches the original; seedable for tests) — do NOT introduce a deterministic frame/DELAY%N cadence for movement.'
+    - 'cmake --preset debug && cmake --build build: zero warnings under -Werror -Wconversion -Wshadow. Full ctest --test-dir build green. Only the three write_set files change. Do NOT write tests here (a sibling gjm mission adds regression tests) — but the build and existing suite must pass.'
+budget:
+    rounds: 3
+    reflection_after_each: true
+current_round: 2
+context: |-
+    Second fix on the fix/audit-findings-batch branch (after the BorderGlow scope
+    fix). Maintainer verified live: roamer blocks only blink their eyes, they
+    never move; drop blocks never descend. Audit-2 finding, jdc-confirmed
+    (docs/audits/2026-07-14-animation-cadence-parity.md): the modern
+    block_system_advance_animations (block_system.c:604-646) only sets the sprite
+    index for ROAMER and has no DROP case; nothing relocates these blocks, so
+    ~15 levels that use roamers and the drop levels play easier and wrong. Restore
+    the original movement handler (original/blocks.c:1220-1256, 1364-1421,
+    1448-1474). This is a gameplay-mechanic restoration — jck (author) gates
+    faithfulness; a sibling gjm mission adds regression tests. RANDOM_BLK (?)
+    morph is a separate missing mechanic, deliberately OUT of scope here.

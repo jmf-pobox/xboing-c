@@ -1,0 +1,82 @@
+results:
+    - mission: m-2026-07-15-005
+      round: 1
+      created_at: "2026-07-15T04:39:57Z"
+      author: gjm
+      verdict: pass
+      confidence: 0.95
+      files_changed:
+        - path: tests/test_block_system.c
+          added: 239
+          removed: 0
+      evidence:
+        - name: cmake --build build --target test_block_system
+          status: pass
+        - name: ctest --test-dir build -R test_block_system --output-on-failure
+          status: pass
+        - name: cmake --build build-asan --target test_block_system
+          status: pass
+        - name: ctest --test-dir build-asan -R test_block_system --output-on-failure (ASan+UBSan, no findings)
+          status: pass
+        - name: 'RED-proof: stubbed block_system_update_movement to an unconditional no-op in src/block_system.c, rebuilt, reran ctest -R test_block_system'
+          status: pass
+      prose: |
+        Added 6 new cmocka tests (TC-35..TC-40) plus a find_roamer() scan helper
+        to tests/test_block_system.c, pinning block_system_update_movement
+        (mission m-2026-07-15-003, ADR-070). All srand-seeded with fixed
+        literals (12345, 2468, 13579, 97531, 24680, 11223) for full
+        determinism -- no wall-clock or frame-count assertions, only
+        invariants (moved-to-neighbor, never-moved, moved>=3 times).
+
+        Coverage:
+          - test_roamer_moves_to_free_neighbor: lone ROAMER_BLK with all 4
+            neighbors free relocates to an orthogonal neighbor within 3000
+            frames; asserts new cell is a 4-neighbor and old cell vacated.
+          - test_roamer_boxed_in_never_moves: ROAMER at grid corner (0,0)
+            with right/down occupied (left/up out-of-bounds) never leaves
+            its cell over 5000 frames -- covers occupied-target (4a) and
+            out-of-bounds (4b) in one scenario, since at a corner every
+            direction is rejected for a different reason.
+          - test_roamer_blocked_by_ball_in_only_free_cell: ROAMER with 3 of
+            4 neighbors occupied and a block_system_ball_pos_t placed in the
+            remaining free cell never moves (4d, the important case).
+            Coordinate mapping: ball.x = target_col * COL_WIDTH (55),
+            ball.y = target_row * ROW_HEIGHT (32) -- matches check_adjacent's
+            ball_col = x / col_width, ball_row = y / row_height
+            (original/blocks.c:179-180 X2COL/Y2ROW).
+          - test_roamer_moves_repeatedly: lone roamer with open space over a
+            30000-frame run relocates >=3 times -- catches a regression to
+            "some eye values don't attempt a move" (round-2 fix), asserting
+            on move count threshold, not exact frame numbers, so it's robust
+            to the seed.
+          - test_drop_descends_and_blocked: two DROP_BLKs driven together --
+            one with a free cell below descends to (row+1, col) with the
+            source cleared; one whose target cell is occupied never moves.
+            Loop breaks at the first descent of the free-cell case rather
+            than running a fixed frame count, because letting the loop run
+            longer allows the freshly-placed DROP_BLK (fresh random timer)
+            to descend a second time, which would confound a "moved exactly
+            one row" assertion -- found this via an initial red herring
+            failure (assert diff -2 != 20) before narrowing the loop.
+          - test_drop_bottom_guard_blocks_move: DROP_BLK at row 14 (whose
+            descent target is row 15) never moves even with a free cell
+            below -- (row+1) >= MAX_ROW-2 (16) rejects unconditionally at
+            the boundary (4c).
+
+        RED proof: temporarily replaced block_system_update_movement's body
+        in src/block_system.c with an unconditional early return (stub),
+        rebuilt, and reran ctest -R test_block_system. Result: 3 of 6 new
+        tests failed as expected --
+          test_roamer_moves_to_free_neighbor:  0 != 1 (never moved)
+          test_roamer_moves_repeatedly:        move_count >= 3 is not true (0 moves)
+          test_drop_descends_and_blocked:      0 != 1 (never descended)
+        The other 3 (boxed_in_never_moves, blocked_by_ball, bottom_guard)
+        correctly still passed under the stub -- they assert absence of
+        movement, which a no-op also produces; that's expected, not a gap.
+        Restored src/block_system.c from a pre-edit backup immediately after
+        and re-verified both debug and ASan builds green.
+
+        git status --porcelain confirms only tests/test_block_system.c was
+        touched by this mission (other repo-wide diffs, e.g. src/block_system.c,
+        include/block_system.h, docs/DESIGN.md, src/game_modes.c, predate this
+        mission -- carried over from m-2026-07-15-003 on the same branch).

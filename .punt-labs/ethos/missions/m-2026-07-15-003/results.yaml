@@ -1,0 +1,52 @@
+results:
+    - mission: m-2026-07-15-003
+      round: 1
+      created_at: "2026-07-15T04:17:27Z"
+      author: jdc
+      verdict: pass
+      confidence: 0.9
+      files_changed:
+        - path: include/block_system.h
+          added: 77
+          removed: 0
+        - path: src/block_system.c
+          added: 149
+          removed: 2
+        - path: src/game_modes.c
+          added: 24
+          removed: 2
+      evidence:
+        - name: Ported CheckAdjacentBlocks (bounds, !occupied, !exploding, r+1<MAX_ROW-2, no ball in cell) + ROAMER move + DROP move from original/blocks.c:1220-1256,1364-1421,1447-1474
+          status: pass
+        - name: 'Seam: block_system_update_movement(ctx, frame, balls, nballs) from mode_game_update after advance_animations; balls via ball_system_get_render_info -> block_system_ball_pos_t; ball->cell = x/col_width,y/row_height (X2COL/Y2ROW)'
+          status: pass
+        - name: 'Iteration safety: forward scan; placed blocks get timers >= frame+50 (roamer)/+200 (drop) so a rightward/downward-moved block can''t retrigger same tick; leftward/upward land on already-scanned cells. At most one move/tick.'
+          status: pass
+        - name: Removed deterministic ROAMER eye-cycle from advance_animations; eyes rand-scheduled inside movement update. rand() timers, not frame/DELAY%N.
+          status: pass
+        - name: 'Scratch harness: roamer free-cell moved (5,4)->(4,4) f549; boxed-in stayed 5000 ticks; DROP (3,2)->(4,2) f224. Build zero-warning; ctest 61/61; only 3 write_set files.'
+          status: pass
+        - name: 'DEVIATION FOR JCK RULING: original d=bonus_slide+1 (blocks.c:1377) off-by-one — bonus_slide 0->left..3->down, 4->d=5->default->STALE r1/c1 from a prior block. jdc mapped eye value directly (0=neutral=no-move,1=L,2=R,3=U,4=D). Player-observable: original 0 always moves (left); jdc 0=no-move. jck must rule faithful vs literal.'
+          status: skip
+    - mission: m-2026-07-15-003
+      round: 2
+      created_at: "2026-07-15T04:30:48Z"
+      author: jdc
+      verdict: pass
+      confidence: 0.95
+      files_changed:
+        - path: src/block_system.c
+          added: 24
+          removed: 11
+        - path: include/block_system.h
+          added: 9
+          removed: 10
+      evidence:
+        - name: 'Move-direction maps all 5 rolled values: 0=L,1=R,2=U,3=D,4=L wrap; matches original 0-3, replaces stale-fallthrough deterministically; no no-move branch'
+          status: pass
+        - name: Every move-timer firing attempts a move (frequency matches original); blocked roamer still waits (check_adjacent + reschedule unchanged)
+          status: pass
+        - name: Eye sprite rand()%5 on eye timer, consumed by move switch — faithful to blocks.c:1372,1377; comments cite original/blocks.c:1377
+          status: pass
+        - name: Round-1 approvals unchanged; build zero-warning -Werror -Wconversion -Wshadow; ctest 61/61; only write_set files changed
+          status: pass

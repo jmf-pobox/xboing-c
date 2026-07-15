@@ -299,8 +299,30 @@ static void mode_game_update(sdl2_state_mode_t mode, void *ud)
     gun_system_env_t genv = game_callbacks_gun_env(ctx);
     gun_system_update(ctx->gun, &genv);
 
-    /* Block animation slides (BONUS/DEATH/EXTRABALL/ROAMER cycling) */
-    block_system_advance_animations(ctx->block, (int)sdl2_state_frame(ctx->state));
+    /* Block animation slides (BONUS/DEATH/EXTRABALL cycling) */
+    int game_frame = (int)sdl2_state_frame(ctx->state);
+    block_system_advance_animations(ctx->block, game_frame);
+
+    /* ROAMER_BLK / DROP_BLK grid movement — needs live ball positions for
+     * the adjacency check (original/blocks.c:1239-1252). */
+    block_system_ball_pos_t ball_positions[MAX_BALLS];
+    for (int i = 0; i < MAX_BALLS; i++)
+    {
+        ball_system_render_info_t ball_info;
+        if (ball_system_get_render_info(ctx->ball, i, &ball_info) == BALL_SYS_OK)
+        {
+            ball_positions[i].active = ball_info.active;
+            ball_positions[i].x = ball_info.x;
+            ball_positions[i].y = ball_info.y;
+        }
+        else
+        {
+            ball_positions[i].active = 0;
+            ball_positions[i].x = 0;
+            ball_positions[i].y = 0;
+        }
+    }
+    block_system_update_movement(ctx->block, game_frame, ball_positions, MAX_BALLS);
 
     /* Block explosion state machine — advances exploding blocks one stage
      * per tick at BLOCK_EXPLODE_DELAY=10 ticks/stage, fires the finalize

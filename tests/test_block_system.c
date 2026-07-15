@@ -564,6 +564,237 @@ static void test_savegame_accessors_unoccupied(void **state)
 }
 
 /* =========================================================================
+ * Group 11: ROAMER_BLK / DROP_BLK movement (mission m-2026-07-15-003,
+ * ADR-070).  Ports original/blocks.c:1364-1421 (ROAMER_BLK eye + move
+ * timers) and :1447-1474 (DROP_BLK drop timer), gated by the adjacency
+ * check at :1220-1256 (CheckAdjacentBlocks).
+ * ========================================================================= */
+
+/* Scan the grid for a ROAMER_BLK cell.  Returns 1 and writes the position
+ * to *out_r and *out_c if found, 0 if the grid has no ROAMER_BLK left. */
+static int find_roamer(const block_system_t *ctx, int *out_r, int *out_c)
+{
+    for (int r = 0; r < MAX_ROW; r++)
+    {
+        for (int c = 0; c < MAX_COL; c++)
+        {
+            if (block_system_get_type(ctx, r, c) == ROAMER_BLK)
+            {
+                *out_r = r;
+                *out_c = c;
+                return 1;
+            }
+        }
+    }
+    return 0;
+}
+
+/* TC-35: A lone ROAMER_BLK with all four neighbors free relocates to an
+ * orthogonal neighbor within a bounded number of frames. */
+static void test_roamer_moves_to_free_neighbor(void **state)
+{
+    (void)state;
+    srand(12345);
+    block_system_t *ctx = make_ctx();
+
+    const int r0 = 8;
+    const int c0 = 4;
+    block_system_add(ctx, r0, c0, ROAMER_BLK, 0, 0);
+
+    int moved = 0;
+    int new_r = -1;
+    int new_c = -1;
+    for (int frame = 1; frame <= 3000 && !moved; frame++)
+    {
+        block_system_update_movement(ctx, frame, NULL, 0);
+
+        if (block_system_get_type(ctx, r0, c0) != ROAMER_BLK)
+        {
+            moved = 1;
+            assert_int_equal(find_roamer(ctx, &new_r, &new_c), 1);
+        }
+    }
+
+    assert_int_equal(moved, 1);
+
+    /* Moved to an orthogonal (4-connected) neighbor, not a diagonal or a
+     * multi-cell jump. */
+    int dr = abs(new_r - r0);
+    int dc = abs(new_c - c0);
+    assert_true((dr == 1 && dc == 0) || (dr == 0 && dc == 1));
+
+    /* Original cell vacated. */
+    assert_int_equal(block_system_is_occupied(ctx, r0, c0), 0);
+
+    block_system_destroy(ctx);
+}
+
+/* TC-36: A ROAMER_BLK boxed in on all four orthogonal sides never leaves
+ * its cell, however many move-timer windows elapse.  Also exercises the
+ * grid-edge (out-of-bounds) rejection: the roamer sits at (0, 0) where
+ * left/up are out of bounds and right/down are occupied, so every one of
+ * the four candidate directions is rejected for a different reason. */
+static void test_roamer_boxed_in_never_moves(void **state)
+{
+    (void)state;
+    srand(2468);
+    block_system_t *ctx = make_ctx();
+
+    block_system_add(ctx, 0, 0, ROAMER_BLK, 0, 0);
+    block_system_add(ctx, 0, 1, RED_BLK, 0, 0); /* right neighbor: occupied */
+    block_system_add(ctx, 1, 0, RED_BLK, 0, 0); /* down neighbor: occupied */
+    /* Left/up are out of bounds — no block needed to reject them. */
+
+    for (int frame = 1; frame <= 5000; frame++)
+    {
+        block_system_update_movement(ctx, frame, NULL, 0);
+        assert_int_equal(block_system_get_type(ctx, 0, 0), ROAMER_BLK);
+    }
+
+    block_system_destroy(ctx);
+}
+
+/* TC-37: A ROAMER_BLK with exactly one free orthogonal neighbor, and a
+ * ball occupying that neighbor's grid cell, never moves — the ball
+ * adjacency check in check_adjacent() rejects the only otherwise-legal
+ * destination.  Coordinate mapping matches check_adjacent(): ball_col =
+ * x / col_width, ball_row = y / row_height (original/blocks.c:179-180
+ * X2COL/Y2ROW), so a ball at (col * COL_WIDTH, row * ROW_HEIGHT) maps
+ * exactly to grid cell (row, col). */
+static void test_roamer_blocked_by_ball_in_only_free_cell(void **state)
+{
+    (void)state;
+    srand(13579);
+    block_system_t *ctx = make_ctx();
+
+    const int r0 = 8;
+    const int c0 = 4;
+    block_system_add(ctx, r0, c0, ROAMER_BLK, 0, 0);
+    block_system_add(ctx, r0 - 1, c0, RED_BLK, 0, 0); /* up: occupied */
+    block_system_add(ctx, r0 + 1, c0, RED_BLK, 0, 0); /* down: occupied */
+    block_system_add(ctx, r0, c0 - 1, RED_BLK, 0, 0); /* left: occupied */
+    /* right (r0, c0 + 1) is the only free neighbor. */
+
+    block_system_ball_pos_t balls[1];
+    balls[0].active = 1;
+    balls[0].x = (c0 + 1) * COL_WIDTH;
+    balls[0].y = r0 * ROW_HEIGHT;
+
+    for (int frame = 1; frame <= 5000; frame++)
+    {
+        block_system_update_movement(ctx, frame, balls, 1);
+        assert_int_equal(block_system_get_type(ctx, r0, c0), ROAMER_BLK);
+    }
+
+    /* The ball-occupied cell never received the roamer. */
+    assert_int_equal(block_system_get_type(ctx, r0, c0 + 1), NONE_BLK);
+
+    block_system_destroy(ctx);
+}
+
+/* TC-38: A lone ROAMER_BLK with open space in every direction relocates
+ * repeatedly over a long run.  A regression to "0/4 directions attempt a
+ * move" (round-2 fix, ADR-070) would show up here as zero or one
+ * relocation instead of several. */
+static void test_roamer_moves_repeatedly(void **state)
+{
+    (void)state;
+    srand(97531);
+    block_system_t *ctx = make_ctx();
+
+    int cur_r = 9;
+    int cur_c = 4;
+    block_system_add(ctx, cur_r, cur_c, ROAMER_BLK, 0, 0);
+
+    int move_count = 0;
+    for (int frame = 1; frame <= 30000; frame++)
+    {
+        block_system_update_movement(ctx, frame, NULL, 0);
+
+        if (block_system_get_type(ctx, cur_r, cur_c) != ROAMER_BLK)
+        {
+            assert_int_equal(find_roamer(ctx, &cur_r, &cur_c), 1);
+            move_count++;
+        }
+    }
+
+    /* Robust to the specific seed: assert "moved repeatedly", not an exact
+     * count. */
+    assert_true(move_count >= 3);
+
+    block_system_destroy(ctx);
+}
+
+/* TC-39: A DROP_BLK with a free cell below descends one row; the source
+ * cell is cleared and the destination is a fresh DROP_BLK.  A second
+ * DROP_BLK whose cell below is permanently occupied never moves. */
+static void test_drop_descends_and_blocked(void **state)
+{
+    (void)state;
+    srand(24680);
+    block_system_t *ctx = make_ctx();
+
+    /* Column 2: free cell below — expected to descend. */
+    block_system_add(ctx, 5, 2, DROP_BLK, 0, 0);
+
+    /* Column 3: cell below permanently occupied — expected to stay put. */
+    block_system_add(ctx, 5, 3, DROP_BLK, 0, 0);
+    block_system_add(ctx, 6, 3, RED_BLK, 0, 0);
+
+    /* Stop at the first descent of the column-2 block.  Looping further
+     * would let the freshly-placed DROP_BLK at (6, 2) roll its own timer
+     * and descend again, which is a correct-but-confounding second move
+     * for this assertion (it only cares about "descends once"). */
+    int moved = 0;
+    for (int frame = 1; frame <= 2500 && !moved; frame++)
+    {
+        block_system_update_movement(ctx, frame, NULL, 0);
+        if (!block_system_is_occupied(ctx, 5, 2))
+        {
+            moved = 1;
+        }
+    }
+    assert_int_equal(moved, 1);
+
+    /* Descended: old cell clear, new cell holds a fresh DROP_BLK. */
+    assert_int_equal(block_system_get_type(ctx, 6, 2), DROP_BLK);
+
+    /* Blocked: DROP_BLK never moved, blocking RED_BLK untouched. */
+    assert_int_equal(block_system_get_type(ctx, 5, 3), DROP_BLK);
+    assert_int_equal(block_system_get_type(ctx, 6, 3), RED_BLK);
+
+    block_system_destroy(ctx);
+}
+
+/* TC-40: A DROP_BLK whose destination row falls within the bottom two
+ * rows (paddle clearance) never descends, even with a free cell below —
+ * the (row + 1) >= MAX_ROW - 2 guard in check_adjacent() (where `row` is
+ * the candidate destination row) rejects the move unconditionally.
+ * MAX_ROW - 2 == 16, so a DROP_BLK at row 14 (destination row 15) is the
+ * boundary case: 15 + 1 == 16 >= MAX_ROW - 2. */
+static void test_drop_bottom_guard_blocks_move(void **state)
+{
+    (void)state;
+    srand(11223);
+    block_system_t *ctx = make_ctx();
+
+    const int r0 = 14;
+    const int c0 = 5;
+    block_system_add(ctx, r0, c0, DROP_BLK, 0, 0);
+    /* Cell below is free — the guard alone must block the move. */
+
+    for (int frame = 1; frame <= 2500; frame++)
+    {
+        block_system_update_movement(ctx, frame, NULL, 0);
+        assert_int_equal(block_system_get_type(ctx, r0, c0), DROP_BLK);
+    }
+
+    assert_int_equal(block_system_is_occupied(ctx, r0 + 1, c0), 0);
+
+    block_system_destroy(ctx);
+}
+
+/* =========================================================================
  * Test runner
  * ========================================================================= */
 
@@ -617,6 +848,14 @@ int main(void)
         cmocka_unit_test(test_get_black_next_frame_wrong_type),
         cmocka_unit_test(test_get_random_roundtrip),
         cmocka_unit_test(test_savegame_accessors_unoccupied),
+
+        /* Group 11: ROAMER_BLK / DROP_BLK movement */
+        cmocka_unit_test(test_roamer_moves_to_free_neighbor),
+        cmocka_unit_test(test_roamer_boxed_in_never_moves),
+        cmocka_unit_test(test_roamer_blocked_by_ball_in_only_free_cell),
+        cmocka_unit_test(test_roamer_moves_repeatedly),
+        cmocka_unit_test(test_drop_descends_and_blocked),
+        cmocka_unit_test(test_drop_bottom_guard_blocks_move),
     };
 
     return cmocka_run_group_tests(tests, NULL, NULL);

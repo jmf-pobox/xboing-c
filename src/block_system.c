@@ -633,13 +633,171 @@ void block_system_advance_animations(block_system_t *ctx, int frame)
                     bp->bonus_slide = (frame / BLOCK_EXTRABALL_DELAY) % 2;
                     break;
 
-                case ROAMER_BLK:
-                    /* 5 directions: neutral, L, R, U, D */
-                    bp->bonus_slide = (frame / BLOCK_ROAM_EYES_DELAY) % 5;
-                    break;
+                /* ROAMER_BLK's bonus_slide (eye direction) is driven by
+                 * the rand()-scheduled eye timer in
+                 * block_system_update_movement, not a deterministic
+                 * cycle — see original/blocks.c:1364-1373. */
 
                 default:
                     break;
+            }
+        }
+    }
+}
+
+/* =========================================================================
+ * ROAMER_BLK / DROP_BLK grid movement
+ * ========================================================================= */
+
+/*
+ * Port of CheckAdjacentBlocks() (original/blocks.c:1220-1256).  Returns
+ * nonzero iff a ROAMER_BLK/DROP_BLK may move INTO (row, col): in bounds,
+ * unoccupied, not exploding, at least two rows clear of the paddle, and
+ * no active ball currently sits in that cell.
+ */
+static int check_adjacent(const block_system_t *ctx, int row, int col,
+                          const block_system_ball_pos_t *balls, int nballs)
+{
+    if (row < 0 || row >= MAX_ROW)
+    {
+        return 0;
+    }
+    if (col < 0 || col >= MAX_COL)
+    {
+        return 0;
+    }
+
+    const block_entry_t *bp = &ctx->blocks[row][col];
+    if (bp->occupied || bp->exploding)
+    {
+        return 0;
+    }
+
+    /* Keeps moving blocks out of the bottom two rows, off the paddle
+     * (original/blocks.c:1236-1237). */
+    if ((row + 1) >= (MAX_ROW - 2))
+    {
+        return 0;
+    }
+
+    for (int i = 0; i < nballs; i++)
+    {
+        if (!balls[i].active)
+        {
+            continue;
+        }
+
+        /* original/blocks.c:179-180 X2COL/Y2ROW: col = x / colWidth,
+         * row = y / rowHeight. */
+        int ball_col = balls[i].x / ctx->col_width;
+        int ball_row = balls[i].y / ctx->row_height;
+
+        if (ball_row == row && ball_col == col)
+        {
+            return 0;
+        }
+    }
+
+    return 1;
+}
+
+void block_system_update_movement(block_system_t *ctx, int frame,
+                                  const block_system_ball_pos_t *balls, int nballs)
+{
+    if (ctx == NULL)
+    {
+        return;
+    }
+    if (balls == NULL)
+    {
+        nballs = 0;
+    }
+
+    for (int r = 0; r < MAX_ROW; r++)
+    {
+        for (int c = 0; c < MAX_COL; c++)
+        {
+            block_entry_t *bp = &ctx->blocks[r][c];
+            if (!bp->occupied)
+            {
+                continue;
+            }
+
+            /* ROAMER_BLK: eye timer + move timer (original/blocks.c:1364-1421). */
+            if (bp->block_type == ROAMER_BLK)
+            {
+                if (bp->next_frame == frame)
+                {
+                    /* Eye timer fires: reroll gaze direction. */
+                    bp->next_frame = frame + (rand() % BLOCK_ROAM_EYES_DELAY) + 50;
+                    bp->bonus_slide = rand() % 5;
+                }
+                else if (bp->last_frame == frame)
+                {
+                    /* Move timer fires: every firing attempts a real move
+                     * (jck ruling, round 2 — original/blocks.c:1377 maps
+                     * bonus_slide 1-4 to L/R/U/D via `d = bonus_slide + 1`
+                     * and silently falls through to a stale r1/c1 from a
+                     * prior block's move on the 0/5 cases, but it always
+                     * *attempts* a move on every firing; a naive 0=neutral
+                     * port would skip ~1/5 of firings and understate
+                     * roamer wander frequency ~20% on roamer-dense
+                     * levels).  This port maps all 5 rolled eye values to
+                     * a direction so every firing attempts a move,
+                     * without reproducing the stale-variable bug: 0=L,
+                     * 1=R, 2=U, 3=D match the original's 0-3 exactly, and
+                     * 4 wraps to L (deterministic substitute for the
+                     * original's stale fallthrough on d==5). The eye
+                     * sprite roll (bonus_slide) stays a plain rand() % 5
+                     * above — eye/move alignment is cosmetic and not
+                     * required to match. */
+                    int dr = 0;
+                    int dc = 0;
+                    switch (bp->bonus_slide)
+                    {
+                        case 0:
+                            dc = -1;
+                            break;
+                        case 1:
+                            dc = 1;
+                            break;
+                        case 2:
+                            dr = -1;
+                            break;
+                        case 3:
+                            dr = 1;
+                            break;
+                        case 4:
+                            dc = -1;
+                            break;
+                        default:
+                            break;
+                    }
+
+                    if (check_adjacent(ctx, r + dr, c + dc, balls, nballs))
+                    {
+                        block_system_add(ctx, r + dr, c + dc, ROAMER_BLK, 0, frame);
+                        clear_entry(bp, &ctx->blocks_exploding);
+                    }
+                    else
+                    {
+                        bp->last_frame = frame + (rand() % BLOCK_ROAM_DELAY) + 300;
+                    }
+                }
+            }
+
+            /* DROP_BLK: single drop timer (original/blocks.c:1447-1474). */
+            if (bp->drop && bp->next_frame == frame)
+            {
+                if (check_adjacent(ctx, r + 1, c, balls, nballs))
+                {
+                    block_system_add(ctx, r + 1, c, DROP_BLK, 0, frame);
+                    clear_entry(bp, &ctx->blocks_exploding);
+                }
+                else
+                {
+                    bp->next_frame = frame + BLOCK_DROP_DELAY;
+                }
             }
         }
     }
