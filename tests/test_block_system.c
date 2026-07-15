@@ -1003,6 +1003,101 @@ static void test_random_block_morphs_when_loaded_at_frame0(void **state)
 }
 
 /* =========================================================================
+ * Group 13: exploding-block movement/morph guard (mission m-2026-07-15-016)
+ *
+ * block_system_update_movement skips exploding cells entirely (the
+ * `if (bp->exploding) continue;` guard, src/block_system.c:763). Without
+ * it, an occupied+exploding RANDOM/ROAMER/DROP block whose timer is due
+ * gets morphed/moved out from under the explosion animation, and a
+ * successful ROAMER/DROP move calls clear_entry() -- decrementing
+ * ctx->blocks_exploding and vacating the cell before the explosion
+ * finalize callback (block_system_update_explosions) ever fires,
+ * silently dropping the scoring/finalize side effect for that block.
+ * ========================================================================= */
+
+/* TC-45: An occupied+exploding RANDOM_BLK whose morph timer is due is
+ * neither morphed nor uncounted by block_system_update_movement -- the
+ * exploding guard must run before the RANDOM_BLK morph branch. */
+static void test_exploding_random_block_not_morphed_or_cleared(void **state)
+{
+    (void)state;
+    srand(31415);
+    block_system_t *ctx = make_ctx();
+
+    const int r0 = 6;
+    const int c0 = 3;
+
+    /* frame=0 -> next_frame = 0 + 1 = 1, so the morph timer is already due
+     * by the time update_movement is called at frame=100 below. */
+    block_system_add(ctx, r0, c0, RANDOM_BLK, 0, 0);
+    assert_int_equal(block_system_get_type(ctx, r0, c0), RED_BLK);
+
+    block_system_status_t st = block_system_explode(ctx, r0, c0, 0);
+    assert_int_equal(st, BLOCK_SYS_OK);
+
+    int before = block_system_get_exploding_count(ctx);
+    assert_int_equal(before, 1);
+    int type_before = block_system_get_type(ctx, r0, c0);
+
+    block_system_update_movement(ctx, 100, NULL, 0);
+
+    /* Exploding count untouched -- the RANDOM_BLK morph branch never
+     * calls clear_entry itself, but this is the definitive "did the
+     * guard run" signal for the sibling ROAMER/DROP branches that do. */
+    assert_int_equal(block_system_get_exploding_count(ctx), before);
+
+    /* Still occupied, still the pre-morph type -- the
+     * `if (bp->exploding) continue;` guard must skip the whole movement
+     * body, including the RANDOM_BLK morph branch below it. */
+    assert_int_equal(block_system_is_occupied(ctx, r0, c0), 1);
+    assert_int_equal(block_system_get_type(ctx, r0, c0), type_before);
+
+    block_system_render_info_t info;
+    block_system_get_render_info(ctx, r0, c0, &info);
+    assert_int_equal(info.exploding, 1);
+
+    block_system_destroy(ctx);
+}
+
+/* TC-46: An occupied+exploding ROAMER_BLK with a free orthogonal neighbor
+ * is never relocated by block_system_update_movement, however many
+ * move-timer windows elapse -- and ctx->blocks_exploding never drops.
+ * Same seed (12345), same origin cell (8, 4), and the same 3000-frame
+ * bound as test_roamer_moves_to_free_neighbor, which proves this exact
+ * setup relocates well within the loop when the block is NOT exploding.
+ * Without the exploding guard, the successful move's clear_entry() call
+ * would both vacate the cell and decrement blocks_exploding out from
+ * under the pending explosion -- silently skipping the finalize scoring
+ * callback. */
+static void test_exploding_roamer_block_not_moved_or_cleared(void **state)
+{
+    (void)state;
+    srand(12345);
+    block_system_t *ctx = make_ctx();
+
+    const int r0 = 8;
+    const int c0 = 4;
+    block_system_add(ctx, r0, c0, ROAMER_BLK, 0, 0);
+
+    block_system_status_t st = block_system_explode(ctx, r0, c0, 0);
+    assert_int_equal(st, BLOCK_SYS_OK);
+
+    int before = block_system_get_exploding_count(ctx);
+    assert_int_equal(before, 1);
+
+    for (int frame = 1; frame <= 3000; frame++)
+    {
+        block_system_update_movement(ctx, frame, NULL, 0);
+
+        assert_int_equal(block_system_get_exploding_count(ctx), before);
+        assert_int_equal(block_system_is_occupied(ctx, r0, c0), 1);
+        assert_int_equal(block_system_get_type(ctx, r0, c0), ROAMER_BLK);
+    }
+
+    block_system_destroy(ctx);
+}
+
+/* =========================================================================
  * Test runner
  * ========================================================================= */
 
@@ -1070,6 +1165,10 @@ int main(void)
         cmocka_unit_test(test_random_block_keeps_morphing),
         cmocka_unit_test(test_non_random_block_never_morphs),
         cmocka_unit_test(test_random_block_morphs_when_loaded_at_frame0),
+
+        /* Group 13: exploding-block movement/morph guard */
+        cmocka_unit_test(test_exploding_random_block_not_morphed_or_cleared),
+        cmocka_unit_test(test_exploding_roamer_block_not_moved_or_cleared),
     };
 
     return cmocka_run_group_tests(tests, NULL, NULL);

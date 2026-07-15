@@ -1,0 +1,31 @@
+mission_id: m-2026-07-15-016
+status: closed
+type: implement
+created_at: "2026-07-15T20:45:44Z"
+updated_at: "2026-07-15T20:52:57Z"
+closed_at: "2026-07-15T20:52:57Z"
+leader: claude
+worker: gjm
+evaluator:
+    handle: jdc
+    pinned_at: "2026-07-15T20:45:44Z"
+    hash: c08223356d3e6d5aed56e28da477a1aa2707509febfef7c5f62c25871a3e841f
+inputs: {}
+write_set:
+    - tests/test_block_system.c
+success_criteria:
+    - Add a regression test to tests/test_block_system.c pinning the exploding-block guard added in mission m-2026-07-15-015 (block_system_update_movement now skips bp->exploding cells). Register it in the tests[] runner.
+    - 'Test the discriminating case: seed a block that both (a) has a movement/morph/drop timer that is DUE and (b) is exploding, then call block_system_update_movement and assert it was NOT moved/morphed/dropped and ctx->blocks_exploding is UNCHANGED. Prefer a RANDOM_BLK (simplest: block_system_add with random flag, next_frame due) so the assertion is "block_type did not morph away" AND "blocks_exploding count preserved". If a roamer/drop variant is cheap, add it too (optional).'
+    - 'Use the public API to drive it: block_system_add to place the block at frame 0; the public explosion-start function (inspect include/block_system.h / src/block_system.c — e.g. block_system_explode / block_system_start_explode / block_system_hit — find the real symbol) to set it exploding; capture block_system_get_exploding_count(ctx) before; call block_system_update_movement(ctx, frame>=due, NULL, 0); assert the exploding count is identical after and the block did not relocate/morph. Do NOT call any static function.'
+    - 'RED-prove: with the guard removed (delete the `if (bp->exploding) continue;` in src/block_system.c — an out-of-tree/temporary edit you revert byte-for-byte; src is OUTSIDE your write_set, restore via git checkout and verify clean) the new test must FAIL (exploding block morphs/moves and/or blocks_exploding drops), while it PASSES with the guard. Report the exact failure.'
+    - Deterministic srand; asan-clean; free the ctx; only tests/test_block_system.c changes. ctest --test-dir build -R test_block_system green under debug AND asan.
+budget:
+    rounds: 2
+    reflection_after_each: true
+current_round: 1
+context: |-
+    PR #187 review round 2. Copilot found block_system_update_movement processed
+    occupied+exploding blocks, so an exploding roamer/random/drop with a due timer got
+    moved/morphed and clear_entry decremented blocks_exploding + skipped the scoring
+    finalize. jdc fixed it (mission m-2026-07-15-015) with `if (bp->exploding) continue;`.
+    This mission adds the regression test that pins it. jck confirmed the fix is faithful.

@@ -1,0 +1,16 @@
+reflections:
+    - round: 1
+      created_at: "2026-07-15T20:52:35Z"
+      author: jdc
+      converging: true
+      signals:
+        - 'Discriminating (RANDOM_BLK): test_exploding_random_block_not_morphed_or_cleared arms via public block_system_add(RANDOM_BLK, frame=0) so the morph timer is due (next_frame=1) by frame=100, then block_system_explode(...,0) sets exploding=1, then block_system_update_movement(ctx,100,...) is called. Asserts blocks_exploding unchanged, still occupied, get_type==type_before, render_info.exploding==1.'
+        - 'Discriminating (ROAMER_BLK): test_exploding_roamer_block_not_moved_or_cleared uses srand(12345), origin (8,4), ROAMER_BLK, 3000-frame loop bound -- byte-identical setup to the existing test_roamer_moves_to_free_neighbor (tests/test_block_system.c:594-630), which proves this exact config relocates well within the loop when NOT exploding. The only delta is the block_system_explode(...,0) call before the loop, so the test is genuinely discriminating: if it fails, the guard (not the setup) is the cause.'
+        - 'RED-proof executed personally: temporarily replaced `if (bp->exploding)` with `if (0 && bp->exploding)` at src/block_system.c:763 (out-of-tree edit, src is outside my write_set), rebuilt test_block_system, ran it.'
+        - 'RED result -- RANDOM test: FAILED at tests/test_block_system.c:1053, assert_int_equal(block_system_get_type(ctx,r0,c0), type_before) -- "1 != 0" (RED_BLK morphed to a different block_type under the disabled guard).'
+        - 'RED result -- ROAMER test: FAILED at tests/test_block_system.c:1092, assert_int_equal(block_system_get_exploding_count(ctx), before) -- "0 != 1" (successful move''s clear_entry() decremented blocks_exploding from 1 to 0, confirming the finalize-skip bug Copilot found).'
+        - 'GREEN restore: `git checkout -- src/block_system.c`, confirmed `git diff --stat src/block_system.c` empty. Rebuilt test_block_system (debug); both new tests PASS; full suite 40/40 (test_block_system + test_block_system_check_region + test_block_system_explosion all green).'
+        - 'ctest --test-dir build -R test_block_system: 3/3 passed (0.28s). ctest --test-dir build-asan -R test_block_system: 3/3 passed (0.99s), no ASan/UBSan findings.'
+        - 'Robustness: only public API calls (block_system_add/explode/get_exploding_count/get_type/is_occupied/get_render_info/update_movement/destroy) -- no static-function calls. srand(31415) and srand(12345) are fixed literals -- deterministic. Both tests call block_system_destroy(ctx). Both registered in the tests[] array under a new "Group 13" comment block. git status confirms only tests/test_block_system.c changed; src/block_system.c diff is empty after restore.'
+      recommendation: stop
+      reason: Both regression tests are genuinely discriminating (roamer test reuses the exact seed/origin/loop-bound proven to relocate when not exploding), driven entirely through the public API, and I personally reproduced the RED failures the contract demanded (RANDOM_BLK morph-type mismatch at line 1053, ROAMER blocks_exploding drop at line 1092) with the guard disabled, then confirmed GREEN with the guard restored byte-for-byte. Debug and ASan ctest both green, only tests/test_block_system.c changed. All five success criteria satisfied.
