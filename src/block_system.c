@@ -633,10 +633,11 @@ void block_system_advance_animations(block_system_t *ctx, int frame)
                     bp->bonus_slide = (frame / BLOCK_EXTRABALL_DELAY) % 2;
                     break;
 
-                    /* ROAMER_BLK's bonus_slide (eye direction) is driven by
-                     * the rand()-scheduled eye timer in
-                     * block_system_update_movement, not a deterministic
-                     * cycle — see original/blocks.c:1364-1373. */
+                case ROAMER_BLK:
+                    /* Eye direction is driven by the rand()-scheduled eye
+                     * timer in block_system_update_movement, not a
+                     * deterministic cycle — see original/blocks.c:1364-1373. */
+                    break;
 
                 default:
                     break;
@@ -749,6 +750,17 @@ void block_system_update_movement(block_system_t *ctx, int frame,
         {
             block_entry_t *bp = &ctx->blocks[r][c];
             if (!bp->occupied)
+            {
+                continue;
+            }
+
+            /* An exploding block is mid-finalize: skip movement/morph/drop
+             * so clear_entry() can't decrement blocks_exploding out from
+             * under the explosion path (see :83) or vacate the cell before
+             * its scoring callback fires. Matches check_adjacent (:701) and
+             * the placement guards (:1036, :1110). original/blocks.c:1834
+             * keeps such a block occupied+exploding with its type intact. */
+            if (bp->exploding)
             {
                 continue;
             }

@@ -1,0 +1,15 @@
+reflections:
+    - round: 1
+      created_at: "2026-07-15T20:44:48Z"
+      author: jck
+      converging: true
+      signals:
+        - 'Finding A guard placement verified: after !occupied, before ROAMER/RANDOM/DROP handlers — all three excluded when bp->exploding.'
+        - block_start_explode sets exploding=1 keeping occupied=1; clear_entry (83-86) decrements blocks_exploding — without guard a due-timer exploding block corrupts count + skips scoring finalize.
+        - 'CORRECTION to contract rationale: original ClearBlock (blocks.c:2559-2560) ALSO decrements blocksExploding; clear_entry is a faithful port, not a modern-only hazard. The race existed in the original (HandlePendingAnimations guards only occupied, blocks.c:1273).'
+        - 'Original patched the race inconsistently: SetBlockUpForExplosion resets drop=False for DROP_BLK (blocks.c:1840-1842); HandlePendingSpecials double-decrements via ''Maybe somehow got here'' (blocks.c:1178); NO guard for ROAMER/RANDOM. The >= timer broadening makes it reachable — Copilot caught it as live.'
+        - Guard generalizes the original's intent (protect explosion finalize/scoring); no player-visible cadence change for non-exploding blocks. Finding B behavior-identical (explicit case vs fall-to-default).
+        - 'No collateral: timer values, direction map, >= gates, get_random_block_type, adjacency unchanged.'
+        - Build/CI not re-verified by evaluator (no Bash); leader confirms CI green on push.
+      recommendation: stop
+      reason: 'Both findings fix real defects without changing game feel. Finding A closes an explosion/scoring corruption race present in embryonic, inconsistently-patched form in the original and made reachable by modern >= semantics — a faithful generalization, not a redesign. Finding B is a readability no-op. Approved. Keep commit rationale accurate: the original DID decrement via ClearBlock.'

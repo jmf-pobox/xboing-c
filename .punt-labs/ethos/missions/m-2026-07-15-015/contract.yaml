@@ -1,0 +1,31 @@
+mission_id: m-2026-07-15-015
+status: closed
+type: implement
+created_at: "2026-07-15T20:37:39Z"
+updated_at: "2026-07-15T20:44:53Z"
+closed_at: "2026-07-15T20:44:53Z"
+leader: claude
+worker: jdc
+evaluator:
+    handle: jck
+    pinned_at: "2026-07-15T20:37:39Z"
+    hash: 40cbe1204f644c77e6a26757a9b855e3298be267025e806d425bfdea99054f18
+inputs: {}
+write_set:
+    - src/block_system.c
+success_criteria:
+    - 'Fix two Copilot review findings on src/block_system.c (PR #187, both valid).'
+    - 'Finding A (correctness, block_system_update_movement ~line 750): the movement loop only skips `!bp->occupied`, so a block that is occupied AND exploding (bp->exploding==1) is still processed — its roamer move (line ~819-820), RANDOM morph (~839-843), or DROP (~853-854) can fire, and clear_entry() then DECREMENTS ctx->blocks_exploding (block_system.c:83-85) and vacates the source cell, aborting the in-progress explosion''s finalize/scoring callback (block_system_advance/explode path ~588-594). Add a guard `if (bp->exploding) { continue; }` immediately after the `!bp->occupied` continue at the top of the cell loop, so exploding blocks are excluded from movement/morph/drop — matching every sibling traversal in this file (check_adjacent :701, block_system_check_region_bbox :1025, placement guard :1099). Cite the invariant in a brief comment. This is FAITHFUL to the original (original/blocks.c:1834 SetBlockUpForExplosion sets exploding=True but the original''s move path never decremented the exploding counter, whereas the modern clear_entry does — so the guard restores original explosion/scoring behavior; jck gates this).'
+    - 'Finding B (readability, block_system_advance_animations ~line 636-640): the ROAMER_BLK explanatory comment is a free-floating comment inside the `switch (block_type)` with no `case ROAMER_BLK:` label, easy to misread as dead switch logic. Add an explicit `case ROAMER_BLK:` label carrying that comment and a `break;` (behavior identical — it currently falls to `default: break;`). Keep the comment content.'
+    - 'Preserve everything else: timer values, direction map, >= gates, get_random_block_type, adjacency logic. cmake --preset debug && cmake --build build zero-warning under -Werror -Wconversion -Wshadow. Full ctest --test-dir build green AND make asan-test green. Only src/block_system.c changes.'
+budget:
+    rounds: 2
+    reflection_after_each: true
+current_round: 1
+context: |-
+    PR #187 review round 2. Copilot found two issues in the new block-movement code.
+    A is a real explosion/scoring corruption race (exploding blocks not excluded from the
+    movement loop, and the modern clear_entry decrements blocks_exploding). B is a
+    readability fix (explicit ROAMER_BLK case). A sibling gjm mission will add a regression
+    test for A; this mission is the src fix only. jck evaluates faithfulness because the
+    guard affects explosion finalize and scoring.
