@@ -632,8 +632,9 @@ static void test_roamer_moves_to_free_neighbor(void **state)
 /* TC-36: A ROAMER_BLK boxed in on all four orthogonal sides never leaves
  * its cell, however many move-timer windows elapse.  Also exercises the
  * grid-edge (out-of-bounds) rejection: the roamer sits at (0, 0) where
- * left/up are out of bounds and right/down are occupied, so every one of
- * the four candidate directions is rejected for a different reason. */
+ * left/up are out of bounds and right/down are occupied, so all four
+ * candidate directions are rejected — the two edge sides as off-grid, the
+ * two interior sides as filled. */
 static void test_roamer_boxed_in_never_moves(void **state)
 {
     (void)state;
@@ -994,8 +995,8 @@ static void test_random_block_morphs_when_loaded_at_frame0(void **state)
 
     /* Under the bug (`== frame`), next_frame=1 never matches frame>=100
      * and this stays at 1 (only the post-add RED_BLK seen).  The fix
-     * (`>= frame`) catches up on the very first update call and keeps
-     * re-morphing, so at least two distinct types are observed. */
+     * (`frame >= next_frame`) catches up on the very first update call and
+     * keeps re-morphing, so at least two distinct types are observed. */
     assert_true(distinct_count >= 2);
 
     block_system_destroy(ctx);

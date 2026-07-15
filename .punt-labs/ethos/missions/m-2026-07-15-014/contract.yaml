@@ -1,0 +1,28 @@
+mission_id: m-2026-07-15-014
+status: closed
+type: implement
+created_at: "2026-07-15T20:29:21Z"
+updated_at: "2026-07-15T20:31:11Z"
+closed_at: "2026-07-15T20:31:11Z"
+leader: claude
+worker: gjm
+evaluator:
+    handle: jdc
+    pinned_at: "2026-07-15T20:29:21Z"
+    hash: c08223356d3e6d5aed56e28da477a1aa2707509febfef7c5f62c25871a3e841f
+inputs: {}
+write_set:
+    - tests/test_block_system.c
+success_criteria:
+    - Fix two Copilot review comment-accuracy findings in tests/test_block_system.c (comment wording ONLY — no code/logic/assert/seed changes, no test behavior change).
+    - 'Finding 1 (TC-36 test_roamer_boxed_in_never_moves header comment, ~line 632-636): the comment says the roamer at (0,0) has "every one of the four candidate directions is rejected for a different reason." Inaccurate — left AND up are both rejected for the SAME reason (out of bounds), right AND down both for the SAME reason (occupied). Reword to two reasons not four, e.g. "left/up are out of bounds and right/down are occupied, so all four candidate directions are rejected — the two edge sides as off-grid, the two interior sides as filled."'
+    - 'Finding 2 (RANDOM morph assert comment, ~line 995): the comment writes the fixed condition as "(`>= frame`)", which is reversed/imprecise. The actual gate is `frame >= bp->next_frame`. Change the parenthetical to "(`frame >= next_frame`)". Keep the surrounding bug-vs-fix explanation intact.'
+    - cmake --build build --target test_block_system compiles; ctest --test-dir build -R test_block_system green. Only tests/test_block_system.c changes (git status --porcelain shows exactly that one file).
+budget:
+    rounds: 1
+    reflection_after_each: true
+current_round: 1
+context: |-
+    PR #187 review round 1. Copilot posted two inline comment-accuracy findings on the
+    regression tests (comment nits, zero behavior impact). Fix the wording to be accurate.
+    No code, assert, or seed changes.

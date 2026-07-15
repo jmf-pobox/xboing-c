@@ -1,0 +1,14 @@
+reflections:
+    - round: 1
+      created_at: "2026-07-15T20:30:55Z"
+      author: jdc
+      converging: true
+      signals:
+        - 'git diff tests/test_block_system.c is comment-only: two hunks, both touch only /* ... */ text, zero code/assert/seed/logic lines'
+        - 'Finding 1 (TC-36 header, lines ~635-637): reworded from ''every one of the four candidate directions is rejected for a different reason'' to ''all four candidate directions are rejected — the two edge sides as off-grid, the two interior sides as filled'' — now states two reasons, matching roamer at (0,0) with RED_BLK at (0,1) and (1,0)'
+        - 'Finding 2 (RANDOM morph assert comment, line ~997): fix-side parenthetical changed from ''(`>= frame`)'' to ''(`frame >= next_frame`)'', matching the actual gate `frame >= bp->next_frame` in src/block_system.c; bug-side ''(`== frame`)'' and surrounding bug-vs-fix explanation unchanged'
+        - 'git status --porcelain shows exactly one tracked file modified: tests/test_block_system.c'
+        - cmake --build build --target test_block_system compiles clean
+        - 'ctest --test-dir build -R test_block_system: 3/3 passed (test_block_system_check_region, test_block_system, test_block_system_explosion)'
+      recommendation: stop
+      reason: Both Copilot findings fixed with comment-only wording changes, verified against actual test body and src/block_system.c gate condition. No code/assert/seed/logic touched. Build and tests green. All success criteria satisfied.

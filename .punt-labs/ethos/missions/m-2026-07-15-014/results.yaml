@@ -1,0 +1,18 @@
+results:
+    - mission: m-2026-07-15-014
+      round: 1
+      created_at: "2026-07-15T20:30:17Z"
+      author: gjm
+      verdict: pass
+      confidence: 0.97
+      files_changed:
+        - path: tests/test_block_system.c
+          added: 4
+          removed: 3
+      evidence:
+        - name: 'Finding 1: TC-36 header comment reworded — four directions rejected for two reasons (edge out-of-bounds vs interior occupied), not four distinct reasons'
+          status: pass
+        - name: 'Finding 2: RANDOM morph assert comment fix-side parenthetical changed >= frame -> frame >= next_frame; bug-side == frame and explanation unchanged'
+          status: pass
+        - name: 'Comment-only: no code/assert/seed touched; test_block_system compiles; ctest -R test_block_system 3/3 green; only tests/test_block_system.c changed'
+          status: pass
