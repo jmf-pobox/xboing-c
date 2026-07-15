@@ -1,0 +1,24 @@
+reflections:
+    - round: 1
+      created_at: "2026-07-15T03:48:45Z"
+      author: jck
+      converging: true
+      signals:
+        - 'original/special.c:133-148 ToggleWallsOn: static GREEN play border when noWalls==True, static RED otherwise — a real gameplay signal, independent of BorderGlow.'
+        - original/sfx.c:324-359 BorderGlow is pulse-only (frame%40), attract/menu-gated; original/main.c:544 ResetBorderGlow sets static red at MODE_GAME entry.
+        - Round 1 correctly removed all 3 gameplay glow sites and left attract sites untouched (verified).
+        - 'REGRESSION: game_render_playfield draws static red (200,0,0,255) unconditionally at game_render.c:384, dropping the SPECIAL_NO_WALLS green-border signal special.c:141 requires. game_render_border_glow still holds correct green-OR logic but is now attract-only (orphaned from gameplay).'
+        - 'original/special.c:193-197 DrawSpecials: a separate NoWall panel text label existed alongside the border signal in 1996; modern special_system.c:247 is that panel equivalent and is fine — but does not excuse dropping the border color.'
+      recommendation: continue
+      reason: 'Round 1 removed the pulse (correct) but made the gameplay border unconditionally red, losing the green-when-no-walls signal. Round 2: make game_render_playfield''s border color conditional on special_system_is_active(ctx->special, SPECIAL_NO_WALLS) — static green (0,200,0,255) vs red (200,0,0,255), no intensity cycling, no call to game_render_border_glow (pulse stays attract-only). One fix to game_render_playfield covers both the GAME/PAUSE and dialogue-over-game paths. Leave the specials-panel NoWall indicator and attract glow untouched.'
+    - round: 2
+      created_at: "2026-07-15T03:56:09Z"
+      author: jck
+      converging: true
+      signals:
+        - 'game_render_playfield draws STATIC border: SPECIAL_NO_WALLS -> green (0,200,0,255), else red (200,0,0,255), no frame/intensity — matches original/special.c:141,146 ToggleWallsOn.'
+        - No game_render_border_glow in SDL2ST_GAME/PAUSE or dialogue-over-game; sfx_system_update_glow absent from mode_game_update; only game_render_border_glow reads glow state, and it's attract-only now.
+        - 'Editor (SDL2ST_EDIT via game_render_playfield) can never show green: mode_edit_enter calls special_system_turn_off (clears no_walls) before first render; only game_callbacks.c:181 (gameplay block-hit) sets NO_WALLS. Editor border always red — faithful.'
+        - Attract glow update sites (game_modes.c:448,511,573,624,659,714,776,901,1248) and game_render_border_glow callers (game_render_ui.c:77,646,1265) unchanged — attract still pulses.
+      recommendation: stop
+      reason: 'Faithful: gameplay border is static red normally, static green while no-walls is active (original/special.c:141,146), no pulse; attract screens keep the decorative red<->green pulse; editor stays red. The stale glow comment nit is fixed. Approving close.'

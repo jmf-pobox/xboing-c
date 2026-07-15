@@ -317,7 +317,9 @@ static void mode_game_update(sdl2_state_mode_t mode, void *ud)
 
     /* SFX (shake, fade, etc.) */
     sfx_system_update(ctx->sfx, (int)sdl2_state_frame(ctx->state));
-    sfx_system_update_glow(ctx->sfx, (int)sdl2_state_frame(ctx->state));
+    /* BorderGlow is attract/menu-only in the original (original/sfx.c) —
+     * handleGameMode never calls it, so gameplay does not advance the
+     * glow animation. */
     sfx_system_update_deveyes(ctx->sfx, GAME_PLAY_WIDTH, GAME_PLAY_HEIGHT);
 
     /* Level timer countdown — decrement once per second.

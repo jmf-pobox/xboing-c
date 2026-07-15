@@ -376,13 +376,17 @@ void game_render_playfield(const game_ctx_t *ctx)
 {
     SDL_Renderer *sdl = sdl2_renderer_get(ctx->renderer);
 
-    /* Draw play area border — matches legacy playWindow border_width=2,
-     * color=red.  game_render_border_glow() runs after this and overlays
-     * the cycling glow color (and forces green when SPECIAL_NO_WALLS is
-     * active per original/special.c:138-148 ToggleWallsOn), so the
-     * static red here only shows during the brief window before glow
-     * draws each frame. */
-    SDL_SetRenderDrawColor(sdl, 200, 0, 0, 255);
+    /* Draw play area border — matches legacy playWindow border_width=2.
+     * BorderGlow (game_render_border_glow) is attract/menu-only in the
+     * original (original/sfx.c; handleGameMode never calls BorderGlow), so
+     * gameplay and the editor keep a static (non-pulsing) border.  Color is
+     * static green while the no-walls special is active and static red
+     * otherwise, matching ToggleWallsOn (original/special.c:141 green,
+     * original/special.c:146 red). */
+    if (special_system_is_active(ctx->special, SPECIAL_NO_WALLS))
+        SDL_SetRenderDrawColor(sdl, 0, 200, 0, 255);
+    else
+        SDL_SetRenderDrawColor(sdl, 200, 0, 0, 255);
 
     int bx = PLAY_AREA_X - BORDER_THICKNESS;
     int by = PLAY_AREA_Y - BORDER_THICKNESS;
@@ -1051,7 +1055,9 @@ void game_render_eyedude(const game_ctx_t *ctx)
 
 void game_render_border_glow(const game_ctx_t *ctx)
 {
-    /* Read-only — animation is advanced in mode_game_update() */
+    /* Read-only — the glow animation is advanced only by the attract/menu
+     * mode update handlers (sfx_system_update_glow), never during gameplay
+     * (BorderGlow is attract-only in the original; original/sfx.c). */
     sfx_glow_state_t glow = sfx_system_get_glow_state(ctx->sfx);
 
     /* Map color_index (0-6) to intensity (100-255) */
@@ -1387,7 +1393,11 @@ void game_render_frame(const game_ctx_t *ctx)
                 case SDL2ST_PAUSE:
                     game_render_background(ctx);
                     game_render_playfield(ctx);
-                    game_render_border_glow(ctx);
+                    /* BorderGlow is attract/menu-only in the original
+                     * (original/sfx.c); handleGameMode never calls it, so
+                     * gameplay under the dialogue overlay shows the static
+                     * red/green border drawn by game_render_playfield()
+                     * (original/special.c:141,146). */
                     game_render_eyedude(ctx);
                     game_render_deveyes(ctx);
                     break;
@@ -1429,8 +1439,11 @@ void game_render_frame(const game_ctx_t *ctx)
             game_render_background(ctx);
             /* Playfield border + blocks + paddle + balls + bullets (clipped) */
             game_render_playfield(ctx);
-            /* Animated border glow (overwrites static red border) */
-            game_render_border_glow(ctx);
+            /* BorderGlow is attract/menu-only in the original
+             * (original/sfx.c); handleGameMode never calls it, so gameplay
+             * shows the static red/green border drawn by
+             * game_render_playfield() above (original/special.c:141,146),
+             * matching the original's unanimated playWindow border. */
             /* EyeDude character (inside play area, after clip removed) */
             game_render_eyedude(ctx);
             /* Devil eyes blink animation */
