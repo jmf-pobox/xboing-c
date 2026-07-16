@@ -1,0 +1,18 @@
+results:
+    - mission: m-2026-07-16-004
+      round: 1
+      created_at: "2026-07-16T01:05:23Z"
+      author: gjm
+      verdict: pass
+      confidence: 0.97
+      files_changed:
+        - path: tests/test_block_system.c
+          added: 44
+          removed: 0
+      evidence:
+        - name: 'test_bonus_block_spin_descends: BONUS_BLK, advance_animations at k*BLOCK_BONUS_DELAY for k=0..4, asserts bonus_slide == 3,2,1,0,3 (descending); uses BLOCK_BONUS_DELAY from header, observable getter only'
+          status: pass
+        - name: 'RED-proof: reverted src BONUS case to ascending via Edit (src carried jdc''s uncommitted fix, so git checkout would have discarded it — used Edit + restored byte-identical, blob c59a702). Test FAILED 0 != 3 at frame 0; restored -> PASS'
+          status: pass
+        - name: ctest debug 3/3 green; asan 3/3 green, clean; only tests/test_block_system.c net-changed (src restored byte-for-byte)
+          status: pass

@@ -1099,6 +1099,47 @@ static void test_exploding_roamer_block_not_moved_or_cleared(void **state)
 }
 
 /* =========================================================================
+ * Group 14: BONUS_BLK coin-block spin direction (mission m-2026-07-16-004)
+ *
+ * block_system_advance_animations computes bonus_slide for
+ * BONUSX2_BLK/BONUSX4_BLK/BONUS_BLK as
+ * `3 - (frame / BLOCK_BONUS_DELAY) % 4` — a descending 3,2,1,0,3,...
+ * cycle, matching original/blocks.c:1188-1218 (HandlePendingBonuses
+ * decrements bonusSlide).  A regression to the ascending form
+ * `(frame / BLOCK_BONUS_DELAY) % 4` would spin the coin backwards.
+ * ========================================================================= */
+
+/* TC-47: BONUS_BLK bonus_slide descends 3,2,1,0,3 across five
+ * BLOCK_BONUS_DELAY windows.  Each call passes a frame that is an exact
+ * multiple of BLOCK_BONUS_DELAY, so the formula's `frame / BLOCK_BONUS_DELAY`
+ * term steps 0,1,2,3,4 and the expected sequence is fixed independent of
+ * BLOCK_BONUS_DELAY's numeric value. */
+static void test_bonus_block_spin_descends(void **state)
+{
+    (void)state;
+    srand(8642);
+    block_system_t *ctx = make_ctx();
+
+    const int r0 = 7;
+    const int c0 = 4;
+    block_system_add(ctx, r0, c0, BONUS_BLK, 0, 0);
+
+    const int expected[5] = {3, 2, 1, 0, 3};
+
+    for (int k = 0; k < 5; k++)
+    {
+        block_system_advance_animations(ctx, k * BLOCK_BONUS_DELAY);
+
+        block_system_render_info_t info;
+        block_system_status_t st = block_system_get_render_info(ctx, r0, c0, &info);
+        assert_int_equal(st, BLOCK_SYS_OK);
+        assert_int_equal(info.bonus_slide, expected[k]);
+    }
+
+    block_system_destroy(ctx);
+}
+
+/* =========================================================================
  * Test runner
  * ========================================================================= */
 
@@ -1170,6 +1211,9 @@ int main(void)
         /* Group 13: exploding-block movement/morph guard */
         cmocka_unit_test(test_exploding_random_block_not_morphed_or_cleared),
         cmocka_unit_test(test_exploding_roamer_block_not_moved_or_cleared),
+
+        /* Group 14: BONUS_BLK coin-block spin direction */
+        cmocka_unit_test(test_bonus_block_spin_descends),
     };
 
     return cmocka_run_group_tests(tests, NULL, NULL);

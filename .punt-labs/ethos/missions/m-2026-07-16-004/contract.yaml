@@ -1,0 +1,29 @@
+mission_id: m-2026-07-16-004
+status: closed
+type: implement
+created_at: "2026-07-16T01:02:57Z"
+updated_at: "2026-07-16T01:07:45Z"
+closed_at: "2026-07-16T01:07:45Z"
+leader: claude
+worker: gjm
+evaluator:
+    handle: jdc
+    pinned_at: "2026-07-16T01:02:57Z"
+    hash: c08223356d3e6d5aed56e28da477a1aa2707509febfef7c5f62c25871a3e841f
+inputs: {}
+write_set:
+    - tests/test_block_system.c
+success_criteria:
+    - 'Add a regression test to tests/test_block_system.c pinning the BONUS coin-block spin DIRECTION fixed in mission m-2026-07-16-001: block_system_advance_animations now sets bonus_slide = 3 - (frame / BLOCK_BONUS_DELAY) % 4 (descending 3->2->1->0->3), matching original/blocks.c:1188-1218. Register it in the tests[] runner.'
+    - The test places a BONUS_BLK (or BONUSX2_BLK) via block_system_add, calls block_system_advance_animations(ctx, frame) at frames chosen to land on successive BONUS_DELAY steps (frame = 0, BLOCK_BONUS_DELAY, 2*BLOCK_BONUS_DELAY, 3*, 4*), reads bonus_slide via the observable getter (block_system_get_render_info(...).bonus_slide), and asserts the sequence is 3,2,1,0,3 (descending), NOT 0,1,2,3,0. Use BLOCK_BONUS_DELAY from the header; do not hardcode 150. Observable getters only; no static calls.
+    - 'RED-prove: revert the src expression to `(frame / BLOCK_BONUS_DELAY) % 4` (ascending) via a temporary out-of-tree edit to src/block_system.c that you restore byte-for-byte (src is OUTSIDE this write_set — git checkout and verify clean). The new test must FAIL with the ascending expression and PASS with the descending fix. Report the exact failure.'
+    - Deterministic srand; asan-clean; free the ctx; only tests/test_block_system.c changes. ctest --test-dir build -R test_block_system green under debug AND asan.
+budget:
+    rounds: 2
+    reflection_after_each: true
+current_round: 1
+context: |-
+    Post-1.0.9 polish batch. jdc fixed the BONUS block spin to count down 3->0 (mission
+    m-2026-07-16-001, jck-approved) matching original/blocks.c:1188-1218. This mission pins
+    the direction so an ascending regression is caught. (The quit-sting fix #2 is an audio
+    side-effect, not unit-tested here.)

@@ -1,0 +1,18 @@
+reflections:
+    - round: 1
+      created_at: "2026-07-16T01:07:18Z"
+      author: jdc
+      converging: true
+      signals:
+        - test_bonus_block_spin_descends added at tests/test_block_system.c:1117-1140, registered in tests[] at line 1215
+        - uses BLOCK_BONUS_DELAY constant from include/block_system.h:57, no hardcoded 150
+        - asserts sequence 3,2,1,0,3 at frames 0,BLOCK_BONUS_DELAY,2x,3x,4x via block_system_get_render_info (public getter only)
+        - 'RED-proof executed: temporarily edited src/block_system.c to ascending (frame / BLOCK_BONUS_DELAY) % 4, rebuilt test_block_system, ctest failed with ''0 != 3'' at test_block_system.c:1136 (k=0 iteration expected 3 got 0)'
+        - restored src/block_system.c to exact descending expression `bp->bonus_slide = 3 - (frame / BLOCK_BONUS_DELAY) % 4;`; git diff src/block_system.c confirmed byte-identical to pre-RED-proof state
+        - git diff src/game_modes.c confirmed the quit-sting fix (sdl2_audio_play_at_percent game_over at 100%) untouched by the RED-proof round-trip
+        - git status shows only src/block_system.c, src/game_modes.c, tests/test_block_system.c modified; no other net changes
+        - own srand(8642) seed, ctx freed via block_system_destroy, no static/internal calls
+        - 'ctest --test-dir build -R test_block_system: 3/3 passed (debug)'
+        - 'ctest --test-dir build-asan -R test_block_system: 3/3 passed (ASan+UBSan)'
+      recommendation: stop
+      reason: 'All four success criteria verified directly: the test pins the descending 3,2,1,0 sequence using BLOCK_BONUS_DELAY and public getters only; the RED-proof was independently re-executed and failed exactly as predicted (0 != 3 at frame 0) with the ascending expression, then the descending fix was restored byte-for-byte with git diff proof; only tests/test_block_system.c is a net content change, and both prior working-tree fixes (block_system.c spin direction, game_modes.c quit sting) remain intact; ctest is green under debug and ASan/UBSan. No further round needed.'
