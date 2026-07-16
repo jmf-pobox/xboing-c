@@ -1,11 +1,11 @@
 cmake_minimum_required(VERSION 3.16)
-project(xboing VERSION 1.0.9 LANGUAGES C)
+project(xboing VERSION 1.0.10 LANGUAGES C)
 include(GNUInstallDirs)
 
 # Release date shown in the man page .TH header.  A fixed ISO date (not a
 # wall-clock value) so builds stay reproducible and mandoc can parse it.
 # Bump on each release.
-set(XBOING_MAN_DATE "2026-07-15")
+set(XBOING_MAN_DATE "2026-07-16")
 
 # Export compile_commands.json for clang-tidy
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
