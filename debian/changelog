@@ -1,3 +1,16 @@
+xboing (1.0.10-1) unstable; urgency=medium
+
+  * The bonus coin blocks ($, 2x, 4x) now spin in the original's direction.
+    The SDL2 port cycled the four coin frames the wrong way (a mirror-image
+    spin); they now count down to match the 1996 game. Cosmetic; spin rate
+    unchanged.
+  * Restore the game-over sound sting when you confirm a quit (q → yes),
+    matching the original. It was silent in the port, and a first attempt
+    was cut off by audio shutdown — the game now lets the ~1.2s sting finish
+    playing before the window closes.
+
+ -- J Freeman <jmf@pobox.com>  Wed, 16 Jul 2026 21:20:00 -0700
+
 xboing (1.0.9-1) unstable; urgency=medium
 
   * Restore several 1996 block behaviours that were missing or wrong in the
