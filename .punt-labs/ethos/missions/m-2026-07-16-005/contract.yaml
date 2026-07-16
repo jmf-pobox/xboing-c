@@ -1,0 +1,33 @@
+mission_id: m-2026-07-16-005
+status: closed
+type: implement
+created_at: "2026-07-16T01:46:55Z"
+updated_at: "2026-07-16T01:53:56Z"
+closed_at: "2026-07-16T01:53:56Z"
+leader: claude
+worker: sjl
+evaluator:
+    handle: jdc
+    pinned_at: "2026-07-16T01:46:55Z"
+    hash: c08223356d3e6d5aed56e28da477a1aa2707509febfef7c5f62c25871a3e841f
+inputs: {}
+write_set:
+    - src/sdl2_audio.c
+    - include/sdl2_audio.h
+    - src/game_modes.c
+success_criteria:
+    - 'Make the confirmed-quit game_over sting (added in PR #189) actually AUDIBLE. Root cause (verified): mode_dialogue_exit calls sdl2_audio_play_at_percent then pushes SDL_QUIT; the main loop sets running=false and sdl2_audio_destroy calls Mix_CloseAudio ~1-2 frames (~30ms) later, cutting off the ~1205ms sample. Maintainer confirmed nothing is heard on quit.'
+    - 'Add a bounded blocking drain API to the audio module and call it in the quit path ONLY (so the headless unit/integration suite, which never exercises the quit path, is not slowed): `void sdl2_audio_wait_all(sdl2_audio_t *ctx, int max_ms);` in include/sdl2_audio.h + src/ sdl2_audio.c. Implementation: NULL-guard ctx; if !ctx->audio_opened return; loop `while (Mix_Playing(-1) > 0 && waited < max_ms) { SDL_Delay(10); waited += 10; }`. It returns immediately when no channel is playing. Document WHY (original''s forked audio outlived exit(); we drain in-process before Mix_CloseAudio so the quit sting is heard).'
+    - In src/game_modes.c mode_dialogue_exit, in the confirmed-quit branch, right after the existing `sdl2_audio_play_at_percent(ctx->audio, "game_over", 100);`, add `sdl2_audio_wait_all(ctx->audio, 1500);` (BEFORE the SDL_QUIT push). 1500ms cap > game_over.wav's 1205ms so the full sting plays; the drain exits early when it finishes. Keep the ctx->audio guard.
+    - Do NOT drain inside sdl2_audio_destroy (would slow every teardown incl. tests) and do NOT change any other audio behavior. cmake --preset debug && cmake --build build zero-warning -Werror -Wconversion -Wshadow. Full ctest --test-dir build green AND make asan-test green (the suite must not slow — the drain is only in the quit path). Only the three write_set files change.
+    - 'In the result, describe the expected UX: on confirmed quit the window holds ~1.2s while the sting plays, then closes — the in-process faithful equivalent of the original''s fork-and-exit. Flag that the maintainer will live-verify audibility.'
+budget:
+    rounds: 2
+    reflection_after_each: true
+current_round: 1
+context: |-
+    Follow-up to PR #189. The quit sting was added faithfully but is inaudible: SDL_mixer is
+    torn down (Mix_CloseAudio) before the ~1.2s sample plays. Fix: bounded drain in the quit
+    path only. sjl (SDL2/audio author) owns the mixer-lifecycle change; jdc evaluates. The
+    original (original/main.c:714-715) played game_over then exited; its forked audio child
+    finished after exit — we replicate audibility with a bounded in-process wait.

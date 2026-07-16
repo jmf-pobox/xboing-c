@@ -1,0 +1,28 @@
+mission_id: m-2026-07-16-009
+status: closed
+type: implement
+created_at: "2026-07-16T03:05:40Z"
+updated_at: "2026-07-16T03:08:29Z"
+closed_at: "2026-07-16T03:08:29Z"
+leader: claude
+worker: jdc
+evaluator:
+    handle: gjm
+    pinned_at: "2026-07-16T03:05:40Z"
+    hash: 7349512b3191332fef8a79f56caf962febc697b8444629912da4aa22b9b2efec
+inputs: {}
+write_set:
+    - include/sdl2_audio.h
+    - src/game_modes.c
+success_criteria:
+    - 'Fix two Copilot comment-grammar nits (PR #190, comment prose only — NO code changes).'
+    - 'include/sdl2_audio.h (~line 180, sdl2_audio_wait_all doc comment): change "(whichever first)" to "(whichever comes first)".'
+    - 'src/game_modes.c (~line 1342, quit-sting comment): change "The original forked audio that outlived exit()." to "The original forked its audio so it outlived exit().".'
+    - Comment text only — no code/logic/signature changes. cmake --build build still compiles zero-warning; ctest --test-dir build green. Only the two write_set files change, comment-only diffs (git diff shows no code lines touched).
+budget:
+    rounds: 1
+    reflection_after_each: true
+current_round: 1
+context: |-
+    PR #190 review round 3. Copilot flagged two grammar imperfections in comments (header doc +
+    quit-sting comment). Trivial prose fixes, zero behavior impact.

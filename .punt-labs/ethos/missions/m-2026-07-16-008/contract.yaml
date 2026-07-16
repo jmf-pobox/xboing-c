@@ -1,0 +1,29 @@
+mission_id: m-2026-07-16-008
+status: closed
+type: implement
+created_at: "2026-07-16T02:52:57Z"
+updated_at: "2026-07-16T03:00:16Z"
+closed_at: "2026-07-16T03:00:16Z"
+leader: claude
+worker: sjl
+evaluator:
+    handle: jdc
+    pinned_at: "2026-07-16T02:52:57Z"
+    hash: c08223356d3e6d5aed56e28da477a1aa2707509febfef7c5f62c25871a3e841f
+inputs: {}
+write_set:
+    - src/sdl2_audio.c
+success_criteria:
+    - 'Fix Copilot finding (PR #190 round 2, valid): sdl2_audio_wait_all bounds the wait by the SUM of intended SDL_Delay durations (waited += step), not real elapsed time. SDL_Delay may oversleep, so wall-clock can exceed max_ms. Rebound the loop on SDL_GetTicks() elapsed time.'
+    - 'Rewrite the loop body of sdl2_audio_wait_all to measure real elapsed via SDL_GetTicks(): add `max_ms <= 0` to the early-return guard; capture `Uint32 start = SDL_GetTicks();` then loop `while (Mix_Playing(-1) > 0) { Uint32 elapsed = SDL_GetTicks() - start; if ((int)elapsed >= max_ms) break; int remaining = max_ms - (int)elapsed; SDL_Delay((Uint32)(remaining < 10 ? remaining : 10)); }`. The SDL_GetTicks() unsigned subtraction is wraparound-safe for sub-second intervals; `remaining` is > 0 inside the loop so the (Uint32) cast is safe under -Wconversion. Keep the existing `// cppcheck-suppress constParameterPointer` line and the non-const signature.'
+    - 'Net effect: the loop now exits the moment REAL time reaches max_ms (or the sound finishes), with at most one final SDL_Delay of oversleep — no accumulated intended-sleep drift. Behavior for the 1500ms quit caller is unchanged in practice (sound ends ~1205ms first).'
+    - cmake --preset debug && cmake --build build zero-warning -Werror -Wconversion -Wshadow. Full ctest --test-dir build green. Suppress comment intact so cppcheck (CI) stays green. Only src/sdl2_audio.c changes.
+budget:
+    rounds: 2
+    reflection_after_each: true
+current_round: 1
+context: |-
+    PR #190 round 2. After the round-1 clamp, Copilot correctly notes the cap still measures
+    intended-sleep-sum, not wall-clock (SDL_Delay oversleeps). Switch to SDL_GetTicks() elapsed
+    bounding — the definitively correct bounded-wait. Practically moot for the one-shot quit sting
+    (loop exits on Mix_Playing==0 at ~1.2s), but the API contract should be right. sjl owns it; jdc evals.

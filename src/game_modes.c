@@ -1337,6 +1337,10 @@ static void mode_dialogue_exit(sdl2_state_mode_t mode, void *ud)
                 if (ctx->audio)
                 {
                     sdl2_audio_play_at_percent(ctx->audio, "game_over", 100);
+                    /* Hold ~1.2s so the sting is heard before Mix_CloseAudio
+                     * tears the mixer down (game_over.wav is 1205ms). The
+                     * original forked its audio so it outlived exit(). */
+                    sdl2_audio_wait_all(ctx->audio, 1500);
                 }
                 SDL_Event quit_event = {0};
                 quit_event.type = SDL_QUIT;
