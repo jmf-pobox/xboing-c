@@ -1,0 +1,35 @@
+mission_id: m-2026-07-16-015
+status: closed
+type: implement
+created_at: "2026-07-16T22:42:32Z"
+updated_at: "2026-07-16T23:15:59Z"
+closed_at: "2026-07-16T23:15:59Z"
+leader: claude
+worker: jdc
+evaluator:
+    handle: jck
+    pinned_at: "2026-07-16T22:42:32Z"
+    hash: 40cbe1204f644c77e6a26757a9b855e3298be267025e806d425bfdea99054f18
+inputs: {}
+write_set:
+    - include/sdl2_input.h
+    - src/sdl2_input.c
+    - src/game_input.c
+    - docs/DESIGN.md
+success_criteria:
+    - 'Restore the original''s `=` debug skip-level cheat and make the parsed-but-inert `-debug` flag (ctx->debug_mode, set at src/game_init.c:322 but never read) functional, matching original/main.c:511-522. Maintainer chose the FAITHFUL Shift-aware option: unshifted `=` = cheat; Shift+`=` (i.e. `+`) = volume up; `-` = volume down. jck (author, keymap authority) gates faithfulness + the ADR.'
+    - 'Input plumbing. include/sdl2_input.h: add a new action SDL2I_DEBUG_SKIP (before SDL2I_ACTION_COUNT). src/sdl2_input.c default_bindings: change [SDL2I_VOLUME_UP] from {SDL_SCANCODE_EQUALS, SDL_SCANCODE_KP_PLUS} to {SDL_SCANCODE_KP_PLUS, SDL_SCANCODE_UNKNOWN} (numpad + keeps UNSHIFTED volume-up), and add [SDL2I_DEBUG_SKIP] = {SDL_SCANCODE_EQUALS, SDL_SCANCODE_UNKNOWN}. This routes the physical `=` key to DEBUG_SKIP; game_input then splits on the Shift modifier (the input layer already exposes sdl2_input_shift_held()).'
+    - 'Handler in src/game_input.c game_input_global (once-per-frame, just_pressed — this is an edge-triggered key). On sdl2_input_just_pressed(SDL2I_DEBUG_SKIP): (a) if sdl2_input_shift_held(ctx->input) -> VOLUME UP: reuse the exact existing VOLUME_UP path (sdl2_audio_volume_up + "Maximum volume: N%" message) so Shift+`=` (`+`) raises volume in any mode, matching original/main.c:822. Keep the existing SDL2I_VOLUME_UP handler for numpad KP_PLUS (unshifted volume) working. (b) else (plain `=`, no Shift) AND mode == SDL2ST_GAME: if ctx->debug_mode -> skip the level (see next criterion) + message_system_set(ctx->message, "Cheating, skip level ...", 1, frame); else -> message_system_set(ctx->message, "Stop trying to cheat!!", 1, frame). Outside SDL2ST_GAME with no Shift: no-op (original''s `=` cheat is game-only). Guard on ctx->message / ctx->audio non-null like the sibling handlers.'
+    - 'Skip mechanism = faithful port of SkipToNextLevel (original/blocks.c): clear the REQUIRED blocks so game_rules_check sees block_system_still_active()==0 and transitions to BONUS -> next level via the normal completion path (NO scoring — it''s a cheat). The original clears the required/colored/counter/roamer/drop/random blocks and leaves the special/bonus/ indestructible types (the SkipToNextLevel switch lists specials as no-op). Prefer mirroring that selectivity; block_system_clear_all is acceptable ONLY if jck agrees the end state is identical (level ends immediately either way). Do NOT award points or force-transition the state machine directly — clear blocks and let game_rules do the transition, exactly as the original relies on the normal loop.'
+    - 'ADR in docs/DESIGN.md (ADR-072, next number — verify latest is ADR-071): document (a) -debug is now functional (was inert), (b) `=` restored as the debug skip-level cheat gated on debug_mode with the "Cheating"/"Stop trying to cheat!!" messages, (c) the Shift-aware split — SDL scancodes cannot distinguish XK_equal (unshifted) from XK_plus (Shift+=) on the same physical key, so the port routes SDL_SCANCODE_EQUALS to DEBUG_SKIP and branches on sdl2_input_shift_held(); numpad KP_PLUS retains unshifted volume-up. Cite original/main.c: 511-522, 822, keys.c:195, and SkipToNextLevel in original/blocks.c. Note the keys-help display (src/keys_system.c:26) already shows "+/-" for volume, so it needs no change.'
+    - cmake --preset debug && cmake --build build zero-warning -Werror -Wconversion -Wshadow. Full ctest --test-dir build green AND make asan-test green. Only the four write_set files change. (A sibling gjm mission adds keybinding regression tests — do not add tests here.)
+budget:
+    rounds: 3
+    reflection_after_each: true
+current_round: 2
+context: |-
+    Post-session cleanup #3, maintainer picked the faithful Shift-aware variant. The `-debug`
+    flag is parsed but never read (key-command-parity audit Deviation #1); the original's `=`
+    skip-level cheat (gated on debug) was never ported and `=` was repurposed for volume-up —
+    colliding with the original where `=`=cheat and `+`(Shift+=)=volume. Restore the original
+    keymap via a Shift-aware split. jck (author) gates the keymap faithfulness and the ADR.

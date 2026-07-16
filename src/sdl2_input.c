@@ -67,8 +67,13 @@ static const struct sdl2_input_binding default_bindings[SDL2I_ACTION_COUNT] = {
     [SDL2I_ENTER_EDITOR] = {{SDL_SCANCODE_E, SDL_SCANCODE_UNKNOWN}},
     [SDL2I_SET_LEVEL] = {{SDL_SCANCODE_W, SDL_SCANCODE_UNKNOWN}},
     [SDL2I_QUIT] = {{SDL_SCANCODE_Q, SDL_SCANCODE_UNKNOWN}},
-    [SDL2I_VOLUME_UP] = {{SDL_SCANCODE_EQUALS, SDL_SCANCODE_KP_PLUS}},
+    /* Numpad '+' stays unshifted volume-up; bare EQUALS scancode can't
+     * distinguish unshifted '=' from Shift+'=' ('+'), so it is routed to
+     * SDL2I_DEBUG_SKIP and game_input_global branches on
+     * sdl2_input_shift_held() — original/main.c:511-522, :822. */
+    [SDL2I_VOLUME_UP] = {{SDL_SCANCODE_KP_PLUS, SDL_SCANCODE_UNKNOWN}},
     [SDL2I_VOLUME_DOWN] = {{SDL_SCANCODE_MINUS, SDL_SCANCODE_KP_MINUS}},
+    [SDL2I_DEBUG_SKIP] = {{SDL_SCANCODE_EQUALS, SDL_SCANCODE_UNKNOWN}},
     [SDL2I_TOGGLE_AUDIO] = {{SDL_SCANCODE_A, SDL_SCANCODE_UNKNOWN}},
     [SDL2I_TOGGLE_SFX] = {{SDL_SCANCODE_S, SDL_SCANCODE_UNKNOWN}},
     [SDL2I_TOGGLE_CONTROL] = {{SDL_SCANCODE_G, SDL_SCANCODE_UNKNOWN}},
@@ -472,6 +477,8 @@ const char *sdl2_input_action_name(sdl2_input_action_t action)
             return "volume_up";
         case SDL2I_VOLUME_DOWN:
             return "volume_down";
+        case SDL2I_DEBUG_SKIP:
+            return "debug_skip";
         case SDL2I_TOGGLE_AUDIO:
             return "toggle_audio";
         case SDL2I_TOGGLE_SFX:

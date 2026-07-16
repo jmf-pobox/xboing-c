@@ -57,6 +57,9 @@ typedef enum
     SDL2I_QUIT,
     SDL2I_VOLUME_UP,
     SDL2I_VOLUME_DOWN,
+    /* '=' debug skip-level cheat (unshifted); Shift+'=' ('+') routes to
+     * volume up instead — original/main.c:511-522, :822. */
+    SDL2I_DEBUG_SKIP,
     SDL2I_TOGGLE_AUDIO,
     SDL2I_TOGGLE_SFX,
     SDL2I_TOGGLE_CONTROL,

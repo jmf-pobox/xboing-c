@@ -1,0 +1,59 @@
+results:
+    - mission: m-2026-07-16-015
+      round: 1
+      created_at: "2026-07-16T22:54:28Z"
+      author: jdc
+      verdict: pass
+      confidence: 0.95
+      files_changed:
+        - path: include/sdl2_input.h
+          added: 4
+          removed: 0
+        - path: src/sdl2_input.c
+          added: 9
+          removed: 1
+        - path: src/game_input.c
+          added: 58
+          removed: 0
+        - path: docs/DESIGN.md
+          added: 65
+          removed: 0
+      evidence:
+        - name: SDL2I_DEBUG_SKIP added; VOLUME_UP rebound {EQUALS,KP_PLUS}->{KP_PLUS,UNKNOWN}; DEBUG_SKIP={EQUALS,UNKNOWN}; action_name added
+          status: pass
+        - name: 'game_input_global DEBUG_SKIP handler: shift_held -> volume-up path (reuses sdl2_audio_volume_up + Maximum volume msg); else GAME mode -> debug_mode ? clear-required + ''Cheating, skip level ...'' : ''Stop trying to cheat!!'''
+          status: pass
+        - name: Skip clears EXACTLY block_system_still_active's required set (RED/BLUE/GREEN/TAN/YELLOW/PURPLE/COUNTER/DROP) via block_system_clear; specials left; no score, no forced transition -> game_rules_check completes on next tick. Mirrors SkipToNextLevel/StillActiveBlocks.
+          status: pass
+        - name: 'Leader verified: cleared set == still_active required set (block_system.c:1165-1174); roamer/random handled (RANDOM live type is a color; ROAMER non-required)'
+          status: pass
+        - name: 'Runtime harness (throwaway) confirmed all 4: Shift+= volume, = w/o debug -> Stop-cheating + blocks intact, = w/ debug -> required cleared (still_active 0) + BLACK survives + Cheating msg, numpad + volume'
+          status: pass
+        - name: cmake debug zero-warning -Werror -Wconversion -Wshadow; ctest 61/61; asan 61/61 clean; clang-format/cppcheck/markdownlint clean; ADR-072 added; only the 4 write_set files changed
+          status: pass
+    - mission: m-2026-07-16-015
+      round: 2
+      created_at: "2026-07-16T23:11:53Z"
+      author: jdc
+      verdict: pass
+      confidence: 0.94
+      files_changed:
+        - path: src/game_input.c
+          added: 30
+          removed: 12
+        - path: docs/DESIGN.md
+          added: 8
+          removed: 6
+      evidence:
+        - name: Cheat now calls block_system_explode(ctx->block,row,col,frame) per required block (RED..PURPLE,COUNTER,DROP) — the real ball/gun explosion path — instead of block_system_clear. Animation plays; block_system_update_explosions finalize (game_callbacks_on_block_finalize) awards hit_points via score_system_add; still_active->0 only after finalize -> game_rules_check completes normally (no forced transition).
+          status: pass
+        - name: 'Sound gap found+fixed: finalize callback does NOT play block sound (only ball/gun hit paths do via play_block_hit_sound); jdc added block_sound_lookup + sdl2_audio_play_at_percent per exploded block, matching PlaySoundForBlock at kill time (original/blocks.c:1868).'
+          status: pass
+        - name: 'Screen shake added after loop (ctx->sfx-guarded): sfx_system_set_mode(SFX_MODE_SHAKE)+set_end_frame(frame+140), matching original/blocks.c:2460-2461.'
+          status: pass
+        - name: 'Runtime harness: 63-required-block level -> score 0 immediately, shake set immediately, score += 8550 ~30 ticks later exactly when still_active->0 (matches original deferred AddToScore timing). Specials survive.'
+          status: pass
+        - name: 'ADR-072 rewritten: cheat awards FULL score + per-block sound + animation + shake, completes on normal path; ''no score'' claim retracted. Cites blocks.c:2409-2462,:1867-1871,:1543-1548,:2460-2461.'
+          status: pass
+        - name: cmake debug zero-warning -Werror -Wconversion -Wshadow; ctest 61/61 debug + asan clean; markdownlint clean. Round-1 keymap (sdl2_input.h/.c) unchanged/approved. clang-format/cppcheck run in CI (unavailable locally).
+          status: pass

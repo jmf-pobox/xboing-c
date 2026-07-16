@@ -18,6 +18,7 @@
 #include <SDL2/SDL.h>
 
 #include "ball_system.h"
+#include "block_sound.h"
 #include "block_system.h"
 #include "dialogue_system.h"
 #include "editor_system.h"
@@ -237,6 +238,103 @@ void game_input_global(game_ctx_t *ctx)
             char str[32];
             snprintf(str, sizeof(str), "Maximum volume: %d%%", vol);
             message_system_set(ctx->message, str, 1, frame);
+        }
+    }
+
+    /* '=': Shift+'=' ('+') is volume up; unshifted '=' is the debug
+     * skip-level cheat — original/main.c:511-522 (XK_equal), :822
+     * (XK_plus). SDL scancodes can't tell '=' from '+' on one physical
+     * key, so both share SDL2I_DEBUG_SKIP and branch on shift state. */
+    if (sdl2_input_just_pressed(ctx->input, SDL2I_DEBUG_SKIP))
+    {
+        if (sdl2_input_shift_held(ctx->input))
+        {
+            if (ctx->audio)
+            {
+                int vol = sdl2_audio_volume_up(ctx->audio);
+                char str[32];
+                snprintf(str, sizeof(str), "Maximum volume: %d%%", vol);
+                message_system_set(ctx->message, str, 1, frame);
+            }
+        }
+        else if (mode == SDL2ST_GAME)
+        {
+            if (ctx->debug_mode)
+            {
+                /* SkipToNextLevel (original/blocks.c:2409-2462): DrawBlock
+                 * with blockType KILL_BLK routes each required block
+                 * through the real explosion path (blocks.c:1867-1871,
+                 * PlaySoundForBlock + SetBlockUpForExplosion) -- NOT a
+                 * silent clear.  ExplodeBlocksPending later fires
+                 * AddToScore(hitPoints) for each one on its final
+                 * animation frame (blocks.c:1543-1548), so the cheat
+                 * awards full score, same as a legitimate kill.  Routing
+                 * through block_system_explode (not block_system_clear)
+                 * reproduces this: the animation plays and
+                 * block_system_update_explosions' finalize callback
+                 * (game_callbacks_on_block_finalize) awards hit_points via
+                 * score_system_add once each block's explosion completes.
+                 * block_system_still_active() only reads 0 after that, so
+                 * game_rules_check completes the level on the normal
+                 * per-tick path -- no state is forced here. */
+                for (int row = 0; row < MAX_ROW; row++)
+                {
+                    for (int col = 0; col < MAX_COL; col++)
+                    {
+                        if (!block_system_is_occupied(ctx->block, row, col))
+                            continue;
+
+                        int block_type = block_system_get_type(ctx->block, row, col);
+                        switch (block_type)
+                        {
+                            case RED_BLK:
+                            case BLUE_BLK:
+                            case GREEN_BLK:
+                            case TAN_BLK:
+                            case YELLOW_BLK:
+                            case PURPLE_BLK:
+                            case COUNTER_BLK:
+                            case DROP_BLK:
+                                if (block_system_explode(ctx->block, row, col, frame) ==
+                                    BLOCK_SYS_OK)
+                                {
+                                    /* PlaySoundForBlock (blocks.c:1868) fires at
+                                     * kill time, not at finalize time --
+                                     * game_callbacks_on_block_finalize does not
+                                     * play sound (it only fires on the ball/gun
+                                     * hit paths, via play_block_hit_sound at hit
+                                     * time). Replicate it here so each exploded
+                                     * block still sounds. */
+                                    if (ctx->audio)
+                                    {
+                                        block_sound_t s = block_sound_lookup(block_type);
+                                        if (s.name)
+                                            sdl2_audio_play_at_percent(ctx->audio, s.name,
+                                                                       s.volume);
+                                    }
+                                }
+                                break;
+                            default:
+                                break;
+                        }
+                    }
+                }
+
+                /* Screen shake during the explosion wave --
+                 * original/blocks.c:2460-2461 (SetSfxEndFrame(frame+140);
+                 * changeSfxMode(SFX_SHAKE)). */
+                if (ctx->sfx)
+                {
+                    sfx_system_set_mode(ctx->sfx, SFX_MODE_SHAKE);
+                    sfx_system_set_end_frame(ctx->sfx, frame + 140);
+                }
+
+                message_system_set(ctx->message, "Cheating, skip level ...", 1, frame);
+            }
+            else
+            {
+                message_system_set(ctx->message, "Stop trying to cheat!!", 1, frame);
+            }
         }
     }
 
