@@ -619,8 +619,10 @@ void block_system_advance_animations(block_system_t *ctx, int frame)
                 case BONUSX2_BLK:
                 case BONUSX4_BLK:
                 case BONUS_BLK:
-                    /* 4-frame spin cycle at BLOCK_BONUS_DELAY interval */
-                    bp->bonus_slide = (frame / BLOCK_BONUS_DELAY) % 4;
+                    /* 4-frame spin, descending 3->0 per BLOCK_BONUS_DELAY,
+                     * matching original/blocks.c:1188-1218 (HandlePendingBonuses
+                     * decrements bonusSlide). */
+                    bp->bonus_slide = 3 - (frame / BLOCK_BONUS_DELAY) % 4;
                     break;
 
                 case DEATH_BLK:

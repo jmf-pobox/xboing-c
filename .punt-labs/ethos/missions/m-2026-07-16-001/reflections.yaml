@@ -1,0 +1,13 @@
+reflections:
+    - round: 1
+      created_at: "2026-07-16T01:02:39Z"
+      author: jck
+      converging: true
+      signals:
+        - '#2 matches original/main.c:714-715 (handleExitKeys plays game_over @ 100% on confirmed-yes quit, then exit()); correct path (yes-branch only, not cancel), ctx->audio-guarded, volume 100 not 99.'
+        - '#3 matches original/blocks.c:1089-1218 (HandlePendingBonuses): bonusSlide spawns at 3, decrements 3->2->1->0->3. New expr `3 - (frame/BLOCK_BONUS_DELAY)%4` yields 3,2,1,0 over steps — correct descending direction. BONUS_DELAY=150 unchanged; DEATH/EXTRABALL untouched.'
+        - '#3 affects BONUS_BLK/BONUSX2_BLK/BONUSX4_BLK only; cosmetic spin direction, no scoring/timing effect.'
+        - Only src/game_modes.c and src/block_system.c changed; build zero-warning, ctest 61/61, asan 61/61 clean.
+        - 'AUDIBILITY CAVEAT #2: original playSoundFile forked a child that outlived exit(), guaranteeing the sting finished; modern starts SDL_mixer playback then pushes SDL_QUIT in-process — if mixer teardown runs before the channel drains, the sting could truncate. Maintainer to verify live; does not block approval (faithful call is correct).'
+      recommendation: stop
+      reason: 'Both are faithful 1996 restorations. #2 adds the missing confirmed-quit game_over sting at the original''s 100% volume in the correct path; #3 reverses the BONUS spin to the original''s descending direction, cosmetic and rate-preserving. Approved. Maintainer should live-check whether the quit sting is audible before teardown.'
