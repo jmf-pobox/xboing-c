@@ -172,6 +172,16 @@ int sdl2_audio_volume_down(sdl2_audio_t *ctx);
 /* Halt all currently playing channels immediately. */
 void sdl2_audio_halt(sdl2_audio_t *ctx);
 
+/*
+ * Block until all mixer channels finish playing, or max_ms elapses
+ * (whichever first). Returns immediately if nothing is playing. Used at
+ * quit so a sound started just before teardown (the game_over sting) is
+ * heard: the original forked its audio so it outlived exit()
+ * (original/main.c:714-715); we drain in-process before Mix_CloseAudio.
+ * Safe to call with ctx == NULL (no-op).
+ */
+void sdl2_audio_wait_all(sdl2_audio_t *ctx, int max_ms);
+
 /* Mute/unmute all audio.  When muted, play() returns OK but is silent. */
 void sdl2_audio_set_muted(sdl2_audio_t *ctx, bool muted);
 

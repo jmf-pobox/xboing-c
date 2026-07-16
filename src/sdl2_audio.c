@@ -702,6 +702,22 @@ void sdl2_audio_halt(sdl2_audio_t *ctx)
     Mix_HaltChannel(-1);
 }
 
+void sdl2_audio_wait_all(sdl2_audio_t *ctx, int max_ms)
+{
+    if (ctx == NULL || !ctx->audio_opened)
+    {
+        return;
+    }
+
+    const int poll_ms = 10;
+    int waited = 0;
+    while (Mix_Playing(-1) > 0 && waited < max_ms)
+    {
+        SDL_Delay((Uint32)poll_ms);
+        waited += poll_ms;
+    }
+}
+
 int sdl2_audio_count(const sdl2_audio_t *ctx)
 {
     if (ctx == NULL)

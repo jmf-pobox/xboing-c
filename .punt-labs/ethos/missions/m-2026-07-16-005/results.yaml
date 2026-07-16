@@ -1,0 +1,60 @@
+results:
+    - mission: m-2026-07-16-005
+      round: 1
+      created_at: "2026-07-16T01:50:46Z"
+      author: sjl
+      verdict: pass
+      confidence: 0.9
+      files_changed:
+        - path: include/sdl2_audio.h
+          added: 10
+          removed: 0
+        - path: src/game_modes.c
+          added: 4
+          removed: 0
+        - path: src/sdl2_audio.c
+          added: 16
+          removed: 0
+      evidence:
+        - name: cmake --preset debug && cmake --build build (zero warnings, -Werror -Wconversion -Wshadow)
+          status: pass
+        - name: ctest --test-dir build --output-on-failure (61/61, 1 disabled, 37.08s)
+          status: pass
+        - name: cmake --preset asan && cmake --build build-asan (zero warnings)
+          status: pass
+        - name: ctest --test-dir build-asan --output-on-failure (61/61, 1 disabled, 43.22s, ASan+UBSan clean)
+          status: pass
+        - name: git status --porcelain (only write_set files modified)
+          status: pass
+        - name: grep -rl quit_pending tests/ (no test exercises confirmed-quit branch; drain code path is untested by ctest suite, confirming no timing impact)
+          status: pass
+      prose: |
+        Added sdl2_audio_wait_all(ctx, max_ms) to include/sdl2_audio.h and
+        src/sdl2_audio.c: polls Mix_Playing(-1) in 10ms increments, returns
+        early once nothing is playing, bails out after max_ms regardless.
+        Guarded by ctx->audio_opened (matches the guard used at
+        sdl2_audio.c:366 in destroy). No-op on ctx == NULL.
+
+        Wired into src/game_modes.c mode_dialogue_exit's confirmed-quit
+        branch only: after sdl2_audio_play_at_percent(ctx->audio,
+        "game_over", 100), call sdl2_audio_wait_all(ctx->audio, 1500)
+        before the SDL_QUIT event is pushed. game_over.wav is ~1205ms;
+        1500ms cap leaves headroom without risking a perceptibly long hang
+        if Mix_Playing never clears.
+
+        Did NOT touch sdl2_audio_destroy — the drain is confined to the
+        quit-confirmation path so normal teardown (including every test
+        that creates/destroys an audio context) is unaffected. Confirmed
+        no test exercises quit_pending's confirmed branch (grep found zero
+        matches in tests/), so the ctest suite's timing is unaffected by
+        the new blocking call; total suite time (37s debug, 43s asan) is
+        consistent with pre-existing runtimes for this suite (test_keybindings
+        alone routinely takes 6-7s).
+
+        Expected UX: pressing q then confirming quit with y now holds the
+        window open for up to ~1.2s (until game_over.wav finishes) before
+        the window closes, versus the prior near-instant close that cut the
+        sting off after 1-2 frames. Maintainer should live-verify audibility
+        with sound on — this fix guarantees the mixer isn't torn down before
+        playback completes, but only a real listen confirms the sample is
+        audible end-to-end.
