@@ -705,18 +705,25 @@ void sdl2_audio_halt(sdl2_audio_t *ctx)
 // cppcheck-suppress constParameterPointer
 void sdl2_audio_wait_all(sdl2_audio_t *ctx, int max_ms)
 {
-    if (ctx == NULL || !ctx->audio_opened)
+    if (ctx == NULL || !ctx->audio_opened || max_ms <= 0)
     {
         return;
     }
 
+    /* Bound by wall-clock elapsed time, not the sum of intended SDL_Delay
+     * durations: SDL_Delay may oversleep, so summing requested steps can
+     * let real elapsed time exceed max_ms. */
     const int poll_ms = 10;
-    int waited = 0;
-    while (Mix_Playing(-1) > 0 && waited < max_ms)
+    Uint32 start = SDL_GetTicks();
+    while (Mix_Playing(-1) > 0)
     {
-        int step = (max_ms - waited < poll_ms) ? (max_ms - waited) : poll_ms;
-        SDL_Delay((Uint32)step);
-        waited += step;
+        int elapsed = (int)(SDL_GetTicks() - start);
+        if (elapsed >= max_ms)
+        {
+            break;
+        }
+        int remaining = max_ms - elapsed;
+        SDL_Delay((Uint32)(remaining < poll_ms ? remaining : poll_ms));
     }
 }
 
