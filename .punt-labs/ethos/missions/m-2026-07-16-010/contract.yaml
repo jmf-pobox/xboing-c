@@ -1,0 +1,30 @@
+mission_id: m-2026-07-16-010
+status: closed
+type: implement
+created_at: "2026-07-16T12:34:34Z"
+updated_at: "2026-07-16T12:58:57Z"
+closed_at: "2026-07-16T12:58:57Z"
+leader: claude
+worker: jdc
+evaluator:
+    handle: jck
+    pinned_at: "2026-07-16T12:34:34Z"
+    hash: 40cbe1204f644c77e6a26757a9b855e3298be267025e806d425bfdea99054f18
+inputs: {}
+write_set:
+    - src/block_system.c
+success_criteria:
+    - 'Fix the DEATH_BLK wink rhythm (audit MEDIUM). Current: block_system_advance_animations uses a UNIFORM `bp->bonus_slide = (frame / BLOCK_DEATH_DELAY1) % 5` — a flat 5-step, 500-tick cycle. Original (original/blocks.c:1313-1334) is ASYMMETRIC: a closed-eye hold for DEATH_DELAY2 (700), then a rapid blink through the frames at DEATH_DELAY1 (100) each, period ~1000 ticks, with the 4th frame drawn-then-instantly-overwritten so it is not visibly shown. jck (author) gates the exact target rhythm.'
+    - 'Replace the DEATH_BLK case with a stateless asymmetric formula keyed on `frame` (DEATH blocks are level-loaded at frame 0, so all are in phase and a frame-based formula reproduces the original phase without per-block timer state). Target: period = BLOCK_DEATH_DELAY2 + 3*BLOCK_DEATH_DELAY1 (700 + 300 = 1000); t = frame % period; bonus_slide = (t < BLOCK_DEATH_DELAY2) ? 0 : 1 + (t - BLOCK_DEATH_DELAY2) / BLOCK_DEATH_DELAY1; Sequence: slide 0 held 700 ticks, then slides 1,2,3 for 100 ticks each, repeat — matching the original''s hold-then-blink with the 4th frame not shown. jdc: verify the arithmetic is -Wconversion-clean (all int, positive) and produces exactly [0×700, 1×100, 2×100, 3×100] per period. Cite original/blocks.c:1313-1334 and the DELAY constants in the comment.'
+    - 'jck FAITHFULNESS RULING (evaluator): confirm against original/blocks.c:1313-1334 that (a) the closed-eye hold is DEATH_DELAY2 and the blink step is DEATH_DELAY1, (b) the 4th sprite frame (bonusSlide==4) is drawn then immediately overwritten by the reset-to-0 redraw, so NOT showing it is faithful, (c) whether 3 blink frames (1,2,3) is correct or the intended wink shows a different count — RULE on the exact visible sequence and have jdc match it. If jck rules frame 4 should be briefly visible or the count differs, adjust the period/mapping.'
+    - Do NOT change BLOCK_DEATH_DELAY1/2 values, other animation cases (BONUS/EXTRABALL/ROAMER), or any timer in block_system_update_movement. cmake --preset debug && cmake --build build zero-warning -Werror -Wconversion -Wshadow. Full ctest --test-dir build green AND make asan-test green. Only src/block_system.c changes. (A sibling gjm mission adds the regression test — do not add tests here.)
+budget:
+    rounds: 3
+    reflection_after_each: true
+current_round: 1
+context: |-
+    Post-1.0.10 fidelity fix. Audit 2026-07-14-animation-cadence-parity 1b: DEATH_BLK winks ~2x
+    too fast with no idle hold and an extra visible frame. Restore the original's asymmetric
+    hold-then-blink. Stateless frame-keyed formula is appropriate (DEATH blocks are level-loaded
+    in phase; the original's per-block timer and a frame%period formula coincide). jck (original
+    author) gates the exact visible rhythm.

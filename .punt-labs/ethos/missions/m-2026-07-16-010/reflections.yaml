@@ -1,0 +1,13 @@
+reflections:
+    - round: 1
+      created_at: "2026-07-16T12:58:46Z"
+      author: jck
+      converging: true
+      signals:
+        - 'Independent tick-by-tick trace of original/blocks.c:1313-1334 (spawn nextFrame=700, DELAY1=100, DELAY2=700): fire@700 draws stale 0 (redundant), @800 draws 1 (first real change), @900→2, @1000→3, @1100 draws 4 then reset-redraws 0 same tick.'
+        - 'CONFIRMED jdc''s correction: closed-eye hold is 800 (DEATH_DELAY2+DEATH_DELAY1), not 700 — the DELAY2-boundary fire is a redundant redraw of the still-0 value; transition to slide 1 is one DELAY1 later. Period is 1100 (DEATH_DELAY2+4*DEATH_DELAY1).'
+        - 'CONFIRMED frame 4 never visibly shown: drawn then overwritten by reset-to-0 in the same synchronous tick, no screen refresh between — hence 3 visible blink frames (1,2,3).'
+        - Formula (t<hold0?0:1+(t-hold0)/DELAY1, hold0=800, period=1100) produces slide 0 for 800 then 1,2,3 for 100 each; DELAY1/DELAY2 and other cases unchanged.
+        - 'Restores the 1996 skull wink feel: long closed hold + quick blink, replacing the port''s flat 2x-too-fast 500-tick cycle. 800/1100 is the faithful answer.'
+      recommendation: stop
+      reason: jdc's instruction-level trace is correct and beats the audit's design-intent reading — the redundant boundary redraw makes the hold 800 and period 1100. Faithful reproduction of the original DEATH_BLK wink. Approved to ship.
