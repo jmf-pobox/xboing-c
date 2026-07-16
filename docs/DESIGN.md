@@ -4220,13 +4220,15 @@ frame→real-time stretch across all frame-count timers.
 modern gameplay logic tick and the original's in-game frame are **both
 7.5 ms at default speed**:
 
-- Modern: `tick_interval = SDL2L_TICK_UNIT_US(1500) × (10 − speed)`; at
+- Modern: `tick_interval = SDL2L_TICK_UNIT_US × (10 − speed)` (the macro
+  `SDL2L_TICK_UNIT_US = 1500`); at
   `SDL2L_DEFAULT_SPEED = 5` → 7500 µs = 7.5 ms/tick
   (`src/sdl2_loop.c:45-47`, `include/sdl2_loop.h:35,39`).
 - Original: `SetUserSpeed(5)` sets `userDelay = 5`
   (`original/init.c:529,916`); in-game `SetGameSpeed(FAST_SPEED=5)`
   computes `speed = delay × userDelay = 5 × 5 = 25`
-  (`original/main.c:155-160`, `FAST_SPEED` at `main.h:81`); the loop
+  (`original/main.c:155-160`, `FAST_SPEED` at
+  `original/include/main.h:81`); the loop
   calls `sleepSync(display, 25)` → `usleep(25 × 300) = 7500 µs` = 7.5 ms
   per iteration (`original/misc.c`, `original/main.c:1876`).
 

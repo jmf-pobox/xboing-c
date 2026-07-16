@@ -48,7 +48,7 @@ flagged for jck's ruling in §6.
 `sdl2_loop`'s tick interval: `tick_interval_us = 1500 * (10 -
 speed_level)` (`src/sdl2_loop.c:45-47`, `include/sdl2_loop.h:35-39`).
 At `SDL2L_DEFAULT_SPEED=5`: `1500*(10-5) = 7500 us = 7.5 ms/tick` →
-**133 ticks/sec**. `stub_tick()` (`src/sdl2_state.c:1176-1189`) calls
+**133 ticks/sec**. `stub_tick()` (`src/game_init.c:1176-1189`) calls
 `sdl2_state_update()` exactly once per consumed tick, which
 increments `ctx->frame` exactly once (`src/sdl2_state.c:233-238`)
 unless paused or in a dialogue. `mode_game_update()`
@@ -286,7 +286,7 @@ explicitly in the requested constant enumeration and remains open.
 |---|---|
 | Modern tick formula, default 7.5ms/tick | `src/sdl2_loop.c:45-47`, `include/sdl2_loop.h:35-39` |
 | `sdl2_state_update` increments frame once/tick | `src/sdl2_state.c:233-238` |
-| `stub_tick` calls `sdl2_state_update` once per consumed tick | `src/sdl2_state.c:1176-1189` |
+| `stub_tick` calls `sdl2_state_update` once per consumed tick | `src/game_init.c:1176-1189` |
 | `mode_game_update` — no multiplier loop, calls systems once/tick | `src/game_modes.c:286-373` |
 | `ATTRACT_FRAME_MULTIPLIER=6`, 10 call sites | `src/game_modes.c:422,470,533,595,646,681,736,798,923,1270` |
 | Original `speed`/`userDelay`/`speedLevel` globals | `original/main.c:113-141` |
