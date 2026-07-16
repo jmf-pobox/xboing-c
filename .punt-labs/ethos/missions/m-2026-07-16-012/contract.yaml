@@ -1,0 +1,27 @@
+mission_id: m-2026-07-16-012
+status: closed
+type: implement
+created_at: "2026-07-16T13:11:21Z"
+updated_at: "2026-07-16T13:17:28Z"
+closed_at: "2026-07-16T13:17:28Z"
+leader: claude
+worker: jdc
+evaluator:
+    handle: jck
+    pinned_at: "2026-07-16T13:11:21Z"
+    hash: 40cbe1204f644c77e6a26757a9b855e3298be267025e806d425bfdea99054f18
+inputs: {}
+write_set:
+    - include/block_system.h
+success_criteria:
+    - 'Fix Copilot finding (PR #192): the block_system_advance_animations header doc in include/block_system.h still describes DEATH_BLK as "5-frame cycle, BLOCK_DEATH_DELAY1 interval", which is now stale — the case is asymmetric. Update ONLY that clause to describe the actual behavior; doc comment only, no code.'
+    - 'In the doc comment (~line 223-225), change the DEATH_BLK clause from "DEATH_BLK (5-frame cycle, BLOCK_DEATH_DELAY1 interval)" to accurately state: DEATH_BLK is an asymmetric wink — slide 0 held for BLOCK_DEATH_DELAY2 + BLOCK_DEATH_DELAY1 (closed eye), then slides 1-3 at BLOCK_DEATH_DELAY1 each, and the 5th sprite (slide 4) is never shown (period BLOCK_DEATH_DELAY2 + 4*BLOCK_DEATH_DELAY1). Cite original/blocks.c:1313-1334. Keep the BONUS and EXTRABALL clauses and the rest of the comment unchanged.'
+    - 'Doc-only: no code lines change; cmake --build build still compiles zero-warning; only include/block_system.h changes.'
+budget:
+    rounds: 1
+    reflection_after_each: true
+current_round: 1
+context: |-
+    PR #192 review. Copilot noted the advance_animations header doc still calls DEATH_BLK a uniform
+    5-frame cycle; the mission-010 fix made it asymmetric (hold 800, blink 1-3, period 1100, slide 4
+    hidden). Update the doc to match. jck (author) verifies the description matches the shipped rhythm.

@@ -1,0 +1,17 @@
+reflections:
+    - round: 1
+      created_at: "2026-07-16T13:15:37Z"
+      author: jdc
+      converging: true
+      signals:
+        - Every block_system_get_render_info call in test_death_block_wink_rhythm (8 checkpoint asserts + the full-period sweep loop) now routes through the new file-local helper wink_slide_at(ctx, r, c, frame), which asserts status == BLOCK_SYS_OK before returning info.bonus_slide. No raw unasserted get_render_info read remains in the function.
+        - Helper's status-check idiom (block_system_status_t st = ...; assert_int_equal(st, BLOCK_SYS_OK);) is byte-for-byte the pattern used in the sibling test_bonus_block_spin_descends (line 1134-1136) -- consistent with the file's existing style.
+        - 'All 9 bonus_slide expectations are unchanged: 0,0,1,1,2,3,3,0,1 at frames {0, hold0-1, hold0, hold0+d1-1, hold0+d1, hold0+2*d1, period-1, period, period+hold0}. Sweep loop invariants unchanged: slide in {0,1,2,3}, never 4, zero_count == hold0. Only status assertions were added; rhythm logic untouched.'
+        - Only observable getters used (block_system_advance_animations, block_system_get_render_info) -- no static/internal block_system calls. ctx freed via block_system_destroy at function end. srand(31337) unchanged.
+        - 'git diff scope: tests/test_block_system.c is the only file touched by this mission''s write_set. (include/block_system.h shows an unrelated uncommitted doc-comment diff that predates this mission -- present since before HEAD commit 85db284 -- and is out of the write_set; the PreToolUse hook would have blocked gjm from touching it anyway.)'
+        - 'cmake --build build --target test_block_system: forced recompile (removed stale .o), compiles clean, no warnings.'
+        - 'ctest --test-dir build -R test_block_system: 3/3 passed (test_block_system_check_region, test_block_system, test_block_system_explosion).'
+        - 'cmake --build build-asan --target test_block_system: forced recompile, compiles clean.'
+        - 'ctest --test-dir build-asan -R test_block_system: 3/3 passed, no ASan/UBSan findings.'
+      recommendation: stop
+      reason: 'All three success criteria met: (1) Copilot finding fixed -- every get_render_info call now asserts BLOCK_SYS_OK before reading bonus_slide, matching the sibling test''s idiom; (2) rhythm expectations and sweep invariants are byte-identical to the prior version, only status assertions were added via a small observable-getters-only helper; (3) debug and asan builds both compile and pass 3/3 tests with zero sanitizer findings. Scope is clean -- write_set is respected. Converged in round 1, no further rounds needed.'

@@ -1156,6 +1156,21 @@ static void test_bonus_block_spin_descends(void **state)
  * BLOCK_DEATH_DELAY1 ticks and would produce slide 4.
  * ========================================================================= */
 
+/* Helper: advance animations to `frame`, assert the render-info lookup for
+ * (r,c) succeeds, and return its bonus_slide.  Centralizes the BLOCK_SYS_OK
+ * check so every checkpoint and sweep iteration below asserts the status
+ * before trusting info.bonus_slide, matching the idiom in
+ * test_bonus_block_spin_descends. */
+static int wink_slide_at(block_system_t *ctx, int r, int c, int frame)
+{
+    block_system_advance_animations(ctx, frame);
+
+    block_system_render_info_t info;
+    block_system_status_t st = block_system_get_render_info(ctx, r, c, &info);
+    assert_int_equal(st, BLOCK_SYS_OK);
+    return info.bonus_slide;
+}
+
 /* TC-48: Checkpoint frames across two full cycles match the documented
  * asymmetric rhythm exactly, without hardcoding the numeric values of
  * BLOCK_DEATH_DELAY1/2 — only their symbolic combination. */
@@ -1173,52 +1188,32 @@ static void test_death_block_wink_rhythm(void **state)
     const int hold0 = BLOCK_DEATH_DELAY2 + d1;
     const int period = BLOCK_DEATH_DELAY2 + 4 * d1;
 
-    block_system_render_info_t info;
-
     /* frame 0 -> 0 (closed eye at cycle start) */
-    block_system_advance_animations(ctx, 0);
-    block_system_get_render_info(ctx, r0, c0, &info);
-    assert_int_equal(info.bonus_slide, 0);
+    assert_int_equal(wink_slide_at(ctx, r0, c0, 0), 0);
 
     /* hold0 - 1 -> 0 (still held closed just before the first blink) */
-    block_system_advance_animations(ctx, hold0 - 1);
-    block_system_get_render_info(ctx, r0, c0, &info);
-    assert_int_equal(info.bonus_slide, 0);
+    assert_int_equal(wink_slide_at(ctx, r0, c0, hold0 - 1), 0);
 
     /* hold0 -> 1 (first blink frame) */
-    block_system_advance_animations(ctx, hold0);
-    block_system_get_render_info(ctx, r0, c0, &info);
-    assert_int_equal(info.bonus_slide, 1);
+    assert_int_equal(wink_slide_at(ctx, r0, c0, hold0), 1);
 
     /* hold0 + d1 - 1 -> 1 (still on blink frame 1) */
-    block_system_advance_animations(ctx, hold0 + d1 - 1);
-    block_system_get_render_info(ctx, r0, c0, &info);
-    assert_int_equal(info.bonus_slide, 1);
+    assert_int_equal(wink_slide_at(ctx, r0, c0, hold0 + d1 - 1), 1);
 
     /* hold0 + d1 -> 2 */
-    block_system_advance_animations(ctx, hold0 + d1);
-    block_system_get_render_info(ctx, r0, c0, &info);
-    assert_int_equal(info.bonus_slide, 2);
+    assert_int_equal(wink_slide_at(ctx, r0, c0, hold0 + d1), 2);
 
     /* hold0 + 2*d1 -> 3 */
-    block_system_advance_animations(ctx, hold0 + 2 * d1);
-    block_system_get_render_info(ctx, r0, c0, &info);
-    assert_int_equal(info.bonus_slide, 3);
+    assert_int_equal(wink_slide_at(ctx, r0, c0, hold0 + 2 * d1), 3);
 
     /* period - 1 -> 3 (still on the last blink frame just before wrap) */
-    block_system_advance_animations(ctx, period - 1);
-    block_system_get_render_info(ctx, r0, c0, &info);
-    assert_int_equal(info.bonus_slide, 3);
+    assert_int_equal(wink_slide_at(ctx, r0, c0, period - 1), 3);
 
     /* period -> 0 (wraps to closed-eye) */
-    block_system_advance_animations(ctx, period);
-    block_system_get_render_info(ctx, r0, c0, &info);
-    assert_int_equal(info.bonus_slide, 0);
+    assert_int_equal(wink_slide_at(ctx, r0, c0, period), 0);
 
     /* period + hold0 -> 1 (second cycle's blink, proves the wrap phase) */
-    block_system_advance_animations(ctx, period + hold0);
-    block_system_get_render_info(ctx, r0, c0, &info);
-    assert_int_equal(info.bonus_slide, 1);
+    assert_int_equal(wink_slide_at(ctx, r0, c0, period + hold0), 1);
 
     /* Key invariant sweep: across one full period, bonus_slide is always
      * in {0,1,2,3}, never 4, and is 0 for exactly `hold0` of the frames
@@ -1226,10 +1221,9 @@ static void test_death_block_wink_rhythm(void **state)
     int zero_count = 0;
     for (int frame = 0; frame < period; frame++)
     {
-        block_system_advance_animations(ctx, frame);
-        block_system_get_render_info(ctx, r0, c0, &info);
-        assert_true(info.bonus_slide >= 0 && info.bonus_slide <= 3);
-        if (info.bonus_slide == 0)
+        int slide = wink_slide_at(ctx, r0, c0, frame);
+        assert_true(slide >= 0 && slide <= 3);
+        if (slide == 0)
         {
             zero_count++;
         }
