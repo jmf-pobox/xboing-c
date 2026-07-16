@@ -54,6 +54,20 @@ static void inject_key(game_ctx_t *ctx, SDL_Scancode sc)
     sdl2_input_process_event(ctx->input, &e);
 }
 
+/* Same as inject_key but sets the SDL key modifier mask -- needed to
+ * distinguish Shift+'=' ('+', volume up) from bare '=' (debug skip-level
+ * cheat), since both share SDL_SCANCODE_EQUALS on a US keyboard layout. */
+static void inject_key_mod(game_ctx_t *ctx, SDL_Scancode sc, Uint16 mod)
+{
+    sdl2_input_begin_frame(ctx->input);
+    SDL_Event e = {0};
+    e.type = SDL_KEYDOWN;
+    e.key.keysym.scancode = sc;
+    e.key.keysym.mod = mod;
+    e.key.repeat = 0;
+    sdl2_input_process_event(ctx->input, &e);
+}
+
 
 /* =========================================================================
  * Fixtures
@@ -772,6 +786,139 @@ static void test_real_game_q_opens_dialogue(void **vstate)
 }
 
 /* =========================================================================
+ * Group 9: '=' debug skip-level cheat + Shift-aware keymap
+ * (mission m-2026-07-16-015) -- SDL2I_DEBUG_SKIP shares SDL_SCANCODE_EQUALS
+ * with Shift+'=' ('+'); game_input_global branches on
+ * sdl2_input_shift_held(): unshifted '=' in SDL2ST_GAME explodes required
+ * blocks only when ctx->debug_mode is set (src/game_input.c:248-339);
+ * Shift+'=' always routes to volume up, never the cheat.
+ *
+ * Each test clears the grid and seeds a deterministic board (independent
+ * of whichever level the fixture happened to load), so the assertions do
+ * not depend on level-file content.
+ * ========================================================================= */
+
+static void seed_required_and_special_blocks(game_ctx_t *ctx)
+{
+    assert_int_equal(block_system_clear_all(ctx->block), BLOCK_SYS_OK);
+    assert_int_equal(block_system_add(ctx->block, 0, 0, RED_BLK, 0, 0), BLOCK_SYS_OK);
+    assert_int_equal(block_system_add(ctx->block, 0, 1, BLUE_BLK, 0, 0), BLOCK_SYS_OK);
+    /* BLACK_BLK is not a "required" type (block_system_still_active only
+     * counts color blocks, COUNTER_BLK, DROP_BLK) and is absent from the
+     * cheat's explode switch (src/game_input.c:289-296) -- it must survive
+     * the skip-level cheat untouched. */
+    assert_int_equal(block_system_add(ctx->block, 0, 2, BLACK_BLK, 0, 0), BLOCK_SYS_OK);
+    assert_true(block_system_still_active(ctx->block));
+    assert_int_equal(block_system_get_exploding_count(ctx->block), 0);
+}
+
+/* Unshifted '=' with debug_mode on: required blocks (RED, BLUE) enter the
+ * explosion animation; the BLACK_BLK special survives untouched. Driving
+ * the explosion state machine to finalize (frame, +10, +20, +30 -- see
+ * test_update_advances_one_stage_per_tick_at_delay in
+ * tests/test_block_system_explosion.c) proves the cheat completes the
+ * level through the normal per-tick path, not a forced state change. */
+static void test_debug_skip_cheats_when_debug(void **vstate)
+{
+    game_ctx_t *ctx = ((kb_fixture_t *)*vstate)->ctx;
+    ctx->debug_mode = true;
+    seed_required_and_special_blocks(ctx);
+
+    int frame = (int)sdl2_state_frame(ctx->state);
+    inject_key(ctx, SDL_SCANCODE_EQUALS);
+    game_input_global(ctx);
+
+    assert_int_equal(block_system_get_exploding_count(ctx->block), 2);
+    assert_true(block_system_is_occupied(ctx->block, 0, 0));
+    assert_true(block_system_is_occupied(ctx->block, 0, 1));
+    assert_true(block_system_is_occupied(ctx->block, 0, 2));
+    assert_int_equal(block_system_get_type(ctx->block, 0, 2), BLACK_BLK);
+
+    block_system_update_explosions(ctx->block, frame, NULL, NULL);
+    block_system_update_explosions(ctx->block, frame + 10, NULL, NULL);
+    block_system_update_explosions(ctx->block, frame + 20, NULL, NULL);
+    block_system_update_explosions(ctx->block, frame + 30, NULL, NULL);
+
+    assert_int_equal(block_system_get_exploding_count(ctx->block), 0);
+    assert_false(block_system_is_occupied(ctx->block, 0, 0));
+    assert_false(block_system_is_occupied(ctx->block, 0, 1));
+    /* Required blocks are gone; only the surviving special remains, so the
+     * level no longer reports required blocks outstanding. */
+    assert_false(block_system_still_active(ctx->block));
+    assert_true(block_system_is_occupied(ctx->block, 0, 2));
+}
+
+/* The discriminating debug-gate test: same setup, ctx->debug_mode == false.
+ * Unshifted '=' must not touch the grid at all -- no explosions armed, no
+ * blocks disturbed. */
+static void test_debug_skip_blocked_without_debug(void **vstate)
+{
+    game_ctx_t *ctx = ((kb_fixture_t *)*vstate)->ctx;
+    ctx->debug_mode = false;
+    seed_required_and_special_blocks(ctx);
+
+    inject_key(ctx, SDL_SCANCODE_EQUALS);
+    game_input_global(ctx);
+
+    assert_int_equal(block_system_get_exploding_count(ctx->block), 0);
+    assert_true(block_system_is_occupied(ctx->block, 0, 0));
+    assert_int_equal(block_system_get_type(ctx->block, 0, 0), RED_BLK);
+    assert_true(block_system_is_occupied(ctx->block, 0, 1));
+    assert_int_equal(block_system_get_type(ctx->block, 0, 1), BLUE_BLK);
+    assert_true(block_system_is_occupied(ctx->block, 0, 2));
+    assert_int_equal(block_system_get_type(ctx->block, 0, 2), BLACK_BLK);
+    assert_true(block_system_still_active(ctx->block));
+}
+
+/* Shift+'=' ('+') must always route to volume up, even with debug_mode on
+ * -- it must never fall into the skip-level branch. */
+static void test_shift_equals_is_volume_up(void **vstate)
+{
+    game_ctx_t *ctx = ((kb_fixture_t *)*vstate)->ctx;
+    if (!ctx->audio)
+    {
+        skip();
+        return;
+    }
+    ctx->debug_mode = true;
+    seed_required_and_special_blocks(ctx);
+    sdl2_audio_set_volume_percent(ctx->audio, 50);
+    int before = sdl2_audio_get_volume_percent(ctx->audio);
+
+    inject_key_mod(ctx, SDL_SCANCODE_EQUALS, KMOD_LSHIFT);
+    game_input_global(ctx);
+
+    assert_int_equal(sdl2_audio_get_volume_percent(ctx->audio), before + 1);
+    assert_int_equal(block_system_get_exploding_count(ctx->block), 0);
+    assert_true(block_system_is_occupied(ctx->block, 0, 0));
+    assert_true(block_system_is_occupied(ctx->block, 0, 1));
+}
+
+/* Numpad '+' is the sole VOLUME_UP binding (no debug-skip ambiguity) and
+ * must behave identically to Shift+'=': volume up, grid untouched. */
+static void test_numpad_plus_is_volume_up(void **vstate)
+{
+    game_ctx_t *ctx = ((kb_fixture_t *)*vstate)->ctx;
+    if (!ctx->audio)
+    {
+        skip();
+        return;
+    }
+    ctx->debug_mode = true;
+    seed_required_and_special_blocks(ctx);
+    sdl2_audio_set_volume_percent(ctx->audio, 50);
+    int before = sdl2_audio_get_volume_percent(ctx->audio);
+
+    inject_key(ctx, SDL_SCANCODE_KP_PLUS);
+    game_input_global(ctx);
+
+    assert_int_equal(sdl2_audio_get_volume_percent(ctx->audio), before + 1);
+    assert_int_equal(block_system_get_exploding_count(ctx->block), 0);
+    assert_true(block_system_is_occupied(ctx->block, 0, 0));
+    assert_true(block_system_is_occupied(ctx->block, 0, 1));
+}
+
+/* =========================================================================
  * Test registration
  * ========================================================================= */
 
@@ -859,6 +1006,14 @@ int main(void)
         cmocka_unit_test_setup_teardown(test_real_game_q_opens_dialogue, setup_game, teardown),
     };
 
+    const struct CMUnitTest debug_skip_tests[] = {
+        cmocka_unit_test_setup_teardown(test_debug_skip_cheats_when_debug, setup_game, teardown),
+        cmocka_unit_test_setup_teardown(test_debug_skip_blocked_without_debug, setup_game,
+                                        teardown),
+        cmocka_unit_test_setup_teardown(test_shift_equals_is_volume_up, setup_game, teardown),
+        cmocka_unit_test_setup_teardown(test_numpad_plus_is_volume_up, setup_game, teardown),
+    };
+
     int rc = 0;
     rc |= cmocka_run_group_tests_name("global keys", global_tests, NULL, NULL);
     rc |= cmocka_run_group_tests_name("mode scoping", scoping_tests, NULL, NULL);
@@ -871,5 +1026,7 @@ int main(void)
                                       playtest_full_frame_tests, NULL, NULL);
     rc |= cmocka_run_group_tests_name("playtest quit blocked (xboing-3h3)", playtest_quit_tests,
                                       NULL, NULL);
+    rc |= cmocka_run_group_tests_name("debug skip-level cheat + shift keymap (m-2026-07-16-015)",
+                                      debug_skip_tests, NULL, NULL);
     return rc;
 }

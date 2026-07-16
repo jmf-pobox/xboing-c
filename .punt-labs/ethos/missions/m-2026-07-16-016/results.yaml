@@ -1,0 +1,20 @@
+results:
+    - mission: m-2026-07-16-016
+      round: 1
+      created_at: "2026-07-16T23:21:57Z"
+      author: gjm
+      verdict: pass
+      confidence: 0.95
+      files_changed:
+        - path: tests/test_keybindings.c
+          added: 90
+          removed: 0
+      evidence:
+        - name: '4 tests added + registered: test_debug_skip_cheats_when_debug (debug=1: = explodes required RED/BLUE, exploding_count->2, BLACK survives, update_explosions finalizes -> still_active false), test_debug_skip_blocked_without_debug (debug=0: no explosions, blocks unchanged), test_shift_equals_is_volume_up (Shift+= -> volume, never explodes even with debug=1), test_numpad_plus_is_volume_up (KP_PLUS -> volume)'
+          status: pass
+        - name: inject_key_mod(ctx,sc,mod) local helper mirrors inject_key + sets keysym.mod (test-only, production untouched)
+          status: pass
+        - name: 'RED-proof: changed src gate to if(1) -> test_debug_skip_blocked_without_debug FAILS (2!=0, tests/test_keybindings.c:863, explosions leak past broken gate) while other 3 pass; src restored byte-for-byte (git diff --stat empty)'
+          status: pass
+        - name: ctest -R test_keybindings green debug + asan (asan-clean); only tests/test_keybindings.c changed; src cheat (block_system_explode + debug gate) intact
+          status: pass
