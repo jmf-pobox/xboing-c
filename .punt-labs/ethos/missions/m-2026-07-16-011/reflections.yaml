@@ -1,0 +1,18 @@
+reflections:
+    - round: 1
+      created_at: "2026-07-16T13:06:10Z"
+      author: jdc
+      converging: true
+      signals:
+        - 'expectations correct: hold0/period/d1 derived from BLOCK_DEATH_DELAY1/2 header constants, not hardcoded'
+        - 'all required checkpoints asserted: 0->0, hold0-1->0, hold0->1, hold0+d1-1->1, hold0+d1->2, hold0+2*d1->3, period-1->3, period->0'
+        - full-period sweep asserts bonus_slide in {0,1,2,3} (never 4), zero_count == hold0
+        - observable getter only (block_system_get_render_info), no static calls
+        - 'RED-proof: swapped DEATH_BLK to flat (frame/BLOCK_DEATH_DELAY1)%5 via Edit, rebuilt, test FAILED at tests/test_block_system.c:1186 (2 != 0, hold0-1 checkpoint)'
+        - restored asymmetric fix via Edit; grep -c hold0 = BLOCK_DEATH_DELAY2 src/block_system.c == 1; git diff src/block_system.c matches original mission-010 hunk only
+        - 'rebuilt with fix restored: test_death_block_wink_rhythm passes'
+        - 'ctest -R test_block_system green: build (debug) 3/3 passed 0.34s, build-asan 3/3 passed 0.69s'
+        - deterministic srand(31337), ctx freed via block_system_destroy, registered in tests[] as Group 15
+        - 'net changed files: tests/test_block_system.c only; src/block_system.c and game_modes.c unchanged from pre-mission state'
+      recommendation: stop
+      reason: 'All four success criteria verified directly. Test derives hold0/period from header constants (no hardcoded 100/700/800/1100), asserts every required checkpoint plus a bonus second-cycle wrap check, and sweeps the full period confirming slide 4 is never shown and slide 0 holds for exactly hold0 frames. Re-ran the RED-proof myself: flat formula fails at line 1186 with 2 != 0 on the hold0-1 checkpoint (frame 799, (799/100)%5=2 vs expected 0). Restored the asymmetric fix via Edit; grep -c confirms exactly one occurrence and git diff shows only the original mission-010 hunk, byte-identical to before the round-trip. Rebuilt and confirmed the test passes with the fix restored. ctest -R test_block_system green under both debug and asan builds. No actionable findings. Approve, close the mission.'

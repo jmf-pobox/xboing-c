@@ -1,0 +1,20 @@
+results:
+    - mission: m-2026-07-16-010
+      round: 1
+      created_at: "2026-07-16T12:58:39Z"
+      author: jdc
+      verdict: pass
+      confidence: 0.9
+      files_changed:
+        - path: src/block_system.c
+          added: 18
+          removed: 2
+      evidence:
+        - name: 'DEATH_BLK case replaced flat (frame/DELAY1)%5 with asymmetric formula; jdc traced original/blocks.c:1313-1334 instruction-by-instruction and CORRECTED the mission spec''s off-by-one: DELAY2-boundary fire redraws stale slide 0 before transitioning'
+          status: pass
+        - name: 'hold0 = DEATH_DELAY2 + DEATH_DELAY1 = 800; period = DEATH_DELAY2 + 4*DEATH_DELAY1 = 1100; bonus_slide=(t<hold0)?0:1+(t-hold0)/DELAY1. Sequence: slide 0 for 800, then 1,2,3 for 100 each; frame 4 never emitted'
+          status: pass
+        - name: jck independently traced draws tick-by-tick and CONFIRMED 800/1100 is the faithful rhythm (700/1000 was wrong); approved to ship
+          status: pass
+        - name: cmake debug zero-warning -Werror -Wconversion -Wshadow; ctest 60/60 (test_sdl2_font pre-existing local SDL segfault excluded, reproduces without this change, unrelated); asan clean; only src/block_system.c changed
+          status: pass

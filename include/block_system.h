@@ -221,9 +221,11 @@ void block_system_update_explosions(block_system_t *ctx, int frame, block_system
 /*
  * Advance per-block animation slides for animated block types based on the
  * current frame counter.  Updates `bonus_slide` for BONUSX2/X4/BONUS_BLK
- * (4-frame cycle, BLOCK_BONUS_DELAY interval), DEATH_BLK (5-frame cycle,
- * BLOCK_DEATH_DELAY1 interval), and EXTRABALL_BLK (2-frame cycle,
- * BLOCK_EXTRABALL_DELAY interval).
+ * (4-frame cycle, BLOCK_BONUS_DELAY interval), DEATH_BLK (asymmetric wink:
+ * slide 0 held for BLOCK_DEATH_DELAY2 + BLOCK_DEATH_DELAY1, then slides 1-3
+ * at BLOCK_DEATH_DELAY1 each; the 5th sprite is never shown; period
+ * BLOCK_DEATH_DELAY2 + 4*BLOCK_DEATH_DELAY1 — original/blocks.c:1313-1334),
+ * and EXTRABALL_BLK (2-frame cycle, BLOCK_EXTRABALL_DELAY interval).
  *
  * ROAMER_BLK's bonus_slide (eye direction) is NOT cycled here — it is
  * driven by the rand()-scheduled eye timer in block_system_update_movement,

@@ -1140,6 +1140,100 @@ static void test_bonus_block_spin_descends(void **state)
 }
 
 /* =========================================================================
+ * Group 15: DEATH_BLK asymmetric wink rhythm (mission m-2026-07-16-011,
+ * jck-approved restoration in mission m-2026-07-16-010)
+ *
+ * block_system_advance_animations computes DEATH_BLK's bonus_slide as:
+ *   hold0  = BLOCK_DEATH_DELAY2 + BLOCK_DEATH_DELAY1        (closed hold)
+ *   period = BLOCK_DEATH_DELAY2 + 4 * BLOCK_DEATH_DELAY1    (full cycle)
+ *   t = frame % period
+ *   bonus_slide = (t < hold0) ? 0 : 1 + (t - hold0) / BLOCK_DEATH_DELAY1
+ *
+ * Rhythm: slide 0 held for `hold0` ticks (closed eye), then slides 1,2,3
+ * each held for BLOCK_DEATH_DELAY1 ticks, then the cycle wraps back to 0.
+ * Slide 4 is never produced. A regression to the flat
+ * `(frame / BLOCK_DEATH_DELAY1) % 5` formula would hold slide 0 for only
+ * BLOCK_DEATH_DELAY1 ticks and would produce slide 4.
+ * ========================================================================= */
+
+/* Helper: advance animations to `frame`, assert the render-info lookup for
+ * (r,c) succeeds, and return its bonus_slide.  Centralizes the BLOCK_SYS_OK
+ * check so every checkpoint and sweep iteration below asserts the status
+ * before trusting info.bonus_slide, matching the idiom in
+ * test_bonus_block_spin_descends. */
+static int wink_slide_at(block_system_t *ctx, int r, int c, int frame)
+{
+    block_system_advance_animations(ctx, frame);
+
+    block_system_render_info_t info;
+    block_system_status_t st = block_system_get_render_info(ctx, r, c, &info);
+    assert_int_equal(st, BLOCK_SYS_OK);
+    return info.bonus_slide;
+}
+
+/* TC-48: Checkpoint frames across two full cycles match the documented
+ * asymmetric rhythm exactly, without hardcoding the numeric values of
+ * BLOCK_DEATH_DELAY1/2 — only their symbolic combination. */
+static void test_death_block_wink_rhythm(void **state)
+{
+    (void)state;
+    srand(31337);
+    block_system_t *ctx = make_ctx();
+
+    const int r0 = 9;
+    const int c0 = 4;
+    block_system_add(ctx, r0, c0, DEATH_BLK, 0, 0);
+
+    const int d1 = BLOCK_DEATH_DELAY1;
+    const int hold0 = BLOCK_DEATH_DELAY2 + d1;
+    const int period = BLOCK_DEATH_DELAY2 + 4 * d1;
+
+    /* frame 0 -> 0 (closed eye at cycle start) */
+    assert_int_equal(wink_slide_at(ctx, r0, c0, 0), 0);
+
+    /* hold0 - 1 -> 0 (still held closed just before the first blink) */
+    assert_int_equal(wink_slide_at(ctx, r0, c0, hold0 - 1), 0);
+
+    /* hold0 -> 1 (first blink frame) */
+    assert_int_equal(wink_slide_at(ctx, r0, c0, hold0), 1);
+
+    /* hold0 + d1 - 1 -> 1 (still on blink frame 1) */
+    assert_int_equal(wink_slide_at(ctx, r0, c0, hold0 + d1 - 1), 1);
+
+    /* hold0 + d1 -> 2 */
+    assert_int_equal(wink_slide_at(ctx, r0, c0, hold0 + d1), 2);
+
+    /* hold0 + 2*d1 -> 3 */
+    assert_int_equal(wink_slide_at(ctx, r0, c0, hold0 + 2 * d1), 3);
+
+    /* period - 1 -> 3 (still on the last blink frame just before wrap) */
+    assert_int_equal(wink_slide_at(ctx, r0, c0, period - 1), 3);
+
+    /* period -> 0 (wraps to closed-eye) */
+    assert_int_equal(wink_slide_at(ctx, r0, c0, period), 0);
+
+    /* period + hold0 -> 1 (second cycle's blink, proves the wrap phase) */
+    assert_int_equal(wink_slide_at(ctx, r0, c0, period + hold0), 1);
+
+    /* Key invariant sweep: across one full period, bonus_slide is always
+     * in {0,1,2,3}, never 4, and is 0 for exactly `hold0` of the frames
+     * (the closed-eye hold). */
+    int zero_count = 0;
+    for (int frame = 0; frame < period; frame++)
+    {
+        int slide = wink_slide_at(ctx, r0, c0, frame);
+        assert_true(slide >= 0 && slide <= 3);
+        if (slide == 0)
+        {
+            zero_count++;
+        }
+    }
+    assert_int_equal(zero_count, hold0);
+
+    block_system_destroy(ctx);
+}
+
+/* =========================================================================
  * Test runner
  * ========================================================================= */
 
@@ -1214,6 +1308,9 @@ int main(void)
 
         /* Group 14: BONUS_BLK coin-block spin direction */
         cmocka_unit_test(test_bonus_block_spin_descends),
+
+        /* Group 15: DEATH_BLK asymmetric wink rhythm */
+        cmocka_unit_test(test_death_block_wink_rhythm),
     };
 
     return cmocka_run_group_tests(tests, NULL, NULL);

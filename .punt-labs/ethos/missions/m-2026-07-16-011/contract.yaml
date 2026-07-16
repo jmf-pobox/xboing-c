@@ -1,0 +1,30 @@
+mission_id: m-2026-07-16-011
+status: closed
+type: implement
+created_at: "2026-07-16T13:00:25Z"
+updated_at: "2026-07-16T13:06:41Z"
+closed_at: "2026-07-16T13:06:41Z"
+leader: claude
+worker: gjm
+evaluator:
+    handle: jdc
+    pinned_at: "2026-07-16T13:00:25Z"
+    hash: c08223356d3e6d5aed56e28da477a1aa2707509febfef7c5f62c25871a3e841f
+inputs: {}
+write_set:
+    - tests/test_block_system.c
+success_criteria:
+    - 'Add a regression test to tests/test_block_system.c pinning the DEATH_BLK asymmetric wink rhythm fixed in mission m-2026-07-16-010: block_system_advance_animations now sets bonus_slide via hold0=BLOCK_DEATH_DELAY2+BLOCK_DEATH_DELAY1 (800), period=BLOCK_DEATH_DELAY2 +4*BLOCK_DEATH_DELAY1 (1100), bonus_slide=(t<hold0)?0:1+(t-hold0)/BLOCK_DEATH_DELAY1. Register it in the tests[] runner.'
+    - 'The test places a DEATH_BLK via block_system_add, then for representative frames calls block_system_advance_animations(ctx, frame) and asserts bonus_slide via the observable getter (block_system_get_render_info().bonus_slide). Assert the sequence using the header constants (do NOT hardcode 100/700/800/1100): frame 0 -> 0; hold0-1 -> 0; hold0 -> 1; hold0+DELAY1-1 -> 1; hold0+DELAY1 -> 2; hold0+2*DELAY1 -> 3; period-1 -> 3; period -> 0 (wrap). ALSO assert the KEY invariant: across one full period [0, period), bonus_slide is NEVER 4 (the 5th sprite is never shown) and is held at 0 for exactly the first `hold0` frames (i.e. frame hold0-1 is 0 and frame hold0 is 1). Observable getters only; no static calls.'
+    - 'RED-prove: revert the src DEATH_BLK case to the old flat `(frame / BLOCK_DEATH_DELAY1) % 5` (temporary out-of-tree edit to src/block_system.c you restore byte-for-byte; src is OUTSIDE this write_set — use Edit to swap, rebuild, run, then Edit back and verify git diff --stat src/block_system.c is empty). The new test must FAIL with the flat formula (e.g. it shows slide 4, and/or slide 0 held only ~100 not 800) and PASS with the asymmetric fix. Report the exact failure. NOTE: src/block_system.c currently carries the uncommitted DEATH fix — do NOT git checkout it (that discards the fix); use Edit both ways.'
+    - Deterministic srand; asan-clean; free the ctx; only tests/test_block_system.c changes. ctest --test-dir build -R test_block_system green under debug AND asan. (test_sdl2_font fails locally on this Mac pre-existing/environmental — ignore it; run -R test_block_system specifically.)
+budget:
+    rounds: 2
+    reflection_after_each: true
+current_round: 1
+context: |-
+    Post-1.0.10 fidelity fix. jdc restored the DEATH_BLK asymmetric wink (mission m-2026-07-16-010,
+    jck-approved): closed-eye hold 800 ticks then blink slides 1,2,3 at 100 each, period 1100, 5th
+    sprite never shown. jdc traced the original instruction-by-instruction and corrected an off-by-one
+    in the initial spec (hold is DELAY2+DELAY1=800, not 700). This mission pins that rhythm so a
+    regression back to the flat cycle (or wrong hold/period) is caught.

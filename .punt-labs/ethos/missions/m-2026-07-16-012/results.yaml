@@ -1,0 +1,16 @@
+results:
+    - mission: m-2026-07-16-012
+      round: 1
+      created_at: "2026-07-16T13:13:40Z"
+      author: jdc
+      verdict: pass
+      confidence: 0.98
+      files_changed:
+        - path: include/block_system.h
+          added: 4
+          removed: 3
+      evidence:
+        - name: 'DEATH_BLK doc clause reworded to asymmetric wink: slide 0 held DELAY2+DELAY1, then slides 1-3 at DELAY1, 5th sprite never shown, period DELAY2+4*DELAY1, cites original/blocks.c:1313-1334; BONUS/EXTRABALL/ROAMER clauses unchanged'
+          status: pass
+        - name: doc-only, no code lines; cmake build zero-warning; only include/block_system.h changed
+          status: pass

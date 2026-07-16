@@ -1,0 +1,27 @@
+mission_id: m-2026-07-16-013
+status: closed
+type: implement
+created_at: "2026-07-16T13:11:29Z"
+updated_at: "2026-07-16T13:17:29Z"
+closed_at: "2026-07-16T13:17:29Z"
+leader: claude
+worker: gjm
+evaluator:
+    handle: jdc
+    pinned_at: "2026-07-16T13:11:29Z"
+    hash: c08223356d3e6d5aed56e28da477a1aa2707509febfef7c5f62c25871a3e841f
+inputs: {}
+write_set:
+    - tests/test_block_system.c
+success_criteria:
+    - 'Fix Copilot finding (PR #192): test_death_block_wink_rhythm calls block_system_get_render_info(...) and reads info.bonus_slide WITHOUT asserting the returned block_system_status_t == BLOCK_SYS_OK first. Sibling tests (e.g. test_bonus_block_spin_descends) assert BLOCK_SYS_OK to avoid reading an uninitialized info on an unexpected unoccupied/out-of-bounds cell. Make test_death_block_wink_rhythm consistent.'
+    - For every block_system_get_render_info(ctx, r0, c0, &info) call in test_death_block_wink_rhythm (the checkpoint asserts AND the full-period sweep loop), assert the return value equals BLOCK_SYS_OK before reading info.bonus_slide — match the exact pattern/idiom used by test_bonus_block_spin_descends in the same file (read it first). A small local helper is fine if it reduces repetition, but keep it observable-getters-only and consistent with the file's style. Do NOT change the asserted bonus_slide expectations or the rhythm logic — only add the status assertions.
+    - cmake --build build --target test_block_system compiles; ctest --test-dir build -R test_block_system green (debug AND asan). Only tests/test_block_system.c changes. (Ignore test_sdl2_font — pre-existing local Mac segfault; run -R test_block_system specifically.)
+budget:
+    rounds: 1
+    reflection_after_each: true
+current_round: 1
+context: |-
+    PR #192 review. Copilot: test_death_block_wink_rhythm doesn't check the get_render_info status
+    before reading bonus_slide, unlike sibling tests. Add the BLOCK_SYS_OK assertions for robustness/
+    consistency. No change to the rhythm expectations.

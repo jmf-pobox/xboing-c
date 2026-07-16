@@ -626,9 +626,25 @@ void block_system_advance_animations(block_system_t *ctx, int frame)
                     break;
 
                 case DEATH_BLK:
-                    /* 5-frame winking pirate cycle */
-                    bp->bonus_slide = (frame / BLOCK_DEATH_DELAY1) % 5;
+                {
+                    /* Asymmetric wink (original/blocks.c:1313-1334): the eye
+                     * closes for BLOCK_DEATH_DELAY2, then blinks through
+                     * slides 1-3 at BLOCK_DEATH_DELAY1 each. The trigger
+                     * that fires exactly at the DELAY2 boundary redraws
+                     * slide 0 again first (bonusSlide is already 0 there,
+                     * so that redraw is a visible no-op) before arming the
+                     * DELAY1-spaced blink — so slide 0 is actually held for
+                     * DELAY2 + DELAY1, one extra blink-tick longer than the
+                     * raw DELAY2 hold. The 5th sprite (bonusSlide == 4) is
+                     * drawn and instantly overwritten by the reset-to-0
+                     * redraw within the same tick, so it is never visibly
+                     * shown — hence 3 blink frames, not 4. */
+                    const int hold0 = BLOCK_DEATH_DELAY2 + BLOCK_DEATH_DELAY1;
+                    const int period = BLOCK_DEATH_DELAY2 + 4 * BLOCK_DEATH_DELAY1;
+                    const int t = frame % period;
+                    bp->bonus_slide = (t < hold0) ? 0 : 1 + (t - hold0) / BLOCK_DEATH_DELAY1;
                     break;
+                }
 
                 case EXTRABALL_BLK:
                     /* 2-frame flip */
