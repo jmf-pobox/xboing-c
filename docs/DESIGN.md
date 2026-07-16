@@ -4234,7 +4234,7 @@ modern gameplay logic tick and the original's in-game frame are **both
   per iteration (`original/misc.c:102-108`, `original/main.c:1876`).
 
 `BALL_AUTO_ACTIVE_DELAY = 3000` (`include/ball_types.h:41`, matching
-`original/include/ball_types.h:41`) against an **un-gated**
+`original/include/ball_types.h:41`) against an **ungated**
 `frame == nextFrame` check (`original/ball.c:2068`) therefore elapses in
 `3000 × 7.5 ms ≈ 22.5 s` in the **1996 original too**. The "5× too slow"
 premise came from misreading `sleepSync`'s argument as the *speed level*

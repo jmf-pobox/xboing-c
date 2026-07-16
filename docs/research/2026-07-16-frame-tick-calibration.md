@@ -22,7 +22,7 @@ behavior, not a porting bug.** Tracing the original's actual runtime
 `speed` value (not the naive `speed=5` read of `sleepSync`'s
 parameter name) shows the original ran its main loop at the exact
 same 7.5 ms/iteration the modern port uses by default. At that
-cadence, `BALL_AUTO_ACTIVE_DELAY=3000` un-gated main-loop iterations
+cadence, `BALL_AUTO_ACTIVE_DELAY=3000` ungated main-loop iterations
 elapse in `3000 * 7.5 ms = 22.5 s` in **both** trees. This is not a
 new derivation — it is the same baseline two already-committed audits
 (`docs/research/2026-06-27-warp-speed-modern.md` §5,
@@ -152,7 +152,7 @@ per §1.
 
 | Constant | Original value (cite) | Modern value (cite) | Real-time cadence (both trees, since tick rate matches) | Classification |
 |---|---|---|---|---|
-| `BALL_AUTO_ACTIVE_DELAY` | 3000 (`original/include/ball_types.h:41`, checked un-gated at `original/ball.c:2068`) | 3000 (`include/ball_types.h:41`, `src/ball_system.c:569,910`) | 22.5 s | Ported 1:1, faithful — **not stretched** |
+| `BALL_AUTO_ACTIVE_DELAY` | 3000 (`original/include/ball_types.h:41`, checked ungated at `original/ball.c:2068`) | 3000 (`include/ball_types.h:41`, `src/ball_system.c:569,910`) | 22.5 s | Ported 1:1, faithful — **not stretched** |
 | `BALL_FRAME_RATE` | 5 (`original/include/ball_types.h:36`, gate at `original/ball.c:2051,2088`) | 5 (`include/ball_types.h:36`, `src/ball_system.c:377,442`) | ball moves every 37.5 ms (293 px/s, confirmed MATCH by `docs/audits/2026-07-13-gameplay-logic-parity.md` §2) | Ported 1:1, faithful |
 | `BIRTH_FRAME_RATE` | 5 (`original/include/ball_types.h:35`, `original/ball.c:1828,1873,1970`) | 5 (`include/ball_types.h:35`, `src/ball_system.c:143,236,848,893,1349`) | birth/pop sprite steps every 37.5 ms | Ported 1:1, faithful |
 | `BONUS_SEED` | 2000 (`original/include/main.h:58`, `original/main.c:970-971`) | 2000 (`src/game_rules.c:34,102`) | random 0-15 s, avg 7.5 s until a bonus/special spawn roll | Ported 1:1, faithful |
@@ -194,7 +194,7 @@ seconds* if gameplay ticks run ~5x slow. **They do not (§1) — so there
 is no tension.** `hold0=BLOCK_DEATH_DELAY2+BLOCK_DEATH_DELAY1=800`
 ticks and `period=BLOCK_DEATH_DELAY2+4*BLOCK_DEATH_DELAY1=1100` ticks
 (`src/block_system.c:642-645`) elapse in `800*7.5ms=6.0s` and
-`1100*7.5ms=8.25s` in the modern port. The original's un-gated
+`1100*7.5ms=8.25s` in the modern port. The original's ungated
 main-loop iteration counter runs at the identical 7.5ms/iteration
 (§1b), so the same tick counts elapse in the identical wall-clock time
 there too. **The wink fix is correct as shipped and needs no revisit
@@ -296,7 +296,7 @@ explicitly in the requested constant enumeration and remains open.
 | `main()` calls `SetGameSpeed(FAST_SPEED)` after init | `original/main.c:1890-1899` |
 | Original main-loop tick dispatch (GAME vs attract) | `original/main.c:1746-1749,1876-1879` |
 | `sleepSync` implementation | `original/misc.c:102-108` |
-| `BALL_AUTO_ACTIVE_DELAY` un-gated check | `original/ball.c:2068`, `src/ball_system.c` (frame equality/threshold at set sites 569,910) |
+| `BALL_AUTO_ACTIVE_DELAY` ungated check | `original/ball.c:2068`, `src/ball_system.c` (frame equality/threshold at set sites 569,910) |
 | `BALL_AUTO_ACTIVE_DELAY=3000` both trees | `original/include/ball_types.h:41`, `include/ball_types.h:41` |
 | DEATH_BLK wink fix (PR #192) | `src/block_system.c:642-645`, commit `ad6efa2` |
 | Paddle velocity 2x finding (open) | `docs/audits/2026-07-13-gameplay-logic-parity.md` §9, finding #1 |

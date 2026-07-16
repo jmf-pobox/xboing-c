@@ -565,7 +565,7 @@ typedef struct {
 | `BALL_READY` | 6 | On paddle, waiting for launch |
 | `BALL_NONE` | 7 | Null/undefined |
 
-**Lifecycle:** `BALL_NONE` -> `BALL_CREATE` (8-frame birth animation) -> `BALL_READY` (on paddle, auto-launch after 3000 frames, ~22.5 s at default speed) -> `BALL_ACTIVE` (in play) -> `BALL_DIE`/`BALL_POP` (8-frame reverse animation) -> `BALL_NONE`
+**Lifecycle:** `BALL_NONE` -> `BALL_CREATE` (8-frame birth animation) -> `BALL_READY` (on paddle, auto-launch after 3000 frames/ticks, ~22.5 s at default speed) -> `BALL_ACTIVE` (in play) -> `BALL_DIE`/`BALL_POP` (8-frame reverse animation) -> `BALL_NONE`
 
 ### Paddle Collision
 
@@ -845,7 +845,7 @@ Toggle via `G` key. Default: `CONTROL_KEYS` (or `CONTROL_MOUSE` if `-keys` not s
 ### Special States
 
 - **Reverse mode** (`reverseOn`): Left/right controls inverted. Set by `REVERSE_BLK`. Reset on ball death.
-- **Sticky mode** (`stickyOn`): Ball sticks to paddle on contact, launches on shoot key/click. Set by `STICKY_BLK`. Auto-launches after `BALL_AUTO_ACTIVE_DELAY` (3000 frames, ~22.5 s at default speed).
+- **Sticky mode** (`stickyOn`): Ball sticks to paddle on contact, launches on shoot key/click. Set by `STICKY_BLK`. Auto-launches after `BALL_AUTO_ACTIVE_DELAY` (3000 frames/ticks, ~22.5 s at default speed).
 
 ### Paddle Size Transitions
 
