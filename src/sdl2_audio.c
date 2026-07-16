@@ -702,6 +702,7 @@ void sdl2_audio_halt(sdl2_audio_t *ctx)
     Mix_HaltChannel(-1);
 }
 
+// cppcheck-suppress constParameterPointer
 void sdl2_audio_wait_all(sdl2_audio_t *ctx, int max_ms)
 {
     if (ctx == NULL || !ctx->audio_opened)
@@ -713,8 +714,9 @@ void sdl2_audio_wait_all(sdl2_audio_t *ctx, int max_ms)
     int waited = 0;
     while (Mix_Playing(-1) > 0 && waited < max_ms)
     {
-        SDL_Delay((Uint32)poll_ms);
-        waited += poll_ms;
+        int step = (max_ms - waited < poll_ms) ? (max_ms - waited) : poll_ms;
+        SDL_Delay((Uint32)step);
+        waited += step;
     }
 }
 

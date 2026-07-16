@@ -1,0 +1,30 @@
+mission_id: m-2026-07-16-007
+status: closed
+type: implement
+created_at: "2026-07-16T02:18:33Z"
+updated_at: "2026-07-16T02:22:47Z"
+closed_at: "2026-07-16T02:22:47Z"
+leader: claude
+worker: sjl
+evaluator:
+    handle: jdc
+    pinned_at: "2026-07-16T02:18:33Z"
+    hash: c08223356d3e6d5aed56e28da477a1aa2707509febfef7c5f62c25871a3e841f
+inputs: {}
+write_set:
+    - src/sdl2_audio.c
+success_criteria:
+    - 'Fix two Copilot findings on sdl2_audio_wait_all (PR #190), both valid. Only src/sdl2_audio.c changes.'
+    - '#2 (cppcheck CI failure, constParameterPointer): cppcheck --enable=style --error-exitcode=1 fails on sdl2_audio.c:705 because sdl2_audio_wait_all''s `ctx` is not mutated. Match the established file convention (the sibling action helper sdl2_audio_halt at line 695 keeps a non-const `sdl2_audio_t *` and carries `// cppcheck-suppress constParameterPointer` on the line immediately above it, line 694). Add the identical `// cppcheck-suppress constParameterPointer` comment on the line immediately before `void sdl2_audio_wait_all(...)`. Keep the signature non-const (consistent with halt/set_muted — the action-on-the-audio-system family). Do NOT const the parameter.'
+    - '#1 (bounded-wait overshoot): the drain loop `while (... && waited < max_ms){ SDL_Delay(10); waited += 10; }` can overshoot max_ms by up to 9ms when max_ms is not a multiple of the 10ms poll step. Clamp the final delay to the remaining time so total wait never exceeds max_ms, e.g. `int step = (max_ms - waited < poll_ms) ? (max_ms - waited) : poll_ms; SDL_Delay((Uint32)step); waited += step;`. (max_ms <= 0 already returns immediately via the loop condition — preserve that.) No behavior change for the 1500ms caller; just precise bounding.'
+    - cmake --preset debug && cmake --build build zero-warning -Werror -Wconversion -Wshadow (mind the -Wconversion cast on the clamped step). Full ctest --test-dir build green. The cppcheck-suppress comment must exactly match the halt precedent so `make cppcheck-src` (CI) passes — verify the pattern byte-for-byte against line 694. Only src/sdl2_audio.c changes.
+budget:
+    rounds: 2
+    reflection_after_each: true
+current_round: 1
+context: |-
+    PR #190 review round 1. Copilot flagged the new sdl2_audio_wait_all: (a) cppcheck
+    constParameterPointer is failing CI — fix by matching the sdl2_audio_halt suppress-comment
+    convention (line 694), NOT by const-ing the param; (b) the bounded wait can overshoot max_ms by
+    <=9ms — clamp the last delay. Both small, in src/sdl2_audio.c. sjl owns the audio helper; jdc
+    evaluates.
