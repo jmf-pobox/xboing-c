@@ -1,0 +1,30 @@
+mission_id: m-2026-07-16-001
+status: closed
+type: implement
+created_at: "2026-07-16T00:57:41Z"
+updated_at: "2026-07-16T01:02:42Z"
+closed_at: "2026-07-16T01:02:42Z"
+leader: claude
+worker: jdc
+evaluator:
+    handle: jck
+    pinned_at: "2026-07-16T00:57:41Z"
+    hash: 40cbe1204f644c77e6a26757a9b855e3298be267025e806d425bfdea99054f18
+inputs: {}
+write_set:
+    - src/game_modes.c
+    - src/block_system.c
+success_criteria:
+    - 'Fix two small verified 1996-fidelity deviations (audit candidates #2 and #3). Both are gameplay/SFX faithfulness — jck gates.'
+    - '#2 (Q confirmed-quit sting, MISSING): the original plays game_over at 100% volume on a confirmed quit (original/main.c:714-715 handleExitKeys, then exit()); the modern confirm-quit path is silent. In src/game_modes.c mode_dialogue_exit, inside the quit_pending + answer==''y''/''Y'' branch (currently at ~1333-1338), BEFORE `SDL_PushEvent(&quit_event)`, add `sdl2_audio_play_at_percent(ctx->audio, "game_over", 100)` guarded by `ctx->audio` non-null (match the guard style used at game_modes.c:362 and :1112). Volume 100 (NOT the 99 used for in-game game-over) — the original used 100% here. If audibility-before-exit is a concern, note it in the result for the maintainer; implement the faithful call regardless.'
+    - '#3 (BONUS coin spin direction reversed, cosmetic): the original decrements bonusSlide 3->0->3 every BONUS_DELAY (original/blocks.c:1188-1218 HandlePendingBonuses); the port counts UP. In src/block_system.c block_system_advance_animations, the BONUSX2/BONUSX4/ BONUS case (~623) `bp->bonus_slide = (frame / BLOCK_BONUS_DELAY) % 4;` — change to `bp->bonus_slide = 3 - (frame / BLOCK_BONUS_DELAY) % 4;` so it counts DOWN 3->0, matching the original. Update the comment to note the descending direction + original/blocks.c:1188-1218 citation. Verify against original/blocks.c that the decrement is 3->0 (not 0->3). Do NOT change the rate (BONUS_DELAY) or the other animation cases (DEATH/EXTRABALL untouched here).'
+    - 'cmake --preset debug && cmake --build build zero-warning -Werror -Wconversion -Wshadow. Full ctest --test-dir build green AND make asan-test green. Only the two write_set files change. (A sibling gjm mission adds a regression test for #3 direction — do not add tests here.)'
+budget:
+    rounds: 2
+    reflection_after_each: true
+current_round: 1
+context: |-
+    Small polish batch after 1.0.9. Two audit-confirmed deviations the maintainer chose:
+    #2 missing game_over sting on confirmed quit (sfx-parity.md), #3 BONUS block spin
+    counts up instead of the original's down (animation-cadence-parity.md 1c). Both small,
+    discrete, faithful restorations. jck (author) gates 1996 fidelity.

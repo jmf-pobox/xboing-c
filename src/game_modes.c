@@ -1332,6 +1332,12 @@ static void mode_dialogue_exit(sdl2_state_mode_t mode, void *ud)
             const char *ans = dialogue_system_get_input(ctx->dialogue);
             if (ans && (ans[0] == 'y' || ans[0] == 'Y'))
             {
+                /* Quit sting at 100% — original/main.c:714-715
+                 * (handleExitKeys) plays game_over before ShutDown/exit(). */
+                if (ctx->audio)
+                {
+                    sdl2_audio_play_at_percent(ctx->audio, "game_over", 100);
+                }
                 SDL_Event quit_event = {0};
                 quit_event.type = SDL_QUIT;
                 SDL_PushEvent(&quit_event);

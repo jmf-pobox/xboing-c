@@ -1,0 +1,23 @@
+results:
+    - mission: m-2026-07-16-001
+      round: 1
+      created_at: "2026-07-16T01:01:00Z"
+      author: jdc
+      verdict: pass
+      confidence: 0.9
+      files_changed:
+        - path: src/game_modes.c
+          added: 6
+          removed: 0
+        - path: src/block_system.c
+          added: 4
+          removed: 2
+      evidence:
+        - name: '#2: game_over@100 added before SDL_QUIT push in mode_dialogue_exit confirmed-quit branch, ctx->audio-guarded; matches original/main.c:714-715 (100%, not the 99% used in-game)'
+          status: pass
+        - name: '#2 audibility note: sting starts playback synchronously before SDL_QUIT is dequeued; whether audible depends on mixer teardown on quit — maintainer live-check flagged'
+          status: pass
+        - name: '#3: BONUS spin changed to `3 - (frame/BLOCK_BONUS_DELAY)%4` (descending 3->0), confirmed against original/blocks.c:1188-1218 (bonusSlide-- wraps <0->3); rate + DEATH/EXTRABALL untouched'
+          status: pass
+        - name: cmake debug zero-warning -Werror -Wconversion -Wshadow; ctest 61/61; make asan-test 61/61 clean; only the two write_set files changed
+          status: pass
