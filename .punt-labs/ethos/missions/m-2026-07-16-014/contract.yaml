@@ -1,0 +1,44 @@
+mission_id: m-2026-07-16-014
+status: closed
+type: investigate
+created_at: "2026-07-16T14:57:18Z"
+updated_at: "2026-07-16T15:10:50Z"
+closed_at: "2026-07-16T15:10:50Z"
+leader: claude
+worker: jdc
+evaluator:
+    handle: jck
+    pinned_at: "2026-07-16T14:57:18Z"
+    hash: 40cbe1204f644c77e6a26757a9b855e3298be267025e806d425bfdea99054f18
+inputs:
+    files:
+        - src/sdl2_loop.c
+        - src/game_modes.c
+        - src/ball_system.c
+        - src/block_system.c
+        - src/game_rules.c
+        - include/sdl2_loop.h
+        - include/ball_types.h
+        - original/main.c
+        - original/misc.c
+        - original/ball.c
+write_set:
+    - docs/research/2026-07-16-frame-tick-calibration.md
+success_criteria:
+    - 'Quantify the frame->real-time mapping gap between the modern SDL2 port and original/ that makes frame-count timers run too slow. Anchor: the ball auto-launch (BALL_AUTO_ACTIVE_DELAY =3000) currently fires at ~22-25s (verified: modern tick = 1500*(10-speed)us = 7.5ms at default speed 5 -> 133 ticks/sec -> 3000/133 ~= 22.5s); the maintainer says it SHOULD be ~5s. Original: sleepSync(display, speed) -> usleep(speed*300) = 1.5ms/frame at speed 5 -> ~667 frames/sec -> 3000/667 ~= 4.5s. Confirm these numbers from the code.'
+    - 'ROOT-CAUSE the discrepancy. Primary hypothesis to prove or refute: attract-mode updates run each system _update() ATTRACT_FRAME_MULTIPLIER (6x) per tick to compensate for the slower fixed-timestep, but GAMEPLAY (mode_game_update) advances env->frame / runs ball+block updates only 1x per tick — so gameplay frame-count timers run ~5-6x slower than the original while attract is (roughly) calibrated. Read mode_game_update vs mode_*_update (attract) in game_modes.c and how env->frame advances in each; state exactly how many system updates and frame increments happen per tick in GAME vs ATTRACT. Is the ~5x purely the missing gameplay multiplier, or also the tick-rate choice?'
+    - 'ENUMERATE the frame-count timing constants and classify each as (a) already rescaled for the new tick rate, or (b) ported 1:1 and therefore stretched. Cover at least: BALL_AUTO_ACTIVE_DELAY (3000), BALL_FRAME_RATE, BIRTH_FRAME_RATE, BONUS_SEED (2000), BONUS_LENGTH/BLOCK bonus, BLOCK_ROAM_EYES_DELAY(300)/ROAM_DELAY(1000)/DROP_DELAY(1000)/RANDOM_DELAY(500)/BONUS_DELAY(150)/ DEATH_DELAY1(100)/DEATH_DELAY2(700)/EXTRABALL_DELAY, EXPLODE_DELAY, paddle velocity (PADDLE_VELOCITY 10->4 in the port), ball speed. For each: original value, modern value, whether the port rescaled it, and its resulting real-time at default speed vs the original''s real-time. Note the paddle was rescaled ~2x-ish and the block delays appear ported 1:1 (from prior audits) — verify.'
+    - 'Cross-check against known-calibrated anchors so the recommendation is consistent: the bonus-screen line pacing is INTENTIONAL hand-tuning (docs/specs/2026-06-06-bonus-renderer-rewrite.md, bead xboing-725 not-a-bug) and the DEATH_BLK wink (just shipped) was ruled faithful at 800/1100 ticks — so any global rescale proposal must NOT break those. Flag which timers are deliberately tuned vs accidentally stretched.'
+    - 'RECOMMEND a fix strategy with the maintainer''s ~5s anchor as ground truth (5s at 133 ticks/sec = ~665 ticks): options are (i) add a gameplay frame multiplier mirroring ATTRACT_FRAME_MULTIPLIER, (ii) a global rescale of ported-1:1 frame constants by the measured ratio, (iii) per-constant rescale. Give the trade-offs, which timers each option fixes/breaks, and a recommended path + rough scope. Do NOT change any production code in this mission — analysis + report only.'
+    - 'Deliverable: docs/research/2026-07-16-frame-tick-calibration.md with the measured ratio, the GAME-vs-ATTRACT per-tick update analysis, the constants table, the anchors that must not break, and the recommendation. Cite original/<file>:<line> and src/<file>:<line> throughout.'
+budget:
+    rounds: 1
+    reflection_after_each: true
+current_round: 1
+context: |-
+    User observed the ball auto-launches at ~25s (should be ~5s). Same class as the tracked paddle-2x
+    deviation: the port changed the frame->real-time mapping but ported frame-count constants 1:1
+    inconsistently. Prime suspect: gameplay lacks the 6x per-tick compensation that attract has. This
+    is an ANALYSIS-ONLY investigation to quantify the gap across all frame-based timers and recommend
+    a calibration strategy anchored on auto-launch ~= 5s. jck (author, timing/feel authority) evaluates.
+    Timing/calibration is the delicate class the maintainer flagged — do not spot-patch; scope it first.
