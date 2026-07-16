@@ -1,0 +1,21 @@
+results:
+    - mission: m-2026-07-16-009
+      round: 1
+      created_at: "2026-07-16T03:07:18Z"
+      author: jdc
+      verdict: pass
+      confidence: 0.98
+      files_changed:
+        - path: include/sdl2_audio.h
+          added: 1
+          removed: 1
+        - path: src/game_modes.c
+          added: 1
+          removed: 1
+      evidence:
+        - name: 'sdl2_audio.h doc comment: ''(whichever first)'' -> ''(whichever comes first)'''
+          status: pass
+        - name: 'game_modes.c quit-sting comment: ''forked audio that outlived exit()'' -> ''forked its audio so it outlived exit()'''
+          status: pass
+        - name: comment-only (git diff shows no code lines); cmake build zero-warning; only the two write_set files changed
+          status: pass

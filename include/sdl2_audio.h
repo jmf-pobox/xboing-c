@@ -174,7 +174,7 @@ void sdl2_audio_halt(sdl2_audio_t *ctx);
 
 /*
  * Block until all mixer channels finish playing, or max_ms elapses
- * (whichever first). Returns immediately if nothing is playing. Used at
+ * (whichever comes first). Returns immediately if nothing is playing. Used at
  * quit so a sound started just before teardown (the game_over sting) is
  * heard: the original forked its audio so it outlived exit()
  * (original/main.c:714-715); we drain in-process before Mix_CloseAudio.
