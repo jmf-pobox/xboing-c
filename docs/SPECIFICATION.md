@@ -541,7 +541,7 @@ typedef struct {
 | `MIN_DY_BALL` | 2 | Minimum Y velocity |
 | `MAX_BALL_MASS` | 3.0 | Maximum ball mass |
 | `MIN_BALL_MASS` | 1.0 | Minimum ball mass |
-| `BALL_AUTO_ACTIVE_DELAY` | 3000 | Auto-launch delay (ms) |
+| `BALL_AUTO_ACTIVE_DELAY` | 3000 | Auto-launch delay (frames/ticks; ~22.5 s at default speed — see ADR-071) |
 | `PADDLE_HIT_SCORE` | 10 | Points per paddle hit |
 | `DIST_BALL_OF_PADDLE` | 45 | Ball offset above paddle (px) |
 | `PADDLE_BALL_FRAME_TILT` | 5000 | Auto-tilt frame threshold |
@@ -565,7 +565,7 @@ typedef struct {
 | `BALL_READY` | 6 | On paddle, waiting for launch |
 | `BALL_NONE` | 7 | Null/undefined |
 
-**Lifecycle:** `BALL_NONE` -> `BALL_CREATE` (8-frame birth animation) -> `BALL_READY` (on paddle, auto-launch after 3000ms) -> `BALL_ACTIVE` (in play) -> `BALL_DIE`/`BALL_POP` (8-frame reverse animation) -> `BALL_NONE`
+**Lifecycle:** `BALL_NONE` -> `BALL_CREATE` (8-frame birth animation) -> `BALL_READY` (on paddle, auto-launch after 3000 frames/ticks, ~22.5 s at default speed) -> `BALL_ACTIVE` (in play) -> `BALL_DIE`/`BALL_POP` (8-frame reverse animation) -> `BALL_NONE`
 
 ### Paddle Collision
 
@@ -845,7 +845,7 @@ Toggle via `G` key. Default: `CONTROL_KEYS` (or `CONTROL_MOUSE` if `-keys` not s
 ### Special States
 
 - **Reverse mode** (`reverseOn`): Left/right controls inverted. Set by `REVERSE_BLK`. Reset on ball death.
-- **Sticky mode** (`stickyOn`): Ball sticks to paddle on contact, launches on shoot key/click. Set by `STICKY_BLK`. Auto-launches after `BALL_AUTO_ACTIVE_DELAY` (3000ms).
+- **Sticky mode** (`stickyOn`): Ball sticks to paddle on contact, launches on shoot key/click. Set by `STICKY_BLK`. Auto-launches after `BALL_AUTO_ACTIVE_DELAY` (3000 frames/ticks, ~22.5 s at default speed).
 
 ### Paddle Size Transitions
 

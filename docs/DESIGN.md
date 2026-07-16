@@ -4203,3 +4203,76 @@ them, restoring the intended difficulty; both stay off the bottom two
 rows and never spawn onto a ball. jck (author) approved the port and the
 direction-mapping deviation as faithful-in-spirit. Regression tests pin
 the movement, the adjacency constraints, and the blocked-waits behavior.
+
+## ADR-071: Gameplay frame→tick mapping is 1:1; the ~22.5 s ball auto-launch is faithful, not a bug
+
+**Status:** Accepted (2026-07-16)
+
+The maintainer observed the ball auto-launches (fires off the paddle
+without a keypress) after ~22–25 s, and it *felt* far too long — the
+suspicion was a ~5× frame-rate calibration bug, the same class as the
+open `PADDLE_VELOCITY` deviation. An investigation
+(`docs/research/2026-07-16-frame-tick-calibration.md`, mission
+m-2026-07-16-014, jck-verified) was commissioned to quantify a suspected
+frame→real-time stretch across all frame-count timers.
+
+**Finding: there is no stretch — the behavior is faithful.** The
+modern gameplay logic tick and the original's in-game frame are **both
+7.5 ms at default speed**:
+
+- Modern: `tick_interval = SDL2L_TICK_UNIT_US × (10 − speed_level)` (the
+  macro `SDL2L_TICK_UNIT_US = 1500`; `speed_level` is the 1–9 warp level,
+  not the original's runtime `speed` global); at
+  `SDL2L_DEFAULT_SPEED = 5` → 7500 µs = 7.5 ms/tick
+  (`src/sdl2_loop.c:45-47`, `include/sdl2_loop.h:35,39`).
+- Original: `SetUserSpeed(5)` sets `userDelay = 5`
+  (`original/init.c:529,916`); in-game `SetGameSpeed(FAST_SPEED=5)`
+  computes `speed = delay × userDelay = 5 × 5 = 25`
+  (`original/main.c:155-160`, `FAST_SPEED` at
+  `original/include/main.h:81`); the loop
+  calls `sleepSync(display, 25)` → `usleep(25 × 300) = 7500 µs` = 7.5 ms
+  per iteration (`original/misc.c:102-108`, `original/main.c:1876`).
+
+`BALL_AUTO_ACTIVE_DELAY = 3000` (`include/ball_types.h:41`, matching
+`original/include/ball_types.h:41`) against an **ungated**
+`frame == nextFrame` check (`original/ball.c:2068`) therefore elapses in
+`3000 × 7.5 ms ≈ 22.5 s` in the **1996 original too**. The "5× too slow"
+premise came from misreading `sleepSync`'s argument as the *speed level*
+(5 → 1.5 ms) instead of the computed runtime `speed` global
+(25 → 7.5 ms). Two prior committed audits
+(`docs/research/2026-06-27-warp-speed-modern.md`,
+`docs/audits/2026-07-13-gameplay-logic-parity.md`) independently used the
+same 7.5 ms / `speed = 25` baseline.
+
+**Why gameplay has no `ATTRACT_FRAME_MULTIPLIER`.** The 6× multiplier
+(`src/game_modes.c`) exists only because *non-*`MODE_GAME` screens ran a
+fixed, speed-independent `sleepSync(display, 3)` (~900 µs) in the
+original; attract therefore ticked ~6× faster than gameplay and the port
+compensates. `MODE_GAME` was always driven by the `speed`-derived 7.5 ms
+rate in both trees, so it correctly needs no multiplier — adding one
+would *create* a deviation, silently re-timing every faithfully-matched
+gameplay constant.
+
+**Decision.** Keep the ~22.5 s auto-launch and the 1:1 gameplay
+frame→tick mapping unchanged. `BALL_AUTO_ACTIVE_DELAY` is a deliberately
+large *safety-net fallback* (so a ready ball never auto-fires while the
+player is still lining up aim), not a pacing device, and it is faithful
+to the original. A shorter auto-launch (e.g. 3–5 s) is a legitimate
+modern quality-of-life change but a **deliberate deviation** — a
+single-constant edit (`BALL_AUTO_ACTIVE_DELAY` → ~400 for 3 s / ~665 for
+5 s, scoped to `include/ball_types.h:41` and `src/ball_system.c:569,910`)
+requiring its own ADR and jck sign-off, **not** a bug fix. The maintainer
+elected to keep it faithful.
+
+**Explicitly rejected:** a gameplay frame multiplier, and any global
+rescale of ported-1:1 frame constants. Both presuppose a systemic stretch
+that does not exist and would regress every confirmed-faithful constant
+(ball movement, block explosion delays, bonus/special spawn odds, and the
+DEATH_BLK wink of ADR-adjacent PR #192 — faithful at 800/1100 ticks =
+6.0 s / 8.25 s in both trees).
+
+**Consequences.** No code change. The one genuinely open timing
+deviation remains `PADDLE_VELOCITY` (2× too *fast*, tracked in
+`docs/audits/2026-07-13-gameplay-logic-parity.md` finding #1). This ADR
+records the auto-launch as confirmed-faithful so it is not re-opened as a
+bug.

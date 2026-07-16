@@ -1,0 +1,24 @@
+results:
+    - mission: m-2026-07-16-014
+      round: 1
+      created_at: "2026-07-16T15:10:40Z"
+      author: jdc
+      verdict: pass
+      confidence: 0.93
+      files_changed:
+        - path: docs/research/2026-07-16-frame-tick-calibration.md
+          added: 308
+          removed: 0
+      evidence:
+        - name: 'PREMISE REFUTED: original in-game frame = 7.5ms, NOT 1.5ms. SetUserSpeed(5) (init.c:529,916)->userDelay=5; SetGameSpeed(FAST_SPEED=5)->speed=25; sleepSync->usleep(25*300)=7500us. Leader used speed-level(5) not runtime speed(25). Independently re-verified.'
+          status: pass
+        - name: GAME tick original==modern (7.5ms). BALL_AUTO_ACTIVE_DELAY=3000 => ~22.5s in the 1996 original too (un-gated check original/ball.c:2068). Modern ~25s is FAITHFUL, not a 5x stretch.
+          status: pass
+        - name: ATTRACT_FRAME_MULTIPLIER=6 compensates attract's fixed sleepSync(display,3) tick; GAME never had that mismatch, needs no multiplier. Hypothesis refuted. Corroborated by 2 prior committed audits.
+          status: pass
+        - name: DEATH_BLK wink 800/1100 ticks = 6.0s/8.25s in BOTH trees; faithful in ticks AND seconds. Block/bonus/spawn constants ported 1:1 faithfully. PADDLE_VELOCITY 2x-too-fast is a separate open deviation.
+          status: pass
+        - name: 'Recommendation: NO calibration bug; reject gameplay-multiplier and global-rescale. A ~3s auto-launch is a DELIBERATE deviation (BALL_AUTO_ACTIVE_DELAY 3000->~400) needing ADR + jck sign-off (ADR-045 precedent), scoped to include/ball_types.h:41 + src/ball_system.c:569,910 only.'
+          status: pass
+        - name: docs/research/2026-07-16-frame-tick-calibration.md created (only file); markdownlint-clean
+          status: pass

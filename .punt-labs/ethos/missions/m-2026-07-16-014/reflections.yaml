@@ -1,0 +1,15 @@
+reflections:
+    - round: 1
+      created_at: "2026-07-16T15:10:50Z"
+      author: jck
+      converging: true
+      signals:
+        - 'Independently verified vs original/: SetUserSpeed(5) (init.c:529,916)->userDelay=5; SetGameSpeed(FAST_SPEED=5) (main.c:155-160,1897; FAST_SPEED=5 main.h:81)->speed=25; sleepSync(display,25) (main.c:1876-1877) -> usleep(25*300)=7500us=7.5ms/iter (misc.c:102-108). Modern 7.5ms/tick (sdl2_loop.c:45-47, default speed 5). Identical.'
+        - 'original/ball.c:2068 auto-fire check is un-gated -> 3000-frame auto-launch = 22.5s in the ORIGINAL too. Premise (original ~4.5s, modern 5x bug) refuted: anchor misread SetUserSpeed''s literal 5 as the runtime speed global (actually 25).'
+        - ATTRACT_FRAME_MULTIPLIER=6 (game_modes.c:422) compensates non-GAME modes' fixed sleepSync(display,3)~900us tick; MODE_GAME is speed-derived in both trees, correctly needs no multiplier.
+        - 'RULING A: ~22.5s auto-launch is FAITHFUL — a deliberately-large safety-net fallback so a ready ball never auto-fires while the player is still aiming; rarely triggered in real play, not a pacing device.'
+        - 'RULING B: maintainer''s ~3s is a DELIBERATE deviation, not a fidelity fix. One-constant change (BALL_AUTO_ACTIVE_DELAY 3000->~400 for 3s / ~665 for 5s) scoped to include/ball_types.h:41 + src/ball_system.c:569,910. Needs ADR + jck sign-off (ADR-045 precedent). jck does not block but prefers 5s over 3s and wants a playtest note; NO tick-rate/multiplier changes.'
+        - 'RULING C: DEATH_BLK wink 800/1100 ticks = 6.0s/8.25s in both trees; faithful in ticks AND seconds, no regression.'
+        - REJECT gameplay-multiplier and global-rescale — both re-time every already-faithful constant (ball movement, block explosions, bonus odds, DEATH wink, ADR-045 ball speed) for no fidelity gain.
+      recommendation: stop
+      reason: Deliverable verified line-by-line against original/; refutation holds. No further research round. Next action is a maintainer decision (ADR) on the deliberate ~3-5s deviation, not more investigation.
