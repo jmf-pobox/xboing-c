@@ -1,0 +1,21 @@
+results:
+    - mission: m-2026-07-17-010
+      round: 1
+      created_at: "2026-07-17T03:57:24Z"
+      author: jdc
+      verdict: pass
+      confidence: 0.95
+      files_changed:
+        - path: include/block_system.h
+          added: 0
+          removed: 0
+        - path: tests/test_block_system.c
+          added: 0
+          removed: 0
+      evidence:
+        - name: 'include/block_system.h:453-477 block_system_type_is_required doc comment rewritten: 0 for NONE_BLK/KILL_BLK/19 specials; nonzero for 8 required AND anything else (RANDOM/DYNAMITE/BLACKHIT + out-of-range) via default-required, matching original/blocks.c:2506-2533 default:return True. Header now agrees with code on all input classes.'
+          status: pass
+        - name: tests/test_block_system.c TC-53 comment updated (out-of-range documented as required; no open finding). Assertions unchanged (9999/-100 -> required).
+          status: pass
+        - name: Comment-only, no logic change. cmake debug zero-warning; ctest 61/61; asan 61/61 clean. Only the 2 write-set files changed.
+          status: pass

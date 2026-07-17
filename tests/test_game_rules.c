@@ -38,9 +38,12 @@
 #include "game_context.h"
 #include "game_init.h"
 #include "game_rules.h"
+#include "message_system.h"
 #include "paddle_system.h"
+#include "sdl2_audio.h"
 #include "sdl2_input.h"
 #include "sdl2_state.h"
+#include "sfx_system.h"
 
 /* =========================================================================
  * Writable argv buffer
@@ -511,6 +514,152 @@ static void test_spawn_throttle_no_reschedule_while_active(void **vstate)
 }
 
 /* =========================================================================
+ * game_rules_skip_level (mission m-2026-07-17-008,
+ * docs/specs/2026-07-16-debug-skip-cheat-design.md)
+ *
+ * game_rules_skip_level is the thin orchestrator: it delegates the grid
+ * sweep to block_system_explode_all_required() (unit-tested directly in
+ * tests/test_block_system.c Group 17) and only sequences the
+ * audio/sfx/state side effects around that call.  These tests exercise
+ * the orchestration, not the sweep itself.
+ * ========================================================================= */
+
+/* TC-61: NULL ctx does not crash. */
+static void test_skip_level_null_ctx_no_crash(void **state)
+{
+    (void)state;
+    game_rules_skip_level(NULL, 0);
+}
+
+/* TC-62: Zero required blocks on the grid.  After the call: cheated is
+ * set, the message is posted, sfx mode is SFX_MODE_SHAKE unconditionally
+ * (armed regardless of cleared count -- src/game_rules.c's `if
+ * (ctx->sfx)` block has no cleared>0 guard), and -- because cleared==0
+ * -- the "touch" sound is never requested (that call is gated on
+ * `cleared > 0`, src/game_rules.c). Verified via the sdl2_audio call-log
+ * spy (sdl2_audio_log_snapshot), the same observability mechanism
+ * tests/test_audio_name_validation.c uses; not a documentation-only
+ * claim. */
+static void test_skip_level_zero_required_shake_no_touch_audio(void **vstate)
+{
+    fixture_t *f = (fixture_t *)*vstate;
+    game_ctx_t *ctx = f->ctx;
+
+    block_system_clear_all(ctx->block);
+    assert_int_equal(block_system_still_active(ctx->block), 0);
+
+    sdl2_audio_log_clear(ctx->audio);
+
+    const int frame = 5000;
+    game_rules_skip_level(ctx, frame);
+
+    assert_true(ctx->cheated);
+    assert_string_equal(message_system_get_text(ctx->message), "Cheating, skip level ...");
+    assert_int_equal(sfx_system_get_mode(ctx->sfx), SFX_MODE_SHAKE);
+
+    sdl2_audio_call_t entries[16];
+    int n = sdl2_audio_log_snapshot(ctx->audio, entries, 16);
+    for (int i = 0; i < n; i++)
+    {
+        assert_string_not_equal(entries[i].name, "touch");
+    }
+}
+
+/* TC-63: cleared > 0 arms the shake for exactly 140 frames from the call
+ * frame.  sfx_system has no end_frame getter (only
+ * sfx_system_set_end_frame), so end_frame==frame+140 is pinned
+ * indirectly: sfx_system_update() returns 1 (still running) at
+ * frame+139 and 0 (expired, mode reset to SFX_MODE_NONE) at frame+140 --
+ * matching update_shake's `if (frame >= ctx->end_frame)` expiry check
+ * (src/sfx_system.c). This is the closest assertable proxy for a private
+ * field with no accessor; noted per the mission's "closest asserting
+ * alternative" instruction. */
+static void test_skip_level_cleared_shake_end_frame_140(void **vstate)
+{
+    fixture_t *f = (fixture_t *)*vstate;
+    game_ctx_t *ctx = f->ctx;
+
+    block_system_clear_all(ctx->block);
+    block_system_add(ctx->block, 2, 3, RED_BLK, 0, 0);
+    block_system_add(ctx->block, 2, 4, GREEN_BLK, 0, 0);
+
+    const int frame = 8000;
+    game_rules_skip_level(ctx, frame);
+
+    assert_int_equal(sfx_system_get_mode(ctx->sfx), SFX_MODE_SHAKE);
+
+    /* Still running one frame before expiry. */
+    assert_int_equal(sfx_system_update(ctx->sfx, frame + 139), 1);
+    assert_int_equal(sfx_system_get_mode(ctx->sfx), SFX_MODE_SHAKE);
+
+    /* Expires exactly at frame + 140. */
+    assert_int_equal(sfx_system_update(ctx->sfx, frame + 140), 0);
+    assert_int_equal(sfx_system_get_mode(ctx->sfx), SFX_MODE_NONE);
+}
+
+/* TC-64: ctx->cheated flips to true regardless of what is on the board
+ * (pins ADR-073) -- uses the level's default just-loaded board (many
+ * required blocks still present) rather than an emptied grid, so the
+ * assertion is independent of TC-62/TC-63's cleared-count scenarios. */
+static void test_skip_level_sets_cheated_regardless_of_board(void **vstate)
+{
+    fixture_t *f = (fixture_t *)*vstate;
+    game_ctx_t *ctx = f->ctx;
+
+    ctx->cheated = false;
+    assert_int_equal(block_system_still_active(ctx->block), 1);
+
+    game_rules_skip_level(ctx, 42);
+
+    assert_true(ctx->cheated);
+}
+
+/* TC-65: The "Cheating, skip level ..." message replaces whatever was
+ * posted before the call -- non-vacuous because the pre-condition text
+ * is deliberately different from the expected post-call text. */
+static void test_skip_level_sets_message(void **vstate)
+{
+    fixture_t *f = (fixture_t *)*vstate;
+    game_ctx_t *ctx = f->ctx;
+
+    message_system_set(ctx->message, "- unrelated pre-existing message -", 0, 0);
+    assert_string_equal(message_system_get_text(ctx->message), "- unrelated pre-existing message -");
+
+    game_rules_skip_level(ctx, 99);
+
+    assert_string_equal(message_system_get_text(ctx->message), "Cheating, skip level ...");
+}
+
+/* TC-66: Direct-API regression -- seed a small required-only grid, call
+ * game_rules_skip_level, then drive block_system_update_explosions
+ * across frames to finalize.  block_system_still_active must drain to 0,
+ * proving the cheat drives the level to completion via the real
+ * explosion lifecycle (not a shortcut that skips finalize). */
+static void test_skip_level_drives_level_to_completion(void **vstate)
+{
+    fixture_t *f = (fixture_t *)*vstate;
+    game_ctx_t *ctx = f->ctx;
+
+    block_system_clear_all(ctx->block);
+    block_system_add(ctx->block, 4, 1, RED_BLK, 0, 0);
+    block_system_add(ctx->block, 4, 2, BLUE_BLK, 0, 0);
+    block_system_add(ctx->block, 4, 3, COUNTER_BLK, 3, 0);
+    assert_int_equal(block_system_still_active(ctx->block), 1);
+
+    const int frame = 100;
+    game_rules_skip_level(ctx, frame);
+
+    /* Drive the explosion state machine forward well past the 4-stage
+     * animation (BLOCK_EXPLODE_DELAY=10 per stage) to finalize. */
+    for (int f2 = frame; f2 < frame + 100; f2++)
+    {
+        block_system_update_explosions(ctx->block, f2, NULL, NULL);
+    }
+
+    assert_int_equal(block_system_still_active(ctx->block), 0);
+}
+
+/* =========================================================================
  * Main
  * ========================================================================= */
 
@@ -537,6 +686,18 @@ int main(void)
         cmocka_unit_test_setup_teardown(test_spawn_throttle_one_at_a_time, setup, teardown),
         cmocka_unit_test_setup_teardown(test_spawn_throttle_expires_and_rearms, setup, teardown),
         cmocka_unit_test_setup_teardown(test_spawn_throttle_no_reschedule_while_active, setup,
+                                        teardown),
+
+        /* game_rules_skip_level (mission m-2026-07-17-008) */
+        cmocka_unit_test(test_skip_level_null_ctx_no_crash),
+        cmocka_unit_test_setup_teardown(test_skip_level_zero_required_shake_no_touch_audio, setup,
+                                        teardown),
+        cmocka_unit_test_setup_teardown(test_skip_level_cleared_shake_end_frame_140, setup,
+                                        teardown),
+        cmocka_unit_test_setup_teardown(test_skip_level_sets_cheated_regardless_of_board, setup,
+                                        teardown),
+        cmocka_unit_test_setup_teardown(test_skip_level_sets_message, setup, teardown),
+        cmocka_unit_test_setup_teardown(test_skip_level_drives_level_to_completion, setup,
                                         teardown),
     };
 

@@ -1,0 +1,38 @@
+mission_id: m-2026-07-17-006
+status: closed
+type: implement
+created_at: "2026-07-17T02:57:14Z"
+updated_at: "2026-07-17T03:23:56Z"
+closed_at: "2026-07-17T03:23:56Z"
+leader: claude
+worker: jdc
+evaluator:
+    handle: gjm
+    pinned_at: "2026-07-17T02:57:14Z"
+    hash: 7349512b3191332fef8a79f56caf962febc697b8444629912da4aa22b9b2efec
+inputs: {}
+write_set:
+    - src/game_input.c
+    - src/game_rules.c
+    - include/game_rules.h
+    - src/block_system.c
+    - include/block_system.h
+    - docs/DESIGN.md
+success_criteria:
+    - 'Implement docs/specs/2026-07-16-debug-skip-cheat-design.md EXACTLY as jck approved (m-2026-07-17-005). This is a BEHAVIOR-PRESERVING refactor + one doc correction: it relocates and centralizes existing logic, it must NOT change what the = cheat or block_system_still_active do. The block_system.c explosion-timer >= fix from m-2026-07-17-004 is already committed (64b9976) — do not touch block_system_update_explosions.'
+    - 'block_system: add `int block_system_type_is_required(int block_type)` (include/block_system.h + src/block_system.c) — a pure function returning nonzero for EXACTLY the 8 required types {RED_BLK, BLUE_BLK, GREEN_BLK, TAN_BLK, YELLOW_BLK, PURPLE_BLK, COUNTER_BLK, DROP_BLK} and 0 for every other value (NONE_BLK, KILL_BLK, all 19 non-required specials, and out-of-range). NO ROAMER_BLK (jck''s binding ruling: mirror StillActiveBlocks, not SkipToNextLevel). Then rewrite block_system_still_active to call this predicate instead of its inline switch (keep the `blocks_exploding > 1` tail check and signature/behavior identical). Cite original/blocks.c:2506- 2533 (StillActiveBlocks exemption list) in the predicate''s comment.'
+    - 'game_rules: add `void game_rules_skip_level(game_ctx_t *ctx, int frame)` (include/game_rules.h + src/game_rules.c) — the modern analog of SkipToNextLevel (cite original/blocks.c:2409-2462). Move the cheat body here VERBATIM in effect: grid scan filtering on block_system_type_is_required -> block_system_explode; a single deduplicated "touch" play if anything exploded (preserve the 16-channel-mixer rationale comment); sfx_system_set_mode(SFX_MODE_SHAKE) + set_end_frame(frame+ 140) (cite blocks.c:2460-2461); ctx->cheated = true (ADR-073); message_system_set "Cheating, skip level ...". NULL-guard ctx per c-code.md. The function assumes the caller already confirmed debug_mode + SDL2ST_GAME (document that in the comment; do not re-check).'
+    - 'game_input.c: shrink the SDL2I_DEBUG_SKIP handler to input-dispatch only (~80 lines -> ~18): shift-held -> volume up (unchanged); else mode==SDL2ST_GAME -> (debug_mode ? game_rules_skip_level (ctx, frame) : message "Stop trying to cheat!!"). Remove the grid scan, block-type switch, sound, shake, cheated-flag, and cheat message from game_input.c — they now live in game_rules_skip_level. Drop any now-unused block-grid includes from game_input.c if they''re unused elsewhere in the file.'
+    - 'docs/DESIGN.md: (1) CORRECT the ADR-072 inaccuracy (~line 4296-4301) that claims SkipToNextLevel and StillActiveBlocks use "the same exemption list" — they differ by exactly ROAMER_BLK; amend in place or append a dated correction note citing docs/specs/2026-07-16-debug-skip-cheat-design.md. (2) ADD a new ADR documenting BOTH the explosion-timer == -> >= fix (m-2026-07-17-004, the real fix the brief mis-cited as ADR-070; give it a correct new ADR number) AND the cheat extraction / shared block_system_type_is_required predicate (this mission). Record the roamer deviation decision (mirror StillActiveBlocks) and its rationale.'
+    - 'Gates: cmake --preset debug && cmake --build build zero-warning (-Werror -Wconversion -Wshadow -Wshadow). Full ctest --test-dir build green — existing tests (test_keybindings, block/rules, still_active) must pass UNCHANGED, proving behavior preservation (the = handler moved but its observable effect is identical). make asan-test green (ASan+UBSan clean). markdownlint clean on docs/DESIGN.md and the spec. (test_sdl2_font may fail locally on this Mac — environmental, passes in CI; ignore ONLY that one.) A sibling gjm test mission adds new coverage for the predicate + skip-level regression; do not add tests here.'
+budget:
+    rounds: 3
+    reflection_after_each: true
+current_round: 1
+context: |-
+    Clean-design implementation of the = / -debug skip-level cheat per the jck-approved blueprint
+    docs/specs/2026-07-16-debug-skip-cheat-design.md. Maintainer flagged the inline ~80-line handler
+    as hacky; this extracts it to game_rules_skip_level + a shared block_system_type_is_required
+    predicate (single source of truth with still_active), input-path-synchronous (Option A).
+    Behavior-preserving — existing tests must stay green. jck's binding rulings: required set is
+    exactly the 8 types, NO ROAMER; fix the ADR-072 "same exemption list" inaccuracy.

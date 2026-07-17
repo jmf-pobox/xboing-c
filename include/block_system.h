@@ -450,6 +450,53 @@ int block_system_get_hit_points(const block_system_t *ctx, int row, int col);
  */
 int block_system_still_active(const block_system_t *ctx);
 
+/*
+ * Single source of truth for both block_system_still_active() (the
+ * level-complete check) and block_system_explode_all_required() (the
+ * debug skip-level cheat's grid sweep): our invariant is that the
+ * cheat's kill-set must equal the completion check it short-circuits,
+ * so one predicate drives both — they can never disagree.
+ *
+ * Returns nonzero if block_type must be cleared before the level is
+ * considered complete: RED_BLK, BLUE_BLK, GREEN_BLK, TAN_BLK,
+ * YELLOW_BLK, PURPLE_BLK, COUNTER_BLK, DROP_BLK.  Returns 0 for
+ * NONE_BLK, KILL_BLK, and the 19 non-required special types.  Values
+ * that are neither a required type nor an exempted type —
+ * RANDOM_BLK, DYNAMITE_BLK, BLACKHIT_BLK, and any genuinely
+ * out-of-range int — fall through to the default-required case and
+ * return nonzero, matching the original's default: return True
+ * (original/blocks.c:2506-2533).
+ *
+ * Behavior citation: which types are required mirrors
+ * StillActiveBlocks's exemption switch (original/blocks.c:2506-2533)
+ * — every type the original lists with a bare `break` is non-required
+ * here; everything else (the `default` case there) is required.
+ * ROAMER_BLK is deliberately NOT required here even though
+ * SkipToNextLevel's own, slightly different exemption list
+ * (original/blocks.c:2427-2452) omits it, so the original itself kills
+ * roamers on cheat but doesn't count them toward completion — a
+ * single predicate can't reproduce both.  See docs/DESIGN.md ADR-074
+ * for the ruling and rationale.
+ */
+int block_system_type_is_required(int block_type);
+
+/*
+ * Explode every occupied required block (block_system_type_is_required())
+ * through the normal explosion lifecycle: block_system_explode() arms
+ * each one at `frame`; the caller's own per-tick
+ * block_system_update_explosions() drives the animation and finalize
+ * callback exactly as it does for an ordinary ball/gun kill.  Returns
+ * the number of blocks armed (block_system_explode() ==
+ * BLOCK_SYS_OK); 0 if ctx is NULL or nothing was armed.
+ *
+ * This is the ONLY grid iteration for "clear every required block" —
+ * the single sweep the debug skip-level cheat (game_rules_skip_level(),
+ * game_rules.c) delegates to. Pure block-grid mutation: no audio, sfx,
+ * score, or game_ctx_t dependency, so it unit-tests directly against a
+ * bare block_system_t with no other subsystem stubbed out.
+ */
+int block_system_explode_all_required(block_system_t *ctx, int frame);
+
 /* Return the count of blocks currently in explosion animation. */
 int block_system_get_exploding_count(const block_system_t *ctx);
 

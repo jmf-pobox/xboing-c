@@ -1175,16 +1175,70 @@ int block_system_get_hit_points(const block_system_t *ctx, int row, int col)
     return ctx->blocks[row][col].hit_points;
 }
 
+int block_system_type_is_required(int block_type)
+{
+    /*
+     * Behavior citation: every type listed here with a bare `break` is
+     * non-required (returns 0), matching StillActiveBlocks's exemption
+     * switch (original/blocks.c:2506-2533); everything else — including
+     * RANDOM_BLK/DYNAMITE_BLK/BLACKHIT_BLK and genuinely out-of-range
+     * ints — falls to `default` and is required (returns 1), matching
+     * the original's `default: return True`.  See the header doc
+     * comment for why this one predicate is the single source of truth
+     * for both still_active() and explode_all_required().
+     */
+    switch (block_type)
+    {
+        /*
+         * NONE_BLK (empty cell) and KILL_BLK (destroyed sentinel) are
+         * not blocks the level must clear — neither the original's
+         * exemption switch nor this one is ever consulted with these
+         * values while a cell is occupied (the only caller-guarded
+         * path, still_active()), but block_system_explode_all_required()
+         * gates on the same occupied check before calling this
+         * predicate, so these two cases are unreachable in production.
+         * They are listed explicitly anyway: without a case here they
+         * would fall to `default: return 1`, contradicting this
+         * function's own header contract (include/block_system.h) that
+         * documents 0 for both.
+         */
+        case NONE_BLK:
+        case KILL_BLK:
+            return 0;
+
+        /* Non-required blocks */
+        case BLACK_BLK:
+        case BULLET_BLK:
+        case ROAMER_BLK:
+        case BOMB_BLK:
+        case TIMER_BLK:
+        case HYPERSPACE_BLK:
+        case STICKY_BLK:
+        case MULTIBALL_BLK:
+        case MAXAMMO_BLK:
+        case PAD_SHRINK_BLK:
+        case PAD_EXPAND_BLK:
+        case REVERSE_BLK:
+        case MGUN_BLK:
+        case WALLOFF_BLK:
+        case EXTRABALL_BLK:
+        case DEATH_BLK:
+        case BONUSX2_BLK:
+        case BONUSX4_BLK:
+        case BONUS_BLK:
+            return 0;
+
+        default:
+            return 1;
+    }
+}
+
 int block_system_still_active(const block_system_t *ctx)
 {
     /*
      * Returns nonzero if the level still has required blocks.
      * Matches legacy StillActiveBlocks() (blocks.c:2464-2526).
-     *
-     * Required blocks: color blocks (RED..PURPLE), COUNTER_BLK, DROP_BLK.
-     * Non-required: BLACK, BULLET, ROAMER, BOMB, TIMER, HYPERSPACE,
-     * STICKY, MULTIBALL, MAXAMMO, PAD_SHRINK, PAD_EXPAND, REVERSE,
-     * MGUN, WALLOFF, EXTRABALL, DEATH, BONUSX2, BONUSX4, BONUS.
+     * Required/non-required classification: block_system_type_is_required().
      */
     if (ctx == NULL)
     {
@@ -1196,50 +1250,46 @@ int block_system_still_active(const block_system_t *ctx)
         for (int c = 0; c < MAX_COL; c++)
         {
             const block_entry_t *bp = &ctx->blocks[r][c];
-
-            if (!bp->occupied)
-            {
-                continue;
-            }
-
-            switch (bp->block_type)
-            {
-                /* Non-required blocks */
-                case BLACK_BLK:
-                case BULLET_BLK:
-                case ROAMER_BLK:
-                case BOMB_BLK:
-                case TIMER_BLK:
-                case HYPERSPACE_BLK:
-                case STICKY_BLK:
-                case MULTIBALL_BLK:
-                case MAXAMMO_BLK:
-                case PAD_SHRINK_BLK:
-                case PAD_EXPAND_BLK:
-                case REVERSE_BLK:
-                case MGUN_BLK:
-                case WALLOFF_BLK:
-                case EXTRABALL_BLK:
-                case DEATH_BLK:
-                case BONUSX2_BLK:
-                case BONUSX4_BLK:
-                case BONUS_BLK:
-                    break;
-
-                default:
-                    /* Required block found — level not complete */
-                    return 1;
-            }
+            if (bp->occupied && block_system_type_is_required(bp->block_type))
+                return 1;
         }
     }
 
-    /* Explosions still pending — level not complete */
+    /* Explosions still pending — level not complete. */
     if (ctx->blocks_exploding > 1)
     {
         return 1;
     }
 
     return 0;
+}
+
+int block_system_explode_all_required(block_system_t *ctx, int frame)
+{
+    if (ctx == NULL)
+    {
+        return 0;
+    }
+
+    int armed = 0;
+    for (int r = 0; r < MAX_ROW; r++)
+    {
+        for (int c = 0; c < MAX_COL; c++)
+        {
+            const block_entry_t *bp = &ctx->blocks[r][c];
+            if (!bp->occupied || !block_system_type_is_required(bp->block_type))
+            {
+                continue;
+            }
+
+            if (block_system_explode(ctx, r, c, frame) == BLOCK_SYS_OK)
+            {
+                armed++;
+            }
+        }
+    }
+
+    return armed;
 }
 
 int block_system_get_exploding_count(const block_system_t *ctx)

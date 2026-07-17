@@ -28,6 +28,7 @@
 #include "score_system.h"
 #include "sdl2_audio.h"
 #include "sdl2_state.h"
+#include "sfx_system.h"
 #include "special_system.h"
 
 /* Legacy bonus spawning constants */
@@ -480,6 +481,47 @@ void game_rules_check(game_ctx_t *ctx)
     /* Bonus block spawning */
     int frame = (int)sdl2_state_frame(ctx->state);
     try_spawn_bonus(ctx, frame);
+}
+
+void game_rules_skip_level(game_ctx_t *ctx, int frame)
+{
+    /* Orchestrates the cross-subsystem effects of the debug skip-level
+     * cheat. Holds zero grid knowledge itself: the sweep that explodes
+     * every required block lives once, in
+     * block_system_explode_all_required() (src/block_system.c) --
+     * this function only sequences the audio/sfx/state side effects
+     * around that call. */
+    if (ctx == NULL)
+        return;
+
+    int cleared = block_system_explode_all_required(ctx->block, frame);
+
+    /* One "touch" for the whole wave, not one per block.  Every
+     * required block type maps to the same sound (block_sound.c:26);
+     * cheating on level 1 explodes ~44 blocks in one tick, and
+     * replaying "touch" per-block saturates the 16-channel SDL_mixer
+     * (sdl2_audio.c:248) and spams "no free channel".  A single play
+     * here is audibly identical to the original's burst -- modern-mixer
+     * adaptation, original behavior is the burst at
+     * original/blocks.c:1868. */
+    if (cleared > 0 && ctx->audio)
+        sdl2_audio_play_at_percent(ctx->audio, "touch", 99);
+
+    /* Screen shake during the explosion wave -- original/blocks.c:
+     * 2460-2461 (SetSfxEndFrame(frame+140); changeSfxMode(SFX_SHAKE)). */
+    if (ctx->sfx)
+    {
+        sfx_system_set_mode(ctx->sfx, SFX_MODE_SHAKE);
+        sfx_system_set_end_frame(ctx->sfx, frame + 140);
+    }
+
+    /* Using the cheat disqualifies this session from every high-score
+     * board, personal and global (ADR-073) — a deliberate deviation
+     * from the 1996 original, which let cheated scores into the local
+     * table. */
+    ctx->cheated = true;
+
+    message_system_set(ctx->message, "Cheating, skip level ...", 1, frame);
 }
 
 void game_rules_check_ball_eyedude(game_ctx_t *ctx)

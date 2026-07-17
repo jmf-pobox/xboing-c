@@ -1,0 +1,25 @@
+results:
+    - mission: m-2026-07-17-009
+      round: 1
+      created_at: "2026-07-17T03:49:28Z"
+      author: jdc
+      verdict: pass
+      confidence: 0.9
+      files_changed:
+        - path: src/block_system.c
+          added: 0
+          removed: 0
+        - path: tests/test_block_system.c
+          added: 0
+          removed: 0
+      evidence:
+        - name: 'block_system_type_is_required: added `case NONE_BLK: case KILL_BLK: return 0;` to the non-required group. Both sentinels now return 0 per include/block_system.h contract. Narrow fix — default:return 1 unchanged, so 8 required + RANDOM/DYNAMITE/BLACKHIT + junk still required (faithful to original/blocks.c:2506-2533 default:return True).'
+          status: pass
+        - name: TC-52 flipped assert_true->assert_false on NONE/KILL; FINDING comment updated to FIXED.
+          status: pass
+        - name: 'Production behavior-neutral: predicate only called under bp->occupied in still_active + explode_all_required; no occupied cell holds NONE/KILL. still_active/explode_all_required unchanged.'
+          status: pass
+        - name: cmake debug zero-warning; ctest 61/61 incl flipped TC-52; asan 61/61 ASan+UBSan clean; cppcheck-src clean on block_system.c.
+          status: pass
+        - name: 'FOLLOW-UP (out of write-set, reported not edited): include/block_system.h:462-464 ''and any out-of-range value'' [returns 0] is wrong — out-of-range returns nonzero via default. Recommended corrected wording provided. TC-53 (9999/-100 -> required) left as-is, comment flags open header-wording finding.'
+          status: pass
