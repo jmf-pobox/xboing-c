@@ -444,7 +444,8 @@ int block_system_get_hit_points(const block_system_t *ctx, int row, int col);
 /*
  * Return nonzero if the level still has required blocks.
  *
- * Required blocks: color blocks (RED..PURPLE), COUNTER_BLK, DROP_BLK.
+ * A block counts as required iff block_system_type_is_required() returns
+ * nonzero for its type (the single source of truth for the required set).
  * Also returns nonzero if blocks_exploding > 1 (explosions still pending).
  * Matches legacy StillActiveBlocks().
  */
