@@ -686,6 +686,19 @@ static void test_skip_level_drives_level_to_completion(void **vstate)
  * exactly one of those seven disappears; when a different case fires
  * (0-24), ctx->bonus_block_active goes true instead and the seed is
  * abandoned in favor of the next one.
+ *
+ * Per-seed cost: exactly one throttle_tick, not a wait for the
+ * BONUS_SEED-frame (0..1999) schedule interval to elapse.  try_spawn_bonus
+ * only rolls a bonus type once `frame >= ctx->next_bonus_frame` becomes
+ * true (src/game_rules.c:101,109); forcing ctx->next_bonus_frame to
+ * exactly `current_frame + 1` -- the frame value sdl2_state_update is
+ * about to advance to (src/sdl2_state.c:237 increments before dispatch)
+ * -- makes that condition true on the very next tick, so the roll +
+ * dynamite/non-dynamite outcome for this seed is observable after one
+ * tick instead of up to THROTTLE_BONUS_SEED*2 (4000).  This skips only
+ * the schedule-and-wait bookkeeping, not the roll itself: find_random_empty_cell
+ * and `rand() % 27` still execute for real off the seeded rand() stream,
+ * so this is still a genuine per-seed roll, not a stubbed one.
  * ========================================================================= */
 
 #define DYNAMITE_SEED_ROW 12
@@ -738,18 +751,21 @@ static void test_dynamite_spawn_silent_no_bomb_sfx(void **vstate)
         block_system_clear_all(ctx->block);
         seed_dynamite_targets(ctx);
         ctx->bonus_block_active = false;
-        ctx->next_bonus_frame = 0;
         sdl2_audio_log_clear(ctx->audio);
         srand(seed);
 
-        for (int i = 0; i < THROTTLE_BONUS_SEED * 2 && !found_dynamite; i++)
-        {
-            throttle_tick(ctx);
-            if (ctx->bonus_block_active)
-                break; /* Case 0-24 rolled for this seed -- try the next one. */
-            if (dynamite_targets_remaining(ctx->block) < DYNAMITE_TARGET_COUNT)
-                found_dynamite = 1;
-        }
+        /* Force the roll to happen on the very next tick instead of
+         * waiting out the BONUS_SEED schedule interval -- see the
+         * "Per-seed cost" note above. */
+        int current_frame = (int)sdl2_state_frame(ctx->state);
+        ctx->next_bonus_frame = current_frame + 1;
+
+        throttle_tick(ctx);
+
+        if (ctx->bonus_block_active)
+            continue; /* Case 0-24 rolled for this seed -- try the next one. */
+        if (dynamite_targets_remaining(ctx->block) < DYNAMITE_TARGET_COUNT)
+            found_dynamite = 1;
     }
 
     /* Non-vacuous: a seed that actually rolled dynamite must have been
