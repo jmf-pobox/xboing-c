@@ -1,0 +1,31 @@
+mission_id: m-2026-07-17-009
+status: closed
+type: implement
+created_at: "2026-07-17T03:42:37Z"
+updated_at: "2026-07-17T03:53:39Z"
+closed_at: "2026-07-17T03:53:39Z"
+leader: claude
+worker: jdc
+evaluator:
+    handle: gjm
+    pinned_at: "2026-07-17T03:42:37Z"
+    hash: 7349512b3191332fef8a79f56caf962febc697b8444629912da4aa22b9b2efec
+inputs: {}
+write_set:
+    - src/block_system.c
+    - tests/test_block_system.c
+success_criteria:
+    - 'Fix the header-vs-implementation contract violation gjm found (verified by jdc): in src/block_system.c, block_system_type_is_required(NONE_BLK) and (KILL_BLK) return 1 (fall to `default: return 1`), contradicting include/block_system.h:460-465 which documents them as 0. Add `case NONE_BLK:` and `case KILL_BLK:` to the non-required (return 0) group of the exemption switch so the implementation honors its documented contract. NONE_BLK(-2) = empty cell, KILL_BLK(-1) = destroyed sentinel — neither is a block that must be cleared, so 0 (not required) is the correct semantics.'
+    - Behavior-neutral in production (the predicate is only ever called under bp->occupied in still_active + explode_all_required, and no occupied cell holds NONE/KILL), so no gameplay change — this closes a latent public-API contract bug. Confirm still_active and explode_all_required behavior is unchanged.
+    - 'Flip the characterization pin: in tests/test_block_system.c, TC-52 (test_type_is_required_none_and_kill, ~line 1307-1344) change its two assert_true calls on NONE_BLK/KILL_BLK to assert_false (the predicate now correctly returns 0), and update the FINDING comment to note the defect is now FIXED (predicate matches header) rather than pending.'
+    - cmake --preset debug && cmake --build build zero-warning; ctest --test-dir build green (all, incl the flipped TC-52); make asan-test green (ASan+UBSan clean). Only src/block_system.c and tests/test_block_system.c change.
+budget:
+    rounds: 2
+    reflection_after_each: true
+current_round: 1
+context: |-
+    Follow-on from m-2026-07-17-008: gjm's tests surfaced that block_system_type_is_required returns 1
+    for NONE_BLK/KILL_BLK, contradicting its header contract (should be 0). jdc confirmed. Fix in-PR
+    (no follow-up bead, project rule): add the two cases to the return-0 group + flip TC-52 to
+    assert_false. Public predicate should honor its documented contract even though currently
+    unreachable under the occupied-guard.

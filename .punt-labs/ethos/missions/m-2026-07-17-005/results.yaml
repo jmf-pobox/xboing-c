@@ -1,0 +1,24 @@
+results:
+    - mission: m-2026-07-17-005
+      round: 1
+      created_at: "2026-07-17T02:55:33Z"
+      author: jdc
+      verdict: pass
+      confidence: 0.9
+      files_changed:
+        - path: docs/specs/2026-07-16-debug-skip-cheat-design.md
+          added: 1
+          removed: 0
+      evidence:
+        - name: Extract cheat body -> game_rules_skip_level(ctx, frame) in game_rules.c/.h (level/rules layer, modern analog of SkipToNextLevel). game_input handler shrinks to shift->volume / GAME+debug->call / GAME+!debug->message.
+          status: pass
+        - name: Shared block_system_type_is_required(int) routed through BOTH cheat kill-set AND still_active. Required set = {RED,BLUE,GREEN,TAN,YELLOW,PURPLE,COUNTER,DROP}_BLK (8), exhaustive vs 20-type enum.
+          status: pass
+        - name: RANDOM_BLK -> RED+flag at placement; DYNAMITE/BLACKHIT never placed live. No under-coverage.
+          status: pass
+        - name: 'Divergence documented: SkipToNextLevel kills ROAMER (400pts), StillActiveBlocks does not count it; ADR-072 ''same exemption list'' is inaccurate.'
+          status: pass
+        - name: Recommendation Option A (input-path-synchronous); >= timer fix neutralizes skew, Option B adds ctx field for no gain.
+          status: pass
+        - name: docs/specs/2026-07-16-debug-skip-cheat-design.md written, markdownlint-clean.
+          status: pass

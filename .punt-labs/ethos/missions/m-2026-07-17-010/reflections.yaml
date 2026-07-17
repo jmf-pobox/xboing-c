@@ -1,0 +1,15 @@
+reflections:
+    - round: 1
+      created_at: "2026-07-17T03:59:47Z"
+      author: gjm
+      converging: true
+      signals:
+        - 'header-code-agreement: block_system.h:453-480 now matches src/block_system.c:1178-1234 switch statement on every input class (8 required types, NONE_BLK/KILL_BLK, 19 non-required specials, RANDOM/DYNAMITE/BLACKHIT, out-of-range default-required) -- no remaining contradiction'
+        - TC-53 (tests/test_block_system.c) comment updated to reflect the resolved header finding; assertions unchanged (assert_true(9999), assert_true(-100)), still correct against code
+        - diff is comment-only in include/block_system.h and comment-only in tests/test_block_system.c -- no executable logic changed
+        - 'cmake --preset debug && cmake --build build: zero warnings, zero errors'
+        - 'ctest --test-dir build -R block_system: 3/3 passed (test_block_system_check_region, test_block_system, test_block_system_explosion)'
+        - 'ctest --test-dir build (full suite): 61/61 passed, 1 disabled (test_attract_screenshots, documented pre-existing exclusion unrelated to this change)'
+        - Single-source-of-truth and ROAMER/ADR-074 notes in the header preserved intact
+      recommendation: stop
+      reason: All three success criteria satisfied. The header comment for block_system_type_is_required now states accurately that out-of-range ints (and RANDOM_BLK/DYNAMITE_BLK/BLACKHIT_BLK) return nonzero via the default-required case, matching src/block_system.c:1178-1234 exactly, and the false returns-0-for-out-of-range clause is gone. TC-53's comment was updated to close out the header-wording finding without touching its assertions. Change is comment-only in both files (verified by reading the full diff and the current header/test source). Build is zero-warning; block_system-scoped tests and the full ctest suite are green (61/61, 1 pre-existing disabled test unrelated to this mission). No further rounds needed.

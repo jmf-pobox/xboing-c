@@ -39,4 +39,19 @@ void game_rules_next_level(game_ctx_t *ctx);
  */
 void game_rules_check_ball_eyedude(game_ctx_t *ctx);
 
+/*
+ * Debug skip-level cheat: orchestrates the cross-subsystem effects of
+ * clearing every required block on the grid.  Delegates the grid sweep
+ * to block_system_explode_all_required() (this function holds no grid
+ * knowledge itself), then plays one "touch" sound if anything
+ * exploded, arms a 140-frame screen shake, marks the session as
+ * cheated (ADR-073), and posts the "Cheating, skip level ..." message.
+ * Behavior citation: original/blocks.c:2409-2462 (SkipToNextLevel),
+ * 1543-1548 (score at explosion finalize), 2460-2461 (shake).
+ *
+ * Caller must already have confirmed ctx->debug_mode and
+ * SDL2ST_GAME -- this function does not re-check either.
+ */
+void game_rules_skip_level(game_ctx_t *ctx, int frame);
+
 #endif /* GAME_RULES_H */

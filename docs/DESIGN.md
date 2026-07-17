@@ -4297,9 +4297,13 @@ and, for every occupied block *except* the special/bonus/indestructible
 types (`BONUSX2`, `TIMER`, `BONUSX4`, `BONUS`, `BLACK`, `BULLET`,
 `MAXAMMO`, `BOMB`, `DEATH`, `REVERSE`, `HYPERSPACE`, `EXTRABALL`,
 `MGUN`, `WALLOFF`, `MULTIBALL`, `STICKY`, `PAD_SHRINK`,
-`PAD_EXPAND` — the same exemption list `StillActiveBlocks`,
-`original/blocks.c:2482-2541`, checks to decide whether the level is
-done), calls `DrawBlock(display, window, r, c, KILL_BLK)`
+`PAD_EXPAND` — an exemption list that differs from
+`StillActiveBlocks`'s (`original/blocks.c:2482-2541`) by exactly one
+type: `ROAMER_BLK` sits in `StillActiveBlocks`'s exemption list but not
+in this one, so the original itself kills roamers on cheat while never
+counting them toward level completion — a single required-block
+predicate can't reproduce both readings at once (ADR-074 covers the
+ruling for this port), calls `DrawBlock(display, window, r, c, KILL_BLK)`
 (`original/blocks.c:2450`). `DrawBlock`'s `KILL_BLK` case
 (`original/blocks.c:1867-1871`) is not a silent removal: it calls
 `PlaySoundForBlock(blockP->blockType)` immediately, then
@@ -4500,3 +4504,113 @@ globally never sees the wisdom prompt at all, matching the
 `!ctx->savegame_restored_session` term it sits alongside, so there's
 no dialogue whose answer `submit_score` would then silently
 discard.
+
+## ADR-074: Explosion timer uses `>=`; the skip-level sweep moves into `block_system`
+
+**Status:** Accepted (2026-07-16)
+
+Two fixes land together because the second was blocked on the first:
+the cheat's explosions never finalized until the timer comparison was
+fixed, and fixing the timer exposed that the grid sweep didn't belong
+in the caller that had it.
+
+**Part 1 — the explosion-timer fix.** `block_system_update_explosions`
+gated advancement on `bp->explode_next_frame != frame` (exact
+equality), a direct port of `original/blocks.c:1502`. That comparison
+is safe in the original because every explosion is armed and checked
+inside the same single-threaded per-tick loop — arm-then-check always
+sees a consistent `frame`. This port arms explosions from two call
+sites at different points in the frame: ball/gun hits inside
+`mode_game_update` (same tick the check below runs, so `==` still
+works), and the `=` debug skip-level cheat from `game_input_global`,
+which reads `frame` once per *visual* frame, before the per-tick
+update loop runs. By the time `block_system_update_explosions`
+executes, `frame` has already advanced past the value the cheat armed
+with, so `==` never matches again — the block sits `exploding` forever,
+`blocks_exploding` never drains, and `block_system_still_active` never
+reads 0, so the level never reaches `SDL2ST_BONUS`. Changed the guard
+to `frame < bp->explode_next_frame` (i.e. `>=` fires), matching the
+due-or-past convention already used for the roamer/drop/random
+movement timers (ADR-070) and the ball-system timers. Each call still
+advances at most one stage (`explode_slide++`, `explode_next_frame +=
+BLOCK_EXPLODE_DELAY`), so ball-hit explosions animate and score exactly
+as before — this is strictly an armed-cheat unblock, not a change to
+ordinary-kill timing.
+
+**Part 2 — the grid sweep belongs in `block_system`, not its caller.**
+The first cut of the cheat (`docs/specs/2026-07-16-debug-skip-cheat-
+design.md`, mission m-2026-07-17-005 round 1) moved the ~80-line
+grid-walk-and-explode body out of `game_input_global` and into
+`game_rules_skip_level`, but kept the `MAX_ROW`x`MAX_COL` loop and the
+per-cell `block_system_is_occupied`/`get_type`/`explode` calls there —
+trading an input-layer grid leak for a rules-layer one. That is a
+placement bug specific to *this* codebase's structure, not a fidelity
+question: `block_system` is the only module with direct field access
+to the grid (opaque-context pattern, ADR-016); every other module,
+including `game_rules`, queries it through the public API. A second,
+independent encoding of "which blocks are required" already existed in
+`block_system_still_active`; a third copy of the same fact in
+`game_rules.c` would be one more place for the two to drift apart.
+
+**Decision — our structure, not a port of the original's.** We are
+explicit that this is a structural choice, not a fidelity requirement:
+the *behavior* (which blocks clear, full score per block, one "touch"
+burst, the 140-frame shake, normal level completion once
+`still_active()` reads 0) still matches `SkipToNextLevel`
+(`original/blocks.c:2409-2462`) and its citations in ADR-072/073. The
+*code layout* does not mirror the original at all — `SkipToNextLevel`
+inlines its own grid walk and its own (slightly different, see below)
+exemption switch, duplicating what `StillActiveBlocks` already encodes.
+This port instead puts every fact in exactly one place:
+
+- **`block_system_type_is_required(int block_type)`** (`src/
+  block_system.c`) is the single predicate for "must this block be
+  cleared for the level to complete". `block_system_still_active` and
+  the new sweep below both call it; they cannot disagree.
+- **`block_system_explode_all_required(block_system_t *ctx, int
+  frame)`** (`src/block_system.c`, `include/block_system.h`) is the
+  *only* grid iteration for "clear every required block". It walks the
+  grid once, arms `block_system_explode` on every occupied cell whose
+  type is required, and returns the count armed. It has no
+  `game_ctx_t`, audio, sfx, or score dependency — it unit-tests against
+  a bare `block_system_t` with nothing else stubbed.
+- **`game_rules_skip_level(game_ctx_t *ctx, int frame)`** (`src/
+  game_rules.c`) is a thin orchestrator with zero grid knowledge: it
+  calls `block_system_explode_all_required`, plays one "touch" sound
+  if the returned count is nonzero, arms the shake, sets
+  `ctx->cheated`, and posts the message. No `MAX_ROW`/`MAX_COL`, no
+  per-cell block queries.
+- **`game_input_global`** (`src/game_input.c`) is dispatch only: it
+  resolves the Shift-vs-unshifted `=` branch and the `ctx->debug_mode`
+  gate, then calls `game_rules_skip_level`. It has no block-system
+  include at all.
+
+**The roamer decision, restated as our invariant.** `SkipToNextLevel`'s
+own exemption list (`original/blocks.c:2427-2452`) and
+`StillActiveBlocks`'s (`original/blocks.c:2506-2533`) differ by exactly
+one type: `ROAMER_BLK` is exempt (non-required) in
+`StillActiveBlocks` but not exempt in `SkipToNextLevel`, so the 1996
+cheat kills roamers (400 pts) for a type the completion check never
+waited on in the first place. A single predicate cannot encode both
+readings. We rule that `block_system_type_is_required` must equal the
+completion check it is also used to short-circuit — the cheat's
+kill-set and the level-complete check are the same question asked
+twice, and they must have the same answer, or the cheat could explode
+a block that doesn't unblock the level, or leave one behind that
+would. `ROAMER_BLK` stays non-required in this port's single predicate.
+The forgone 400 roamer points are an artifact of the original's own
+internal inconsistency between two functions that were never meant to
+agree, and are unobservable to a player: the cheat is `-debug`-gated
+and was never available in a normal 1996 session.
+
+**Consequences.** `make check` (format, cppcheck, ctest debug, ctest
+ASan+UBSan, deb-lint) passes unchanged; `test_keybindings` and the
+existing block/rules/still-active unit tests pass with no behavior
+change, because the sweep and the predicate are the same operations,
+just relocated. Testability improves: the predicate, the sweep, and
+the orchestration are each checkable at their own layer without
+standing up the other two (`docs/specs/2026-07-16-debug-skip-cheat-
+design.md` §Testability). Any future caller that needs "explode every
+required block" (there is currently only one — the cheat) gets it from
+`block_system_explode_all_required` rather than writing a fourth copy
+of the grid walk.

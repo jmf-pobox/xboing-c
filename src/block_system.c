@@ -569,9 +569,22 @@ void block_system_update_explosions(block_system_t *ctx, int frame, block_system
         {
             block_entry_t *bp = &ctx->blocks[r][c];
 
-            /* exploding flag is the canonical guard.  Match the equality
-             * check at original/blocks.c:1502 (NOT >=). */
-            if (!bp->exploding || bp->explode_next_frame != frame)
+            /* exploding flag is the canonical guard.  original/blocks.c:1502
+             * used exact equality because arm and check happened in the same
+             * consistent-frame tick.  This port arms explosions from two
+             * paths: ball hits inside mode_game_update (same frame the
+             * check below runs), and the `=` debug skip-level cheat from
+             * game_input_global, which reads frame ONCE per visual frame
+             * BEFORE the per-tick update runs -- by the time this check
+             * executes, frame has already advanced past explode_next_frame,
+             * so `==` would strand the block exploding forever.  `>=`
+             * matches the fixed-timestep convention used for the
+             * roamer/drop/random movement timers (ADR-070) and the
+             * ball_system timers: due-or-past, not exact.  Each call still
+             * advances at most one stage (explode_slide++ then
+             * explode_next_frame += BLOCK_EXPLODE_DELAY), so ball-hit
+             * explosions animate/score identically to before. */
+            if (!bp->exploding || frame < bp->explode_next_frame)
             {
                 continue;
             }
@@ -1162,16 +1175,71 @@ int block_system_get_hit_points(const block_system_t *ctx, int row, int col)
     return ctx->blocks[row][col].hit_points;
 }
 
+int block_system_type_is_required(int block_type)
+{
+    /*
+     * The explicit cases below return 0 (non-required); everything
+     * else — RANDOM_BLK/DYNAMITE_BLK/BLACKHIT_BLK and genuinely
+     * out-of-range ints — falls to `default` and returns 1 (required).
+     * The exempt set matches StillActiveBlocks (original/blocks.c:
+     * 2506-2533), whose equivalent switch reaches its own
+     * `default: return True` by bare `break` arms; this port returns
+     * directly instead.  See the header doc comment for why this one
+     * predicate is the single source of truth for both still_active()
+     * and explode_all_required().
+     */
+    switch (block_type)
+    {
+        /*
+         * NONE_BLK (empty cell) and KILL_BLK (destroyed sentinel) are
+         * not blocks the level must clear — neither the original's
+         * exemption switch nor this one is ever consulted with these
+         * values while a cell is occupied (the only caller-guarded
+         * path, still_active()), but block_system_explode_all_required()
+         * gates on the same occupied check before calling this
+         * predicate, so these two cases are unreachable in production.
+         * They are listed explicitly anyway: without a case here they
+         * would fall to `default: return 1`, contradicting this
+         * function's own header contract (include/block_system.h) that
+         * documents 0 for both.
+         */
+        case NONE_BLK:
+        case KILL_BLK:
+            return 0;
+
+        /* Non-required blocks */
+        case BLACK_BLK:
+        case BULLET_BLK:
+        case ROAMER_BLK:
+        case BOMB_BLK:
+        case TIMER_BLK:
+        case HYPERSPACE_BLK:
+        case STICKY_BLK:
+        case MULTIBALL_BLK:
+        case MAXAMMO_BLK:
+        case PAD_SHRINK_BLK:
+        case PAD_EXPAND_BLK:
+        case REVERSE_BLK:
+        case MGUN_BLK:
+        case WALLOFF_BLK:
+        case EXTRABALL_BLK:
+        case DEATH_BLK:
+        case BONUSX2_BLK:
+        case BONUSX4_BLK:
+        case BONUS_BLK:
+            return 0;
+
+        default:
+            return 1;
+    }
+}
+
 int block_system_still_active(const block_system_t *ctx)
 {
     /*
      * Returns nonzero if the level still has required blocks.
      * Matches legacy StillActiveBlocks() (blocks.c:2464-2526).
-     *
-     * Required blocks: color blocks (RED..PURPLE), COUNTER_BLK, DROP_BLK.
-     * Non-required: BLACK, BULLET, ROAMER, BOMB, TIMER, HYPERSPACE,
-     * STICKY, MULTIBALL, MAXAMMO, PAD_SHRINK, PAD_EXPAND, REVERSE,
-     * MGUN, WALLOFF, EXTRABALL, DEATH, BONUSX2, BONUSX4, BONUS.
+     * Required/non-required classification: block_system_type_is_required().
      */
     if (ctx == NULL)
     {
@@ -1183,50 +1251,46 @@ int block_system_still_active(const block_system_t *ctx)
         for (int c = 0; c < MAX_COL; c++)
         {
             const block_entry_t *bp = &ctx->blocks[r][c];
-
-            if (!bp->occupied)
-            {
-                continue;
-            }
-
-            switch (bp->block_type)
-            {
-                /* Non-required blocks */
-                case BLACK_BLK:
-                case BULLET_BLK:
-                case ROAMER_BLK:
-                case BOMB_BLK:
-                case TIMER_BLK:
-                case HYPERSPACE_BLK:
-                case STICKY_BLK:
-                case MULTIBALL_BLK:
-                case MAXAMMO_BLK:
-                case PAD_SHRINK_BLK:
-                case PAD_EXPAND_BLK:
-                case REVERSE_BLK:
-                case MGUN_BLK:
-                case WALLOFF_BLK:
-                case EXTRABALL_BLK:
-                case DEATH_BLK:
-                case BONUSX2_BLK:
-                case BONUSX4_BLK:
-                case BONUS_BLK:
-                    break;
-
-                default:
-                    /* Required block found — level not complete */
-                    return 1;
-            }
+            if (bp->occupied && block_system_type_is_required(bp->block_type))
+                return 1;
         }
     }
 
-    /* Explosions still pending — level not complete */
+    /* Explosions still pending — level not complete. */
     if (ctx->blocks_exploding > 1)
     {
         return 1;
     }
 
     return 0;
+}
+
+int block_system_explode_all_required(block_system_t *ctx, int frame)
+{
+    if (ctx == NULL)
+    {
+        return 0;
+    }
+
+    int armed = 0;
+    for (int r = 0; r < MAX_ROW; r++)
+    {
+        for (int c = 0; c < MAX_COL; c++)
+        {
+            const block_entry_t *bp = &ctx->blocks[r][c];
+            if (!bp->occupied || !block_system_type_is_required(bp->block_type))
+            {
+                continue;
+            }
+
+            if (block_system_explode(ctx, r, c, frame) == BLOCK_SYS_OK)
+            {
+                armed++;
+            }
+        }
+    }
+
+    return armed;
 }
 
 int block_system_get_exploding_count(const block_system_t *ctx)

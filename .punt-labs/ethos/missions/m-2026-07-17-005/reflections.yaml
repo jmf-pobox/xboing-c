@@ -1,0 +1,14 @@
+reflections:
+    - round: 1
+      created_at: "2026-07-17T02:55:46Z"
+      author: jck
+      converging: true
+      signals:
+        - 'Roamer divergence independently verified: SkipToNextLevel exclude-switch (blocks.c:2427-2452, 18 entries) omits ROAMER -> kills it (400pts); StillActiveBlocks exclude-switch (blocks.c:2506-2529, 19 entries) includes ROAMER -> never required. The two original functions differ by exactly ROAMER_BLK.'
+        - 'RULING: block_system_type_is_required mirrors StillActiveBlocks EXACTLY — {RED,BLUE,GREEN,TAN,YELLOW,PURPLE,COUNTER,DROP}_BLK, NO ROAMER. This matches the currently-shipped 8-case switch; the design only names/centralizes shipped behavior. Adding roamer-kill now would be the actual behavior change. Final.'
+        - Required set verified exhaustive vs full 20-type block_types.h enum. RANDOM_BLK->RED+flag at placement (block_system.c:455-460); DYNAMITE/BLACKHIT have zero grid-placement call sites. No under-coverage.
+        - score(explode->finalize->score_system_add) / sound(one dedup 'touch', 16-channel constraint) / shake(SFX_MODE_SHAKE end frame+140, blocks.c:2460-2461) / cheated (ADR-073) all preserved — design relocates code only.
+        - Option A (input-path-synchronous) matches original/main.c handleGameKeys synchronous dispatch of the debug key; faithful, no determinism cost under replay harness.
+        - ADR-072 (docs/DESIGN.md:4296-4301) 'same exemption list' claim is factually false and MUST be corrected in the implement mission.
+      recommendation: stop
+      reason: 'Design faithful and clean; roamer resolved toward completion-congruence (no live behavior change); excluded-type exhaustiveness verified not assumed. APPROVED with two binding items for the implementer: (1) is_required = exactly the 8 types, NO ROAMER; (2) correct the ADR-072 ''same exemption list'' inaccuracy in docs/DESIGN.md.'

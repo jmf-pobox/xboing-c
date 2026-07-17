@@ -18,9 +18,9 @@
 #include <SDL2/SDL.h>
 
 #include "ball_system.h"
-#include "block_system.h"
 #include "dialogue_system.h"
 #include "editor_system.h"
+#include "game_rules.h"
 #include "gun_system.h"
 #include "level_system.h"
 #include "message_system.h"
@@ -259,84 +259,9 @@ void game_input_global(game_ctx_t *ctx)
         else if (mode == SDL2ST_GAME)
         {
             if (ctx->debug_mode)
-            {
-                /* SkipToNextLevel (original/blocks.c:2409-2462): DrawBlock
-                 * with blockType KILL_BLK routes each required block
-                 * through the real explosion path (blocks.c:1867-1871,
-                 * PlaySoundForBlock + SetBlockUpForExplosion) -- NOT a
-                 * silent clear.  ExplodeBlocksPending later fires
-                 * AddToScore(hitPoints) for each one on its final
-                 * animation frame (blocks.c:1543-1548), so the cheat
-                 * awards full score, same as a legitimate kill.  Routing
-                 * through block_system_explode (not block_system_clear)
-                 * reproduces this: the animation plays and
-                 * block_system_update_explosions' finalize callback
-                 * (game_callbacks_on_block_finalize) awards hit_points via
-                 * score_system_add once each block's explosion completes.
-                 * block_system_still_active() only reads 0 after that, so
-                 * game_rules_check completes the level on the normal
-                 * per-tick path -- no state is forced here. */
-                bool cleared = false;
-                for (int row = 0; row < MAX_ROW; row++)
-                {
-                    for (int col = 0; col < MAX_COL; col++)
-                    {
-                        if (!block_system_is_occupied(ctx->block, row, col))
-                            continue;
-
-                        int block_type = block_system_get_type(ctx->block, row, col);
-                        switch (block_type)
-                        {
-                            case RED_BLK:
-                            case BLUE_BLK:
-                            case GREEN_BLK:
-                            case TAN_BLK:
-                            case YELLOW_BLK:
-                            case PURPLE_BLK:
-                            case COUNTER_BLK:
-                            case DROP_BLK:
-                                if (block_system_explode(ctx->block, row, col, frame) ==
-                                    BLOCK_SYS_OK)
-                                    cleared = true;
-                                break;
-                            default:
-                                break;
-                        }
-                    }
-                }
-
-                /* PlaySoundForBlock (blocks.c:1868) fires once per block at
-                 * kill time in the original. Cheating on level 1 explodes
-                 * ~44 required blocks in one tick; every required block
-                 * type maps to the same "touch" sound (block_sound.c:26),
-                 * so replaying it per-block saturates the 16-channel
-                 * SDL_mixer (sdl2_audio.c:248) and spams "no free channel".
-                 * A single play here is audibly identical to the original's
-                 * burst -- modern-mixer adaptation, not a behavior change. */
-                if (cleared && ctx->audio)
-                    sdl2_audio_play_at_percent(ctx->audio, "touch", 99);
-
-                /* Screen shake during the explosion wave --
-                 * original/blocks.c:2460-2461 (SetSfxEndFrame(frame+140);
-                 * changeSfxMode(SFX_SHAKE)). */
-                if (ctx->sfx)
-                {
-                    sfx_system_set_mode(ctx->sfx, SFX_MODE_SHAKE);
-                    sfx_system_set_end_frame(ctx->sfx, frame + 140);
-                }
-
-                /* Using the cheat disqualifies this session from every
-                 * high-score board, personal and global (ADR-073) — a
-                 * deliberate deviation from the 1996 original, which let
-                 * cheated scores into the local table. */
-                ctx->cheated = true;
-
-                message_system_set(ctx->message, "Cheating, skip level ...", 1, frame);
-            }
+                game_rules_skip_level(ctx, frame);
             else
-            {
                 message_system_set(ctx->message, "Stop trying to cheat!!", 1, frame);
-            }
         }
     }
 

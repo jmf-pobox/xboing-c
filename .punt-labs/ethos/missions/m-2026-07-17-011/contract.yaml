@@ -1,0 +1,27 @@
+mission_id: m-2026-07-17-011
+status: closed
+type: implement
+created_at: "2026-07-17T11:38:06Z"
+updated_at: "2026-07-17T11:45:33Z"
+closed_at: "2026-07-17T11:45:33Z"
+leader: claude
+worker: gjm
+evaluator:
+    handle: jdc
+    pinned_at: "2026-07-17T11:38:06Z"
+    hash: c08223356d3e6d5aed56e28da477a1aa2707509febfef7c5f62c25871a3e841f
+inputs: {}
+write_set:
+    - tests/test_game_rules.c
+success_criteria:
+    - 'Fix Copilot finding (PR #195): TC-64 (test_skip_level_sets_cheated_regardless_of_board, tests/test_game_rules.c ~line 604) asserts block_system_still_active(ctx->block)==1 as a precondition, which relies on the freshly-loaded level 1 board containing at least one required block. That couples the test to external level data (level01.data) — it can break if level content changes, even though the behavior under test (ctx->cheated flips true) is independent of the board. Make the precondition deterministic by seeding the board explicitly instead of depending on the loaded level.'
+    - 'Replace the reliance on the default loaded board: at the top of TC-64, block_system_clear_all then block_system_add one required block (e.g. RED_BLK at a known cell) so block_system_still_active(ctx->block)==1 holds deterministically regardless of level data — the same explicit-seed approach TC-66 (test_skip_level_drives_level_to_completion) already uses. Keep the test''s intent: it still proves ctx->cheated flips true after game_rules_skip_level independent of what is on the board (a seeded required block is fine; the point is the assertion no longer depends on external level content). Update the test''s comment to describe the explicit seed rather than "uses the level''s default just-loaded board".'
+    - Do not weaken any assertion. cmake --preset debug && cmake --build build; ctest --test-dir build -R test_game_rules --output-on-failure green; full ctest still green; make asan-test green (ASan+UBSan clean). Only tests/test_game_rules.c changes.
+budget:
+    rounds: 1
+    reflection_after_each: true
+current_round: 1
+context: |-
+    PR #195 Copilot review: TC-64's precondition assert_int_equal(block_system_still_active(ctx->block),
+    1) depends on level 1 having required blocks. Decouple by explicitly seeding a required block (like
+    TC-66) so the cheated-flag assertion is deterministic and layout-independent.

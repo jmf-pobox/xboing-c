@@ -1,0 +1,29 @@
+mission_id: m-2026-07-17-004
+status: open
+type: implement
+created_at: "2026-07-17T02:38:06Z"
+updated_at: "2026-07-17T02:38:06Z"
+leader: claude
+worker: jdc
+evaluator:
+    handle: jck
+    pinned_at: "2026-07-17T02:38:06Z"
+    hash: 40cbe1204f644c77e6a26757a9b855e3298be267025e806d425bfdea99054f18
+inputs: {}
+write_set:
+    - src/block_system.c
+success_criteria:
+    - 'Fix a level-progression bug in the just-merged = debug skip-level cheat (PR #194): after the cheat explodes the required blocks, the level does not advance. Root cause (verified): block_system_update_explosions (src/block_system.c:574) advances an explosion only when `bp->explode_next_frame == frame` (exact equality; the code reads `bp->explode_next_frame != frame -> continue`). The cheat arms explosions via block_system_explode from game_input_global (src/game_input.c:298, using frame = sdl2_state_frame read ONCE per visual frame BEFORE the per-tick updates run), but update_explosions runs inside mode_game_update AFTER the frame counter advanced — so `explode_next_frame == frame` never holds for the cheat''s blocks. They stay stuck exploding forever, ctx->blocks_exploding never drains, block_system_still_active keeps returning nonzero (the `blocks_exploding > 1` guard), and game_rules_check never transitions to SDL2ST_BONUS. Ball-hit explosions are unaffected because they arm and are checked within the same tick.'
+    - 'Change the explosion-advance gate at src/block_system.c:574 from exact equality to due-or-past: `if (!bp->exploding || bp->explode_next_frame != frame)` becomes `if (!bp->exploding || frame < bp->explode_next_frame)` — i.e., advance the explosion when `frame >= bp->explode_next_frame`. This is the SAME adaptation ADR-070 made for the roamer/ drop/random movement timers (== -> >=): robust to a frame armed on the input path vs checked on the tick, and to skipped frames under the fixed-timestep loop. Each advance still does `explode_slide++; explode_next_frame += BLOCK_EXPLODE_DELAY;`, so it advances at most one stage per update_explosions call (no double-advance, no double-score) — verify this: a block armed at F finalizes exactly one stage per subsequent tick, and blocks_exploding decrements to 0.'
+    - 'Update the comment at src/block_system.c:572-573 (currently "Match the equality check at original/blocks.c:1502 (NOT >=)") to explain the >= adaptation and WHY: explosions can be armed from the input path (the = cheat) at a frame the per-tick update loop has already passed, so exact == strands them; >= matches the port''s fixed-timestep convention (ADR-070) and the ball_system timer convention. Keep the original/blocks.c:1502 citation as provenance.'
+    - 'Preserve everything else: scoring on finalize (game_callbacks_on_block_finalize via the finalize path), the 4-stage animation, the clear_entry/blocks_exploding bookkeeping, BLOCK_EXPLODE_DELAY. Confirm normal ball-hit explosions still animate+score+finalize identically (same tick, frame>=explode_next_frame holds exactly as == did). cmake --preset debug && cmake --build build zero-warning -Werror -Wconversion -Wshadow. Full ctest --test-dir build green AND make asan-test green. Only src/block_system.c changes. (A sibling gjm mission adds the regression test.)'
+budget:
+    rounds: 3
+    reflection_after_each: true
+current_round: 1
+context: |-
+    Maintainer reported: the = cheat clears the blocks but the level does not progress. Root-caused to
+    the explosion timer's exact `== frame` at block_system.c:574 vs the cheat arming explosions from
+    the input path (game_input_global) at a frame the per-tick update_explosions has already passed.
+    Same class as the ADR-070 movement `==`->`>=` fix. jck gates the explosion faithfulness (the
+    comment cites original/blocks.c:1502 == ; this is a justified modern deviation).

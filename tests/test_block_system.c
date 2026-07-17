@@ -1234,6 +1234,286 @@ static void test_death_block_wink_rhythm(void **state)
 }
 
 /* =========================================================================
+ * Group 16: block_system_type_is_required (mission m-2026-07-17-008,
+ * docs/specs/2026-07-16-debug-skip-cheat-design.md)
+ *
+ * Single source of truth for block_system_still_active() (level-complete
+ * check) and block_system_explode_all_required() (the debug skip-level
+ * cheat's grid sweep).  See the header doc comment
+ * (include/block_system.h) and the design spec's "Required-block set"
+ * table for the citation trail.
+ * ========================================================================= */
+
+/* TC-49: The 8 required types return nonzero. */
+static void test_type_is_required_color_and_special_required(void **state)
+{
+    (void)state;
+
+    assert_true(block_system_type_is_required(RED_BLK));
+    assert_true(block_system_type_is_required(BLUE_BLK));
+    assert_true(block_system_type_is_required(GREEN_BLK));
+    assert_true(block_system_type_is_required(TAN_BLK));
+    assert_true(block_system_type_is_required(YELLOW_BLK));
+    assert_true(block_system_type_is_required(PURPLE_BLK));
+    assert_true(block_system_type_is_required(COUNTER_BLK));
+    assert_true(block_system_type_is_required(DROP_BLK));
+}
+
+/* TC-50: The 19 non-required special types return 0 — the exemption
+ * switch in block_system_type_is_required (src/block_system.c). */
+static void test_type_is_required_non_required_types(void **state)
+{
+    (void)state;
+
+    assert_false(block_system_type_is_required(BLACK_BLK));
+    assert_false(block_system_type_is_required(BULLET_BLK));
+    assert_false(block_system_type_is_required(ROAMER_BLK));
+    assert_false(block_system_type_is_required(BOMB_BLK));
+    assert_false(block_system_type_is_required(TIMER_BLK));
+    assert_false(block_system_type_is_required(HYPERSPACE_BLK));
+    assert_false(block_system_type_is_required(STICKY_BLK));
+    assert_false(block_system_type_is_required(MULTIBALL_BLK));
+    assert_false(block_system_type_is_required(MAXAMMO_BLK));
+    assert_false(block_system_type_is_required(PAD_SHRINK_BLK));
+    assert_false(block_system_type_is_required(PAD_EXPAND_BLK));
+    assert_false(block_system_type_is_required(REVERSE_BLK));
+    assert_false(block_system_type_is_required(MGUN_BLK));
+    assert_false(block_system_type_is_required(WALLOFF_BLK));
+    assert_false(block_system_type_is_required(EXTRABALL_BLK));
+    assert_false(block_system_type_is_required(DEATH_BLK));
+    assert_false(block_system_type_is_required(BONUSX2_BLK));
+    assert_false(block_system_type_is_required(BONUSX4_BLK));
+    assert_false(block_system_type_is_required(BONUS_BLK));
+}
+
+/* TC-51: RANDOM_BLK, DYNAMITE_BLK, BLACKHIT_BLK are not in the exemption
+ * switch, so they fall to `default: return 1` — required, by the same
+ * default-required rule that catches the 8 color/special types above.
+ * Pins the edge case the design spec calls out explicitly: these three
+ * never persist as a live bp->block_type (RANDOM_BLK morphs to RED_BLK +
+ * a flag at block_system_add; DYNAMITE_BLK/BLACKHIT_BLK are never
+ * placed), so the fact the bare predicate reports them "required" is
+ * inert in practice — but this test pins the predicate's actual return
+ * value regardless. */
+static void test_type_is_required_random_dynamite_blackhit(void **state)
+{
+    (void)state;
+
+    assert_true(block_system_type_is_required(RANDOM_BLK));
+    assert_true(block_system_type_is_required(DYNAMITE_BLK));
+    assert_true(block_system_type_is_required(BLACKHIT_BLK));
+}
+
+/* TC-52: NONE_BLK and KILL_BLK.
+ *
+ * FIXED (mission m-2026-07-17-009): include/block_system.h:460-465
+ * documents this function as "Returns 0 for every other value,
+ * including NONE_BLK, KILL_BLK, the 19 non-required special types,
+ * and any out-of-range value."  block_system_type_is_required now has
+ * explicit `case NONE_BLK: case KILL_BLK: return 0;` arms, so the
+ * predicate matches the header for both sentinels. Still unreachable
+ * in production either way: block_system_still_active and
+ * block_system_explode_all_required both gate this predicate behind
+ * `bp->occupied`, and no code path leaves an occupied cell with
+ * block_type == NONE_BLK or KILL_BLK (block_system_clear sets
+ * occupied=0 alongside NONE_BLK; KILL_BLK is never assigned to
+ * bp->block_type at all) — but the predicate itself now honors its
+ * documented contract regardless of caller-side guards. */
+static void test_type_is_required_none_and_kill(void **state)
+{
+    (void)state;
+
+    assert_false(block_system_type_is_required(NONE_BLK));
+    assert_false(block_system_type_is_required(KILL_BLK));
+}
+
+/* TC-53: Out-of-range values (9999, -100) are not in the exemption
+ * switch either, so they fall to `default: return 1` — required, same
+ * default-required rule as TC-51 (RANDOM_BLK/DYNAMITE_BLK/
+ * BLACKHIT_BLK), and matching the original's `default: return True`
+ * (original/blocks.c:2506-2533).
+ *
+ * Resolved (mission m-2026-07-17-010): include/block_system.h now
+ * documents out-of-range ints as falling through to the
+ * default-required case and returning nonzero, matching this test's
+ * assertions. No open finding remains here. */
+static void test_type_is_required_out_of_range(void **state)
+{
+    (void)state;
+
+    assert_true(block_system_type_is_required(9999));
+    assert_true(block_system_type_is_required(-100));
+}
+
+/* TC-54: Agreement sweep — for every placeable block type (0..MAX_BLOCKS-1),
+ * a single-block grid containing only that type reports
+ * block_system_still_active() consistently with
+ * block_system_type_is_required(type).  RANDOM_BLK is skipped:
+ * block_system_add morphs it to RED_BLK + a random flag at placement
+ * (src/block_system.c:455-460), so still_active would actually be
+ * exercising RED_BLK's classification, not RANDOM_BLK's own — the
+ * design spec calls this out explicitly ("Skip types that
+ * block_system_add won't place as-is"). NONE_BLK/KILL_BLK are outside
+ * the 0..MAX_BLOCKS-1 placeable range and are covered directly by
+ * TC-52 instead. */
+static void test_type_is_required_agrees_with_still_active_sweep(void **state)
+{
+    (void)state;
+
+    for (int t = 0; t < MAX_BLOCKS; t++)
+    {
+        if (t == RANDOM_BLK)
+        {
+            continue;
+        }
+
+        block_system_t *ctx = make_ctx();
+        block_system_add(ctx, 0, 0, t, 0, 0);
+
+        int expected_required = block_system_type_is_required(t) != 0;
+        int actually_active = block_system_still_active(ctx) != 0;
+        assert_int_equal(actually_active, expected_required);
+
+        block_system_destroy(ctx);
+    }
+}
+
+/* =========================================================================
+ * Group 17: block_system_explode_all_required (mission m-2026-07-17-008)
+ * ========================================================================= */
+
+/* TC-55: NULL ctx returns 0, no crash. */
+static void test_explode_all_required_null_ctx(void **state)
+{
+    (void)state;
+    assert_int_equal(block_system_explode_all_required(NULL, 0), 0);
+}
+
+/* TC-56: Empty grid returns 0. */
+static void test_explode_all_required_empty_grid(void **state)
+{
+    (void)state;
+    block_system_t *ctx = make_ctx();
+
+    assert_int_equal(block_system_explode_all_required(ctx, 0), 0);
+
+    block_system_destroy(ctx);
+}
+
+/* TC-57: A grid with only non-required blocks returns 0 and leaves every
+ * cell un-exploded. */
+static void test_explode_all_required_non_required_only(void **state)
+{
+    (void)state;
+    block_system_t *ctx = make_ctx();
+
+    block_system_add(ctx, 0, 0, BLACK_BLK, 0, 0);
+    block_system_add(ctx, 1, 1, BOMB_BLK, 0, 0);
+    block_system_add(ctx, 2, 2, DEATH_BLK, 3, 0);
+
+    assert_int_equal(block_system_explode_all_required(ctx, 100), 0);
+
+    block_system_render_info_t info;
+    block_system_get_render_info(ctx, 0, 0, &info);
+    assert_int_equal(info.exploding, 0);
+    block_system_get_render_info(ctx, 1, 1, &info);
+    assert_int_equal(info.exploding, 0);
+    block_system_get_render_info(ctx, 2, 2, &info);
+    assert_int_equal(info.exploding, 0);
+
+    block_system_destroy(ctx);
+}
+
+/* TC-58: A mixed grid (3 required + 2 non-required at known cells) arms
+ * exactly the required cells. */
+static void test_explode_all_required_mixed_grid(void **state)
+{
+    (void)state;
+    block_system_t *ctx = make_ctx();
+
+    /* Required */
+    block_system_add(ctx, 0, 0, RED_BLK, 0, 0);
+    block_system_add(ctx, 0, 1, BLUE_BLK, 0, 0);
+    block_system_add(ctx, 0, 2, COUNTER_BLK, 3, 0);
+
+    /* Non-required */
+    block_system_add(ctx, 1, 0, BLACK_BLK, 0, 0);
+    block_system_add(ctx, 1, 1, BOMB_BLK, 0, 0);
+
+    int armed = block_system_explode_all_required(ctx, 500);
+    assert_int_equal(armed, 3);
+
+    block_system_render_info_t info;
+    block_system_get_render_info(ctx, 0, 0, &info);
+    assert_int_equal(info.exploding, 1);
+    assert_int_equal(info.explode_slide, 1);
+    block_system_get_render_info(ctx, 0, 1, &info);
+    assert_int_equal(info.exploding, 1);
+    assert_int_equal(info.explode_slide, 1);
+    block_system_get_render_info(ctx, 0, 2, &info);
+    assert_int_equal(info.exploding, 1);
+    assert_int_equal(info.explode_slide, 1);
+
+    block_system_get_render_info(ctx, 1, 0, &info);
+    assert_int_equal(info.exploding, 0);
+    block_system_get_render_info(ctx, 1, 1, &info);
+    assert_int_equal(info.exploding, 0);
+
+    block_system_destroy(ctx);
+}
+
+/* TC-59: Re-entry before finalize does not re-arm or double-count
+ * already-exploding required cells — the second call returns 0.
+ * block_system_explode's own pre-condition (not already exploding,
+ * original/blocks.c:1825) is what makes this safe: the second sweep's
+ * block_system_explode() calls all return BLOCK_SYS_ERR_INVALID_STATE,
+ * so armed stays 0. */
+static void test_explode_all_required_reentry_no_double_arm(void **state)
+{
+    (void)state;
+    block_system_t *ctx = make_ctx();
+
+    block_system_add(ctx, 3, 1, RED_BLK, 0, 0);
+    block_system_add(ctx, 3, 2, GREEN_BLK, 0, 0);
+
+    int first = block_system_explode_all_required(ctx, 10);
+    assert_int_equal(first, 2);
+
+    int second = block_system_explode_all_required(ctx, 20);
+    assert_int_equal(second, 0);
+
+    /* Still exploding from the first call, not reset by the second. */
+    block_system_render_info_t info;
+    block_system_get_render_info(ctx, 3, 1, &info);
+    assert_int_equal(info.exploding, 1);
+    block_system_get_render_info(ctx, 3, 2, &info);
+    assert_int_equal(info.exploding, 1);
+
+    block_system_destroy(ctx);
+}
+
+/* TC-60: A grid full of required blocks returns a count equal to the
+ * number of occupied required cells placed (MAX_ROW * MAX_COL). */
+static void test_explode_all_required_full_required_grid(void **state)
+{
+    (void)state;
+    block_system_t *ctx = make_ctx();
+
+    for (int r = 0; r < MAX_ROW; r++)
+    {
+        for (int c = 0; c < MAX_COL; c++)
+        {
+            block_system_add(ctx, r, c, RED_BLK, 0, 0);
+        }
+    }
+
+    int armed = block_system_explode_all_required(ctx, 1000);
+    assert_int_equal(armed, MAX_ROW * MAX_COL);
+
+    block_system_destroy(ctx);
+}
+
+/* =========================================================================
  * Test runner
  * ========================================================================= */
 
@@ -1311,6 +1591,22 @@ int main(void)
 
         /* Group 15: DEATH_BLK asymmetric wink rhythm */
         cmocka_unit_test(test_death_block_wink_rhythm),
+
+        /* Group 16: block_system_type_is_required */
+        cmocka_unit_test(test_type_is_required_color_and_special_required),
+        cmocka_unit_test(test_type_is_required_non_required_types),
+        cmocka_unit_test(test_type_is_required_random_dynamite_blackhit),
+        cmocka_unit_test(test_type_is_required_none_and_kill),
+        cmocka_unit_test(test_type_is_required_out_of_range),
+        cmocka_unit_test(test_type_is_required_agrees_with_still_active_sweep),
+
+        /* Group 17: block_system_explode_all_required */
+        cmocka_unit_test(test_explode_all_required_null_ctx),
+        cmocka_unit_test(test_explode_all_required_empty_grid),
+        cmocka_unit_test(test_explode_all_required_non_required_only),
+        cmocka_unit_test(test_explode_all_required_mixed_grid),
+        cmocka_unit_test(test_explode_all_required_reentry_no_double_arm),
+        cmocka_unit_test(test_explode_all_required_full_required_grid),
     };
 
     return cmocka_run_group_tests(tests, NULL, NULL);

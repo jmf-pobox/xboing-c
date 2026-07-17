@@ -1,0 +1,33 @@
+results:
+    - mission: m-2026-07-17-011
+      round: 1
+      created_at: "2026-07-17T11:41:24Z"
+      author: gjm
+      verdict: pass
+      confidence: 0.98
+      files_changed:
+        - path: tests/test_game_rules.c
+          added: 9
+          removed: 3
+      evidence:
+        - name: cmake --preset debug && cmake --build build (test_game_rules + full build)
+          status: pass
+        - name: ctest --test-dir build -R test_game_rules --output-on-failure
+          status: pass
+        - name: ctest --test-dir build --output-on-failure (full suite, 61/61)
+          status: pass
+        - name: make asan-test (ASan + UBSan, 61/61)
+          status: pass
+        - name: git status --porcelain scoped to tests/test_game_rules.c only
+          status: pass
+      prose: |
+        TC-64 (test_skip_level_sets_cheated_regardless_of_board) now seeds
+        its own board explicitly via block_system_clear_all +
+        block_system_add(row=5, col=1, RED_BLK) before asserting
+        still_active==1, matching TC-66's established pattern. The
+        precondition no longer depends on the freshly-loaded level 1's
+        external block content. Comment updated to explain the seed and
+        that the cheated-flag behavior under test is board-independent --
+        the seed exists only to give a deterministic "something is still
+        active" precondition to distinguish pre/post state. No assertions
+        weakened; no other tests touched.

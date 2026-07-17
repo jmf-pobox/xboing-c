@@ -1,0 +1,17 @@
+reflections:
+    - round: 1
+      created_at: "2026-07-17T11:45:15Z"
+      author: jdc
+      converging: true
+      signals:
+        - tests/test_game_rules.c:598-618 (diff vs prior working tree) — TC-64 now calls block_system_clear_all(ctx->block) then block_system_add(ctx->block, 5, 1, RED_BLK, 0, 0) before the still_active precondition; removed dependency on level01.data content
+        - src/block_system.c:439 — block_system_add bounds-checks row<18, col<9 (include/block_types.h:52-53); (5,1) is valid, no paddle-area exclusion at grid level
+        - 'src/block_system.c:1210-1233 — RED_BLK is not in the non-required switch cases, falls to default: return 1 (required), matching TC-66''s identical seed pattern (block_system.c comment confirms RED_BLK/BLUE_BLK/COUNTER_BLK are the standard-required set used elsewhere in this file)'
+        - tests/test_game_rules.c:601-607 — assert_true(ctx->cheated) terminal assertion unchanged; precondition assertion still ==1, not weakened, just given a deterministic setup
+        - tests/test_game_rules.c:598-603 — comment rewritten to describe explicit seed, matches contract's required wording change
+        - 'ctest --test-dir build -R test_game_rules: 1/1 passed (2.36s)'
+        - 'ctest --test-dir build (full debug suite): 61/61 passed, 1 disabled (test_attract_screenshots, documented pre-existing exclusion unrelated to this change)'
+        - 'make asan-test: 61/61 passed, 1 disabled, no ASan/UBSan diagnostics'
+        - git diff -- tests/test_game_rules.c shows only TC-64's body/comment changed; no other test in the file touched
+      recommendation: stop
+      reason: 'All three success criteria met: precondition is now deterministic (explicit seed, not level01.data), matches TC-66''s established pattern, comment updated, no assertion weakened, cheated-flag assertion intact. Full debug + ASan/UBSan suites green. Single-file, single-test-case diff as required. Approve.'

@@ -1,0 +1,32 @@
+mission_id: m-2026-07-17-008
+status: closed
+type: implement
+created_at: "2026-07-17T03:24:42Z"
+updated_at: "2026-07-17T03:42:25Z"
+closed_at: "2026-07-17T03:42:25Z"
+leader: claude
+worker: gjm
+evaluator:
+    handle: jdc
+    pinned_at: "2026-07-17T03:24:42Z"
+    hash: c08223356d3e6d5aed56e28da477a1aa2707509febfef7c5f62c25871a3e841f
+inputs: {}
+write_set:
+    - tests/test_block_system.c
+    - tests/test_game_rules.c
+    - tests/CMakeLists.txt
+success_criteria:
+    - Add the coverage the m-2026-07-17-006 refactor left as a documented gap. This is a TEST-ONLY mission — no production code edits.
+    - 'block_system_type_is_required: (1) nonzero for each of the 8 required types (RED, BLUE, GREEN, TAN, YELLOW, PURPLE, COUNTER, DROP); (2) 0 for each of the 19 non-required specials (BLACK, BULLET, ROAMER, BOMB, TIMER, HYPERSPACE, STICKY, MULTIBALL, MAXAMMO, PAD_SHRINK, PAD_EXPAND, REVERSE, MGUN, WALLOFF, EXTRABALL, DEATH, BONUSX2, BONUSX4, BONUS); (3) nonzero for RANDOM/DYNAMITE/BLACKHIT (default->required fidelity); (4) 0 for NONE_BLK(-2) and KILL_BLK(-1); (5) nonzero for out-of-range (e.g. 9999, -100); (6) agreement: for every defined type, a single-block grid''s block_system_still_active matches the predicate.'
+    - 'block_system_explode_all_required: (7) NULL ctx -> 0 no crash; (8) empty grid -> 0; (9) non-required-only grid -> 0, no exploding flags; (10) mixed grid (N required + M non-required) -> returns N, required cells exploding==1 / explode_next_frame==frame / explode_slide==1, non-required untouched; (11) re-entry: second call before finalize returns 0 for already-exploding cells; (12) full required grid -> count == total occupied required cells.'
+    - 'game_rules_skip_level: (13) NULL ctx no crash; (14) zero required blocks -> shake armed + ctx->cheated true + message posted but "touch" NOT played (audio gated on cleared>0); (15) cleared>0 -> sfx mode == SFX_MODE_SHAKE and end_frame == frame+140; (16) ctx->cheated true after any call (ADR-073); (17) message == "Cheating, skip level ..."; (18) direct-API regression: seed a small required-only grid, call game_rules_skip_level, drive block_system_update_explosions to finalize, assert block_system_still_active == 0. Use the existing test fixtures/helpers where they exist (savegame fixture or game_create) rather than hand-building game_ctx.'
+    - Register via the existing CMake macros (xboing_add_unit_test / xboing_add_integration_test). cmake --preset debug && cmake --build build; ctest --test-dir build -R 'block_system|game_rules' green; full suite still green; make asan-test green (ASan+UBSan clean). Only the write-set files change.
+budget:
+    rounds: 2
+    reflection_after_each: true
+current_round: 1
+context: |-
+    Coverage for the m-2026-07-17-006 skip-level-cheat refactor: unit tests for the pure predicate
+    block_system_type_is_required and the encapsulated sweep block_system_explode_all_required, plus
+    orchestrator + cheat->completion regression for game_rules_skip_level. gjm enumerated these 18
+    cases in the m-006 impl review. Design: docs/specs/2026-07-16-debug-skip-cheat-design.md.

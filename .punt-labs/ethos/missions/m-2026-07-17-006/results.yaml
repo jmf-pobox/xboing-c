@@ -1,0 +1,34 @@
+results:
+    - mission: m-2026-07-17-006
+      round: 1
+      created_at: "2026-07-17T03:17:18Z"
+      author: jdc
+      verdict: pass
+      confidence: 0.92
+      files_changed:
+        - path: include/block_system.h
+          added: 0
+          removed: 0
+        - path: src/block_system.c
+          added: 0
+          removed: 0
+        - path: include/game_rules.h
+          added: 0
+          removed: 0
+        - path: src/game_rules.c
+          added: 0
+          removed: 0
+        - path: docs/DESIGN.md
+          added: 0
+          removed: 0
+      evidence:
+        - name: 'block_system_explode_all_required(ctx, frame) added — single grid-sweep site, returns armed count, pure block-grid (no audio/sfx/score/ctx dep). Encapsulation: grid iteration lives only in block_system.'
+          status: pass
+        - name: 'game_rules_skip_level reduced to thin orchestrator: calls explode_all_required, then audio/sfx/cheated/message. Zero grid knowledge (no MAX_ROW loop, no per-cell is_occupied/get_type/explode). Comment cites original for behavior only.'
+          status: pass
+        - name: block_system_type_is_required is single source of truth for still_active + the sweep; still_active redundant classification comment removed. game_input.c confirmed dispatch-only.
+          status: pass
+        - name: ADR-074 added (explosion-timer >= fix + cheat extraction, framed as our structure); ADR-072 'same exemption list' corrected to name ROAMER_BLK divergence.
+          status: pass
+        - name: cmake debug zero-warning (-Werror -Wconversion -Wshadow); ctest debug 61/61; ctest asan 61/61 ASan+UBSan clean; markdownlint clean; cppcheck no new findings. Existing test_keybindings/test_game_rules pass UNCHANGED (behavior preserved).
+          status: pass

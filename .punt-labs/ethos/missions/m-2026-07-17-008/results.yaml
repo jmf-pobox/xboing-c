@@ -1,0 +1,27 @@
+results:
+    - mission: m-2026-07-17-008
+      round: 1
+      created_at: "2026-07-17T03:36:25Z"
+      author: gjm
+      verdict: pass
+      confidence: 0.9
+      files_changed:
+        - path: tests/test_block_system.c
+          added: 0
+          removed: 0
+        - path: tests/test_game_rules.c
+          added: 0
+          removed: 0
+      evidence:
+        - name: 'predicate block_system_type_is_required (12 cases): 8 required nonzero; 19 specials 0; RANDOM/DYNAMITE/BLACKHIT nonzero; out-of-range nonzero; still_active agreement. NONE/KILL pinned to ACTUAL value (1) with defect comment.'
+          status: pass
+        - name: 'sweep block_system_explode_all_required (6 cases): NULL->0, empty->0, non-required-only->0 no explode, mixed->N + exploding/slide asserts, re-entry->0, full-grid count.'
+          status: pass
+        - name: 'orchestrator game_rules_skip_level (6 cases): NULL no crash; zero-cleared still shakes+cheated+message but no ''touch'' (verified via sdl2_audio_log spy); shake mode+expiry via sfx_system_update; cheated (ADR-073); message; direct-API cheat->still_active drains to 0.'
+          status: pass
+        - name: ctest debug 61 active green; ctest asan 61 green ASan+UBSan clean; cppcheck-tests clean on both files.
+          status: pass
+        - name: 'DEFECT FOUND (out of write-set, flagged): block_system_type_is_required(NONE_BLK/-2, KILL_BLK/-1) returns 1, contradicting include/block_system.h:460-465 (documents 0). switch lacks NONE/KILL cases -> default: return 1. Unreachable in prod (predicate only called under bp->occupied) but a header-vs-impl contract violation. TC-52 pins actual (1) with a flip-to-assert_false note for the fix.'
+          status: pass
+        - name: 'Adaptations: case15 sfx end_frame verified via sfx_system_update expiry (no getter); case14 ''touch''-not-played verified via sdl2_audio_log snapshot spy.'
+          status: pass

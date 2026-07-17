@@ -1,0 +1,28 @@
+mission_id: m-2026-07-17-005
+status: closed
+type: design
+created_at: "2026-07-17T02:46:17Z"
+updated_at: "2026-07-17T02:55:51Z"
+closed_at: "2026-07-17T02:55:51Z"
+leader: claude
+worker: jdc
+evaluator:
+    handle: jck
+    pinned_at: "2026-07-17T02:46:17Z"
+    hash: 40cbe1204f644c77e6a26757a9b855e3298be267025e806d425bfdea99054f18
+inputs: {}
+write_set:
+    - docs/specs/2026-07-16-debug-skip-cheat-design.md
+success_criteria:
+    - 'Assess the current cheat implementation (src/game_input.c:243-341): ~80 lines of gameplay logic (nested MAX_ROW×MAX_COL loop + block-type switch + score-via-explode + single "touch" sound + screen shake + cheated-flag + message) inlined inside game_input_global''s DEBUG_SKIP handler. Confirm the smell: input dispatch should DETECT the key and DELEGATE, not host level-mutation logic. The original keeps this in the game/block layer: SkipToNextLevel (original/blocks.c:2409- 2462), called from the game logic, not the key dispatcher.'
+    - 'Design the clean structure. Proposed (refine or reject with reasons): (a) Extract the cheat body into a named function in the LEVEL/RULES layer — game_rules_skip_level(game_ctx_t *ctx, int frame) in src/game_rules.c (include/game_rules.h) — the modern analog of SkipToNextLevel. It explodes every required block via block_system_explode, plays one "touch", sets SFX_MODE_SHAKE to frame+140, sets ctx->cheated, and posts the message. game_input_global''s handler shrinks to: shift-held → volume up; GAME && debug_mode → game_rules_skip_level(ctx, frame); GAME && !debug → "Stop trying to cheat!!". (b) Single source of truth for the required-block classification: add block_system_type_is_required(int block_type) (or equivalent) to block_system, and route BOTH the cheat''s explode-selection AND block_system_still_active''s counting through it — so the two can never diverge. Verify against the original whether StillActiveBlocks (blocks.c:2482+) and SkipToNextLevel (blocks.c:2409+) key off the SAME block classification (inverse sets); the port should mirror that. CRITICAL faithfulness check: does the required set include RANDOM_BLK and any other type still_active currently counts via its `default` branch? The cheat''s current explicit list (RED/BLUE/GREEN/TAN/YELLOW/PURPLE/COUNTER/DROP) may under-cover what still_active treats as required — the shared predicate must resolve this exactly as the original does.'
+    - 'Decide and justify: should the skip run synchronously on the input path (game_input calls game_rules_skip_level directly, relying on the ADR-070 >= explosion-timer fix for frame robustness) OR be deferred to the next mode_game_update tick (game_input sets an edge flag, the tick consumes it and calls game_rules_skip_level with the tick''s frame, eliminating the input-vs-tick frame skew at the source)? Weigh simplicity vs architectural correctness (gameplay mutations belonging in the tick). Recommend one. Note the >= timer fix (m-2026-07-17- 004, block_system.c:574 == -> >=) is independently correct/kept either way.'
+    - 'Output: docs/specs/2026-07-16-debug-skip-cheat-design.md — problem statement, the chosen clean structure (function signatures, which module owns what, the shared predicate), the input-path- vs-tick decision with rationale, the exact required-block set with original citations, and a short migration note (what moves out of game_input.c, what''s added to game_rules.c/block_system). Markdownlint-clean. jck gates faithfulness (SkipToNextLevel structure + block classification + score/sound/shake preserved). No production code changes in this mission — design only.'
+budget:
+    rounds: 2
+    reflection_after_each: true
+current_round: 1
+context: |
+    The just-merged = / -debug skip-level cheat (PR #194) has a level-progression bug AND a
+    design-cleanliness concern the maintainer raised: "this type of -debug = logic can easily get
+    hacky; it should be simple and clean." Produce a clean design before re-implementing.
