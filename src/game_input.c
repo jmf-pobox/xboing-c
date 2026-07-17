@@ -18,7 +18,6 @@
 #include <SDL2/SDL.h>
 
 #include "ball_system.h"
-#include "block_sound.h"
 #include "block_system.h"
 #include "dialogue_system.h"
 #include "editor_system.h"
@@ -277,6 +276,7 @@ void game_input_global(game_ctx_t *ctx)
                  * block_system_still_active() only reads 0 after that, so
                  * game_rules_check completes the level on the normal
                  * per-tick path -- no state is forced here. */
+                bool cleared = false;
                 for (int row = 0; row < MAX_ROW; row++)
                 {
                     for (int col = 0; col < MAX_COL; col++)
@@ -297,28 +297,24 @@ void game_input_global(game_ctx_t *ctx)
                             case DROP_BLK:
                                 if (block_system_explode(ctx->block, row, col, frame) ==
                                     BLOCK_SYS_OK)
-                                {
-                                    /* PlaySoundForBlock (blocks.c:1868) fires at
-                                     * kill time, not at finalize time --
-                                     * game_callbacks_on_block_finalize does not
-                                     * play sound (it only fires on the ball/gun
-                                     * hit paths, via play_block_hit_sound at hit
-                                     * time). Replicate it here so each exploded
-                                     * block still sounds. */
-                                    if (ctx->audio)
-                                    {
-                                        block_sound_t s = block_sound_lookup(block_type);
-                                        if (s.name)
-                                            sdl2_audio_play_at_percent(ctx->audio, s.name,
-                                                                       s.volume);
-                                    }
-                                }
+                                    cleared = true;
                                 break;
                             default:
                                 break;
                         }
                     }
                 }
+
+                /* PlaySoundForBlock (blocks.c:1868) fires once per block at
+                 * kill time in the original. Cheating on level 1 explodes
+                 * ~44 required blocks in one tick; every required block
+                 * type maps to the same "touch" sound (block_sound.c:26),
+                 * so replaying it per-block saturates the 16-channel
+                 * SDL_mixer (sdl2_audio.c:248) and spams "no free channel".
+                 * A single play here is audibly identical to the original's
+                 * burst -- modern-mixer adaptation, not a behavior change. */
+                if (cleared && ctx->audio)
+                    sdl2_audio_play_at_percent(ctx->audio, "touch", 99);
 
                 /* Screen shake during the explosion wave --
                  * original/blocks.c:2460-2461 (SetSfxEndFrame(frame+140);

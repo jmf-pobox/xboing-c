@@ -1,0 +1,31 @@
+mission_id: m-2026-07-16-017
+status: closed
+type: implement
+created_at: "2026-07-16T23:53:46Z"
+updated_at: "2026-07-17T00:01:04Z"
+closed_at: "2026-07-17T00:01:04Z"
+leader: claude
+worker: jdc
+evaluator:
+    handle: jck
+    pinned_at: "2026-07-16T23:53:46Z"
+    hash: 40cbe1204f644c77e6a26757a9b855e3298be267025e806d425bfdea99054f18
+inputs: {}
+write_set:
+    - src/game_input.c
+    - docs/DESIGN.md
+success_criteria:
+    - 'Fix the audio-channel exhaustion / log spam introduced by the = debug skip-level cheat (mission m-2026-07-16-015). Maintainer observed ~28 "WARN: sdl2_audio: no free channel for ''touch''" at one instant when cheating on level 1: the cheat explodes ~44 required blocks and plays each block''s sound inline (block_sound_lookup + sdl2_audio_play_at_percent per block). All required blocks (RED/BLUE/GREEN/TAN/YELLOW/PURPLE/COUNTER/DROP) map to the SAME sound "touch" (src/block_sound.c), so 44 simultaneous identical plays saturate the 16-channel mixer (sdl2_audio.c:248 channels=16) -> ~28 dropped-play warnings.'
+    - 'Change the cheat (src/game_input.c DEBUG_SKIP debug-mode branch) to play the block-clear sound ONCE for the whole sweep instead of once per block — mirroring the single screen-shake that already sits outside the per-block loop. Remove the per-block block_sound_lookup + play from the explode loop; after the loop, if at least one required block was exploded, play "touch" once via sdl2_audio_play_at_percent(ctx->audio, "touch", 99) (guarded on ctx->audio). Rationale: every cleared required block is "touch", so 44 simultaneous plays are audibly indistinguishable from one; a single play is faithful in effect and eliminates the mixer saturation + warning spam. Keep the explosion (block_system_explode -> animation + finalize scoring), the screen shake, and the "Cheating, skip level ..." message unchanged.'
+    - 'Track whether any block was exploded (e.g. a bool set when block_system_explode returns BLOCK_SYS_OK) so the single "touch" only plays when the cheat actually cleared something (matches: no blocks -> no sound). Do NOT change the non-debug "Stop trying to cheat!!" path, the Shift-> volume path, or the keymap.'
+    - 'Update ADR-072 in docs/DESIGN.md: the per-block explosion sound is collapsed to a single block-clear "touch" for the cheat sweep (the modern 16-channel SDL_mixer can''t play ~44 simultaneous identical sounds without channel exhaustion; audibly identical to the original''s per-block PlaySoundForBlock burst since all required blocks share the "touch" sound). Note this is a modern-mixer adaptation, faithful in effect. jck (author) rules.'
+    - cmake --preset debug && cmake --build build zero-warning -Werror -Wconversion -Wshadow. Full ctest --test-dir build green AND make asan-test green (the keybinding tests assert block explosion + volume, not sound, so they still pass). Only src/game_input.c and docs/DESIGN.md change. Re-run the game (or the throwaway harness) and confirm cheating no longer emits the "no free channel" spam.
+budget:
+    rounds: 2
+    reflection_after_each: true
+current_round: 1
+context: |-
+    Pre-merge refinement of PR #194 / mission m-2026-07-16-015. jdc's round-2 per-block cheat sound
+    (faithful to PlaySoundForBlock) exhausts the 16-channel mixer when ~44 blocks explode at once
+    (all "touch"), spamming warnings. Collapse to a single block-clear sound for the sweep — faithful
+    in effect, matching the single screen-shake. jck gates the faithfulness of the collapse.

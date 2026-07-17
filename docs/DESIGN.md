@@ -4370,11 +4370,33 @@ not part of the committed test suite).
 `game_callbacks_on_block_finalize` does not play a sound (the
 ball/gun-hit paths already played one at hit time via
 `play_block_hit_sound`, before the finalize callback exists to fire
-for them). Because the cheat bypasses those hit-time callsites, it
-plays each exploded block's sound itself — `block_sound_lookup` +
-`sdl2_audio_play_at_percent` — inline in the cheat loop, reproducing
+for them). Because the cheat bypasses those hit-time callsites, round
+1 played each exploded block's sound inline in the cheat loop via
+`block_sound_lookup` + `sdl2_audio_play_at_percent`, reproducing
 `DrawBlock`'s `PlaySoundForBlock(blockP->blockType)`
 (`original/blocks.c:1868`) at kill time rather than finalize time.
+
+**Round 2 fix: single "touch" play instead of one play per block.**
+A level-1 playtest showed the per-block approach exploding ~44
+required blocks in a single tick. Every required block type — `RED`,
+`BLUE`, `GREEN`, `TAN`, `YELLOW`, `PURPLE`, `COUNTER`, `DROP` — maps
+to the same sound, `"touch"` (`src/block_sound.c:26`), so the loop
+issued ~44 simultaneous requests to play the identical sample. SDL2's
+`Mix_PlayChannel` has 16 mixer channels (`src/sdl2_audio.c:248`); once
+they're all occupied, further requests fail and log `"WARN:
+sdl2_audio: no free channel for 'touch'"` — a level-1 cheat produced
+~28 of these warnings. The original's X11/Nas sound path had no such
+channel ceiling, so this divergence is purely a modern-mixer artifact,
+not a game-logic bug. Since all ~44 requests were for the *same*
+sample, playing it once per sweep instead of once per block is
+audibly indistinguishable — a human ear cannot separate 44
+simultaneous copies of one 100ms sample from one copy, and the mixer
+would silently drop most of them anyway. `game_input.c` now tracks
+whether any block exploded (`bool cleared`) and, once the loop exits,
+plays `"touch"` at volume 99 exactly once — `sdl2_audio_play_at_percent(ctx->audio,
+"touch", 99)` — guarded on `ctx->audio`, before the screen shake is
+armed. This is a modern-mixer adaptation, not a design change: score,
+animation, and shake timing are all unchanged from round 1.
 
 The screen shake is set once after the loop, guarded on `ctx->sfx`:
 `sfx_system_set_mode(ctx->sfx, SFX_MODE_SHAKE)` +
