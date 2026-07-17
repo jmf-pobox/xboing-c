@@ -83,7 +83,8 @@ bool sdl2_renderer_is_fullscreen(const sdl2_renderer_t *ctx);
 /*
  * Minimize (iconify) the game window.  The SDL2 equivalent of the
  * original's XIconifyWindow (original/main.c:856, from the XK_i/XK_I
- * case at :853-855) — used by the I key.  No-op if ctx is NULL.
+ * case at :853-855) — used by the I key.  No-op if ctx or its
+ * window is NULL (consistent with the other renderer window APIs).
  */
 void sdl2_renderer_minimize(sdl2_renderer_t *ctx);
 

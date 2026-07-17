@@ -2,7 +2,10 @@
  * game_input.h -- Input dispatch for the SDL2 game.
  *
  * Translates sdl2_input action queries into game module calls.
- * Called once per frame from the event loop.
+ * Two entry points with different cadences: game_input_global() runs
+ * once per visual frame (edge-triggered keys), game_input_update()
+ * runs per fixed-timestep tick (held-key / per-tick gameplay input).
+ * See each prototype below.
  */
 
 #ifndef GAME_INPUT_H
@@ -30,7 +33,7 @@ void game_input_update(game_ctx_t *ctx);
  * Process mode-independent (global) input for the current frame.
  *
  * Handles mode-independent keys: SFX toggle (S), volume (+/-),
- * fullscreen toggle (I), control toggle (G), quit (Q).  Speed keys
+ * minimize/iconify (I), control toggle (G), quit (Q).  Speed keys
  * (1-9) are attract-mode only per original handleSpeedKeys scope.
  * Mirrors original/main.c handleMiscKeys + handleSpeedKeys.
  *
