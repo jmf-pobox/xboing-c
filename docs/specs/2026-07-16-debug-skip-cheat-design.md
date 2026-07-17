@@ -48,9 +48,12 @@ in `block_system`.
 /*
  * Return nonzero if block_type must be cleared for the level to
  * complete: RED, BLUE, GREEN, TAN, YELLOW, PURPLE, COUNTER, DROP.
- * 0 for every other value (NONE, KILL, the 19 non-required specials,
- * out-of-range). Single source of truth: block_system_still_active()
- * and block_system_explode_all_required() both consult it, so the
+ * Return 0 for NONE, KILL, and the 19 non-required specials. Every
+ * other value -- RANDOM/DYNAMITE/BLACKHIT and any out-of-range int --
+ * falls through to the default-required case and returns nonzero,
+ * matching the original's `default: return True`. Single source of
+ * truth: block_system_still_active() and
+ * block_system_explode_all_required() both consult it, so the
  * completion check and the cheat's kill-set can never disagree.
  */
 int block_system_type_is_required(int block_type);
@@ -133,8 +136,12 @@ never knows *how*.
 
 ## Required-block set
 
-`block_system_type_is_required` returns nonzero for exactly these 8
-types and 0 for everything else:
+`block_system_type_is_required` returns nonzero for these 8 types.
+It returns 0 for `NONE_BLK`, `KILL_BLK`, and the 19 non-required
+specials; every other value (`RANDOM_BLK`, `DYNAMITE_BLK`,
+`BLACKHIT_BLK`, and any out-of-range int) falls through to the
+default-required case and returns nonzero, matching the original's
+`default: return True` (`original/blocks.c:2506-2533`):
 
 | Required | Value |
 |---|---|
@@ -191,8 +198,9 @@ separate, repo-wide decision.
 Each layer is checkable at its cheapest level:
 
 1. `block_system_type_is_required` — pure function. Unit test every
-   block type (all required return nonzero; all 19 specials + `NONE` +
-   `KILL` + out-of-range return 0).
+   block type: the 8 required return nonzero; `NONE`, `KILL`, and the
+   19 specials return 0; `RANDOM`/`DYNAMITE`/`BLACKHIT` and
+   out-of-range values return nonzero via the default-required case.
 2. `block_system_explode_all_required` — unit test against a bare
    `block_system_t`: seed a grid mixing required + non-required +
    empty cells, call it, assert exactly the required cells are
