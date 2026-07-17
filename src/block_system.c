@@ -569,9 +569,22 @@ void block_system_update_explosions(block_system_t *ctx, int frame, block_system
         {
             block_entry_t *bp = &ctx->blocks[r][c];
 
-            /* exploding flag is the canonical guard.  Match the equality
-             * check at original/blocks.c:1502 (NOT >=). */
-            if (!bp->exploding || bp->explode_next_frame != frame)
+            /* exploding flag is the canonical guard.  original/blocks.c:1502
+             * used exact equality because arm and check happened in the same
+             * consistent-frame tick.  This port arms explosions from two
+             * paths: ball hits inside mode_game_update (same frame the
+             * check below runs), and the `=` debug skip-level cheat from
+             * game_input_global, which reads frame ONCE per visual frame
+             * BEFORE the per-tick update runs -- by the time this check
+             * executes, frame has already advanced past explode_next_frame,
+             * so `==` would strand the block exploding forever.  `>=`
+             * matches the fixed-timestep convention used for the
+             * roamer/drop/random movement timers (ADR-070) and the
+             * ball_system timers: due-or-past, not exact.  Each call still
+             * advances at most one stage (explode_slide++ then
+             * explode_next_frame += BLOCK_EXPLODE_DELAY), so ball-hit
+             * explosions animate/score identically to before. */
+            if (!bp->exploding || frame < bp->explode_next_frame)
             {
                 continue;
             }

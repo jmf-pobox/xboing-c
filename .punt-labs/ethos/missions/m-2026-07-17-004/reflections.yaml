@@ -1,0 +1,12 @@
+reflections:
+    - round: 1
+      created_at: "2026-07-17T02:55:08Z"
+      author: jck
+      converging: true
+      signals:
+        - Root cause verified vs original/blocks.c:1502 (== safe in 1996 consistent-frame loop) and game_input.c:298 (modern cheat arms from input path, a frame the per-tick loop has passed). == strands cheat-armed explosions; >= is the forced correct adaptation.
+        - 'Ball-hit (same-tick arm+check) explosions unaffected: frame>=next and frame==next are boolean-identical when arm/check coincide. Finalize path (clear_entry + score callback) untouched.'
+        - 'No double-advance/double-score: each update_explosions call advances exactly one stage per outer-loop iteration regardless of gate.'
+        - Comment keeps original/blocks.c:1502 provenance and explains two-arming-paths why. 4-stage animation + blocks_exploding bookkeeping preserved.
+      recommendation: stop
+      reason: Faithful, narrow adaptation of the accepted ==->>= movement-timer pattern; preserves ball-hit fidelity bit-for-bit and closes the level-progression regression. APPROVED.
