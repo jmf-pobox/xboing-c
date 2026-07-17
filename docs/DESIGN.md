@@ -4420,3 +4420,83 @@ ticks later, same as beating the level legitimately (no bonus
 multiplier is skipped or awarded specially — the existing
 bonus-screen logic runs unmodified). Shift+`=` and numpad `+` both
 remain volume-up; `-`/numpad `-` remain volume-down, untouched.
+
+## ADR-073: Using the `=` skip-level cheat disqualifies the session from ALL high-score boards
+
+**Status:** Accepted (2026-07-16)
+
+ADR-072 restored the `=` debug skip-level cheat (`src/game_input.c`,
+`ctx->debug_mode` gate): it explodes every required block on the
+grid through the real explosion lifecycle, and
+`game_callbacks_on_block_finalize` awards each block's `hit_points`
+via `score_system_add` exactly as a legitimate kill would
+(`original/blocks.c:1543-1548`). Nothing in ADR-072 stopped a
+cheated score from reaching either high-score board — Cursor's
+review of PR #194 flagged this: the cheat awards full score with
+nothing gating the personal or global table insert.
+
+**Original behavior.** `handleGameKeys` (`original/main.c:511-522`)
+posts `"Cheating, skip level ..."` and calls `SkipToNextLevel`
+unconditionally once `debug` is set — no flag records that the
+session cheated, and `EndTheGame`/`ResetHighScore`
+(`original/level.c:437-455`) apply no cheat check. A 1996 cheated
+session could rank on the *local* high-score table (there was no
+online/global table in 1996 to protect).
+
+**Decision — deliberate deviation.** This port tracks cheat use with
+a new per-session flag, `ctx->cheated`
+(`include/game_context.h`), and gates high-score submission on it:
+
+- `src/game_input.c`'s `=`-cheat branch sets `ctx->cheated = true`
+  only on the path that actually explodes blocks
+  (`ctx->debug_mode` true) — not merely because `-debug` was
+  passed, and not on the `"Stop trying to cheat!!"` no-op path.
+- `start_new_game` (`src/game_modes.c:99-196`) resets
+  `ctx->cheated = false` at the top of every new game, so a cheat
+  used in a prior session never carries forward. `start_new_game`
+  and the play-test entry point in `mode_game_enter`
+  (`src/game_modes.c:228-266`) are the only two paths that set
+  `ctx->game_active = true`; play-test never reaches
+  `submit_score` at all — `game_rules_ball_died` and
+  `game_rules_check`'s level-complete transition to
+  `SDL2ST_HIGHSCORE` are both gated `!ctx->play_test_active`
+  (`src/game_rules.c:409,419,471`) — so only `start_new_game`'s
+  reset matters for score-eligible sessions.
+- `submit_score` (`src/game_modes.c:1015-1074`) is the *only*
+  call site in `src/` for both `highscore_io_insert` (personal,
+  line ~1034) and `highscore_io_insert_global_atomic` (global,
+  atomic per-uid dedup, line ~1088) — confirmed by grep across
+  `src/`. A single guard at the top of `submit_score`,
+  `if (ctx->cheated) return 0;`, therefore blocks both boards in
+  one place: no personal insert, no personal-file write, no
+  global insert, no in-memory `hs_global` refresh. The return
+  value (`0`) matches the existing "no global board / rejected"
+  contract, so callers (`mode_highscore_enter`,
+  `src/game_modes.c:1146,1206`) fall through to the same
+  `PERSONAL`-table display and skip the `youagod` "boing master"
+  sound exactly as they already do for a rejected global insert.
+
+This mirrors the existing `ctx->savegame_restored_session` guard
+(`src/game_modes.c:1062`, ADR-057-adjacent), which disqualifies a
+loaded-save session from the *global* board only — a save file is
+user-editable but a personal-table entry is already under that same
+user's control, so it's still eligible. The cheat flag is stricter:
+using `=` also disqualifies the *personal* table, because unlike a
+save file, a cheated score was never actually earned by play in
+this session at all.
+
+**Consequences.** A cheated game still shows the score climbing on
+the HUD in real time — live-play scoring (`score_system_add`) is
+untouched; only the high-score *table* insert is blocked. The
+player sees no new high-score-table entry, no "boing master"
+prompt/sound, and the post-game display falls back to whichever
+table was already showing. The `"Words of wisdom Boing Master?"`
+dialogue prompt in `mode_highscore_enter`
+(`src/game_modes.c:1189-1206`) is gated on
+`highscore_io_would_be_global_master`,
+`!ctx->savegame_restored_session`, and `!ctx->cheated` (round 2,
+2026-07-16) — a cheated session that would otherwise rank #1
+globally never sees the wisdom prompt at all, matching the
+`!ctx->savegame_restored_session` term it sits alongside, so there's
+no dialogue whose answer `submit_score` would then silently
+discard.

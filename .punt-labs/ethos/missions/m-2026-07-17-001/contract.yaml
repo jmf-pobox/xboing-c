@@ -1,0 +1,35 @@
+mission_id: m-2026-07-17-001
+status: closed
+type: implement
+created_at: "2026-07-17T01:06:24Z"
+updated_at: "2026-07-17T01:50:34Z"
+closed_at: "2026-07-17T01:50:34Z"
+leader: claude
+worker: jdc
+evaluator:
+    handle: jck
+    pinned_at: "2026-07-17T01:06:24Z"
+    hash: 40cbe1204f644c77e6a26757a9b855e3298be267025e806d425bfdea99054f18
+inputs: {}
+write_set:
+    - include/game_context.h
+    - src/game_input.c
+    - src/game_modes.c
+    - docs/DESIGN.md
+success_criteria:
+    - 'Address Cursor''s Medium finding on PR #194: the = debug skip-level cheat awards full score, and nothing stops a cheated session from entering the high-score boards. Maintainer''s decision: using the cheat disqualifies the session from BOTH the personal (local) AND global high-score boards. This is a DELIBERATE DEVIATION from the 1996 original (which allowed cheated scores into the local high-score table) — jck gates it and it gets an ADR.'
+    - 'Add a session cheated flag: `bool cheated;` in include/game_context.h (near game_active/debug_mode). Set it to true in src/game_input.c in the = cheat branch (the ctx->debug_mode path that explodes the required blocks) — set once the cheat actually runs (alongside the "Cheating, skip level ..." message). It represents "the player used a cheat this game", NOT merely "-debug was passed" (running -debug without ever pressing = must NOT disqualify).'
+    - 'Reset the flag at the start of every new game: set ctx->cheated = false in start_new_game (src/game_modes.c:99) so each fresh game starts clean. Verify no other game-start path leaves it stale (mode_game_enter / start_new_game are the entry points).'
+    - 'Gate submit_score (src/game_modes.c:1015): if ctx->cheated, skip the ENTIRE submission — do NOT call highscore_io_insert on hs_personal (line 1020) and do NOT call highscore_io_insert_global_atomic (line 1074). Early-return a value meaning "not submitted / no global write" (return 0 like the no-global-board path) so the downstream youagod/global-rank prompt is also skipped. This is the only path to either board, so one guard blocks both. Optionally set a brief status message (e.g. via message_system or the existing name-entry/bonus flow) indicating no high score for a cheated game — include only if it fits the existing flow cleanly; otherwise skip silently. Do NOT change scoring during play (the cheat still awards points on the live HUD — only the high-score TABLE entry is blocked).'
+    - 'ADR-073 in docs/DESIGN.md (verify latest is ADR-072; format like ADR-070/071/072): document the deliberate deviation — using the = debug skip-level cheat disqualifies the session from ALL high-score boards (personal + global), unlike the 1996 original which let cheated scores into the local table. Rationale: integrity of the personal board and the planned global/online leaderboard (maintainer decision, addresses Cursor PR #194 finding). Note the flag tracks cheat-USE, not the mere presence of -debug. Cite src/game_modes.c:1015-1074 (submit_score), original/main.c:511-522.'
+    - 'cmake --preset debug && cmake --build build zero-warning -Werror -Wconversion -Wshadow. Full ctest --test-dir build green AND make asan-test green. Only the four write_set files change. (A sibling gjm mission adds a regression test: cheated -> no personal + no global entry.)'
+budget:
+    rounds: 2
+    reflection_after_each: true
+current_round: 2
+context: |-
+    Pre-merge, PR #194. Cursor (Medium): -debug + the new = cheat can forge a global-leaderboard score.
+    Maintainer chose to block BOTH local and global high-score submission for any game where the cheat was
+    used. Deliberate deviation from the original (which had no cheat-disqualification and no global board);
+    scoped to the high-score TABLE entry only (live HUD score during play is unchanged). jck gates the
+    deviation + ADR-073.

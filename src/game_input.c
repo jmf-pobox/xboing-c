@@ -325,6 +325,12 @@ void game_input_global(game_ctx_t *ctx)
                     sfx_system_set_end_frame(ctx->sfx, frame + 140);
                 }
 
+                /* Using the cheat disqualifies this session from every
+                 * high-score board, personal and global (ADR-073) — a
+                 * deliberate deviation from the 1996 original, which let
+                 * cheated scores into the local table. */
+                ctx->cheated = true;
+
                 message_system_set(ctx->message, "Cheating, skip level ...", 1, frame);
             }
             else
