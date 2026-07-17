@@ -1,0 +1,18 @@
+reflections:
+    - round: 1
+      created_at: "2026-07-17T02:10:16Z"
+      author: jdc
+      converging: true
+      signals:
+        - 'git diff tests/test_replay.c: exactly 2 lines changed, matches contract spec byte-for-byte'
+        - '[SDL2I_VOLUME_UP] SDL_SCANCODE_EQUALS -> SDL_SCANCODE_KP_PLUS: confirmed'
+        - '[SDL2I_DEBUG_SKIP] = SDL_SCANCODE_EQUALS added: confirmed'
+        - 'Cross-checked full table (29 entries) against src/sdl2_input.c default_bindings primary scancodes: all match, no other drift (SHOOT=K, VOLUME_DOWN=MINUS, PAUSE=P, ABORT=ESCAPE, etc.)'
+        - VOLUME_DOWN secondary binding KP_MINUS in production not tracked by test table -- consistent with existing pattern (table only ever tracked primary scancodes, e.g. LEFT/RIGHT secondary J/L also untracked)
+        - 'git diff --stat: only tests/test_replay.c touched, 1 file changed'
+        - 'cmake --build build: succeeds, test_replay_smoke and test_replay_gameplay link clean'
+        - 'ctest --test-dir build -R test_replay: 2/2 passed (debug)'
+        - 'cmake --build build-asan: succeeds'
+        - 'ctest --test-dir build-asan -R test_replay: 2/2 passed (asan)'
+      recommendation: stop
+      reason: 'All three success criteria met: table synced correctly and verified against production line-by-line, no unrelated drift or scope creep, debug and asan test_replay suites both green. Mission ready to close.'
