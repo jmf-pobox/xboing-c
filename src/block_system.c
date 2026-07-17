@@ -1178,14 +1178,15 @@ int block_system_get_hit_points(const block_system_t *ctx, int row, int col)
 int block_system_type_is_required(int block_type)
 {
     /*
-     * Behavior citation: every type listed here with a bare `break` is
-     * non-required (returns 0), matching StillActiveBlocks's exemption
-     * switch (original/blocks.c:2506-2533); everything else — including
-     * RANDOM_BLK/DYNAMITE_BLK/BLACKHIT_BLK and genuinely out-of-range
-     * ints — falls to `default` and is required (returns 1), matching
-     * the original's `default: return True`.  See the header doc
-     * comment for why this one predicate is the single source of truth
-     * for both still_active() and explode_all_required().
+     * The explicit cases below return 0 (non-required); everything
+     * else — RANDOM_BLK/DYNAMITE_BLK/BLACKHIT_BLK and genuinely
+     * out-of-range ints — falls to `default` and returns 1 (required).
+     * The exempt set matches StillActiveBlocks (original/blocks.c:
+     * 2506-2533), whose equivalent switch reaches its own
+     * `default: return True` by bare `break` arms; this port returns
+     * directly instead.  See the header doc comment for why this one
+     * predicate is the single source of truth for both still_active()
+     * and explode_all_required().
      */
     switch (block_type)
     {
