@@ -4276,3 +4276,227 @@ deviation remains `PADDLE_VELOCITY` (2× too *fast*, tracked in
 `docs/audits/2026-07-13-gameplay-logic-parity.md` finding #1). This ADR
 records the auto-launch as confirmed-faithful so it is not re-opened as a
 bug.
+
+## ADR-072: `-debug` is now functional; the `=` skip-level cheat is restored
+
+**Status:** Accepted (2026-07-16)
+
+`ctx->debug_mode` was set from the parsed `-debug` CLI flag
+(`src/game_init.c:322`) but never read anywhere — the flag was
+inert. The original's debug-gated cheat key, `=` (`XK_equal`,
+`original/main.c:511-522`), was never ported, so there was nothing
+for the flag to gate.
+
+**Original behavior.** `handleGameKeys` treats `XK_equal` as a cheat
+key: when the global `debug` flag is set, it calls
+`SkipToNextLevel` (`original/blocks.c:2409-2462`) and posts
+`"Cheating, skip level ..."`; otherwise it posts
+`"Stop trying to cheat!!"` and does nothing
+(`original/main.c:511-522`). `SkipToNextLevel` walks the block grid
+and, for every occupied block *except* the special/bonus/indestructible
+types (`BONUSX2`, `TIMER`, `BONUSX4`, `BONUS`, `BLACK`, `BULLET`,
+`MAXAMMO`, `BOMB`, `DEATH`, `REVERSE`, `HYPERSPACE`, `EXTRABALL`,
+`MGUN`, `WALLOFF`, `MULTIBALL`, `STICKY`, `PAD_SHRINK`,
+`PAD_EXPAND` — the same exemption list `StillActiveBlocks`,
+`original/blocks.c:2482-2541`, checks to decide whether the level is
+done), calls `DrawBlock(display, window, r, c, KILL_BLK)`
+(`original/blocks.c:2450`). `DrawBlock`'s `KILL_BLK` case
+(`original/blocks.c:1867-1871`) is not a silent removal: it calls
+`PlaySoundForBlock(blockP->blockType)` immediately, then
+`SetBlockUpForExplosion(row, col, frame)`, which arms the *same*
+explosion lifecycle a ball or bullet hit would arm. Every tick,
+`ExplodeBlocksPending` (`original/blocks.c:1480`) advances that
+lifecycle, and on each block's final animation frame
+(`original/blocks.c:1543-1548`) calls
+`AddToScore((u_long)blockP->hitPoints)` followed by `DisplayScore`.
+**The cheat therefore awards full score for every required block it
+kills, plays each block's explosion sound at kill time, runs the
+explosion animation, and — separately —
+shakes the screen** (`SetSfxEndFrame(frame + 140);
+changeSfxMode(SFX_SHAKE)`, `original/blocks.c:2460-2461`) once for
+the whole sweep. Only after `ExplodeBlocksPending` finalizes the last
+required block does `StillActiveBlocks` read false and the normal
+level-complete path fire. Round 1 of this ADR claimed the cheat
+"awards no score" — that was wrong; the score IS awarded, just
+deferred to each block's finalize frame like any other kill.
+Separately, `handleMiscKeys` treats `XK_plus`/`XK_KP_Add` as
+volume-up and `XK_minus`/`XK_KP_Subtract` as volume-down
+(`original/main.c:820-846`); `keys.c:195`'s help screen already
+labels this pair `+`/`-`, unchanged by this ADR.
+
+**The SDL scancode problem.** `XK_equal` and `XK_plus` are the same
+physical key with and without Shift — X11's keysym layer resolves
+them separately, but `SDL_Scancode` does not; `SDL_SCANCODE_EQUALS`
+fires for both. The existing binding
+`[SDL2I_VOLUME_UP] = {SDL_SCANCODE_EQUALS, SDL_SCANCODE_KP_PLUS}`
+silently treated every unshifted `=` as volume-up, which is why the
+cheat could not be ported as a second binding on the same scancode
+without a shift check.
+
+**Decision.** Add `SDL2I_DEBUG_SKIP` bound to
+`SDL_SCANCODE_EQUALS` only; `SDL2I_VOLUME_UP` keeps
+`SDL_SCANCODE_KP_PLUS` (numpad `+`, unambiguous, still fires
+volume-up unshifted). `game_input_global` branches on
+`sdl2_input_shift_held()`: Shift held routes to the existing
+volume-up path (`sdl2_audio_volume_up` + `"Maximum volume: N%%"`,
+matching `original/main.c:822`); unshifted, in `SDL2ST_GAME`, is the
+cheat — gated on `ctx->debug_mode`, posting the same two original
+messages verbatim.
+
+The skip mechanism routes each occupied "required" block
+(`RED_BLK`..`PURPLE_BLK`, `COUNTER_BLK`, `DROP_BLK` — precisely the
+set `block_system_still_active`, `src/block_system.c:1165-1174`,
+checks, itself a faithful port of `StillActiveBlocks`) through
+`block_system_explode(ctx->block, row, col, frame)` — the *same*
+explosion-arming call the ball-hit and gun-hit paths use
+(`game_callbacks.c` default case in `on_block_hit`,
+`gun_cb_on_block_hit`) — rather than the earlier round's
+`block_system_clear`, which silently deleted the block with none of
+`SkipToNextLevel`'s observable effects. `block_system_explode` only
+arms the explosion; `block_system_update_explosions`, called once
+per tick from `game_modes.c:331-332` exactly as it is for ordinary
+kills, advances the animation and — on each block's last stage —
+fires `game_callbacks_on_block_finalize`, which calls
+`score_system_add(ctx->score, (unsigned long)hit_points, ...)`. This
+reproduces `AddToScore` at the same deferred timing as
+`ExplodeBlocksPending` (`original/blocks.c:1543-1548`): a level-1
+playtest against 63 required blocks showed the score unchanged
+immediately after the cheat fires, then up **8550 points** after 30
+ticks of finalize processing, once every block's explosion completes
+(verified with an ad hoc throwaway harness driving `game_create` +
+`game_input_global` + `block_system_update_explosions` directly;
+not part of the committed test suite).
+
+`game_callbacks_on_block_finalize` does not play a sound (the
+ball/gun-hit paths already played one at hit time via
+`play_block_hit_sound`, before the finalize callback exists to fire
+for them). Because the cheat bypasses those hit-time callsites, round
+1 played each exploded block's sound inline in the cheat loop via
+`block_sound_lookup` + `sdl2_audio_play_at_percent`, reproducing
+`DrawBlock`'s `PlaySoundForBlock(blockP->blockType)`
+(`original/blocks.c:1868`) at kill time rather than finalize time.
+
+**Round 2 fix: single "touch" play instead of one play per block.**
+A level-1 playtest showed the per-block approach exploding ~44
+required blocks in a single tick. Every required block type — `RED`,
+`BLUE`, `GREEN`, `TAN`, `YELLOW`, `PURPLE`, `COUNTER`, `DROP` — maps
+to the same sound, `"touch"` (`src/block_sound.c:26`), so the loop
+issued ~44 simultaneous requests to play the identical sample. SDL2's
+`Mix_PlayChannel` has 16 mixer channels (`src/sdl2_audio.c:248`); once
+they're all occupied, further requests fail and log `"WARN:
+sdl2_audio: no free channel for 'touch'"` — a level-1 cheat produced
+~28 of these warnings. The original's X11/Nas sound path had no such
+channel ceiling, so this divergence is purely a modern-mixer artifact,
+not a game-logic bug. Since all ~44 requests were for the *same*
+sample, playing it once per sweep instead of once per block is
+audibly indistinguishable — a human ear cannot separate 44
+simultaneous copies of one 100ms sample from one copy, and the mixer
+would silently drop most of them anyway. `game_input.c` now tracks
+whether any block exploded (`bool cleared`) and, once the loop exits,
+plays `"touch"` at volume 99 exactly once — `sdl2_audio_play_at_percent(ctx->audio,
+"touch", 99)` — guarded on `ctx->audio`, before the screen shake is
+armed. This is a modern-mixer adaptation, not a design change: score,
+animation, and shake timing are all unchanged from round 1.
+
+The screen shake is set once after the loop, guarded on `ctx->sfx`:
+`sfx_system_set_mode(ctx->sfx, SFX_MODE_SHAKE)` +
+`sfx_system_set_end_frame(ctx->sfx, frame + 140)`, matching
+`SetSfxEndFrame(frame + 140); changeSfxMode(SFX_SHAKE)`
+(`original/blocks.c:2460-2461`) — a single shake for the whole sweep,
+not one per block.
+
+No state transition is forced. `game_rules_check`
+(`src/game_rules.c:463-483`) sees `still_active() == 0` only once
+every required block's explosion has finalized, and takes the normal
+completion path (bonus screen) on that later tick — exactly as an
+ordinary level clear would.
+
+**Consequences.** `-debug` now does something: without it, `=` in
+`SDL2ST_GAME` only posts "Stop trying to cheat!!"; with it, `=`
+explodes the level's required blocks — sound, animation, and a
+screen shake — awards their combined `hit_points` as score once the
+explosions finalize, and the game proceeds to the bonus screen a few
+ticks later, same as beating the level legitimately (no bonus
+multiplier is skipped or awarded specially — the existing
+bonus-screen logic runs unmodified). Shift+`=` and numpad `+` both
+remain volume-up; `-`/numpad `-` remain volume-down, untouched.
+
+## ADR-073: Using the `=` skip-level cheat disqualifies the session from ALL high-score boards
+
+**Status:** Accepted (2026-07-16)
+
+ADR-072 restored the `=` debug skip-level cheat (`src/game_input.c`,
+`ctx->debug_mode` gate): it explodes every required block on the
+grid through the real explosion lifecycle, and
+`game_callbacks_on_block_finalize` awards each block's `hit_points`
+via `score_system_add` exactly as a legitimate kill would
+(`original/blocks.c:1543-1548`). Nothing in ADR-072 stopped a
+cheated score from reaching either high-score board — Cursor's
+review of PR #194 flagged this: the cheat awards full score with
+nothing gating the personal or global table insert.
+
+**Original behavior.** `handleGameKeys` (`original/main.c:511-522`)
+posts `"Cheating, skip level ..."` and calls `SkipToNextLevel`
+unconditionally once `debug` is set — no flag records that the
+session cheated, and `EndTheGame`/`ResetHighScore`
+(`original/level.c:437-455`) apply no cheat check. A 1996 cheated
+session could rank on the *local* high-score table (there was no
+online/global table in 1996 to protect).
+
+**Decision — deliberate deviation.** This port tracks cheat use with
+a new per-session flag, `ctx->cheated`
+(`include/game_context.h`), and gates high-score submission on it:
+
+- `src/game_input.c`'s `=`-cheat branch sets `ctx->cheated = true`
+  only on the path that actually explodes blocks
+  (`ctx->debug_mode` true) — not merely because `-debug` was
+  passed, and not on the `"Stop trying to cheat!!"` no-op path.
+- `start_new_game` (`src/game_modes.c:99-196`) resets
+  `ctx->cheated = false` at the top of every new game, so a cheat
+  used in a prior session never carries forward. `start_new_game`
+  and the play-test entry point in `mode_game_enter`
+  (`src/game_modes.c:228-266`) are the only two paths that set
+  `ctx->game_active = true`; play-test never reaches
+  `submit_score` at all — `game_rules_ball_died` and
+  `game_rules_check`'s level-complete transition to
+  `SDL2ST_HIGHSCORE` are both gated `!ctx->play_test_active`
+  (`src/game_rules.c:409,419,471`) — so only `start_new_game`'s
+  reset matters for score-eligible sessions.
+- `submit_score` (`src/game_modes.c:1015-1074`) is the *only*
+  call site in `src/` for both `highscore_io_insert` (personal,
+  line ~1034) and `highscore_io_insert_global_atomic` (global,
+  atomic per-uid dedup, line ~1088) — confirmed by grep across
+  `src/`. A single guard at the top of `submit_score`,
+  `if (ctx->cheated) return 0;`, therefore blocks both boards in
+  one place: no personal insert, no personal-file write, no
+  global insert, no in-memory `hs_global` refresh. The return
+  value (`0`) matches the existing "no global board / rejected"
+  contract, so callers (`mode_highscore_enter`,
+  `src/game_modes.c:1146,1206`) fall through to the same
+  `PERSONAL`-table display and skip the `youagod` "boing master"
+  sound exactly as they already do for a rejected global insert.
+
+This mirrors the existing `ctx->savegame_restored_session` guard
+(`src/game_modes.c:1062`, ADR-057-adjacent), which disqualifies a
+loaded-save session from the *global* board only — a save file is
+user-editable but a personal-table entry is already under that same
+user's control, so it's still eligible. The cheat flag is stricter:
+using `=` also disqualifies the *personal* table, because unlike a
+save file, a cheated score was never actually earned by play in
+this session at all.
+
+**Consequences.** A cheated game still shows the score climbing on
+the HUD in real time — live-play scoring (`score_system_add`) is
+untouched; only the high-score *table* insert is blocked. The
+player sees no new high-score-table entry, no "boing master"
+prompt/sound, and the post-game display falls back to whichever
+table was already showing. The `"Words of wisdom Boing Master?"`
+dialogue prompt in `mode_highscore_enter`
+(`src/game_modes.c:1189-1206`) is gated on
+`highscore_io_would_be_global_master`,
+`!ctx->savegame_restored_session`, and `!ctx->cheated` (round 2,
+2026-07-16) — a cheated session that would otherwise rank #1
+globally never sees the wisdom prompt at all, matching the
+`!ctx->savegame_restored_session` term it sits alongside, so there's
+no dialogue whose answer `submit_score` would then silently
+discard.

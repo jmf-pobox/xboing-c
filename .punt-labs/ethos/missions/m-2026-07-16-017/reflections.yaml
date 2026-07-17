@@ -1,0 +1,13 @@
+reflections:
+    - round: 1
+      created_at: "2026-07-17T00:01:04Z"
+      author: jck
+      converging: true
+      signals:
+        - 'Correctness: per-block block_sound_lookup+play removed from explode loop; bool cleared set only on block_system_explode==BLOCK_SYS_OK; single post-loop `if (cleared && ctx->audio) sdl2_audio_play_at_percent(ctx->audio,''touch'',99)`. Explosion (animation+finalize scoring), single screen shake, and both messages byte-identical to pre-fix. block_sound.h include removed; block_sound_lookup still live elsewhere (no dead code).'
+        - 'Faithfulness PASS (author ruling): every required block (RED/GREEN/BLUE/TAN/PURPLE/YELLOW/COUNTER/DROP) resolves to the SAME {touch,99} (block_sound.c:17-26). Original PlaySoundForBlock burst = 44 simultaneous copies of ONE sample; a listener cannot distinguish that from one play, and the pre-fix 16-channel mixer (sdl2_audio.c:248) was already dropping ~28/44. Collapse to one play is faithful in effect and closer to what was actually heard. Rejected the ''keep burst, silence warning'' alternative (44x redundant contention, starves genuinely-concurrent sounds).'
+        - 'No regression: score (finalize->score_system_add), animation, and single-sweep shake untouched; cleared guard -> no sound when nothing cleared (matches original).'
+        - ADR-072 accurately documents the collapse as a modern-mixer adaptation (cites block_sound.c:26, sdl2_audio.c:248, the ~28-warning count) without overclaiming; explicitly notes score/animation/shake unchanged.
+        - 'Build/test: jdc reports zero-warning debug, ctest 61/61 debug+asan, cppcheck clean, 0 warning-spam on the level-1 harness (down from ~28) — consistent with code read (not re-run by evaluator).'
+      recommendation: stop
+      reason: Collapse of the ~44 identical 'touch' plays to one guarded post-loop play is faithful in effect (all required blocks share one sample; the pre-fix burst was already truncated at the 16-channel ceiling), fixes the mixer saturation + warning spam, and leaves score/animation/shake/messages/keymap unchanged. ADR-072 accurate. Approved.

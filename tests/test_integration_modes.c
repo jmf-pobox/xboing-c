@@ -41,6 +41,7 @@
 #include "gun_system.h"
 #include "highscore_io.h"
 #include "highscore_system.h"
+#include "paths.h"
 #include "score_system.h"
 #include "sdl2_input.h"
 #include "sdl2_renderer.h"
@@ -356,6 +357,171 @@ static void test_highscore_autoadvance_clears_game_active(void **vstate)
 }
 
 /* =========================================================================
+ * ADR-073 — the '=' debug skip-level cheat forfeits BOTH highscore boards
+ *
+ * submit_score (game_modes.c:1029) early-returns `if (ctx->cheated)` before
+ * either highscore_io_insert (personal) or highscore_io_insert_global_atomic
+ * (global) runs.  A cheated session that would otherwise post a qualifying
+ * score must not land on the personal board.
+ *
+ * These are the only tests in this file that drive a REAL submit_score
+ * insert+write (every other HIGHSCORE test either never sets
+ * game_active=true, or sets score_submitted=true to short-circuit the
+ * submission — see test_highscore_autoadvance_clears_game_active above).
+ * A real submission writes the personal table to
+ * $XDG_DATA_HOME/xboing/score-personal.json, so these two tests use their
+ * own fixture — mirroring tests/test_savegame_system.c's redirection
+ * pattern — to keep that write inside a per-test tmp dir instead of the
+ * developer's real XDG_DATA_HOME.  The shared `setup`/`teardown` above is
+ * left untouched for every other test in the file.
+ * ========================================================================= */
+
+typedef struct
+{
+    game_ctx_t *ctx;
+    char tmp_xdg[256]; /* per-test XDG_DATA_HOME so the personal-board write
+                        * lands in a tmp dir, never the real user dir */
+    char *prev_xdg;    /* heap-owned strdup of caller's prior XDG (or NULL) */
+} cheat_fixture_t;
+
+static int setup_cheat(void **vstate)
+{
+    cheat_fixture_t *f = calloc(1, sizeof(*f));
+    assert_non_null(f);
+
+    /* Preserve the caller's XDG_DATA_HOME so teardown can restore it
+     * exactly — never leak an environment change across tests in the
+     * same process. */
+    const char *existing = getenv("XDG_DATA_HOME");
+    f->prev_xdg = existing ? strdup(existing) : NULL;
+
+    /* Paths are resolved inside game_create, so XDG_DATA_HOME must be
+     * redirected BEFORE that call, not after. */
+    snprintf(f->tmp_xdg, sizeof(f->tmp_xdg), ".tmp/test_integration_modes_xdg_%d",
+             (int)getpid());
+    (void)mkdir(".tmp", 0700);
+    (void)mkdir(f->tmp_xdg, 0700);
+    setenv("XDG_DATA_HOME", f->tmp_xdg, 1);
+
+    char *argv[] = {arg_prog, NULL};
+    f->ctx = game_create(1, argv);
+    assert_non_null(f->ctx);
+    sdl2_state_transition(f->ctx->state, SDL2ST_PRESENTS);
+
+    *vstate = f;
+    return 0;
+}
+
+static int teardown_cheat(void **vstate)
+{
+    cheat_fixture_t *f = (cheat_fixture_t *)*vstate;
+
+    /* Delete any personal score file this test may have written before
+     * destroying the context (path-config still valid). */
+    char score_path[PATHS_MAX_PATH];
+    if (paths_score_file_personal(&f->ctx->paths, score_path, sizeof(score_path)) == PATHS_OK)
+        (void)unlink(score_path);
+
+    game_destroy(f->ctx);
+
+    /* Score files live at $XDG_DATA_HOME/xboing/..., so the intermediate
+     * xboing/ subdir must be removed before the parent tmp dir. */
+    char xboing_dir[300];
+    snprintf(xboing_dir, sizeof(xboing_dir), "%s/xboing", f->tmp_xdg);
+    (void)rmdir(xboing_dir);
+    (void)rmdir(f->tmp_xdg);
+
+    if (f->prev_xdg)
+    {
+        setenv("XDG_DATA_HOME", f->prev_xdg, 1);
+        free(f->prev_xdg);
+    }
+    else
+    {
+        unsetenv("XDG_DATA_HOME");
+    }
+    free(f);
+    return 0;
+}
+
+#define CHEAT_TEST_PRIOR_SCORE 1000UL
+#define CHEAT_TEST_QUALIFYING_SCORE 42000UL
+
+/* Drive the exact mode_highscore_enter seam
+ * test_highscore_autoadvance_clears_game_active uses to reach submit_score:
+ * game_active=true + score_submitted=false + a positive score triggers a
+ * real (non-deferred) submission on the SDL2ST_HIGHSCORE transition —
+ * sys_priv_global_board_active is false here (no XBOING_SCORE_FILE, not
+ * setgid), so the would-be-global-master dialogue branch is never taken
+ * and submit_score runs synchronously inline. */
+static void test_cheated_session_forfeits_highscore(void **vstate)
+{
+    cheat_fixture_t *f = (cheat_fixture_t *)*vstate;
+    game_ctx_t *ctx = f->ctx;
+
+    seed_personal_top(ctx, CHEAT_TEST_PRIOR_SCORE);
+    int prior_count = highscore_io_count(&ctx->hs_personal);
+
+    ctx->level_number = 1;
+    ctx->game_active = true;
+    ctx->score_submitted = false;
+    ctx->savegame_restored_session = false;
+    ctx->game_start = 0;
+    ctx->cheated = true;
+    score_system_set(ctx->score, CHEAT_TEST_QUALIFYING_SCORE);
+
+    sdl2_state_status_t st = sdl2_state_transition(ctx->state, SDL2ST_HIGHSCORE);
+    assert_int_equal(st, SDL2ST_OK);
+
+    /* Cheated: submit_score returned before either insert ran.  The board
+     * is byte-for-byte the seeded state — no new entry, top entry
+     * untouched.  Scan every slot directly rather than using
+     * highscore_io_get_ranking: that function computes the rank a score
+     * WOULD hold even when it was never inserted (it doesn't require
+     * presence), so it cannot tell "not on the board" from "hypothetically
+     * ranks ahead of everything on the board" — exactly the false pass
+     * this regression test must not have. */
+    assert_int_equal(highscore_io_count(&ctx->hs_personal), prior_count);
+    assert_int_equal(ctx->hs_personal.entries[0].score, CHEAT_TEST_PRIOR_SCORE);
+    for (int i = 0; i < HIGHSCORE_NUM_ENTRIES; i++)
+    {
+        assert_int_not_equal(ctx->hs_personal.entries[i].score, CHEAT_TEST_QUALIFYING_SCORE);
+    }
+}
+
+/* Positive control: identical setup with ctx->cheated cleared.  Proves the
+ * test above actually discriminates on the cheated flag rather than passing
+ * for an unrelated reason (e.g. submit_score never being reached at all). */
+static void test_uncheated_session_records_highscore(void **vstate)
+{
+    cheat_fixture_t *f = (cheat_fixture_t *)*vstate;
+    game_ctx_t *ctx = f->ctx;
+
+    seed_personal_top(ctx, CHEAT_TEST_PRIOR_SCORE);
+    int prior_count = highscore_io_count(&ctx->hs_personal);
+
+    ctx->level_number = 1;
+    ctx->game_active = true;
+    ctx->score_submitted = false;
+    ctx->savegame_restored_session = false;
+    ctx->game_start = 0;
+    ctx->cheated = false;
+    score_system_set(ctx->score, CHEAT_TEST_QUALIFYING_SCORE);
+
+    sdl2_state_status_t st = sdl2_state_transition(ctx->state, SDL2ST_HIGHSCORE);
+    assert_int_equal(st, SDL2ST_OK);
+
+    /* Uncheated: the qualifying score is really inserted into the
+     * personal board, ranked ahead of the seeded prior top (42000 > 1000)
+     * — asserted on the entry directly, not just the rank helper, so this
+     * test fails the same way test_cheated_session_forfeits_highscore's
+     * would if the insert didn't actually happen. */
+    assert_int_equal(highscore_io_count(&ctx->hs_personal), prior_count + 1);
+    assert_int_equal(ctx->hs_personal.entries[0].score, CHEAT_TEST_QUALIFYING_SCORE);
+    assert_int_equal(highscore_io_get_ranking(&ctx->hs_personal, CHEAT_TEST_QUALIFYING_SCORE), 1);
+}
+
+/* =========================================================================
  * -grab wiring — game_create applies the CLI flag to the window
  * ========================================================================= */
 
@@ -572,6 +738,10 @@ int main(void)
                                         teardown),
         cmocka_unit_test_setup_teardown(test_highscore_autoadvance_clears_game_active, setup,
                                         teardown),
+        cmocka_unit_test_setup_teardown(test_cheated_session_forfeits_highscore, setup_cheat,
+                                        teardown_cheat),
+        cmocka_unit_test_setup_teardown(test_uncheated_session_records_highscore, setup_cheat,
+                                        teardown_cheat),
         cmocka_unit_test(test_grab_flag_applied),
         cmocka_unit_test(test_grab_flag_absent_default),
         cmocka_unit_test(test_game_aborts_on_level_load_failure),

@@ -57,6 +57,9 @@ typedef enum
     SDL2I_QUIT,
     SDL2I_VOLUME_UP,
     SDL2I_VOLUME_DOWN,
+    /* '=' debug skip-level cheat (unshifted); Shift+'=' ('+') routes to
+     * volume up instead — original/main.c:511-522, :822. */
+    SDL2I_DEBUG_SKIP,
     SDL2I_TOGGLE_AUDIO,
     SDL2I_TOGGLE_SFX,
     SDL2I_TOGGLE_CONTROL,
@@ -106,7 +109,8 @@ typedef struct sdl2_input sdl2_input_t;
  *   Left/J = left,  Right/L = right,  K = shoot,  P = pause,
  *   T = tilt,  D = kill ball,  Z = save,  X = load,  Escape = abort,
  *   Space = start,  C = cycle,  H = scores,  E = editor,  W = set level,
- *   Q = quit,  =/KP+ = volume up,  -/KP- = volume down,
+ *   Q = quit,  Shift+= (+) or KP+ = volume up,  -/KP- = volume down,
+ *   '=' = debug skip-level cheat (unshifted, with -debug),
  *   A = audio,  S = sfx,  G = control toggle,
  *   I = fullscreen toggle (modernized from original iconify),
  *   1-9 = speed levels (attract modes only).

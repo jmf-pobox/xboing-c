@@ -105,6 +105,7 @@ static bool start_new_game(game_ctx_t *ctx)
     ctx->game_active = true;
     ctx->score_submitted = false;
     ctx->savegame_restored_session = false;
+    ctx->cheated = false;
     wisdom_pending = 0;
     quit_pending = 0;
     abort_pending = 0;
@@ -1005,7 +1006,9 @@ static const char *get_player_name(const game_ctx_t *ctx)
  *      on the Hall of Fame).  Personal insert/write status is NOT
  *      reflected here — they may have failed independently.
  *   0: the global insert was rejected (NOT_RANKED, file resolve
- *      failed, elevate failed, or any other error).
+ *      failed, elevate failed, or any other error) OR the session used
+ *      the '=' debug skip-level cheat (ctx->cheated), which skips BOTH
+ *      inserts entirely -- see ADR-073.
  *
  * Callers use the return only to decide which post-game table to
  * display (matches original/level.c:446-449 ResetHighScore(PERSONAL)
@@ -1015,6 +1018,17 @@ static const char *get_player_name(const game_ctx_t *ctx)
 static int submit_score(game_ctx_t *ctx, unsigned long score, unsigned long game_time,
                         unsigned long ts, const char *name, const char *master_text)
 {
+    /* Using the '=' debug skip-level cheat disqualifies the session from
+     * EVERY high-score board, personal and global (ADR-073) -- a
+     * deliberate deviation from the 1996 original, which let cheated
+     * scores land in the local table (original/main.c:511-522).  This is
+     * the only function that calls highscore_io_insert /
+     * highscore_io_insert_global_atomic, so one guard here blocks both
+     * boards.  Return the same value the no-global-board path returns so
+     * callers skip the "boing master" prompt/sound the same way. */
+    if (ctx->cheated)
+        return 0;
+
     /* Personal table — in-memory insert, then disk write.  Log every
      * failure: silent loss on game-over is unrecoverable. */
     highscore_io_result_t ins = highscore_io_insert(
@@ -1185,9 +1199,11 @@ static void mode_highscore_enter(sdl2_state_mode_t mode, void *ud)
              * locked insert will land us at rank 0, not when our existing
              * higher score would block insertion.  Restored sessions skip
              * the prompt entirely — submit_score refuses the global write
-             * anyway, so there's no master text to collect. */
+             * anyway, so there's no master text to collect.  Cheated
+             * sessions skip it too — submit_score refuses the global write
+             * for a cheated run, so there's no master text to collect. */
             if (sys_priv_global_board_active(ctx->paths.xboing_score_file) &&
-                !ctx->savegame_restored_session &&
+                !ctx->savegame_restored_session && !ctx->cheated &&
                 highscore_io_would_be_global_master(&ctx->hs_global, final_score,
                                                     (unsigned long)getuid()) &&
                 sdl2_state_push_dialogue(ctx->state) == SDL2ST_OK)

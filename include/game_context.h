@@ -128,6 +128,10 @@ typedef struct game_ctx
      * a shared score.  Personal-table inserts remain eligible — that file
      * is already under the user's control. */
     bool savegame_restored_session;
+    /* True once the player has used the '=' debug skip-level cheat this
+     * game.  Disqualifies the session from ALL high-score boards, personal
+     * and global (ADR-073).  Reset false at the start of every new game. */
+    bool cheated;
     time_t game_start;  /* Timestamp when game session began */
     int paused_seconds; /* Total seconds spent paused */
 

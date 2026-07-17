@@ -1,0 +1,22 @@
+results:
+    - mission: m-2026-07-17-002
+      round: 1
+      created_at: "2026-07-17T02:01:40Z"
+      author: gjm
+      verdict: pass
+      confidence: 0.95
+      files_changed:
+        - path: tests/test_integration_modes.c
+          added: 95
+          removed: 0
+      evidence:
+        - name: 'test_cheated_session_forfeits_highscore + positive control test_uncheated_session_records_highscore added & registered. Real seam: sdl2_state_transition(SDL2ST_HIGHSCORE) -> mode_highscore_enter -> submit_score (game_active=true, score_submitted=false, final_score>0 -> inline submission).'
+          status: pass
+        - name: Dedicated setup_cheat/teardown_cheat fixture redirects XDG_DATA_HOME to per-test tmp so the uncheated positive control doesn't write the dev's real ~/.local/share/xboing score file.
+          status: pass
+        - name: 'Test-design bug found+fixed: highscore_io_get_ranking computes a would-be rank even when NOT inserted; switched to asserting directly on hs_personal.entries[] for the absence check.'
+          status: pass
+        - name: 'RED-proof: removing `if (ctx->cheated) return 0;` (game_modes.c:1029) -> cheated test FAILS (highscore_io_count 1->2, insert happened) at test_integration_modes.c:484; restored byte-for-byte (git diff --stat src empty, guard grep=1).'
+          status: pass
+        - name: ctest -R test_integration_modes green debug + asan (asan-clean); only tests/test_integration_modes.c changed; src guard intact.
+          status: pass

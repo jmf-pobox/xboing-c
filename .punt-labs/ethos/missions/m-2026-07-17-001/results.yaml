@@ -1,0 +1,53 @@
+results:
+    - mission: m-2026-07-17-001
+      round: 1
+      created_at: "2026-07-17T01:14:19Z"
+      author: jdc
+      verdict: pass
+      confidence: 0.95
+      files_changed:
+        - path: include/game_context.h
+          added: 4
+          removed: 0
+        - path: src/game_input.c
+          added: 3
+          removed: 0
+        - path: src/game_modes.c
+          added: 12
+          removed: 2
+        - path: docs/DESIGN.md
+          added: 40
+          removed: 0
+      evidence:
+        - name: bool cheated (game_context.h:134); set true only in the debug-cheat block-explode branch (game_input.c:332), NOT the 'Stop trying to cheat!!' no-op; reset false in start_new_game (game_modes.c:108)
+          status: pass
+        - name: submit_score returns 0 when ctx->cheated BEFORE both inserts (game_modes.c:1029). Verified via grep only 2 insert sites (highscore_io_insert personal ~1034, insert_global_atomic ~1088), both inside submit_score -> one guard blocks both boards.
+          status: pass
+        - name: play-test never reaches submit_score (game_rules transitions to HIGHSCORE gated !play_test_active, game_rules.c:409,419,471); start_new_game reset is the only score-eligible path -> no stale flag.
+          status: pass
+        - name: 'Harness: cheated false after start_new_game; = without -debug leaves false; = with -debug sets true; new game resets false.'
+          status: pass
+        - name: cmake debug zero-warning -Werror -Wconversion -Wshadow; ctest 61/61; make asan-test 61/61 clean; cppcheck clean on touched files; ADR-073 added; only the 4 write_set files changed.
+          status: pass
+        - name: 'FLAGGED for jck: mode_highscore_enter ''Words of wisdom Boing Master?'' prompt gated on !savegame_restored_session but NOT !cheated — a cheated #1 still gets prompted; submit_score then discards the answer (no board impact, UX dead-end). Left for jck ruling.'
+          status: skip
+    - mission: m-2026-07-17-001
+      round: 2
+      created_at: "2026-07-17T01:49:11Z"
+      author: jdc
+      verdict: pass
+      confidence: 0.96
+      files_changed:
+        - path: src/game_modes.c
+          added: 4
+          removed: 1
+        - path: docs/DESIGN.md
+          added: 3
+          removed: 4
+      evidence:
+        - name: 'Wisdom-prompt guard (game_modes.c:1205-1207) now includes && !ctx->cheated alongside !ctx->savegame_restored_session — a cheated #1 session skips the ''Words of wisdom Boing Master?'' dialogue entirely (no more collect-then-discard UX dead-end). Comment explains.'
+          status: pass
+        - name: 'ADR-073 Consequences updated: wisdom prompt gated on !ctx->cheated as of round 2; ''left as a follow-up'' language removed.'
+          status: pass
+        - name: cmake debug zero-warning -Werror -Wconversion -Wshadow; ctest 61/61; make asan-test 61/61 clean; markdownlint clean on DESIGN.md; only src/game_modes.c + docs/DESIGN.md changed this round (round-1 approved files unchanged).
+          status: pass

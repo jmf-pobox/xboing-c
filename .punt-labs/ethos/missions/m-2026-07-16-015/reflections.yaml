@@ -1,0 +1,27 @@
+reflections:
+    - round: 1
+      created_at: "2026-07-16T23:00:26Z"
+      author: jck
+      converging: false
+      signals:
+        - 'Keymap split PASS: SDL_SCANCODE_EQUALS->DEBUG_SKIP, branch on sdl2_input_shift_held() reproduces XK_equal(cheat)/XK_plus(Shift+=, volume) exactly (original/main.c:511-522,:822). Volume-up is GLOBAL not game-only (handleMiscKeys reached from both handleGameKeys default line 530 AND handleIntroKeys default line 685) — jdc''s unconditional-on-mode Shift branch matches. Numpad KP_PLUS unshifted volume preserved. Debug gating PASS (= cheats only in GAME+debug; else ''Stop trying to cheat!!''; outside GAME no-op).'
+        - Exemption list PASS + messages verbatim-match (original/main.c:516,520). BUT cheat mechanism FAIL on score/animation/sound/shake.
+        - 'FAIL: original SkipToNextLevel (blocks.c:2409-2462) calls DrawBlock(KILL_BLK) per required block (line 2450) -> SetBlockUpForExplosion -> standard 4-frame explosion. ExplodeBlocksPending (blocks.c:1480, unconditional every tick from main.c:1132) fires AddToScore((u_long)blockP->hitPoints)+DisplayScore on the final frame for ANY exploding block (blocks.c:1543-1548). hitPoints is a constant per-type score (RED=100,PURPLE=150,COUNTER=200,DROP=(MAX_ROW-row)*100, blocks.c:2331-2398), never decremented. So the original cheat AWARDS FULL SCORE for every cleared block + per-block explosion sound + screen shake (SetSfxEndFrame(frame+140);changeSfxMode(SFX_SHAKE), blocks.c:2460-2461).'
+        - jdc's block_system_clear removes blocks with ZERO score/animation/sound/shake — 4 player-visible fidelity misses. The mission contract's 'NO scoring' premise (leader error) is wrong vs blocks.c:1547.
+        - ADR-072 format matches ADR-070/071 but repeats the false 'no score awarded' claim as fact.
+      recommendation: continue
+      reason: Keymap + gating + exemption-list + messages are faithful and approved. The cheat must route each required block through the real explode-and-score path (modern equivalent of DrawBlock(KILL_BLK)/SetBlockUpForExplosion that ball/gun collision uses) so score, per-block sound, explosion animation, and screen shake all fire as in the original — and ADR-072 must state the cheat awards full points. Round 2 required. (Maintainer wants 'match the original', so the faithful path, not the documented-deviation alternative.)
+    - round: 2
+      created_at: "2026-07-16T23:15:58Z"
+      author: jck
+      converging: true
+      signals:
+        - 'Score PASS: cheat calls block_system_explode per required block — the identical entry point ball/gun collisions use (game_callbacks.c) — and game_callbacks_on_block_finalize -> score_system_add(hit_points) awards each block''s points with x2/x4 multipliers, tracing to original AddToScore(hitPoints) on the final explosion frame (blocks.c:1543-1548). SkipToNextLevel''s DrawBlock(KILL_BLK) arms the same lifecycle with no cheat-skip of scoring. Deferred timing (~30 ticks, +8550/63 blocks) faithful.'
+        - 'Animation PASS: block_system_explode only arms; standard 4-stage sequence runs via block_system_update_explosions (no instant clear).'
+        - 'Sound PASS: game_callbacks_on_block_finalize does not play sound (play_block_hit_sound is static/hit-time-only); jdc''s inline block_sound_lookup + sdl2_audio_play_at_percent per exploded block reproduces PlaySoundForBlock at kill time (original/blocks.c:1868) — correct site, per-block at trigger.'
+        - 'Shake PASS: sfx_system_set_mode(SFX_MODE_SHAKE)+set_end_frame(frame+140) once after the loop, matching SetSfxEndFrame(frame+140);changeSfxMode(SFX_SHAKE) (blocks.c:2460-2461) verbatim, single-sweep scope.'
+        - Required set = still_active default (block_system.c:1192-1219); specials survive; HYPERSPACE never in required set (moot); no forced state transition; completion via game_rules_check.
+        - 'ADR-072 explicitly retracts round-1 ''no score'' claim and cites blocks.c:1867-1871,1543-1548,2460-2461, source-verified. Scope: only game_input.c + DESIGN.md changed round 2; round-1 keymap untouched.'
+        - 'NOTE: mission contract''s ''NO scoring'' success criterion was a LEADER ERROR against blocks.c:1543-1548. jck exercises the faithfulness-gating authority to override it in favor of verified original behavior; documented as a retraction in ADR-072, not silent.'
+      recommendation: stop
+      reason: All four round-1 misses (score, animation, sound, shake) fixed and independently verified against original/blocks.c. The cheat routes through the real explode->finalize pipeline with faithful deferred timing, multipliers, per-block sound, and single-sweep shake. Approved.

@@ -1,0 +1,31 @@
+mission_id: m-2026-07-16-016
+status: closed
+type: implement
+created_at: "2026-07-16T23:17:08Z"
+updated_at: "2026-07-16T23:26:12Z"
+closed_at: "2026-07-16T23:26:12Z"
+leader: claude
+worker: gjm
+evaluator:
+    handle: jdc
+    pinned_at: "2026-07-16T23:17:08Z"
+    hash: c08223356d3e6d5aed56e28da477a1aa2707509febfef7c5f62c25871a3e841f
+inputs: {}
+write_set:
+    - tests/test_keybindings.c
+success_criteria:
+    - Add keybinding regression tests to tests/test_keybindings.c pinning the `=` debug skip-level cheat + Shift-aware split shipped in mission m-2026-07-16-015. Register via the existing test runner. Follow the file's keybinding test pattern (game_create -> transition to SDL2ST_GAME -> inject key -> call game_input_global -> assert observable state), per docs/TESTING.md.
+    - 'Behaviors to pin (SDL2I_DEBUG_SKIP is bound to SDL_SCANCODE_EQUALS; game_input_global branches on sdl2_input_shift_held()): (a) Unshifted `=` in SDL2ST_GAME with ctx->debug_mode=1 -> the required blocks (RED/BLUE/GREEN/TAN/YELLOW/PURPLE/COUNTER/DROP) enter exploding state (assert via block_system_get_exploding_count > 0 immediately, or block_system_still_active drops to 0 after ticking block_system_update_explosions to finalize); a special block (e.g. BLACK_BLK or a special) placed on the grid SURVIVES; and the "Cheating, skip level ..." message is set (assert via the message_system observable if one exists, else at least the block-state change). (b) Unshifted `=` in SDL2ST_GAME with ctx->debug_mode=0 -> NO blocks explode (exploding_count unchanged / still_active unchanged) and the "Stop trying to cheat!!" path (message) — assert blocks untouched at minimum. (c) Shift+`=` (inject with KMOD_SHIFT so sdl2_input_shift_held() is true) -> volume UP (assert sdl2_audio_get_volume increased, or the volume action effect), NOT a skip (blocks untouched). (d) Numpad `+` (SDL_SCANCODE_KP_PLUS, no shift) -> volume UP (still works, unshifted), blocks untouched.'
+    - The existing inject helper likely injects a keydown WITHOUT modifiers. You will need to inject SDL_SCANCODE_EQUALS with event.key.keysym.mod = KMOD_LSHIFT (or KMOD_SHIFT) for the Shift case so sdl2_input_process_event sets sdl2_input_shift_held(). Add a small local helper (e.g. inject_key_mod(ctx, scancode, mod)) mirroring the existing inject_key but setting keysym.mod; do NOT change production code. Use the fixtures/setup already in the file (setup_game). Seed blocks/level via the existing game fixture (a level is loaded in SDL2ST_GAME) or the savegame fixture pattern if needed to guarantee required + special blocks are present.
+    - 'RED-prove where cheap: reverting the src change (e.g. debug gate, or explode->clear, or the shift branch) should break the relevant new assertion. At minimum, confirm the debug gate test (a vs b) is discriminating. Report it.'
+    - Deterministic; asan-clean; free contexts; only tests/test_keybindings.c changes. ctest --test-dir build -R test_keybindings green under debug AND asan. (Ignore test_sdl2_font.)
+budget:
+    rounds: 2
+    reflection_after_each: true
+current_round: 1
+context: |-
+    Pin the = debug skip-level cheat + Shift-aware keymap (mission m-2026-07-16-015, jck-approved
+    after 2 rounds). Unshifted = = cheat (GAME+debug, explodes required blocks -> score/sound/
+    animation/shake, completes normally); Shift+= (+) and numpad + = volume up. The cheat uses
+    block_system_explode (real explosion path), so blocks enter exploding state then finalize.
+    Test the debug gate, the shift split, and numpad volume.

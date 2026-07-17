@@ -1,0 +1,31 @@
+mission_id: m-2026-07-17-002
+status: closed
+type: implement
+created_at: "2026-07-17T01:51:51Z"
+updated_at: "2026-07-17T02:06:33Z"
+closed_at: "2026-07-17T02:06:33Z"
+leader: claude
+worker: gjm
+evaluator:
+    handle: jdc
+    pinned_at: "2026-07-17T01:51:51Z"
+    hash: c08223356d3e6d5aed56e28da477a1aa2707509febfef7c5f62c25871a3e841f
+inputs: {}
+write_set:
+    - tests/test_integration_modes.c
+success_criteria:
+    - 'Add a regression test to tests/test_integration_modes.c pinning ADR-073 (mission m-2026-07-17-001): a session where ctx->cheated is set does NOT enter the high-score boards (neither personal hs_personal nor global). Register via the existing runner (xboing_add_integration_test / the tests[] array in this file).'
+    - 'The discriminating test: set up a game_ctx (existing setup_game / fixture in this file), arrange a final score that WOULD rank on the personal board (use the seed_personal_top helper at ~line 182 and/or a low board so the score qualifies), set ctx->cheated = true, then drive the flow that calls submit_score (the bonus->highscore / game-over path — inspect how test_mode_bonus / test_mode_highscore + enter_and_tick reach mode_bonus_enter/mode_highscore_ enter which call submit_score, src/game_modes.c:1146,1206). Assert the personal board did NOT gain the score: highscore_io_count(&ctx->hs_personal) unchanged AND the score is not present in the entries. If reaching submit_score through the mode flow is impractical from a unit test, instead assert the observable guard directly at the highest reachable seam (e.g. set cheated, drive the submission-triggering transition, verify no insert) — document the path you used.'
+    - 'Add the positive control: the SAME setup with ctx->cheated = false DOES insert the qualifying score (board count increases / score present) — proving the test discriminates on the cheated flag, not on an unreachable path.'
+    - 'RED-prove: revert the src guard (src/game_modes.c: remove the `if (ctx->cheated) return 0;` in submit_score) via a temporary out-of-tree Edit you restore byte-for-byte (src is OUTSIDE this write_set; Edit then restore, verify git diff --stat src/game_modes.c empty and the cheated guard grep intact after). Confirm the cheated test FAILS with the guard removed (the cheated score inserts) and PASSES restored. Report the exact failure. If the mode-flow path can''t reach submit_score, RED-prove against whatever seam you tested.'
+    - Deterministic; free contexts (fixture teardown); observable getters only; XDG/score-file redirection if the test would touch the global board (avoid writing real user files — use the setup's tmp XDG pattern). Only tests/test_integration_modes.c changes. ctest --test-dir build -R test_integration_modes green under debug AND asan. (Ignore test_sdl2_font.)
+budget:
+    rounds: 2
+    reflection_after_each: true
+current_round: 1
+context: |-
+    Pin ADR-073 (mission m-2026-07-17-001, jck-approved): using the = debug cheat sets ctx->cheated,
+    and submit_score (game_modes.c:1029) early-returns when cheated -> neither the personal insert
+    (highscore_io_insert) nor the global insert (highscore_io_insert_global_atomic) runs. Test that a
+    cheated qualifying score never lands on the board; positive control with cheated=false inserts.
+    test_integration_modes.c already drives SDL2ST_HIGHSCORE/bonus and has seed_personal_top.
