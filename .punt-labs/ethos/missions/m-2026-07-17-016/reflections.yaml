@@ -1,0 +1,17 @@
+reflections:
+    - round: 1
+      created_at: "2026-07-17T14:11:11Z"
+      author: jdc
+      converging: true
+      signals:
+        - 'ctest --test-dir build -R test_keybindings: Passed (8.27s)'
+        - 'ctest --test-dir build (full): 61/61 passed (test_attract_screenshots Disabled by design)'
+        - 'make asan-test: 61/61 passed under ASan+UBSan'
+        - 'cmake --build build: zero warnings'
+        - 'tests/test_keybindings.c:1041-1048 test_dialogue_key_delete_maps_to_backspace: assert_true(rc) at line 1046 matches gjm''s cited RED line; code inspection of src/game_input.c:513-516 confirms removing ''case SDLK_DELETE:'' falls to default: return false, making *out unset (stays DIALOGUE_KEY_CHAR) and rc false -- assert_true(rc) at line 1046 would genuinely fail. Not a tautology: it exercises the real switch in src/game_input.c through the production dialogue_key_from_sdl entry point.'
+        - Delete and Backspace both assert DIALOGUE_KEY_BACKSPACE (test_dialogue_key_delete_maps_to_backspace, test_dialogue_key_backspace_maps_to_backspace) -- pins the 47p total alias, not a partial one.
+        - unmapped key (SDLK_a) test asserts rc==false AND out untouched (DIALOGUE_KEY_CHAR sentinel) -- test_dialogue_key_unmapped_returns_false
+        - NULL out test asserts rc==false, no crash -- test_dialogue_key_null_out_returns_false
+        - 'git diff --stat -- src/ include/: game_input.c/h, game_main.c, game_rules.c, sdl2_renderer.c/h changes attributable to prior missions m-2026-07-17-014/015 already on this branch (iconify fix, editor-noop fix, dialogue_key_from_sdl seam extraction) -- none introduced by this mission. This mission''s write_set (tests/test_keybindings.c) is the only file gjm touched; hook-enforced.'
+      recommendation: stop
+      reason: 'All three success criteria verified independently: (1) 6 CMocka tests added for dialogue_key_from_sdl covering Delete-alias, Backspace, Return, Escape, unmapped, and NULL-out; (2) RED-prove claim confirmed by code inspection against the actual switch in src/game_input.c -- the cited failing assertion (line 1046) is real and would fire if the SDLK_DELETE case were removed, not a tautological self-check; (3) build is zero-warning, ctest is 61/61 green, make asan-test is 61/61 green under ASan+UBSan, and git diff confirms no src/ change originates from this mission. No further rounds needed.'

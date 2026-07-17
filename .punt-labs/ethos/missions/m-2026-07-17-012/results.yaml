@@ -1,0 +1,21 @@
+results:
+    - mission: m-2026-07-17-012
+      round: 1
+      created_at: "2026-07-17T12:51:31Z"
+      author: sjl
+      verdict: pass
+      confidence: 0.95
+      files_changed:
+        - path: include/sdl2_renderer.h
+          added: 0
+          removed: 0
+        - path: src/sdl2_renderer.c
+          added: 0
+          removed: 0
+      evidence:
+        - name: sdl2_renderer_minimize added — NULL+window guarded SDL_MinimizeWindow wrapper (src/sdl2_renderer.c), mirrors set_mouse_grab guard style; header cites original/main.c:853 (XIconifyWindow). toggle_fullscreen/is_fullscreen untouched.
+          status: pass
+        - name: cmake debug zero-warning (-Werror -Wconversion -Wshadow); ctest 61/61; asan 61/61 clean; only the 2 write-set files changed.
+          status: pass
+        - name: 'Headless note for gjm: SDL_MinimizeWindow callable under dummy driver, returns cleanly; MINIMIZED flag is driver-dependent so assert no-crash + empty SDL_GetError, plus NULL-ctx no-op branch.'
+          status: pass

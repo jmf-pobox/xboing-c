@@ -1,0 +1,27 @@
+mission_id: m-2026-07-17-017
+status: closed
+type: implement
+created_at: "2026-07-17T14:21:28Z"
+updated_at: "2026-07-17T14:40:37Z"
+closed_at: "2026-07-17T14:40:37Z"
+leader: claude
+worker: gjm
+evaluator:
+    handle: jdc
+    pinned_at: "2026-07-17T14:21:28Z"
+    hash: c08223356d3e6d5aed56e28da477a1aa2707509febfef7c5f62c25871a3e841f
+inputs: {}
+write_set:
+    - tests/test_game_rules.c
+success_criteria:
+    - 'Fix Copilot finding (PR #196): test_dynamite_spawn_silent_no_bomb_sfx''s seed search runs up to ~500 * (THROTTLE_BONUS_SEED*2) ~= 2,000,000 throttle_tick() calls worst case (jdc measured ~2.7-3.2s). Cut it without losing coverage: instead of ticking the throttle to wait for a spawn attempt each seed, set ctx->next_bonus_frame = current_frame + 1 (non-zero) so the spawner attempts a spawn on the very next tick, then check the roll. Keep the seed loop only as far as needed to land the roll==25 (dynamite) case, but each iteration must be O(1) ticks, not O(THROTTLE_BONUS_SEED) ticks.'
+    - 'The test must remain a genuine behavioral test: still forces the dynamite (case 25) mass-clear and asserts the audio spy sees NO "bomb". Re-confirm it stays RED against the pre-fix code — briefly re-verify by restoring the bomb@50 play in src/game_rules.c, rebuild, confirm the (now-fast) test FAILS, then restore. Report the RED re-confirmation. Do NOT leave the src/ revert (git status must show only tests/test_game_rules.c).'
+    - cmake --preset debug && cmake --build build zero-warning; ctest --test-dir build -R test_game_rules --output-on-failure green and NOTICEABLY faster; full ctest green; make asan-test green. Only tests/test_game_rules.c changes.
+budget:
+    rounds: 2
+    reflection_after_each: true
+current_round: 1
+context: |-
+    PR #196 Copilot review on the uwk test (test_dynamite_spawn_silent_no_bomb_sfx). The seed-search brute
+    force is slow (~2-3s). Force the spawn attempt via ctx->next_bonus_frame = frame+1 so each seed costs
+    ~1 tick, preserving the roll==25 dynamite path + no-bomb audio-spy assertion. Keep it RED-provable.

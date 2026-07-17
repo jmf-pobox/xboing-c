@@ -1,0 +1,30 @@
+results:
+    - mission: m-2026-07-17-014
+      round: 1
+      created_at: "2026-07-17T13:48:43Z"
+      author: gjm
+      verdict: pass
+      confidence: 0.9
+      files_changed:
+        - path: tests/test_keybindings.c
+          added: 0
+          removed: 0
+        - path: tests/test_game_rules.c
+          added: 0
+          removed: 0
+        - path: tests/test_sdl2_renderer.c
+          added: 0
+          removed: 0
+      evidence:
+        - name: 'c0q RED-PROVEN: test_sticky_paddle_one_press_launches_exactly_one_ball (3 BALL_READY via ball_system_restore, 1 SPACE, 4 sdl2_state_update no begin_frame). RED (remove consume): active=3, assert 3!=1 FAIL. GREEN: active=1 ready=2. + normal single-ball still launches.'
+          status: pass
+        - name: '1xd RED-PROVEN: test_gameplay_editor_e_is_noop + test_attract_e_enters_editor. RED (restore GAME||attract guard): E in GAME -> SDL2ST_EDIT(14), assert 14!=3 FAIL. GREEN: stays GAME; E from INTRO still -> EDIT.'
+          status: pass
+        - name: '2z1 RED-PROVEN: test_iconify_does_not_toggle_fullscreen (RED restore toggle_fullscreen -> is_fullscreen true FAIL; GREEN false) + renderer minimize null-safe/no-crash. DEVIATION (good): dropped the contract''s ''SDL_GetError empty'' assert — dummy driver sets ''operation not supported'' even on the CORRECT path; replaced with smoke + no-fullscreen-flip.'
+          status: pass
+        - name: 'uwk RED-PROVEN: test_dynamite_spawn_silent_no_bomb_sfx (srand 1..500 until roll==25, 7 color blocks row 12 outside spawn rows, ball_system_clear_all avoids false positive). RED (restore bomb@50): spy sees ''bomb'' FAIL. GREEN: no bomb entry.'
+          status: pass
+        - name: '47p ESCALATED (out of TEST-ONLY scope): Delete=Backspace mapping is inline in game_main.c:130-135 main() loop, gated on SDL2ST_DIALOGUE, unreachable from any test entry point. No keysym->action seam exists. gjm correctly refused to fake a test against an unreachable path. Leader to open a seam-extraction jdc mission, then RED->GREEN test it.'
+          status: fail
+        - name: cmake debug zero-warning; ctest 61/61; asan 61/61 ASan+UBSan clean; cppcheck clean on the 3 files; git diff src/include identical to fixed state (all RED reverts restored); only the 3 test files changed.
+          status: pass

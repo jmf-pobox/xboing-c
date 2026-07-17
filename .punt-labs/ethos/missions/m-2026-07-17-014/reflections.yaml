@@ -1,0 +1,19 @@
+reflections:
+    - round: 1
+      created_at: "2026-07-17T13:53:41Z"
+      author: jdc
+      converging: true
+      signals:
+        - ctest --test-dir build -R 'test_keybindings|test_game_rules|test_sdl2_renderer' -> 3/3 passed (10.71s)
+        - ctest --test-dir build (full suite) -> 61/61 passed, 1 disabled (test_attract_screenshots, pre-existing)
+        - ctest --test-dir build-asan -R same filter -> 3/3 passed clean under ASan+UBSan (12.04s)
+        - 'tests/test_keybindings.c:977-1015 test_sticky_paddle_one_press_launches_exactly_one_ball: seeds 3 BALL_READY balls via ball_system_restore, one SPACE + 4x sdl2_state_update in one frame, asserts active==1 ready==2 -- confirmed via code read (src/ball_system.c:242-274 ball_system_activate_waiting always promotes first BALL_READY slot; src/game_input.c:70-87 input_launch_ball runs per-tick) that removing sdl2_input_consume would activate all 3 (matches gjm''s reported RED active=3)'
+        - test correctly bounds the burst at 4 ticks (< BIRTH_FRAME_RATE=5, include/ball_types.h:35) to avoid ball_system.c:405 auto-activate firing mid-test -- verified via code read, not just trusting the comment
+        - tests/test_keybindings.c:281-297 test_gameplay_editor_e_is_noop (SDL2ST_GAME, E -> stays GAME) + test_attract_e_enters_editor (SDL2ST_INTRO, E -> EDIT) both pass; matches src/game_input.c:392-398 is_attract-gated E handler
+        - tests/test_sdl2_renderer.c:203-226 minimize null-safe (TC-22) + no-crash/no-fullscreen-change (TC-23) pass; tests/test_keybindings.c:189-197 confirms I no longer flips fullscreen
+        - 'empirically verified gjm''s dropped ''SDL_GetError empty'' assertion was correct: standalone SDL2 program under SDL_VIDEODRIVER=dummy calling SDL_MinimizeWindow leaves SDL_GetError()==''That operation is not supported'' even on the successful/no-crash path -- asserting empty would have been a false-failure landmine'
+        - 'tests/test_game_rules.c:723-766 test_dynamite_spawn_silent_no_bomb_sfx: seeds 7 target-color blocks at row 12, outside find_random_empty_cell''s own placement range rows 1..MAX_ROW-7=1..11 (src/game_rules.c:44-62) -- verified in code that case 0-24 spawns can never land on row 12, so the seed-search (1..500) cannot self-collide with its own detector; search is bounded (500 x up to 4000 ticks) and deterministic (srand/rand reseeded per attempt); test runs in 2.7-3.2s in both debug and asan'
+        - 'git diff master: only tests/test_keybindings.c, tests/test_game_rules.c, tests/test_sdl2_renderer.c changed by this mission; the 5 src/include changes present in the working tree (game_input.c, game_main.c, game_rules.c, sdl2_renderer.c/.h) are the confirmed m-2026-07-17-013 fix, untouched/unreverted by this mission (gjm''s write_set has no src/ paths, so it structurally could not have touched them)'
+        - '47p escalation verified legitimate: SDLK_DELETE/SDLK_BACKSPACE handling is an inline switch inside int main()''s raw SDL_Event loop (src/game_main.c:30, ~line 127-130), not extracted into a callable seam like dialogue_system_key_input -- no test entry point exists to drive it without either a seam extraction or real keystroke injection into the compiled binary (which docs/TESTING.md documents as unreliable via xdotool/ydotool). This is a real testability gap, not gjm avoiding work.'
+      recommendation: stop
+      reason: All 4 in-scope regression tests (c0q, 1xd, 2z1, uwk) are genuine RED->GREEN regressions verified by code-level tracing, not tautologies. Full debug ctest (61/61) and targeted ASan+UBSan pass clean. Only the 3 write-set test files changed; the m-013 production fix is intact and unreverted. The 47p escalation is a legitimate seam gap, not scope-dodging. Mission is done -- ready to close.

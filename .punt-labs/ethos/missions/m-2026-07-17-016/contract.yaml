@@ -1,0 +1,28 @@
+mission_id: m-2026-07-17-016
+status: closed
+type: implement
+created_at: "2026-07-17T14:01:26Z"
+updated_at: "2026-07-17T14:11:37Z"
+closed_at: "2026-07-17T14:11:37Z"
+leader: claude
+worker: gjm
+evaluator:
+    handle: jdc
+    pinned_at: "2026-07-17T14:01:26Z"
+    hash: c08223356d3e6d5aed56e28da477a1aa2707509febfef7c5f62c25871a3e841f
+inputs: {}
+write_set:
+    - tests/test_keybindings.c
+success_criteria:
+    - RED->GREEN unit test for the dialogue_key_from_sdl seam (m-2026-07-17-015) — completes xboing-47p coverage. TEST-ONLY.
+    - 'In tests/test_keybindings.c (which includes game_input.h), test bool dialogue_key_from_sdl(SDL_Keycode sym, dialogue_key_type_t *out): (a) SDLK_DELETE -> returns true, *out == DIALOGUE_KEY_BACKSPACE (the 47p alias); (b) SDLK_BACKSPACE -> true, *out == DIALOGUE_KEY_BACKSPACE (Delete and Backspace identical); (c) SDLK_RETURN -> true, DIALOGUE_KEY_RETURN; (d) SDLK_ESCAPE -> true, DIALOGUE_KEY_ESCAPE; (e) an unmapped key (e.g. SDLK_a) -> returns false; (f) NULL out -> returns false, no crash.'
+    - 'RED-PROVE it: temporarily remove the `case SDLK_DELETE:` fallthrough in src/game_input.c, rebuild, and confirm the SDLK_DELETE test FAILS (returns false / *out not BACKSPACE); restore and confirm GREEN. Report the RED evidence (the failing assertion + wrong value). Restore src/ to the fixed state — final git status must show ONLY tests/test_keybindings.c changed, no src/ diff from this mission.'
+    - cmake --preset debug && cmake --build build zero-warning; ctest --test-dir build --output-on-failure green; make asan-test green. Only tests/test_keybindings.c changes.
+budget:
+    rounds: 2
+    reflection_after_each: true
+current_round: 1
+context: |-
+    Final piece of the 5-fix parity batch: RED->GREEN test for xboing-47p's Delete=Backspace, now testable
+    via the dialogue_key_from_sdl seam jdc extracted (m-015). Also serves as gjm's confirmation that the
+    seam preserves the Delete=Backspace alias.

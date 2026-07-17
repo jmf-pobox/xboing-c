@@ -1,0 +1,32 @@
+mission_id: m-2026-07-17-015
+status: closed
+type: implement
+created_at: "2026-07-17T13:55:45Z"
+updated_at: "2026-07-17T14:13:11Z"
+closed_at: "2026-07-17T14:13:11Z"
+leader: claude
+worker: jdc
+evaluator:
+    handle: gjm
+    pinned_at: "2026-07-17T13:55:45Z"
+    hash: 7349512b3191332fef8a79f56caf962febc697b8444629912da4aa22b9b2efec
+inputs: {}
+write_set:
+    - include/game_input.h
+    - src/game_input.c
+    - src/game_main.c
+success_criteria:
+    - Extract a pure, unit-testable seam for the dialogue keysym->action mapping so xboing-47p's Delete=Backspace alias (currently inline+untestable in game_main.c's main() loop) can be tested. BEHAVIOR-PRESERVING refactor — the runtime dialogue key handling must be identical.
+    - 'Add `bool dialogue_key_from_sdl(SDL_Keycode sym, dialogue_key_t *out);` to include/game_input.h + src/game_input.c. Pure function: switch on sym — SDLK_RETURN -> DIALOGUE_KEY_RETURN, SDLK_DELETE and SDLK_BACKSPACE -> DIALOGUE_KEY_BACKSPACE (the alias; comment cites original/dialogue.c:327-328), SDLK_ESCAPE -> DIALOGUE_KEY_ESCAPE; each sets *out and returns true. Any other key: return false, leave *out untouched. NULL-guard out (return false). No dependency on game_ctx — it maps a keycode to an action, nothing more. Ensure game_input.h has the needed includes (SDL for SDL_Keycode, dialogue_system.h for dialogue_key_t).'
+    - 'Rewire src/game_main.c: replace the inline SDLK_RETURN/SDLK_DELETE/SDLK_BACKSPACE/SDLK_ESCAPE switch (~line 126-140) with `dialogue_key_t dk; if (dialogue_key_from_sdl(event.key.keysym.sym, &dk)) dialogue_system_key_input(ctx->dialogue, dk, ''\0'');`. Leave the SDL_TEXTINPUT/DIALOGUE_KEY_CHAR path and everything else in the loop unchanged. Net behavior identical (Delete still = Backspace, Return/Escape unchanged, unmapped keys still ignored).'
+    - 'cmake --preset debug && cmake --build build zero-warning (-Werror -Wconversion -Wshadow -Wswitch concerns: the function''s switch has a default returning false, so no -Wswitch-enum issue). Full ctest --test-dir build green (no behavior change -> nothing regresses). make asan-test green. Only the 3 write-set files change. (Sibling gjm mission adds the RED->GREEN test for the seam.)'
+budget:
+    rounds: 2
+    reflection_after_each: true
+current_round: 1
+context: |-
+    xboing-47p test-enablement. gjm (m-2026-07-17-014) correctly refused to fake a test for the
+    Delete=Backspace alias because it's inline in game_main.c's event loop, unreachable from any test
+    entry point. Extract it into a pure dialogue_key_from_sdl() seam in game_input (the SDL input
+    adapter) so it's unit-testable. Behavior-preserving; the sibling gjm mission then RED->GREEN tests
+    Delete and Backspace both map to DIALOGUE_KEY_BACKSPACE.

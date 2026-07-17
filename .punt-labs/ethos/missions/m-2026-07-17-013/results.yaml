@@ -1,0 +1,40 @@
+results:
+    - mission: m-2026-07-17-013
+      round: 1
+      created_at: "2026-07-17T13:01:23Z"
+      author: jdc
+      verdict: pass
+      confidence: 0.95
+      files_changed:
+        - path: src/game_input.c
+          added: 16
+          removed: 8
+        - path: src/game_rules.c
+          added: 3
+          removed: 2
+        - path: src/game_main.c
+          added: 3
+          removed: 0
+      evidence:
+        - name: c0q sticky multi-launch — consume SDL2I_START after ball_system_activate_waiting in input_launch_ball (game_input.c:70-83)
+          status: pass
+        - name: 1xd E editor attract-only — gate SDL2I_ENTER_EDITOR on is_attract only, drop mode==SDL2ST_GAME (game_input.c:388-397)
+          status: pass
+        - name: 2z1 I iconify not fullscreen — sdl2_renderer_minimize replaces sdl2_renderer_toggle_fullscreen for SDL2I_ICONIFY (game_input.c:273-277)
+          status: pass
+        - name: uwk silence dynamite bomb — removed sdl2_audio_play_at_percent(bomb,50) from case 25 dynamite spawn (game_rules.c:225-244)
+          status: pass
+        - name: 47p Delete=Backspace — SDLK_DELETE falls through to SDLK_BACKSPACE case in dialogue key switch (game_main.c:127-135)
+          status: pass
+        - name: cmake --build build (debug preset) — zero warnings on all 3 write-set files
+          status: pass
+        - name: cmake --build build-asan (asan preset) — zero warnings on all 3 write-set files
+          status: pass
+        - name: ctest --test-dir build — 60/61 runnable tests pass; test_keybindings fails exactly 1 subtest (see open_questions)
+          status: fail
+        - name: ctest --test-dir build-asan — same single expected failure, no sanitizer findings
+          status: fail
+        - name: git status --porcelain — only src/game_input.c, src/game_rules.c, src/game_main.c changed inside write_set (plus untracked mission/session dirs)
+          status: pass
+      open_questions:
+        - tests/test_keybindings.c:270-276 test_gameplay_editor asserts the OLD behavior (E opens SDL2ST_EDIT from SDL2ST_GAME) and now fails after fix 1xd. This is the only test affected by any of the 5 fixes. It is out of write_set (owned by sibling gjm test mission) — needs updating to assert E is a no-op (or blocked) from live gameplay, matching original/main.c's handleGameKeys having no E case. No other existing test encodes the old sticky-launch, fullscreen-toggle, dynamite-bomb-sound, or Backspace-only behaviors, so those 4 fixes produced zero test regressions.

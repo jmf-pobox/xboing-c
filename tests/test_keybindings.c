@@ -37,6 +37,7 @@
 #include "sdl2_renderer.h"
 #include "sdl2_state.h"
 #include "sfx_system.h"
+#include "special_system.h"
 
 /* =========================================================================
  * Helpers
@@ -181,12 +182,18 @@ static void test_global_control_toggle(void **vstate)
     assert_int_not_equal(ctx->config.use_keys, before);
 }
 
-static void test_global_fullscreen_no_crash(void **vstate)
+/* I minimizes (iconifies) the window -- original/main.c:853-856
+ * (XIconifyWindow) -- it must NOT toggle fullscreen (mission
+ * m-2026-07-17-014, bead 2z1). Before the fix, I called
+ * sdl2_renderer_toggle_fullscreen. */
+static void test_iconify_does_not_toggle_fullscreen(void **vstate)
 {
     game_ctx_t *ctx = ((kb_fixture_t *)*vstate)->ctx;
+    assert_false(sdl2_renderer_is_fullscreen(ctx->renderer));
     inject_key(ctx, SDL_SCANCODE_I);
     game_input_global(ctx);
-    /* SDL dummy driver — no observable fullscreen change, just no crash */
+    /* No crash under the SDL dummy driver, and still not fullscreen. */
+    assert_false(sdl2_renderer_is_fullscreen(ctx->renderer));
 }
 
 static void test_global_quit_opens_dialogue(void **vstate)
@@ -267,9 +274,23 @@ static void test_gameplay_pause(void **vstate)
     assert_int_equal(sdl2_state_current(ctx->state), SDL2ST_PAUSE);
 }
 
-static void test_gameplay_editor(void **vstate)
+/* E must NOT open the editor from live gameplay -- original binds E only
+ * in handleIntroKeys (attract screens, original/main.c:676-681);
+ * handleGameKeys (original/main.c:430-533) has no E case at all
+ * (mission m-2026-07-17-014, bead 1xd). */
+static void test_gameplay_editor_e_is_noop(void **vstate)
 {
     game_ctx_t *ctx = ((kb_fixture_t *)*vstate)->ctx;
+    inject_key(ctx, SDL_SCANCODE_E);
+    game_input_global(ctx);
+    assert_int_equal(sdl2_state_current(ctx->state), SDL2ST_GAME);
+}
+
+/* Positive sibling: E from an attract screen still enters the editor. */
+static void test_attract_e_enters_editor(void **vstate)
+{
+    game_ctx_t *ctx = ((kb_fixture_t *)*vstate)->ctx;
+    assert_int_equal(sdl2_state_current(ctx->state), SDL2ST_INTRO);
     inject_key(ctx, SDL_SCANCODE_E);
     game_input_global(ctx);
     assert_int_equal(sdl2_state_current(ctx->state), SDL2ST_EDIT);
@@ -919,6 +940,163 @@ static void test_numpad_plus_is_volume_up(void **vstate)
 }
 
 /* =========================================================================
+ * Group 10: Sticky-paddle single-launch per press
+ * (mission m-2026-07-17-014, bead c0q)
+ *
+ * input_launch_ball (src/game_input.c:70-87) runs per tick via
+ * game_input_update -> mode_game_update, but just_pressed(SDL2I_START)
+ * only clears once per FRAME (sdl2_input_begin_frame).  At high warp
+ * sdl2_loop_update drives up to SDL2L_MAX_TICKS_PER_UPDATE (10) ticks
+ * per real frame before the next begin_frame runs.  Without
+ * sdl2_input_consume, one space press would call
+ * ball_system_activate_waiting on every one of those ticks, and since
+ * activate_waiting always promotes the FIRST BALL_READY slot it finds,
+ * a sticky-paddle player holding 2+ balls would see them ALL launch off
+ * one press instead of one at a time.
+ *
+ * Seeds BALL_READY balls directly via ball_system_restore (the same
+ * seam savegame_system_restore uses -- see docs/TESTING.md's savegame
+ * fixture pattern) rather than driving a full multiball sequence.
+ * ball_system_restore sets nextFrame = current_frame + BIRTH_FRAME_RATE
+ * (5) to suppress auto-activation on the immediate post-restore tick
+ * (ball_system.h:292-298) -- so the burst below is capped at
+ * BIRTH_FRAME_RATE-1 (4) ticks, not the full 10-tick real-world warp
+ * burst, to keep the auto-activate timer from firing mid-test and
+ * confounding the assertion.  4 ticks with 3 seeded balls is still
+ * enough to distinguish "exactly one" from "all of them."
+ * ========================================================================= */
+
+static void seed_ready_ball(game_ctx_t *ctx, int index, int x)
+{
+    int frame = (int)sdl2_state_frame(ctx->state);
+    ball_system_status_t rc =
+        ball_system_restore(ctx->ball, index, frame, 1, BALL_READY, x, 500, 3, -3, BALL_NONE);
+    assert_int_equal(rc, BALL_SYS_OK);
+}
+
+static void test_sticky_paddle_one_press_launches_exactly_one_ball(void **vstate)
+{
+    game_ctx_t *ctx = ((kb_fixture_t *)*vstate)->ctx;
+
+    ball_system_clear_all(ctx->ball);
+    special_system_set(ctx->special, SPECIAL_STICKY, 1);
+    seed_ready_ball(ctx, 0, 200);
+    seed_ready_ball(ctx, 1, 260);
+    seed_ready_ball(ctx, 2, 320);
+
+    assert_int_equal(ball_system_get_state(ctx->ball, 0), BALL_READY);
+    assert_int_equal(ball_system_get_state(ctx->ball, 1), BALL_READY);
+    assert_int_equal(ball_system_get_state(ctx->ball, 2), BALL_READY);
+
+    /* ONE space press: begin_frame + process (inject_key), then several
+     * per-tick updates in the SAME frame -- no begin_frame between them,
+     * matching the real high-warp burst (src/game_main.c: one
+     * begin_frame/game_input_global per real frame, N ticks via
+     * sdl2_loop_update -> stub_tick -> sdl2_state_update). */
+    inject_key(ctx, SDL_SCANCODE_SPACE);
+    for (int i = 0; i < 4; i++)
+        sdl2_state_update(ctx->state);
+
+    int ready = 0;
+    int active = 0;
+    for (int i = 0; i < 3; i++)
+    {
+        enum BallStates s = ball_system_get_state(ctx->ball, i);
+        if (s == BALL_READY)
+            ready++;
+        else if (s == BALL_ACTIVE)
+            active++;
+    }
+
+    /* Pre-fix this activated all 3; the fix must leave exactly one
+     * active and the other two still waiting. */
+    assert_int_equal(active, 1);
+    assert_int_equal(ready, 2);
+}
+
+/* Sibling: a single waiting ball still launches normally on one press --
+ * the fix must not suppress the ordinary non-sticky single-ball case. */
+static void test_single_waiting_ball_still_launches_on_one_press(void **vstate)
+{
+    game_ctx_t *ctx = ((kb_fixture_t *)*vstate)->ctx;
+
+    ball_system_clear_all(ctx->ball);
+    seed_ready_ball(ctx, 0, 200);
+    assert_int_equal(ball_system_get_state(ctx->ball, 0), BALL_READY);
+
+    inject_key(ctx, SDL_SCANCODE_SPACE);
+    sdl2_state_update(ctx->state);
+
+    assert_int_equal(ball_system_get_state(ctx->ball, 0), BALL_ACTIVE);
+}
+
+/* =========================================================================
+ * Group 11: dialogue_key_from_sdl — pure keysym -> dialogue-action seam
+ * (mission m-2026-07-17-016, extracted under m-2026-07-17-015 from the
+ * inline switch in game_main.c's event loop).  Pure function, no game_ctx
+ * needed.  Covers xboing-47p's Delete=Backspace alias
+ * (original/dialogue.c:327-328).
+ * ========================================================================= */
+
+static void test_dialogue_key_delete_maps_to_backspace(void **vstate)
+{
+    (void)vstate;
+    dialogue_key_type_t out = DIALOGUE_KEY_CHAR;
+    bool rc = dialogue_key_from_sdl(SDLK_DELETE, &out);
+    assert_true(rc);
+    assert_int_equal(out, DIALOGUE_KEY_BACKSPACE);
+}
+
+/* Delete and Backspace must be indistinguishable to the dialogue system --
+ * the alias is total, not partial. */
+static void test_dialogue_key_backspace_maps_to_backspace(void **vstate)
+{
+    (void)vstate;
+    dialogue_key_type_t out = DIALOGUE_KEY_CHAR;
+    bool rc = dialogue_key_from_sdl(SDLK_BACKSPACE, &out);
+    assert_true(rc);
+    assert_int_equal(out, DIALOGUE_KEY_BACKSPACE);
+}
+
+static void test_dialogue_key_return(void **vstate)
+{
+    (void)vstate;
+    dialogue_key_type_t out = DIALOGUE_KEY_CHAR;
+    bool rc = dialogue_key_from_sdl(SDLK_RETURN, &out);
+    assert_true(rc);
+    assert_int_equal(out, DIALOGUE_KEY_RETURN);
+}
+
+static void test_dialogue_key_escape(void **vstate)
+{
+    (void)vstate;
+    dialogue_key_type_t out = DIALOGUE_KEY_CHAR;
+    bool rc = dialogue_key_from_sdl(SDLK_ESCAPE, &out);
+    assert_true(rc);
+    assert_int_equal(out, DIALOGUE_KEY_ESCAPE);
+}
+
+/* An unmapped key must return false and leave *out untouched -- callers
+ * gate dispatch on the return value, not the out-param's contents. */
+static void test_dialogue_key_unmapped_returns_false(void **vstate)
+{
+    (void)vstate;
+    dialogue_key_type_t out = DIALOGUE_KEY_CHAR;
+    bool rc = dialogue_key_from_sdl(SDLK_a, &out);
+    assert_false(rc);
+    assert_int_equal(out, DIALOGUE_KEY_CHAR);
+}
+
+/* NULL out must be rejected, not crash -- the function NULL-guards its
+ * only pointer parameter. */
+static void test_dialogue_key_null_out_returns_false(void **vstate)
+{
+    (void)vstate;
+    bool rc = dialogue_key_from_sdl(SDLK_RETURN, NULL);
+    assert_false(rc);
+}
+
+/* =========================================================================
  * Test registration
  * ========================================================================= */
 
@@ -931,7 +1109,8 @@ int main(void)
         cmocka_unit_test_setup_teardown(test_global_speed_5, setup_attract, teardown),
         cmocka_unit_test_setup_teardown(test_global_speed_9, setup_attract, teardown),
         cmocka_unit_test_setup_teardown(test_global_control_toggle, setup_attract, teardown),
-        cmocka_unit_test_setup_teardown(test_global_fullscreen_no_crash, setup_attract, teardown),
+        cmocka_unit_test_setup_teardown(test_iconify_does_not_toggle_fullscreen, setup_attract,
+                                        teardown),
         cmocka_unit_test_setup_teardown(test_global_quit_opens_dialogue, setup_attract, teardown),
         cmocka_unit_test_setup_teardown(test_quit_blocked_during_dialogue, setup_attract, teardown),
         cmocka_unit_test_setup_teardown(test_global_set_level_opens_dialogue, setup_attract,
@@ -950,7 +1129,7 @@ int main(void)
 
     const struct CMUnitTest gameplay_tests[] = {
         cmocka_unit_test_setup_teardown(test_gameplay_pause, setup_game, teardown),
-        cmocka_unit_test_setup_teardown(test_gameplay_editor, setup_game, teardown),
+        cmocka_unit_test_setup_teardown(test_gameplay_editor_e_is_noop, setup_game, teardown),
         cmocka_unit_test_setup_teardown(test_gameplay_paddle_left, setup_game, teardown),
         cmocka_unit_test_setup_teardown(test_gameplay_paddle_right, setup_game, teardown),
         cmocka_unit_test_setup_teardown(test_gameplay_paddle_left_arrow, setup_game, teardown),
@@ -969,6 +1148,7 @@ int main(void)
         cmocka_unit_test_setup_teardown(test_title_space_single_press_no_cascade, setup_attract,
                                         teardown),
         cmocka_unit_test_setup_teardown(test_attract_c_cycles_screen, setup_attract, teardown),
+        cmocka_unit_test_setup_teardown(test_attract_e_enters_editor, setup_attract, teardown),
         cmocka_unit_test_setup_teardown(test_highscore_c_cycle_clears_game_active, setup_attract,
                                         teardown),
         cmocka_unit_test_setup_teardown(test_highscore_space_return_clears_game_active,
@@ -1014,6 +1194,22 @@ int main(void)
         cmocka_unit_test_setup_teardown(test_numpad_plus_is_volume_up, setup_game, teardown),
     };
 
+    const struct CMUnitTest sticky_launch_tests[] = {
+        cmocka_unit_test_setup_teardown(test_sticky_paddle_one_press_launches_exactly_one_ball,
+                                        setup_game, teardown),
+        cmocka_unit_test_setup_teardown(test_single_waiting_ball_still_launches_on_one_press,
+                                        setup_game, teardown),
+    };
+
+    const struct CMUnitTest dialogue_key_seam_tests[] = {
+        cmocka_unit_test(test_dialogue_key_delete_maps_to_backspace),
+        cmocka_unit_test(test_dialogue_key_backspace_maps_to_backspace),
+        cmocka_unit_test(test_dialogue_key_return),
+        cmocka_unit_test(test_dialogue_key_escape),
+        cmocka_unit_test(test_dialogue_key_unmapped_returns_false),
+        cmocka_unit_test(test_dialogue_key_null_out_returns_false),
+    };
+
     int rc = 0;
     rc |= cmocka_run_group_tests_name("global keys", global_tests, NULL, NULL);
     rc |= cmocka_run_group_tests_name("mode scoping", scoping_tests, NULL, NULL);
@@ -1028,5 +1224,9 @@ int main(void)
                                       NULL, NULL);
     rc |= cmocka_run_group_tests_name("debug skip-level cheat + shift keymap (m-2026-07-16-015)",
                                       debug_skip_tests, NULL, NULL);
+    rc |= cmocka_run_group_tests_name("sticky-paddle single-launch per press (m-2026-07-17-014)",
+                                      sticky_launch_tests, NULL, NULL);
+    rc |= cmocka_run_group_tests_name("dialogue_key_from_sdl seam (m-2026-07-17-016)",
+                                      dialogue_key_seam_tests, NULL, NULL);
     return rc;
 }

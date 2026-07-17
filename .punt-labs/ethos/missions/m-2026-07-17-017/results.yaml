@@ -1,0 +1,58 @@
+results:
+    - mission: m-2026-07-17-017
+      round: 1
+      created_at: "2026-07-17T14:32:29Z"
+      author: gjm
+      verdict: pass
+      confidence: 0.95
+      files_changed:
+        - path: tests/test_game_rules.c
+          added: 25
+          removed: 9
+      evidence:
+        - name: cmake --preset debug && cmake --build build (zero warnings)
+          status: pass
+        - name: 'Isolated dynamite-test timing (CMOCKA_TEST_FILTER=test_dynamite*): before ~0.20-0.23s (lucky early seed, but worst case unbounded up to THROTTLE_BONUS_SEED*2=4000 ticks/seed, matching Copilot''s 2.7-3.2s worst-case estimate); after 0.22-0.61s steady-state (0.61s only on cold cache), and forcing the full 500-seed range with no early exit still measured 0.23-0.61s -- worst case == best case now because each seed costs exactly 1 throttle_tick'
+          status: pass
+        - name: full ctest --test-dir build (61 active, 1 disabled)
+          status: pass
+        - name: make asan-test (build-asan, 61 active, 1 disabled)
+          status: pass
+        - name: 'RED re-confirm: restored sdl2_audio_play_at_percent(ctx->audio, "bomb", 50) in src/game_rules.c dynamite case, rebuilt, ran fast test -- failed at assert_string_not_equal(entries[i].name, "bomb"), tests/test_game_rules.c:780, confirming the sped-up test still catches the regression'
+          status: fail
+        - name: src/game_rules.c reverted after RED re-confirm (git diff src/game_rules.c empty)
+          status: pass
+        - name: 'git status --porcelain: only tests/test_game_rules.c modified (tracked files)'
+          status: pass
+        - name: 'make cppcheck-src: fails identically with tests/test_game_rules.c stashed (src/ untouched) -- pre-existing, unrelated to this write_set'
+          status: skip
+      prose: |
+        Replaced the per-seed wait-out-the-BONUS_SEED-interval loop (up to
+        THROTTLE_BONUS_SEED*2=4000 throttle_tick calls per seed) with a direct
+        seam: ctx->next_bonus_frame = current_frame + 1 forces try_spawn_bonus's
+        `frame >= ctx->next_bonus_frame` gate (src/game_rules.c:101,109) true on
+        the very next tick, so each seed now costs exactly 1 throttle_tick. The
+        roll itself (find_random_empty_cell + rand()%27) still executes for real
+        off the seeded rand() stream -- this is a genuine per-seed roll, not a
+        stubbed one. Search still runs seeds 1..500 with early exit on the first
+        dynamite roll (found at seed=10 in one diagnostic run); worst case is now
+        bounded at 500 ticks total instead of ~2,000,000.
+
+        Timing: the repo's committed test happened to find its match at a low
+        seed, so wall-clock before/after look similar (~0.2s) in the common case
+        -- the fix's real payoff is eliminating the worst case (Copilot's
+        2.7-3.2s concern), which I confirmed structurally by forcing the loop to
+        run all 500 seeds with no early exit: timing stayed at 0.23-0.61s either
+        way, proving the cost is now seed-count bound (<=500 ticks) rather than
+        tick-count bound (<=2,000,000 ticks).
+
+        RED re-confirmed: restoring the bomb@50 play in src/game_rules.c's
+        dynamite case makes the fast test fail at the same
+        assert_string_not_equal(entries[i].name, "bomb") assertion (tests/test_game_rules.c:780),
+        then fully reverted -- git diff on src/game_rules.c is empty.
+
+        Full ctest suite (61 tests) and make asan-test both green. cppcheck-src
+        fails identically with or without this change (verified by stashing) --
+        pre-existing environment/tooling issue outside this TEST-ONLY write_set.
+        clang-format is not installed on this machine (format-check errors with
+        "command not found"), also outside the write_set's control.

@@ -75,6 +75,14 @@ static void input_launch_ball(game_ctx_t *ctx)
     {
         ball_system_env_t env = game_callbacks_ball_env(ctx);
         ball_system_activate_waiting(ctx->ball, &env);
+        /* input_launch_ball runs per-tick (up to 10 ticks/frame at high
+         * warp), but just_pressed clears only once per FRAME.  Without
+         * consuming the edge here, one space press activates every
+         * sticky-held BALL_READY ball across the whole tick burst
+         * instead of just one — same just_pressed-in-per-tick class
+         * ADR-053 fixed for attract-screen space.  See the existing
+         * consume pattern below (PAUSE/ABORT). */
+        sdl2_input_consume(ctx->input, SDL2I_START);
     }
 }
 
@@ -265,11 +273,10 @@ void game_input_global(game_ctx_t *ctx)
         }
     }
 
-    /* I: fullscreen toggle — original/main.c:853 (XIconifyWindow).
-     * Modernized as fullscreen toggle since SDL2 window management
-     * differs from X11 iconify semantics. See ADR in docs/DESIGN.md. */
+    /* I: minimize/iconify the window — original/main.c:856
+     * (XIconifyWindow), from the XK_i/XK_I case (original/main.c:853-855). */
     if (sdl2_input_just_pressed(ctx->input, SDL2I_ICONIFY))
-        sdl2_renderer_toggle_fullscreen(ctx->renderer);
+        sdl2_renderer_minimize(ctx->renderer);
 
     /* G: toggle keyboard/mouse control — original/main.c:377-394 */
     if (sdl2_input_just_pressed(ctx->input, SDL2I_TOGGLE_CONTROL))
@@ -385,10 +392,11 @@ void game_input_global(game_ctx_t *ctx)
         }
     }
 
-    /* E: enter editor — original only handles E in handleGameKeys and
-     * handleIntroKeys, not during pause/presents/dialogue. */
-    if (sdl2_input_just_pressed(ctx->input, SDL2I_ENTER_EDITOR) &&
-        (mode == SDL2ST_GAME || is_attract))
+    /* E: enter editor — original binds E ONLY in handleIntroKeys
+     * (attract screens, original/main.c:676-681).  handleGameKeys
+     * (original/main.c:430-533) has no E case at all — E must not
+     * open the editor from live gameplay. */
+    if (sdl2_input_just_pressed(ctx->input, SDL2I_ENTER_EDITOR) && is_attract)
         sdl2_state_transition(ctx->state, SDL2ST_EDIT);
 
     /* W: set starting level — original/main.c:671-673, level.c:245-282.
@@ -483,5 +491,35 @@ void game_input_global(game_ctx_t *ctx)
                 sdl2_state_transition(ctx->state, SDL2ST_GAME);
             }
         }
+    }
+}
+
+/* =========================================================================
+ * Dialogue key mapping
+ * ========================================================================= */
+
+bool dialogue_key_from_sdl(SDL_Keycode sym, dialogue_key_type_t *out)
+{
+    if (out == NULL)
+        return false;
+
+    switch (sym)
+    {
+        case SDLK_RETURN:
+            *out = DIALOGUE_KEY_RETURN;
+            return true;
+
+        /* original/dialogue.c:327-328 aliases XK_Delete to XK_BackSpace. */
+        case SDLK_DELETE:
+        case SDLK_BACKSPACE:
+            *out = DIALOGUE_KEY_BACKSPACE;
+            return true;
+
+        case SDLK_ESCAPE:
+            *out = DIALOGUE_KEY_ESCAPE;
+            return true;
+
+        default:
+            return false;
     }
 }

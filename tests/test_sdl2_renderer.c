@@ -187,6 +187,45 @@ static void test_is_fullscreen_initial(void **state)
 }
 
 /* =========================================================================
+ * Group 5a: Minimize/iconify (mission m-2026-07-17-014, bead 2z1)
+ *
+ * sdl2_renderer_minimize is the SDL2 equivalent of the original's
+ * XIconifyWindow (original/main.c:856), bound to the I key -- it must
+ * not affect fullscreen state (see test_iconify_does_not_toggle_fullscreen
+ * in tests/test_keybindings.c for the input-layer regression). This
+ * group covers the renderer-level function in isolation: NULL safety
+ * and a clean call under the dummy video driver.  Neither the
+ * SDL_WINDOW_MINIMIZED flag nor SDL_GetError() are asserted here --
+ * both are driver-dependent (SDL's dummy video driver doesn't implement
+ * window minimize and records "That operation is not supported" even
+ * though the call itself is handled gracefully) (per sjl). */
+
+/* TC-22: minimize(NULL) is a safe no-op. */
+static void test_minimize_null_safe(void **state)
+{
+    (void)state;
+    sdl2_renderer_minimize(NULL); /* Must not crash. */
+}
+
+/* TC-23: minimize on a valid context returns cleanly (smoke test) and
+ * does not flip fullscreen state -- the bug this function replaced
+ * (sdl2_renderer_toggle_fullscreen) would have made this assertion fail. */
+static void test_minimize_no_crash_no_fullscreen_change(void **state)
+{
+    (void)state;
+    sdl2_renderer_config_t cfg = sdl2_renderer_config_defaults();
+    sdl2_renderer_t *ctx = sdl2_renderer_create(&cfg);
+    assert_non_null(ctx);
+    assert_false(sdl2_renderer_is_fullscreen(ctx));
+
+    sdl2_renderer_minimize(ctx);
+
+    assert_false(sdl2_renderer_is_fullscreen(ctx));
+
+    sdl2_renderer_destroy(ctx);
+}
+
+/* =========================================================================
  * Group 5b: Mouse grab (-grab)
  * ========================================================================= */
 
@@ -478,6 +517,9 @@ int main(void)
         /* Group 5: Fullscreen */
         cmocka_unit_test(test_fullscreen_toggle),
         cmocka_unit_test(test_is_fullscreen_initial),
+        /* Group 5a: Minimize/iconify */
+        cmocka_unit_test(test_minimize_null_safe),
+        cmocka_unit_test(test_minimize_no_crash_no_fullscreen_change),
         cmocka_unit_test(test_mouse_grab_set_and_release),
         cmocka_unit_test(test_mouse_grab_null_safe),
         /* Group 6: Null safety */

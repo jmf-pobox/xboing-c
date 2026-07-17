@@ -1,0 +1,29 @@
+mission_id: m-2026-07-17-012
+status: closed
+type: implement
+created_at: "2026-07-17T12:46:12Z"
+updated_at: "2026-07-17T12:55:16Z"
+closed_at: "2026-07-17T12:55:16Z"
+leader: claude
+worker: sjl
+evaluator:
+    handle: jdc
+    pinned_at: "2026-07-17T12:46:12Z"
+    hash: c08223356d3e6d5aed56e28da477a1aa2707509febfef7c5f62c25871a3e841f
+inputs: {}
+write_set:
+    - include/sdl2_renderer.h
+    - src/sdl2_renderer.c
+success_criteria:
+    - 'Add a window-minimize seam so the I key can restore the original''s iconify behavior (xboing-2z1): `void sdl2_renderer_minimize(sdl2_renderer_t *ctx);` in include/sdl2_renderer.h + src/sdl2_renderer.c. It wraps SDL_MinimizeWindow on the renderer''s SDL_Window — the SDL2 equivalent of the original''s XIconifyWindow (original/main.c:853). NULL-guard ctx (and the window) per c-code.md; no-op on NULL. Header comment cites original/main.c:853 (XIconifyWindow) as the behavior provenance.'
+    - Do NOT remove or change sdl2_renderer_toggle_fullscreen / sdl2_renderer_is_fullscreen — the fullscreen capability (ADR-004) and its tests stay; only a NEW minimize function is added. (game_input will switch the I key from toggle_fullscreen to minimize in a sibling jdc mission.)
+    - cmake --preset debug && cmake --build build zero-warning (-Werror -Wconversion -Wshadow). Full ctest green. make asan-test green. Only include/sdl2_renderer.h + src/sdl2_renderer.c change. If the minimize call isn't observable headless (SDL_VIDEODRIVER=dummy), note how a test could assert it (e.g. it returns cleanly / SDL_GetError empty) so the sibling gjm mission can cover it.
+budget:
+    rounds: 2
+    reflection_after_each: true
+current_round: 1
+context: |-
+    Part of the 5-fix key/SFX parity batch. xboing-2z1: the I key currently toggles fullscreen with a
+    false ADR citation; the maintainer chose to RESTORE the original iconify/minimize behavior. This
+    mission adds the sdl2_renderer_minimize seam (SDL_MinimizeWindow) so the sibling jdc mission can point
+    the I key at it. Faithful to original/main.c:853 (XIconifyWindow).
