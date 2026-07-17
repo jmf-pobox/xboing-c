@@ -598,13 +598,19 @@ static void test_skip_level_cleared_shake_end_frame_140(void **vstate)
 }
 
 /* TC-64: ctx->cheated flips to true regardless of what is on the board
- * (pins ADR-073) -- uses the level's default just-loaded board (many
- * required blocks still present) rather than an emptied grid, so the
- * assertion is independent of TC-62/TC-63's cleared-count scenarios. */
+ * (pins ADR-073) -- seeds a single known required block explicitly
+ * (matching TC-66's pattern) rather than relying on the freshly-loaded
+ * level's default board, so the precondition is deterministic and does
+ * not depend on external level file content. The cheated-flag behavior
+ * itself is board-independent; this test only needs *some* required
+ * block present to distinguish the pre/post states. */
 static void test_skip_level_sets_cheated_regardless_of_board(void **vstate)
 {
     fixture_t *f = (fixture_t *)*vstate;
     game_ctx_t *ctx = f->ctx;
+
+    block_system_clear_all(ctx->block);
+    block_system_add(ctx->block, 5, 1, RED_BLK, 0, 0);
 
     ctx->cheated = false;
     assert_int_equal(block_system_still_active(ctx->block), 1);
