@@ -81,6 +81,13 @@ bool sdl2_renderer_toggle_fullscreen(sdl2_renderer_t *ctx);
 bool sdl2_renderer_is_fullscreen(const sdl2_renderer_t *ctx);
 
 /*
+ * Minimize (iconify) the game window.  The SDL2 equivalent of the
+ * original's XIconifyWindow (original/main.c:856, from the XK_i/XK_I
+ * case at :853-855) — used by the I key.  No-op if ctx is NULL.
+ */
+void sdl2_renderer_minimize(sdl2_renderer_t *ctx);
+
+/*
  * Confine (grab) the mouse pointer to the window, or release it.
  * Wraps SDL_SetWindowMouseGrab — the modern equivalent of the original's
  * XGrabPointer(confine_to=window) for the -grab option.  No-op if ctx or

@@ -122,20 +122,9 @@ int main(int argc, char *argv[])
                 }
                 if (event.type == SDL_KEYDOWN && !event.key.repeat)
                 {
-                    switch (event.key.keysym.sym)
-                    {
-                        case SDLK_RETURN:
-                            dialogue_system_key_input(ctx->dialogue, DIALOGUE_KEY_RETURN, '\0');
-                            break;
-                        case SDLK_BACKSPACE:
-                            dialogue_system_key_input(ctx->dialogue, DIALOGUE_KEY_BACKSPACE, '\0');
-                            break;
-                        case SDLK_ESCAPE:
-                            dialogue_system_key_input(ctx->dialogue, DIALOGUE_KEY_ESCAPE, '\0');
-                            break;
-                        default:
-                            break;
-                    }
+                    dialogue_key_type_t dk;
+                    if (dialogue_key_from_sdl(event.key.keysym.sym, &dk))
+                        dialogue_system_key_input(ctx->dialogue, dk, '\0');
                     continue;
                 }
             }

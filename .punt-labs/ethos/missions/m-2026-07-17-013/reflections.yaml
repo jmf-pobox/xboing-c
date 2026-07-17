@@ -1,0 +1,14 @@
+reflections:
+    - round: 1
+      created_at: "2026-07-17T13:05:23Z"
+      author: jck
+      converging: true
+      signals:
+        - 'c0q: original ActivateWaitingBall (original/ball.c:1760-1786) activates the FIRST BALL_READY ball and returns — one launch per keypress in the single-tick loop. Modern per-tick input_launch_ball x10/frame + once-per-frame just_pressed = multi-launch; consume restores one-per-press. Normal single-ball unaffected. ADR-053 is the right class precedent (mechanism differs: consume vs relocate; comment accurate).'
+        - '1xd: handleGameKeys (original/main.c:430-533) has NO XK_e/XK_E case; handleIntroKeys (:676-681) is the only E->MODE_EDIT. Gating to is_attract matches exactly.'
+        - '2z1: original/main.c:853-856 XK_i/XK_I -> XIconifyWindow -> minimize is faithful; fullscreen-toggle was the deviation; false ADR citation removed.'
+        - 'uwk: dynamite mass-clear (SetExplodeAllType/ExplodeAllOfOneType, original/blocks.c:972-1113) never calls PlaySoundForBlock; bomb@50 lives only in PlaySoundForBlock''s BOMB_BLK case (:771-772) fired from a real KILL_BLK hit (:1867-1868). Also dyn_types[] mirrors the original 7-way roll — BOMB_BLK was never a dynamite candidate. Silencing correct on two grounds.'
+        - '47p: original/dialogue.c:327-328 XK_Delete + XK_BackSpace share one body; fallthrough matches.'
+        - No fix introduces a new deviation; no protected invariant touched (MAX_BALLS/grid/paddle/scoring). Verified by reading original/* lines directly, not trusting worker citations.
+      recommendation: stop
+      reason: All five restore 1996 behavior, independently verified against original/*.c. APPROVED per fix (c0q/1xd/2z1/uwk/47p). The one failing test (test_gameplay_editor) encodes the OLD unfaithful E-in-game behavior and must be updated by the sibling gjm test mission to assert E is a no-op in gameplay — not a real regression, does not block this mission.

@@ -666,6 +666,106 @@ static void test_skip_level_drives_level_to_completion(void **vstate)
 }
 
 /* =========================================================================
+ * Silent dynamite bomb (mission m-2026-07-17-014, bead uwk)
+ *
+ * try_spawn_bonus's dynamite case (roll==25, src/game_rules.c:225-245)
+ * clears every block of one randomly-chosen color but must not play the
+ * "bomb" sfx -- SetExplodeAllType (original/blocks.c:1001-1113) is silent;
+ * "bomb"@50 is reserved for a real BOMB_BLK hit via PlaySoundForBlock
+ * (original/blocks.c:771-772).
+ *
+ * There is no seam to force roll==25 directly, so this brute-forces an
+ * rand() seed at test time: for a given seed, rand()/srand() is fully
+ * deterministic (same libc, same call sequence every run -- not flaky),
+ * so trying seeds 1..500 in order and stopping at the first one that
+ * lands on dynamite is itself a deterministic, repeatable sequence.
+ * Detection: seed seven blocks, one of each color in try_spawn_bonus's
+ * dyn_types list, in row 12 -- outside find_random_empty_cell's own
+ * placement range (rows 1..MAX_ROW-7 = 1..11, src/game_rules.c:47-52),
+ * so the spawner can never overwrite them itself.  When dynamite fires,
+ * exactly one of those seven disappears; when a different case fires
+ * (0-24), ctx->bonus_block_active goes true instead and the seed is
+ * abandoned in favor of the next one.
+ * ========================================================================= */
+
+#define DYNAMITE_SEED_ROW 12
+#define DYNAMITE_TARGET_COUNT 7
+
+static const int dynamite_target_types[DYNAMITE_TARGET_COUNT] = {
+    YELLOW_BLK, BLUE_BLK, RED_BLK, PURPLE_BLK, TAN_BLK, COUNTER_BLK, GREEN_BLK,
+};
+
+static void seed_dynamite_targets(game_ctx_t *ctx)
+{
+    for (int i = 0; i < DYNAMITE_TARGET_COUNT; i++)
+    {
+        assert_int_equal(
+            block_system_add(ctx->block, DYNAMITE_SEED_ROW, i, dynamite_target_types[i], 0, 0),
+            BLOCK_SYS_OK);
+    }
+}
+
+/* Count of the seven seeded targets still present untouched. */
+static int dynamite_targets_remaining(const block_system_t *block)
+{
+    int count = 0;
+    for (int i = 0; i < DYNAMITE_TARGET_COUNT; i++)
+    {
+        if (block_system_is_occupied(block, DYNAMITE_SEED_ROW, i) &&
+            block_system_get_type(block, DYNAMITE_SEED_ROW, i) == dynamite_target_types[i])
+        {
+            count++;
+        }
+    }
+    return count;
+}
+
+static void test_dynamite_spawn_silent_no_bomb_sfx(void **vstate)
+{
+    fixture_t *f = (fixture_t *)*vstate;
+    game_ctx_t *ctx = f->ctx;
+
+    ctx->play_test_active = true;
+    /* No ball may be in play for the whole run: an active ball can hit
+     * and clear one of the seeded target blocks by ordinary paddle/wall
+     * collision, which would look identical to a dynamite roll to the
+     * detector below and invalidate the seed search entirely. */
+    ball_system_clear_all(ctx->ball);
+
+    int found_dynamite = 0;
+    for (unsigned seed = 1; seed <= 500 && !found_dynamite; seed++)
+    {
+        block_system_clear_all(ctx->block);
+        seed_dynamite_targets(ctx);
+        ctx->bonus_block_active = false;
+        ctx->next_bonus_frame = 0;
+        sdl2_audio_log_clear(ctx->audio);
+        srand(seed);
+
+        for (int i = 0; i < THROTTLE_BONUS_SEED * 2 && !found_dynamite; i++)
+        {
+            throttle_tick(ctx);
+            if (ctx->bonus_block_active)
+                break; /* Case 0-24 rolled for this seed -- try the next one. */
+            if (dynamite_targets_remaining(ctx->block) < DYNAMITE_TARGET_COUNT)
+                found_dynamite = 1;
+        }
+    }
+
+    /* Non-vacuous: a seed that actually rolled dynamite must have been
+     * found within the search budget, or the silence assertion below
+     * proves nothing. */
+    assert_true(found_dynamite);
+
+    sdl2_audio_call_t entries[16];
+    int n = sdl2_audio_log_snapshot(ctx->audio, entries, 16);
+    for (int i = 0; i < n; i++)
+    {
+        assert_string_not_equal(entries[i].name, "bomb");
+    }
+}
+
+/* =========================================================================
  * Main
  * ========================================================================= */
 
@@ -705,6 +805,9 @@ int main(void)
         cmocka_unit_test_setup_teardown(test_skip_level_sets_message, setup, teardown),
         cmocka_unit_test_setup_teardown(test_skip_level_drives_level_to_completion, setup,
                                         teardown),
+
+        /* Silent dynamite bomb (mission m-2026-07-17-014) */
+        cmocka_unit_test_setup_teardown(test_dynamite_spawn_silent_no_bomb_sfx, setup, teardown),
     };
 
     return cmocka_run_group_tests(tests, NULL, NULL);

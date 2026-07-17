@@ -1,0 +1,35 @@
+mission_id: m-2026-07-17-013
+status: closed
+type: implement
+created_at: "2026-07-17T12:56:21Z"
+updated_at: "2026-07-17T13:05:28Z"
+closed_at: "2026-07-17T13:05:28Z"
+leader: claude
+worker: jdc
+evaluator:
+    handle: jck
+    pinned_at: "2026-07-17T12:56:21Z"
+    hash: 40cbe1204f644c77e6a26757a9b855e3298be267025e806d425bfdea99054f18
+inputs: {}
+write_set:
+    - src/game_input.c
+    - src/game_rules.c
+    - src/game_main.c
+success_criteria:
+    - Five 1996-fidelity fixes, all maintainer-confirmed to RESTORE/MATCH the original (no new deviations). Each cites the original. No tests here (sibling gjm mission owns tests).
+    - 'xboing-c0q (input_launch_ball, src/game_input.c ~70-79): after ball_system_activate_waiting, add `sdl2_input_consume(ctx->input, SDL2I_START);` so the launch fires ONCE per visual frame even though game_input_update runs per-tick (up to 10 ticks/frame at high warp). Fixes the sticky-paddle multi-launch (2+ BALL_READY balls launched on one press). Same just_pressed-in-per-tick class ADR-053 fixed for attract space; reuse the existing sdl2_input_consume pattern (game_input.c:152 PAUSE, :371 ABORT). Comment cites ADR-053 + the WHY (per-tick handler, once-per-frame edge).'
+    - 'xboing-1xd (E-key editor gating, src/game_input.c ~388-392): change the ENTER_EDITOR guard from `(mode == SDL2ST_GAME || is_attract)` to `is_attract` only — the original binds E ONLY in handleIntroKeys (attract); handleGameKeys has no E case (original/main.c:430-533 vs 676-681). Fix the FALSE comment above it (it currently claims the original handles E in handleGameKeys) to state the correct provenance. E must no longer open the editor from live gameplay.'
+    - 'xboing-2z1 (I-key iconify, src/game_input.c ~272): change `sdl2_renderer_toggle_fullscreen(ctx-> renderer)` to `sdl2_renderer_minimize(ctx->renderer)` (the new seam from m-2026-07-17-012), restoring the original iconify/minimize behavior. REPLACE the false comment (it cites a non-existent ADR: "See ADR in docs/DESIGN.md") with accurate provenance: I minimizes/iconifies the window, original/main.c: 856 (XIconifyWindow). Do not remove the renderer fullscreen capability (ADR-004) — just stop the I key from calling it.'
+    - 'xboing-uwk (dynamite SFX, src/game_rules.c ~243): DELETE the `sdl2_audio_play_at_percent(ctx->audio, "bomb", 50);` play in the dynamite bonus-spawn case (case 25). The original''s SetExplodeAllType is SILENT at dynamite spawn; bomb@50 is reserved for a real BOMB_BLK tile being hit (original/blocks.c:771-772). Leave a one-line comment noting the original''s silence. Everything else in the dynamite case (the mass-clear) stays.'
+    - 'xboing-47p (Delete-as-Backspace, src/game_main.c ~130): add `case SDLK_DELETE:` immediately above `case SDLK_BACKSPACE:` so Delete falls through to the same DIALOGUE_KEY_BACKSPACE handler. The original aliases XK_Delete to XK_BackSpace in dialogue text entry (original/dialogue.c:327-328). Comment cites it. Reuse the existing backspace case body (no duplicated logic).'
+    - cmake --preset debug && cmake --build build zero-warning (-Werror -Wconversion -Wshadow). Full ctest --test-dir build green (existing tests must stay green; the E/I/launch behavior changes may require the sibling gjm mission to update expectations — but nothing should regress unexpectedly; flag any existing test that asserts the OLD E-in-game / I-fullscreen behavior so gjm updates it). make asan-test green. Only the 3 write-set files change.
+budget:
+    rounds: 3
+    reflection_after_each: true
+current_round: 1
+context: |-
+    Batch of 5 maintainer-confirmed key/SFX parity fixes, all restoring 1996 behavior: c0q (sticky
+    multi-launch — once-per-frame via sdl2_input_consume, ADR-053 class), 1xd (E editor attract-only),
+    2z1 (I iconify not fullscreen, using the new sdl2_renderer_minimize seam), uwk (silence bomb@50 on
+    dynamite spawn), 47p (Delete=Backspace in dialogues). jck gates faithfulness. Sibling gjm mission
+    adds/updates tests.

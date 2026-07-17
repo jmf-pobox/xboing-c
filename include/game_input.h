@@ -8,6 +8,11 @@
 #ifndef GAME_INPUT_H
 #define GAME_INPUT_H
 
+#include <stdbool.h>
+
+#include <SDL2/SDL.h>
+
+#include "dialogue_system.h"
 #include "game_context.h"
 
 /*
@@ -35,5 +40,15 @@ void game_input_update(game_ctx_t *ctx);
  * per visual frame at high speeds, causing toggle keys to multi-fire.
  */
 void game_input_global(game_ctx_t *ctx);
+
+/*
+ * Map an SDL keycode to a dialogue key action.
+ *
+ * Pure keycode -> dialogue-action mapping, no side effects.  Returns
+ * true and sets *out for RETURN, BACKSPACE, DELETE, and ESCAPE.
+ * Returns false (leaving *out untouched) for anything else.  Delete
+ * aliases to Backspace per original/dialogue.c:327-328.
+ */
+bool dialogue_key_from_sdl(SDL_Keycode sym, dialogue_key_type_t *out);
 
 #endif /* GAME_INPUT_H */

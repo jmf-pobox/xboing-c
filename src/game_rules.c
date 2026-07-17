@@ -239,8 +239,9 @@ static void try_spawn_bonus(game_ctx_t *ctx, int frame)
                     block_system_clear(ctx->block, r, c);
             }
         }
-        if (ctx->audio)
-            sdl2_audio_play_at_percent(ctx->audio, "bomb", 50);
+        /* SetExplodeAllType (original/blocks.c:1001-1113) is silent at
+         * dynamite spawn — bomb@50 plays only for a real BOMB_BLK hit,
+         * via PlaySoundForBlock (original/blocks.c:771-772). */
     }
     else
     {
