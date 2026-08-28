@@ -188,12 +188,14 @@ static void test_init_legacy_env_vars(void **state)
     assert_string_equal(cfg.xboing_score_file, "/my/scores.dat");
 }
 
-/* When the game is installed on this machine, its levels and sounds sit
- * in /usr/share/xboing.  A file lookup checks there before it checks the
- * current folder, so it finds the installed copy and stops early — and
- * the tests below never reach the current-folder case they are checking.
- * Blanking this path makes a lookup behave as if the game were not
- * installed, so those tests give the same answer on every machine. */
+/* When the game is installed, its levels and sounds sit wherever the build
+ * was told to put them — /usr/share/xboing for the .deb, somewhere else
+ * under a different prefix.  cfg->install_data_dir holds that path, and a
+ * lookup checks it before it checks the current folder, so on a machine
+ * with the game installed it finds the installed copy and stops.  The
+ * tests below would then never reach the current-folder case they are
+ * checking.  Blanking that path makes a lookup behave as if the game were
+ * not installed, so those tests give the same answer on every machine. */
 static void ignore_local_installed_assets(paths_config_t *cfg)
 {
     cfg->install_data_dir[0] = '\0';

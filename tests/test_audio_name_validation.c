@@ -101,7 +101,8 @@ static void test_every_block_sound_name_resolves(void **state)
 }
 
 /* =========================================================================
- * Every literal currently passed to sdl2_audio_play in src/.
+ * Every sound name passed straight to sdl2_audio_play or to
+ * sdl2_audio_play_at_percent anywhere in src/.
  *
  * A name the game only ever plays by way of block_sound.c — "bomb", for
  * one — is left out.  test_every_block_sound_name_resolves already checks
