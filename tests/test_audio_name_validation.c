@@ -103,6 +103,11 @@ static void test_every_block_sound_name_resolves(void **state)
 /* =========================================================================
  * Every literal currently passed to sdl2_audio_play in src/.
  *
+ * Sound names that come from block_sound.c ("bomb", "touch", ...) are
+ * left out on purpose.  test_every_block_sound_name_resolves already
+ * checks all of them by asking block_sound_lookup for every block type,
+ * so scripts/audio-literals.sh skips that file when it builds this list.
+ *
  * Generated and kept in sync via `make audio-literals-check`, which
  * diffs this array against scripts/audio-literals.sh output.  CI fails
  * on drift.
@@ -111,8 +116,8 @@ static void test_every_block_sound_name_resolves(void **state)
  * ========================================================================= */
 
 static const char *const k_known_literals[] = {
-    "applause", "balllost", "bomb",    "buzzer", "game_over",
-    "paddle",   "tone",     "toggle",  "youagod", NULL,
+    "applause", "balllost", "buzzer", "game_over", "paddle",
+    "toggle",   "tone",     "touch",  "youagod",   NULL,
 };
 
 static void test_every_known_literal_resolves(void **state)

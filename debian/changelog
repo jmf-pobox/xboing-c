@@ -9,7 +9,7 @@ xboing (1.0.10-1) unstable; urgency=medium
     was cut off by audio shutdown — the game now lets the ~1.2s sting finish
     playing before the window closes.
 
- -- J Freeman <jmf@pobox.com>  Wed, 16 Jul 2026 21:20:00 -0700
+ -- J Freeman <jmf@pobox.com>  Thu, 16 Jul 2026 21:20:00 -0700
 
 xboing (1.0.9-1) unstable; urgency=medium
 

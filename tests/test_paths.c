@@ -188,6 +188,17 @@ static void test_init_legacy_env_vars(void **state)
     assert_string_equal(cfg.xboing_score_file, "/my/scores.dat");
 }
 
+/* When the game is installed on this machine, its levels and sounds sit
+ * in /usr/share/xboing.  A file lookup checks there before it checks the
+ * current folder, so it finds the installed copy and stops early — and
+ * the tests below never reach the current-folder case they are checking.
+ * Blanking this path makes a lookup behave as if the game were not
+ * installed, so those tests give the same answer on every machine. */
+static void ignore_local_installed_assets(paths_config_t *cfg)
+{
+    cfg->install_data_dir[0] = '\0';
+}
+
 /* =========================================================================
  * Group 2: Level file resolution (paths_level_file)
  * ========================================================================= */
@@ -214,6 +225,7 @@ static void test_level_cwd_fallback(void **state)
     /* No overrides, no XDG dirs that exist — should fall through to CWD. */
     paths_init_explicit(&cfg, "/nonexistent/home", NULL, NULL, "/nonexistent/share", NULL, NULL,
                         NULL);
+    ignore_local_installed_assets(&cfg);
 
     char buf[PATHS_MAX_PATH];
     paths_status_t st = paths_level_file(&cfg, "level01.data", buf, sizeof(buf));
@@ -253,6 +265,7 @@ static void test_level_editor_data(void **state)
     paths_config_t cfg;
     paths_init_explicit(&cfg, "/nonexistent/home", NULL, NULL, "/nonexistent/share", NULL, NULL,
                         NULL);
+    ignore_local_installed_assets(&cfg);
 
     char buf[PATHS_MAX_PATH];
     paths_status_t st = paths_level_file(&cfg, "editor.data", buf, sizeof(buf));
@@ -267,6 +280,7 @@ static void test_level_demo_data(void **state)
     paths_config_t cfg;
     paths_init_explicit(&cfg, "/nonexistent/home", NULL, NULL, "/nonexistent/share", NULL, NULL,
                         NULL);
+    ignore_local_installed_assets(&cfg);
 
     char buf[PATHS_MAX_PATH];
     paths_status_t st = paths_level_file(&cfg, "demo.data", buf, sizeof(buf));
@@ -310,6 +324,7 @@ static void test_sound_cwd_fallback(void **state)
     paths_config_t cfg;
     paths_init_explicit(&cfg, "/nonexistent/home", NULL, NULL, "/nonexistent/share", NULL, NULL,
                         NULL);
+    ignore_local_installed_assets(&cfg);
 
     char buf[PATHS_MAX_PATH];
     paths_status_t st = paths_sound_file(&cfg, "balllost", buf, sizeof(buf));
@@ -324,6 +339,7 @@ static void test_sound_au_extension(void **state)
     paths_config_t cfg;
     paths_init_explicit(&cfg, "/nonexistent/home", NULL, NULL, "/nonexistent/share", NULL, NULL,
                         NULL);
+    ignore_local_installed_assets(&cfg);
 
     char buf[PATHS_MAX_PATH];
     paths_status_t st = paths_sound_file(&cfg, "ammo", buf, sizeof(buf));
@@ -535,14 +551,15 @@ static void test_levels_dir_readable_legacy(void **state)
     assert_string_equal(buf, "/custom/levels");
 }
 
-/* TC-28: Levels readable dir — CWD fallback when XDG_DATA_DIRS has no match
- *         (hermetic: use a nonexistent path so the install lookup always
- *         misses, regardless of what is installed on the host). */
+/* TC-28: Levels readable dir — falls back to the current folder when
+ *         XDG_DATA_DIRS has no match.  Same answer whether or not the
+ *         game is installed on this machine. */
 static void test_levels_dir_readable_default(void **state)
 {
     (void)state;
     paths_config_t cfg;
     paths_init_explicit(&cfg, "/home/test", NULL, NULL, "/nonexistent/share", NULL, NULL, NULL);
+    ignore_local_installed_assets(&cfg);
 
     char buf[PATHS_MAX_PATH];
     paths_status_t st = paths_levels_dir_readable(&cfg, buf, sizeof(buf));
@@ -706,13 +723,15 @@ static void test_levels_dir_readable_install_fallback(void **state)
     remove_temp_tree(root, "xboing/levels");
 }
 
-/* TC-38: paths_levels_dir_readable — CWD fallback when XDG_DATA_DIRS points
- *         nowhere (hermetic: nonexistent path so install lookup always misses). */
+/* TC-38: paths_levels_dir_readable — falls back to the current folder when
+ *         XDG_DATA_DIRS points nowhere.  Same answer whether or not the
+ *         game is installed on this machine. */
 static void test_levels_dir_readable_cwd_fallback(void **state)
 {
     (void)state;
     paths_config_t cfg;
     paths_init_explicit(&cfg, "/home/test", NULL, NULL, "/nonexistent/share", NULL, NULL, NULL);
+    ignore_local_installed_assets(&cfg);
 
     char buf[PATHS_MAX_PATH];
     paths_status_t st = paths_levels_dir_readable(&cfg, buf, sizeof(buf));
@@ -859,13 +878,15 @@ static void test_sounds_dir_readable_install_fallback(void **state)
     remove_temp_tree(root, "xboing/sounds");
 }
 
-/* TC-49: paths_sounds_dir_readable — CWD fallback when XDG_DATA_DIRS points
- *         nowhere (hermetic: nonexistent path so install lookup always misses). */
+/* TC-49: paths_sounds_dir_readable — falls back to the current folder when
+ *         XDG_DATA_DIRS points nowhere.  Same answer whether or not the
+ *         game is installed on this machine. */
 static void test_sounds_dir_readable_cwd_fallback(void **state)
 {
     (void)state;
     paths_config_t cfg;
     paths_init_explicit(&cfg, "/home/test", NULL, NULL, "/nonexistent/share", NULL, NULL, NULL);
+    ignore_local_installed_assets(&cfg);
 
     char buf[PATHS_MAX_PATH];
     paths_status_t st = paths_sounds_dir_readable(&cfg, buf, sizeof(buf));
