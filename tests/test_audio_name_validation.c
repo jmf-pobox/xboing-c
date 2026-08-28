@@ -101,7 +101,16 @@ static void test_every_block_sound_name_resolves(void **state)
 }
 
 /* =========================================================================
- * Every literal currently passed to sdl2_audio_play in src/.
+ * Every sound name passed straight to sdl2_audio_play or to
+ * sdl2_audio_play_at_percent anywhere in src/.
+ *
+ * A name the game only ever plays by way of block_sound.c — "bomb", for
+ * one — is left out.  test_every_block_sound_name_resolves already checks
+ * those by asking block_sound_lookup for every block type, which is why
+ * scripts/audio-literals.sh skips src/block_sound.c when it builds the
+ * list.  A name that something else plays directly still belongs here,
+ * even if block_sound.c uses it too: "touch" is on the list because
+ * game_rules.c plays it on its own.
  *
  * Generated and kept in sync via `make audio-literals-check`, which
  * diffs this array against scripts/audio-literals.sh output.  CI fails
@@ -111,8 +120,8 @@ static void test_every_block_sound_name_resolves(void **state)
  * ========================================================================= */
 
 static const char *const k_known_literals[] = {
-    "applause", "balllost", "bomb",    "buzzer", "game_over",
-    "paddle",   "tone",     "toggle",  "youagod", NULL,
+    "applause", "balllost", "buzzer", "game_over", "paddle",
+    "toggle",   "tone",     "touch",  "youagod",   NULL,
 };
 
 static void test_every_known_literal_resolves(void **state)

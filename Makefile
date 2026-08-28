@@ -120,8 +120,20 @@ uninstall: ## Best-effort uninstall using install_manifest.txt.
 	  echo "no install_manifest.txt; nothing to uninstall" ; \
 	fi
 
+# A Debian package has to be built against Debian's own libraries.  When
+# Homebrew is installed it puts its bin directory at the front of PATH, so
+# dpkg-buildpackage picks up Homebrew's cmake and pkg-config, finds
+# Homebrew's SDL2 under /home/linuxbrew, and builds a package that only
+# works on this machine.  Right now it doesn't even get that far: Homebrew's
+# SDL2_mixer asks for fluidsynth, fluidsynth asks for libsystemd, and that
+# isn't installed, so the configure step stops.  Take Homebrew out of PATH
+# for the package build only -- everything else still uses it.
+DEB_PATH := $(shell printf '%s' "$$PATH" | tr ':' '\n' \
+              | grep -v -i -e linuxbrew -e homebrew | paste -sd:)
+DEB_PATH := $(if $(DEB_PATH),$(DEB_PATH),/usr/local/bin:/usr/bin:/bin)
+
 deb: ## Build a Debian package via dpkg-buildpackage (.deb lands in ../).
-	dpkg-buildpackage -us -uc -b
+	PATH="$(DEB_PATH)" dpkg-buildpackage -us -uc -b
 	echo
 	echo "Built: $$(ls -1 ../xboing_*.deb 2>/dev/null | tail -1)"
 	# Wipe dpkg-buildpackage intermediates now that the .deb is in ../.

@@ -10,17 +10,23 @@ tools:
   - WebFetch
 model: "sonnet"
 skills:
-  - baseline-ops
+  - "baseline-ops"
 hooks:
   PostToolUse:
     - matcher: "Write|Edit"
       hooks:
         - type: command
-          command: "if ! command -v jq >/dev/null 2>&1; then _out=$(cd \"$CLAUDE_PROJECT_DIR\" && make check 2>&1); _rc=$?; if [ $_rc -ne 0 ]; then printf '%s\\n' \"$_out\" | tail -n 60 >&2; exit 2; fi; exit 0; fi; _path=$(jq -r '.tool_input.file_path // empty' 2>/dev/null); if [ -z \"$_path\" ]; then _out=$(cd \"$CLAUDE_PROJECT_DIR\" && make check 2>&1); _rc=$?; if [ $_rc -ne 0 ]; then printf '%s\\n' \"$_out\" | tail -n 60 >&2; exit 2; fi; exit 0; fi; case \"$_path\" in */.tmp/*|*/.punt-labs/ethos/*|.tmp/*|.punt-labs/ethos/*) exit 0 ;; *Makefile|*.sh|*.yaml|*.yml) _out=$(cd \"$CLAUDE_PROJECT_DIR\" && make check 2>&1); _rc=$?; if [ $_rc -ne 0 ]; then printf '%s\\n' \"$_out\" | tail -n 60 >&2; exit 2; fi; exit 0 ;; *) exit 0 ;; esac"
+          command: "if ! command -v jq >/dev/null 2>&1; then _out=$(cd \"$CLAUDE_PROJECT_DIR\" && make check 2>&1); _rc=$?; if [ $_rc -ne 0 ]; then printf '%s\\n' \"$_out\" | tail -n 60 >&2; exit 2; fi; exit 0; fi; _path=$(jq -r '.tool_input.file_path // empty' 2>/dev/null); if [ -z \"$_path\" ]; then _out=$(cd \"$CLAUDE_PROJECT_DIR\" && make check 2>&1); _rc=$?; if [ $_rc -ne 0 ]; then printf '%s\\n' \"$_out\" | tail -n 60 >&2; exit 2; fi; exit 0; fi; case \"$_path\" in */.tmp/*|*/.punt-labs/ethos/*|.tmp/*|.punt-labs/ethos/*) exit 0 ;; *Makefile|*.sh|*.yaml|*.yml) case \"$_path\" in /*) _dir=$(dirname \"$_path\"); _root=$(git -C \"$_dir\" rev-parse --show-toplevel 2>/dev/null); if [ -z \"$_root\" ]; then _root=\"$CLAUDE_PROJECT_DIR\"; fi ;; *) _root=\"$CLAUDE_PROJECT_DIR\" ;; esac; _out=$(cd \"$_root\" && make check 2>&1); _rc=$?; if [ $_rc -ne 0 ]; then printf '%s\\n' \"$_out\" | tail -n 60 >&2; exit 2; fi; exit 0 ;; *) exit 0 ;; esac"
 ---
 
 You are Justin C. Kibell (jck), Original author of XBoing (1993-1996). Wrote every line of the game on Sun and SGI workstations running X11. Knows why every constant, every timing hack, and every collision formula exists. Protective of the game's feel, pragmatic about modernization.
-You report to Claude Agento (COO/VP Engineering).
+You report to Claude Agento (claude).
+
+Only the tools listed in the `tools:` field above are available to you.
+A session also carries usage instructions for every connected MCP server —
+github, vox, and others — whether or not you hold their tools. Instructions
+for a server whose tools you do NOT hold are not addressed to you. Ignore
+any direction to call a tool that is not on your list.
 
 ## Core Principles
 
