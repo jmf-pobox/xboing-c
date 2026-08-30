@@ -55,7 +55,7 @@ jobs:
   install-deb:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Install .deb build toolchain
         run: |
@@ -68,8 +68,12 @@ jobs:
       - name: Build .deb via dpkg-buildpackage
         run: dpkg-buildpackage -us -uc -b
 
-      - name: Install produced .deb
-        run: sudo dpkg -i ../xboing_*_amd64.deb
+      - name: Install produced .deb (with runtime deps resolved)
+        run: |
+          # apt-get install ./*.deb resolves runtime Depends (fonts-liberation,
+          # SDL runtime libs) automatically — plain dpkg -i would need a
+          # second `apt-get install -f -y` pass. Glob is arch-agnostic.
+          sudo apt-get install -y ../xboing_*.deb
 
       - name: Verify installed binary reports the release version
         run: |
@@ -77,59 +81,71 @@ jobs:
           out=$(/usr/games/xboing -version)
           echo "$out"
           # Match the man page / formula convention: "xboing X.Y.Z"
-          echo "$out" | grep -E '^xboing [0-9]+\.[0-9]+\.[0-9]+'
+          echo "$out" | grep -qE '^xboing [0-9]+\.[0-9]+\.[0-9]+'
 
       - name: Verify installed binary passes headless smoke launch
         env:
-          SDL_VIDEODRIVER: offscreen
+          # Project convention (.claude/rules/tests.md): `dummy` is the
+          # standard headless driver for smoke/logic runs; `offscreen`
+          # is reserved for pixel-diff tests.
+          SDL_VIDEODRIVER: dummy
           SDL_AUDIODRIVER: dummy
         run: |
-          # Start the game headlessly and let it run briefly to prove SDL
-          # init + asset resolution work end-to-end. Exit code 124 (timeout
-          # killed a running process) is the success case.
+          # Start the game headlessly and let timeout kill it after 3s so we
+          # know it ran the full startup path. The predicate below refuses
+          # exit code 0 on purpose: xboing exits 0 when game_create fails
+          # (SDL init failure, missing assets, etc.), so accepting 0 would
+          # let a broken install pass the check meant to prove init works.
           set +e
           timeout --signal=TERM 3 /usr/games/xboing
           rc=$?
           set -e
           echo "xboing headless exit code: $rc"
-          # 124 = timeout ran happily; 0 = clean exit (also fine)
-          [ "$rc" -eq 124 ] || [ "$rc" -eq 0 ]
+          # 124 = timeout SIGKILLed (process ran the full 3s and ignored TERM)
+          # 143 = 128 + SIGTERM(15) (process caught TERM and exited)
+          # Anything else — including 0 — means it did not survive to be
+          # timed out, and that is a real failure to prove out.
+          [ "$rc" -eq 124 ] || [ "$rc" -eq 143 ]
 
   install-brew:
     runs-on: macos-14
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Install in-repo formula via a local tap (HEAD build)
         run: |
-          # Modern Homebrew refuses `brew install /path/to/formula.rb` —
-          # a formula must live under a tap. Stage the in-repo formula
-          # (packaging/homebrew/xboing.rb, the source of truth that gets
-          # copied to the jmf-pobox/homebrew-xboing tap on release) into
-          # a local tap dir so this leg tests the ACTUAL contents of the
-          # PR, not whatever the public tap currently holds.
+          # Stage the in-repo formula (packaging/homebrew/xboing.rb, the
+          # source of truth that gets copied to jmf-pobox/homebrew-xboing
+          # on release) into a proper local tap so this leg tests the PR's
+          # formula, not whatever the public tap currently holds.
+          #
+          # brew tap-new registers the tap properly (initializes .git,
+          # sets up the tap metadata) — the previous bare mkdir happened to
+          # work but was fragile.
           set -euo pipefail
-          tap_path="$(brew --repository)/Library/Taps/xboing-ci/homebrew-xboing"
-          mkdir -p "$tap_path/Formula"
+          brew tap-new --no-git jmf-pobox/xboing-ci
+          tap_path="$(brew --repository jmf-pobox/xboing-ci)"
           cp packaging/homebrew/xboing.rb "$tap_path/Formula/xboing.rb"
-          brew install --HEAD xboing-ci/xboing/xboing
+          brew install --HEAD jmf-pobox/xboing-ci/xboing
 
       - name: Verify installed binary reports the release version
         run: |
           set -euo pipefail
           out=$(xboing -version)
           echo "$out"
-          # HEAD builds report the CMakeLists.txt project VERSION.
-          echo "$out" | grep -E '^xboing [0-9]+\.[0-9]+\.[0-9]+'
+          echo "$out" | grep -qE '^xboing [0-9]+\.[0-9]+\.[0-9]+'
 
       - name: Verify installed binary passes headless smoke launch
         env:
-          SDL_VIDEODRIVER: offscreen
+          # `dummy` per project convention (see install-deb note above).
+          SDL_VIDEODRIVER: dummy
           SDL_AUDIODRIVER: dummy
         run: |
           set +e
-          # macOS uses gtimeout via coreutils in some setups; ship the
-          # bash timeout via `perl` fallback if timeout isn't present.
+          # timeout is not in the default macos-14 PATH. Use gtimeout via
+          # Homebrew's coreutils (already available via brew's dependency
+          # closure), then perl alarm as the last resort. perl's SIGALRM
+          # kills the exec'd process with signal 14 → shell exit 142.
           if command -v timeout >/dev/null 2>&1; then
             timeout --signal=TERM 3 xboing
           elif command -v gtimeout >/dev/null 2>&1; then
@@ -140,4 +156,8 @@ jobs:
           rc=$?
           set -e
           echo "xboing headless exit code: $rc"
-          [ "$rc" -eq 124 ] || [ "$rc" -eq 0 ] || [ "$rc" -eq 143 ]
+          # 124 = SIGKILL by timeout
+          # 143 = 128 + SIGTERM(15), caught cleanly
+          # 142 = 128 + SIGALRM(14), from the perl fallback path
+          # Refusing 0 for the same reason as install-deb.
+          [ "$rc" -eq 124 ] || [ "$rc" -eq 143 ] || [ "$rc" -eq 142 ]
