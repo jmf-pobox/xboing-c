@@ -1,0 +1,229 @@
+name: Release
+
+# Phase C of the CI + distribution plan (bead xboing-qlw7).
+# Tag-triggered: build .deb, attach to GitHub Release, emit tap sha256,
+# smoke-install on both platforms, SLSA L1 provenance.
+#
+# Prerequisites for full functionality:
+#   - Tag pushed on master matches vMAJOR.MINOR.PATCH.
+#   - debian/changelog head entry version matches the tag.
+#   - packaging/homebrew/xboing.rb is the source of truth for the tap;
+#     manual tap-bump (Phase A2 follow-up) applies the sha256 emitted below.
+
+on:
+  push:
+    tags: ['v*']
+
+permissions: read-all
+
+jobs:
+  # -------------------------------------------------------------------------
+  # 1. Build the .deb and compute the sha256 that Homebrew needs.
+  # -------------------------------------------------------------------------
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+      deb_name: ${{ steps.meta.outputs.deb_name }}
+      tarball_sha256: ${{ steps.meta.outputs.tarball_sha256 }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve release metadata
+        id: meta
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          deb_name="xboing_${version}-1_amd64.deb"
+          echo "version=$version"       >> "$GITHUB_OUTPUT"
+          echo "deb_name=$deb_name"     >> "$GITHUB_OUTPUT"
+          # Fetch the GitHub-generated source tarball for the tag and hash it
+          # so the tap update can pin url + sha256 without a manual round-trip.
+          url="https://github.com/${GITHUB_REPOSITORY}/archive/refs/tags/${GITHUB_REF_NAME}.tar.gz"
+          echo "Fetching $url"
+          curl -sSL -o tarball.tgz "$url"
+          sha=$(shasum -a 256 tarball.tgz | awk '{print $1}')
+          echo "tarball_sha256=$sha" >> "$GITHUB_OUTPUT"
+          rm -f tarball.tgz
+
+      - name: Sanity-check debian/changelog matches the tag
+        run: |
+          set -euo pipefail
+          head_ver=$(dpkg-parsechangelog -l debian/changelog --show-field Version | sed 's/-.*//')
+          expect="${{ steps.meta.outputs.version }}"
+          if [ "$head_ver" != "$expect" ]; then
+            echo "::error::debian/changelog head version ($head_ver) != tag ($expect)"
+            exit 1
+          fi
+
+      - name: Install build toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential devscripts debhelper cmake pkg-config lintian \
+            libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev \
+            libcmocka-dev
+
+      - name: make check
+        run: make check
+
+      - name: Build .deb via dpkg-buildpackage
+        run: dpkg-buildpackage -us -uc -b
+
+      - name: Stage .deb + release notes for upload
+        id: stage
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          cp "../${{ steps.meta.outputs.deb_name }}" artifacts/
+          # Extract the top-most changelog stanza as the Release body.
+          awk '
+            /^xboing \(/ { if (n++) exit; next }
+            /^ -- / { if (n) exit }
+            n
+          ' debian/changelog > artifacts/release-notes.md
+          # Append the tap-bump hint.
+          cat >> artifacts/release-notes.md <<EOF
+
+          ---
+
+          ## Install
+
+          Debian / Ubuntu:
+
+          \`\`\`bash
+          curl -L -o xboing.deb https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/${{ steps.meta.outputs.deb_name }}
+          sudo dpkg -i xboing.deb
+          \`\`\`
+
+          macOS / Linux (Homebrew tap):
+
+          \`\`\`bash
+          brew tap jmf-pobox/xboing
+          brew install xboing
+          \`\`\`
+
+          ## Homebrew tap update
+
+          For the tap maintainer (auto-generated to unblock the manual bump
+          until the tap-PR-open step is wired):
+
+          - Formula \`url\`: \`https://github.com/${GITHUB_REPOSITORY}/archive/refs/tags/${GITHUB_REF_NAME}.tar.gz\`
+          - Formula \`sha256\`: \`${{ steps.meta.outputs.tarball_sha256 }}\`
+          EOF
+
+      - name: Upload .deb + notes as workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-artifacts
+          path: artifacts/
+          if-no-files-found: error
+          retention-days: 30
+
+  # -------------------------------------------------------------------------
+  # 2. Publish the GitHub Release with the .deb attached.
+  # -------------------------------------------------------------------------
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-artifacts
+          path: artifacts/
+
+      - name: Create GitHub Release with .deb attached
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release create "${GITHUB_REF_NAME}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --title "xboing ${{ needs.build.outputs.version }}" \
+            --notes-file artifacts/release-notes.md \
+            "artifacts/${{ needs.build.outputs.deb_name }}"
+
+  # -------------------------------------------------------------------------
+  # 3. Smoke-install the .deb from the freshly published Release.
+  # -------------------------------------------------------------------------
+  smoke-deb:
+    needs: publish
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install SDL runtime
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libsdl2-2.0-0 libsdl2-image-2.0-0 libsdl2-mixer-2.0-0 libsdl2-ttf-2.0-0
+
+      - name: Download .deb from the Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download "${GITHUB_REF_NAME}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --pattern '*.deb'
+
+      - name: Install and verify
+        run: |
+          set -euo pipefail
+          sudo dpkg -i xboing_*_amd64.deb || sudo apt-get install -f -y
+          out=$(/usr/games/xboing -version)
+          echo "$out"
+          echo "$out" | grep -E "^xboing ${{ needs.build.outputs.version }}$"
+
+      - name: Headless smoke launch
+        env:
+          SDL_VIDEODRIVER: offscreen
+          SDL_AUDIODRIVER: dummy
+        run: |
+          set +e
+          timeout --signal=TERM 3 /usr/games/xboing
+          rc=$?
+          set -e
+          [ "$rc" -eq 124 ] || [ "$rc" -eq 0 ]
+
+  # -------------------------------------------------------------------------
+  # 4. Smoke-install via Homebrew — HEAD build of the in-repo formula.
+  # -------------------------------------------------------------------------
+  smoke-brew:
+    needs: publish
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: brew install --HEAD from in-repo formula
+        run: brew install --HEAD --formula ./packaging/homebrew/xboing.rb
+
+      - name: Verify
+        run: |
+          set -euo pipefail
+          out=$(xboing -version)
+          echo "$out"
+          echo "$out" | grep -E '^xboing [0-9]+\.[0-9]+\.[0-9]+$'
+
+      - name: Headless smoke launch
+        env:
+          SDL_VIDEODRIVER: offscreen
+          SDL_AUDIODRIVER: dummy
+        run: |
+          set +e
+          if command -v timeout >/dev/null 2>&1; then
+            timeout --signal=TERM 3 xboing
+          elif command -v gtimeout >/dev/null 2>&1; then
+            gtimeout --signal=TERM 3 xboing
+          else
+            perl -e 'alarm 3; exec @ARGV' xboing
+          fi
+          rc=$?
+          set -e
+          [ "$rc" -eq 124 ] || [ "$rc" -eq 0 ] || [ "$rc" -eq 143 ]
+
+  # -------------------------------------------------------------------------
+  # SLSA L1 provenance attestation is a follow-up: it needs the build job to
+  # emit sha256-subjects for the .deb, and the reusable generator workflow's
+  # inputs are non-trivial. Deferred to xboing-qlw7 follow-up so this Phase
+  # C ship stays focused. Tracking as a separate task once C is proven green
+  # on a rehearsal tag push.
