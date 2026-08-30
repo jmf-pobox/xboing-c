@@ -41,23 +41,16 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Validate that the tag is a strict semver vMAJOR.MINOR.PATCH so
-          # the downstream stanzas can safely echo the version into shell
-          # and heredoc contexts without command-injection risk.
-          case "$REF_NAME" in
-            v[0-9]*.[0-9]*.[0-9]*) ;;
-            *)
-              echo "::error::refusing non-semver tag: $REF_NAME"
-              exit 1 ;;
-          esac
-
+          # Enforce STRICT semver — only digits and two dots after the v —
+          # so downstream stanzas can safely echo the version into shell,
+          # sed replacements, and heredoc contexts without command-injection
+          # or URL-mangling risk. The bare shell glob `[0-9]*.[0-9]*.[0-9]*`
+          # would let `v1.2.3-rc1` and `v1.2.3;id` through; grep is stricter.
           version="${REF_NAME#v}"
-          case "$version" in
-            [0-9]*.[0-9]*.[0-9]*) ;;
-            *)
-              echo "::error::stripped version is not semver: $version"
-              exit 1 ;;
-          esac
+          if ! printf '%s' "$version" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::tag is not strict vMAJOR.MINOR.PATCH: $REF_NAME"
+            exit 1
+          fi
 
           deb_name="xboing_${version}-1_amd64.deb"
 
@@ -77,6 +70,20 @@ jobs:
             echo "tarball_sha256=$sha"
           } >> "$GITHUB_OUTPUT"
 
+      - name: Install build + quality-gate toolchain
+        run: |
+          # devscripts pulls in dpkg-dev (dpkg-parsechangelog) which the next
+          # step needs; clang-format + cppcheck are what `make format-check`
+          # and `make cppcheck-src` invoke. We skip `make lint` (markdown)
+          # here because the release artifact does not include markdown —
+          # docs.yml on PR CI is the gate for that.
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential devscripts debhelper cmake pkg-config lintian \
+            clang-format cppcheck \
+            libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev \
+            libcmocka-dev
+
       - name: Sanity-check debian/changelog matches the tag
         env:
           EXPECT_VERSION: ${{ steps.meta.outputs.version }}
@@ -88,16 +95,17 @@ jobs:
             exit 1
           fi
 
-      - name: Install build toolchain
+      - name: Run quality gates that apply to the release artifact
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            build-essential devscripts debhelper cmake pkg-config lintian \
-            libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev \
-            libcmocka-dev
-
-      - name: make check
-        run: make check
+          # NOT `make check`: the full local gate runs markdownlint-cli2
+          # too, which needs Node/npm setup that adds no value for a
+          # release build. PR CI already ran the markdown gate before this
+          # commit reached master. Everything below matches what a Debian
+          # package cares about.
+          make format-check
+          make cppcheck-src
+          make test
+          make asan-test
 
       - name: Build .deb via dpkg-buildpackage
         run: dpkg-buildpackage -us -uc -b
@@ -121,7 +129,8 @@ jobs:
 
           # Append install snippets + tap-bump hint. Use a quoted heredoc so
           # backticks and $-prefixed shell tokens in the body do not get
-          # expanded by bash — env vars are substituted with envsubst.
+          # expanded by bash. Known-safe values (validated above) are then
+          # substituted in-place via sed after the file is written.
           cat >> artifacts/release-notes.md <<'EOF'
 
           ---
@@ -225,7 +234,9 @@ jobs:
           EXPECT_VERSION: ${{ needs.build.outputs.version }}
         run: |
           set -euo pipefail
-          sudo dpkg -i xboing_*_amd64.deb || sudo apt-get install -f -y
+          # apt-get install ../deb resolves runtime Depends (fonts-liberation
+          # etc.) automatically; glob is arch-agnostic.
+          sudo apt-get install -y ./xboing_*.deb
           out=$(/usr/games/xboing -version)
           echo "$out"
           # xboing -version prints "xboing X.Y.Z" possibly followed by a
@@ -234,18 +245,26 @@ jobs:
 
       - name: Headless smoke launch
         env:
-          SDL_VIDEODRIVER: offscreen
+          # Project convention: `dummy` is the standard headless driver for
+          # smoke runs; `offscreen` is reserved for pixel-diff tests.
+          SDL_VIDEODRIVER: dummy
           SDL_AUDIODRIVER: dummy
         run: |
           set +e
           timeout --signal=TERM 3 /usr/games/xboing
           rc=$?
           set -e
-          [ "$rc" -eq 124 ] || [ "$rc" -eq 0 ]
+          echo "xboing headless exit code: $rc"
+          # 124 = timeout SIGKILLed after the 3s grace; 143 = 128 + SIGTERM.
+          # Anything else — including 0 — means xboing did not survive to
+          # be timed out (game_create returns success even on init failure,
+          # so accepting 0 would hide a broken install).
+          [ "$rc" -eq 124 ] || [ "$rc" -eq 143 ]
 
   # -------------------------------------------------------------------------
   # 4. Smoke-install via Homebrew — HEAD build of the in-repo formula
-  # staged into a synthetic local tap (modern brew rejects raw formula paths).
+  # staged into a properly registered local tap. Modern brew rejects raw
+  # formula paths, and a bare mkdir under Library/Taps is fragile.
   # -------------------------------------------------------------------------
   smoke-brew:
     needs: [build, publish]
@@ -256,10 +275,13 @@ jobs:
       - name: Install in-repo formula via a local tap
         run: |
           set -euo pipefail
-          tap_path="$(brew --repository)/Library/Taps/xboing-ci/homebrew-xboing"
-          mkdir -p "$tap_path/Formula"
+          # brew tap-new registers the tap properly (initializes its .git
+          # and metadata). The namespace lives under jmf-pobox so any
+          # fallback resolution lands on a URL we control.
+          brew tap-new --no-git jmf-pobox/xboing-ci
+          tap_path="$(brew --repository jmf-pobox/xboing-ci)"
           cp packaging/homebrew/xboing.rb "$tap_path/Formula/xboing.rb"
-          brew install --HEAD xboing-ci/xboing/xboing
+          brew install --HEAD jmf-pobox/xboing-ci/xboing
 
       - name: Verify installed binary reports the tag version
         env:
@@ -268,16 +290,18 @@ jobs:
           set -euo pipefail
           out=$(xboing -version)
           echo "$out"
-          # Prefix-match on the version — xboing -version may print a
-          # suffix after the version string.
           echo "$out" | grep -qE "^xboing ${EXPECT_VERSION}([[:space:]]|$)"
 
       - name: Headless smoke launch
         env:
-          SDL_VIDEODRIVER: offscreen
+          # `dummy` per project convention (see smoke-deb note above).
+          SDL_VIDEODRIVER: dummy
           SDL_AUDIODRIVER: dummy
         run: |
           set +e
+          # macos-14 has neither timeout nor gtimeout by default; fall back
+          # to perl alarm which delivers SIGALRM (signal 14) to the exec'd
+          # process → shell exit 142.
           if command -v timeout >/dev/null 2>&1; then
             timeout --signal=TERM 3 xboing
           elif command -v gtimeout >/dev/null 2>&1; then
@@ -287,7 +311,10 @@ jobs:
           fi
           rc=$?
           set -e
-          [ "$rc" -eq 124 ] || [ "$rc" -eq 0 ] || [ "$rc" -eq 143 ]
+          echo "xboing headless exit code: $rc"
+          # 124 = SIGKILL; 143 = 128 + SIGTERM(15); 142 = 128 + SIGALRM(14).
+          # Refusing 0 for the same reason as smoke-deb.
+          [ "$rc" -eq 124 ] || [ "$rc" -eq 143 ] || [ "$rc" -eq 142 ]
 
   # -------------------------------------------------------------------------
   # SLSA L1 provenance attestation for the .deb is a follow-up under
