@@ -16,25 +16,44 @@ permissions: read-all
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    # Matrix across (os, preset). ASan stays Ubuntu-only — clang asan on
+    # macOS catches the same memory bugs the gcc ASan leg on Ubuntu already
+    # covers, and the runner cost isn't proportional. Debug preset runs on
+    # both so we catch clang-vs-gcc warning drift and macOS-specific SDL2
+    # behavior in the ctest suite (per punt-kit/standards/ci.md §1 rule 2).
     strategy:
       fail-fast: false
       matrix:
         include:
-          - preset: debug
+          - os: ubuntu-latest
+            preset: debug
             build_dir: build
-          - preset: asan
+          - os: ubuntu-latest
+            preset: asan
             build_dir: build-asan
+          - os: macos-14
+            preset: debug
+            build_dir: build
+    runs-on: ${{ matrix.os }}
 
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
-      - name: Install dependencies
+      - name: Install dependencies (Ubuntu — apt)
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y cmake pkg-config \
             libcmocka-dev \
             libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev
+
+      - name: Install dependencies (macOS — Homebrew)
+        if: runner.os == 'macOS'
+        run: |
+          # cmake and pkg-config are usually preinstalled on macos-14 but
+          # `brew install` is idempotent, so passing them is safe. cmocka
+          # and the SDL2 stack come from Homebrew.
+          brew install cmake pkg-config cmocka sdl2 sdl2_image sdl2_mixer sdl2_ttf
 
       - name: Configure (${{ matrix.preset }})
         run: cmake --preset ${{ matrix.preset }}
@@ -110,9 +129,26 @@ jobs:
           [ "$rc" -eq 124 ]
 
   install-brew:
-    runs-on: macos-14
+    # Matrix across the two OSes the Homebrew tap actually ships to.
+    # The formula's own docstring says "macOS / Linux brew" and the tap's
+    # CORE_SUBMISSION.md records Linuxbrew as a verified channel — per
+    # punt-kit/standards/ci.md §1, both need their own CI leg.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Bootstrap Homebrew on Linux (pre-installed on macos-14)
+        if: runner.os == 'Linux'
+        run: |
+          # The standard install script exits early on machines that already
+          # have brew, so we gate on runner.os rather than trying to detect.
+          NONINTERACTIVE=1 /bin/bash -c \
+            "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+          echo "/home/linuxbrew/.linuxbrew/bin" >> "$GITHUB_PATH"
 
       - name: Install in-repo formula via a local tap (HEAD build)
         run: |
@@ -144,11 +180,10 @@ jobs:
           SDL_AUDIODRIVER: dummy
         run: |
           set +e
-          # macos-14 ships neither timeout nor gtimeout by default; xboing.rb
-          # does not pull in coreutils. Prefer timeout/gtimeout if present
-          # (rare on macOS but possible if another dep brought them in),
-          # otherwise fall back to perl alarm which delivers SIGALRM
-          # (signal 14) to the exec'd process → shell exit 142.
+          # Linuxbrew's coreutils / macOS's default PATH may or may not ship
+          # timeout/gtimeout. Prefer them if present (Linux always has
+          # `timeout` from coreutils); otherwise fall back to perl alarm on
+          # macOS. perl's SIGALRM (signal 14) → shell exit 142.
           if command -v timeout >/dev/null 2>&1; then
             timeout --signal=TERM 3 xboing
           elif command -v gtimeout >/dev/null 2>&1; then
@@ -159,7 +194,7 @@ jobs:
           rc=$?
           set -e
           echo "xboing headless exit code: $rc"
-          # 124 = timeout hit (GNU timeout without --preserve-status)
-          # 142 = 128 + SIGALRM(14), from the perl fallback path
+          # 124 = GNU timeout hit (without --preserve-status)
+          # 142 = 128 + SIGALRM(14), from the perl fallback path (macOS)
           # Refusing 0 for the same reason as install-deb.
           [ "$rc" -eq 124 ] || [ "$rc" -eq 142 ]
