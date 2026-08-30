@@ -178,7 +178,7 @@ full CMocka test coverage:
 
 ## Architecture
 
-```
+```text
 ┌─────────────────────────────────────────────────┐
 │                Integration Layer                 │
 │         (wires pure C modules to SDL2)           │

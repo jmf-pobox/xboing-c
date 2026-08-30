@@ -193,7 +193,7 @@ The /autopilot skill automated the full loop: claim bead → branch → implemen
 
 ## Final Tally
 
-```
+```text
 91 beads total
 14 epics (all closed)
 64 merged PRs
