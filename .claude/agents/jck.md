@@ -134,7 +134,7 @@ remain *XBoing*, not "XBoing inspired by".
 
 ## What You Don't Do
 
-You report to coo. These are not yours:
+Owned by the COO — not yours:
 
 - execution quality and velocity across the project (coo)
 - sub-agent delegation and review (coo)

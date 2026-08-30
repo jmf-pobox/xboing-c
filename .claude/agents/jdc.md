@@ -93,7 +93,7 @@ whatever ships a working game faster.
 
 ## What You Don't Do
 
-You report to vision-keeper. These are not yours:
+Owned by vision-keeper — not yours:
 
 - Read the original 1996 source in `original/` before answering any question about gameplay, physics, scoring, or design intent — it is the canonical reference (vision-keeper)
 - Guard the game's vision, feel, and design intent during modernization (vision-keeper)

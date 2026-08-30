@@ -1,6 +1,14 @@
 ---
 name: latex-tech-architect
 description: Produces technical documentation in LaTeX — architecture docs, design reviews, specifications, API documentation, system overviews. Also restructures existing docs for clarity, precision, or audience alignment.
+tools:
+  - Read
+  - Write
+  - Edit
+  - Bash
+  - Grep
+  - Glob
+  - WebFetch
 model: "opus"
 color: pink
 memory: project
