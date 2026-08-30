@@ -101,11 +101,13 @@ jobs:
           rc=$?
           set -e
           echo "xboing headless exit code: $rc"
-          # 124 = timeout SIGKILLed (process ran the full 3s and ignored TERM)
-          # 143 = 128 + SIGTERM(15) (process caught TERM and exited)
-          # Anything else — including 0 — means it did not survive to be
-          # timed out, and that is a real failure to prove out.
-          [ "$rc" -eq 124 ] || [ "$rc" -eq 143 ]
+          # GNU timeout without --preserve-status returns 124 whenever the
+          # timeout hits — regardless of how the child was signaled. So the
+          # only success code is 124. Anything else (including 0) means
+          # xboing exited on its own before the timeout, which is a failure
+          # to prove init works (game_create can return success on init
+          # failure).
+          [ "$rc" -eq 124 ]
 
   install-brew:
     runs-on: macos-14
@@ -142,10 +144,11 @@ jobs:
           SDL_AUDIODRIVER: dummy
         run: |
           set +e
-          # timeout is not in the default macos-14 PATH. Use gtimeout via
-          # Homebrew's coreutils (already available via brew's dependency
-          # closure), then perl alarm as the last resort. perl's SIGALRM
-          # kills the exec'd process with signal 14 → shell exit 142.
+          # macos-14 ships neither timeout nor gtimeout by default; xboing.rb
+          # does not pull in coreutils. Prefer timeout/gtimeout if present
+          # (rare on macOS but possible if another dep brought them in),
+          # otherwise fall back to perl alarm which delivers SIGALRM
+          # (signal 14) to the exec'd process → shell exit 142.
           if command -v timeout >/dev/null 2>&1; then
             timeout --signal=TERM 3 xboing
           elif command -v gtimeout >/dev/null 2>&1; then
@@ -156,8 +159,7 @@ jobs:
           rc=$?
           set -e
           echo "xboing headless exit code: $rc"
-          # 124 = SIGKILL by timeout
-          # 143 = 128 + SIGTERM(15), caught cleanly
+          # 124 = timeout hit (GNU timeout without --preserve-status)
           # 142 = 128 + SIGALRM(14), from the perl fallback path
           # Refusing 0 for the same reason as install-deb.
-          [ "$rc" -eq 124 ] || [ "$rc" -eq 143 ] || [ "$rc" -eq 142 ]
+          [ "$rc" -eq 124 ] || [ "$rc" -eq 142 ]
