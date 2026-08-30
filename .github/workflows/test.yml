@@ -93,13 +93,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install from in-repo Homebrew formula (HEAD build)
+      - name: Install in-repo formula via a local tap (HEAD build)
         run: |
-          # The formula in packaging/homebrew/ is the source of truth that
-          # gets copied into the jmf-pobox/homebrew-xboing tap. Test it
-          # directly so tap-copy regressions surface on the PR that makes
-          # them, not after the tap update ships.
-          brew install --HEAD --formula ./packaging/homebrew/xboing.rb
+          # Modern Homebrew refuses `brew install /path/to/formula.rb` —
+          # a formula must live under a tap. Stage the in-repo formula
+          # (packaging/homebrew/xboing.rb, the source of truth that gets
+          # copied to the jmf-pobox/homebrew-xboing tap on release) into
+          # a local tap dir so this leg tests the ACTUAL contents of the
+          # PR, not whatever the public tap currently holds.
+          set -euo pipefail
+          tap_path="$(brew --repository)/Library/Taps/xboing-ci/homebrew-xboing"
+          mkdir -p "$tap_path/Formula"
+          cp packaging/homebrew/xboing.rb "$tap_path/Formula/xboing.rb"
+          brew install --HEAD xboing-ci/xboing/xboing
 
       - name: Verify installed binary reports the release version
         run: |
