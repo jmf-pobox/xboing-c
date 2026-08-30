@@ -97,13 +97,19 @@ jobs:
         run: |
           set -euo pipefail
           # dpkg-parsechangelog Version field is "UPSTREAM-REVISION"
-          # (e.g. "1.0.11-1", "1.0.11-2"). Split both halves properly instead
-          # of assuming "-1"; a maintainer-only rebuild would bump to "-2"
-          # and dpkg-buildpackage would produce a filename this workflow
-          # otherwise wouldn't know about. Arch comes from the runner —
-          # ubuntu-latest is amd64 today but this workflow would break on an
-          # ARM runner if left hardcoded.
+          # for Debian-non-native packages (e.g. "1.0.11-1", "1.0.11-2").
+          # xboing IS Debian-non-native (single-source origin/, packaged in
+          # debian/) so a Debian revision is REQUIRED — the regex below
+          # rejects native-package versions (no `-`) explicitly rather than
+          # falling into the ${raw%-*}/${raw##*-} both-yield-raw trap that
+          # would silently emit `xboing_1.0.11-1.0.11_amd64.deb`. Arch comes
+          # from the runner — ubuntu-latest is amd64 today but this workflow
+          # would break on an ARM runner if left hardcoded.
           raw=$(dpkg-parsechangelog -l debian/changelog --show-field Version)
+          if ! printf '%s' "$raw" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+-[0-9]+$'; then
+            echo "::error::debian/changelog Version ($raw) must be strict UPSTREAM-REVISION with digits only"
+            exit 1
+          fi
           upstream="${raw%-*}"
           revision="${raw##*-}"
           arch=$(dpkg --print-architecture)
@@ -367,17 +373,39 @@ jobs:
           # --HEAD). The in-repo formula only has a `head` stanza; awk
           # rewrites it as a stable `url` + `sha256` pin so `brew install`
           # (without --HEAD) exercises the exact tarball this release ships.
+          #
+          # Match `head` with flexible leading whitespace so harmless
+          # indentation edits to packaging/homebrew/xboing.rb (tabs, extra
+          # spaces, formula-reformatter) don't silently pass through with
+          # only a `head` stanza and no `url`+`sha256` — brew install
+          # (without --HEAD) would then fail with a confusing "no source"
+          # error at release time. The post-condition check below fails
+          # LOUDLY if the rewrite didn't emit url + sha256.
           brew tap-new --no-git jmf-pobox/xboing-ci
           tap_path="$(brew --repository jmf-pobox/xboing-ci)"
           tarball_url="https://github.com/${GH_REPO}/archive/refs/tags/${REF_NAME}.tar.gz"
           awk -v url="$tarball_url" -v sha256="$TARBALL_SHA256" '
-            /^  head / {
-              print "  url \"" url "\""
-              print "  sha256 \"" sha256 "\""
+            /^[[:space:]]*head[[:space:]]/ {
+              # Preserve the leading indentation of the `head` line so the
+              # composed formula stays consistent with the input formula.
+              match($0, /^[[:space:]]*/)
+              indent = substr($0, 1, RLENGTH)
+              print indent "url \"" url "\""
+              print indent "sha256 \"" sha256 "\""
               next
             }
             { print }
           ' packaging/homebrew/xboing.rb > "$tap_path/Formula/xboing.rb"
+
+          # Post-condition: the awk rewrite must have replaced the `head`
+          # stanza with url + sha256, otherwise brew install --HEAD-less
+          # would fall back on an empty formula. Fail here (not at
+          # brew install) so the error is actionable.
+          if ! grep -qE '^[[:space:]]*url[[:space:]]+"'"${tarball_url//./\\.}"'"' "$tap_path/Formula/xboing.rb"; then
+            echo "::error::awk rewrite produced no url stanza — indentation in packaging/homebrew/xboing.rb may have drifted from the expected `head` line pattern"
+            cat "$tap_path/Formula/xboing.rb"
+            exit 1
+          fi
           brew install jmf-pobox/xboing-ci/xboing
 
       - name: Verify installed binary reports the tag version
