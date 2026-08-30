@@ -39,8 +39,8 @@ debian/xboing-dbgsym/
 # Scratch directory (per CLAUDE.md tool-usage policy)
 .tmp/
 
-# JetBrains IDE — share project-level config; per-user state is excluded
-# by .idea/.gitignore (workspace.xml, shelf/, etc.)
+# JetBrains IDE — per-user; not shared across the team.
+.idea/
 
 # Claude Code
 .claude/settings.local.json
