@@ -1,0 +1,332 @@
+name: Release
+
+# Phase C of the CI + distribution plan (bead xboing-qlw7).
+# Tag-triggered: build .deb, publish GitHub Release with the .deb attached
+# and human-readable notes, smoke-install on both platforms.
+#
+# NOT (yet) included: SLSA L1 provenance attestation (deferred — see the
+# comment near the end), Homebrew tap PR-open automation (deferred until
+# a HOMEBREW_TAP_TOKEN secret is provisioned). The sha256 of the tag
+# tarball is emitted in the Release body so the tap can be bumped by hand
+# in the interim.
+
+on:
+  push:
+    tags: ['v*']
+
+permissions: read-all
+
+jobs:
+  # -------------------------------------------------------------------------
+  # 1. Build the .deb and compute the sha256 that Homebrew needs.
+  # -------------------------------------------------------------------------
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+      deb_name: ${{ steps.meta.outputs.deb_name }}
+      tarball_sha256: ${{ steps.meta.outputs.tarball_sha256 }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Resolve and validate release metadata
+        id: meta
+        env:
+          # GITHUB_REF_NAME is trusted (comes from the git ref itself), but
+          # any downstream use has to treat it as untrusted string input —
+          # tag names accept shell metachars. Everything below either
+          # validates it or passes it via env: (never spliced into a run: body).
+          REF_NAME: ${{ github.ref_name }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          # Enforce STRICT semver — only digits and two dots after the v —
+          # so downstream stanzas can safely echo the version into shell,
+          # sed replacements, and heredoc contexts without command-injection
+          # or URL-mangling risk. The bare shell glob `[0-9]*.[0-9]*.[0-9]*`
+          # would let `v1.2.3-rc1` and `v1.2.3;id` through; grep is stricter.
+          version="${REF_NAME#v}"
+          if ! printf '%s' "$version" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::tag is not strict vMAJOR.MINOR.PATCH: $REF_NAME"
+            exit 1
+          fi
+
+          deb_name="xboing_${version}-1_amd64.deb"
+
+          # Fetch the GitHub-generated source tarball for the tag and hash it
+          # so the tap update can pin url + sha256 without a manual round-trip.
+          # --fail turns HTTP 4xx/5xx into a curl exit, so a 404 cannot be
+          # hashed and quietly published in the Release notes.
+          url="https://github.com/${GH_REPO}/archive/refs/tags/${REF_NAME}.tar.gz"
+          echo "Fetching $url"
+          curl --fail -sSL -o tarball.tgz "$url"
+          sha=$(shasum -a 256 tarball.tgz | awk '{print $1}')
+          rm -f tarball.tgz
+
+          {
+            echo "version=$version"
+            echo "deb_name=$deb_name"
+            echo "tarball_sha256=$sha"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Install build + quality-gate toolchain
+        run: |
+          # devscripts pulls in dpkg-dev (dpkg-parsechangelog) which the next
+          # step needs; clang-format + cppcheck are what `make format-check`
+          # and `make cppcheck-src` invoke. We skip `make lint` (markdown)
+          # here because the release artifact does not include markdown —
+          # docs.yml on PR CI is the gate for that.
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential devscripts debhelper cmake pkg-config lintian \
+            clang-format cppcheck \
+            libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev \
+            libcmocka-dev
+
+      - name: Sanity-check debian/changelog matches the tag
+        env:
+          EXPECT_VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          set -euo pipefail
+          head_ver=$(dpkg-parsechangelog -l debian/changelog --show-field Version | sed 's/-.*//')
+          if [ "$head_ver" != "$EXPECT_VERSION" ]; then
+            echo "::error::debian/changelog head version ($head_ver) != tag ($EXPECT_VERSION)"
+            exit 1
+          fi
+
+      - name: Run quality gates that apply to the release artifact
+        run: |
+          # NOT `make check`: the full local gate runs markdownlint-cli2
+          # too, which needs Node/npm setup that adds no value for a
+          # release build. PR CI already ran the markdown gate before this
+          # commit reached master. Everything below matches what a Debian
+          # package cares about.
+          make format-check
+          make cppcheck-src
+          make test
+          make asan-test
+
+      - name: Build .deb via dpkg-buildpackage
+        run: dpkg-buildpackage -us -uc -b
+
+      - name: Stage .deb + release notes for upload
+        env:
+          DEB_NAME: ${{ steps.meta.outputs.deb_name }}
+          TARBALL_SHA256: ${{ steps.meta.outputs.tarball_sha256 }}
+          REF_NAME: ${{ github.ref_name }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          cp "../${DEB_NAME}" artifacts/
+          # Extract the top-most changelog stanza as the Release body.
+          awk '
+            /^xboing \(/ { if (n++) exit; next }
+            /^ -- / { if (n) exit }
+            n
+          ' debian/changelog > artifacts/release-notes.md
+
+          # Append install snippets + tap-bump hint. Use a quoted heredoc so
+          # backticks and $-prefixed shell tokens in the body do not get
+          # expanded by bash. Known-safe values (validated above) are then
+          # substituted in-place via sed after the file is written.
+          cat >> artifacts/release-notes.md <<'EOF'
+
+          ---
+
+          ## Install
+
+          Debian / Ubuntu:
+
+          ```bash
+          curl -L -o xboing.deb __REL_DEB_URL__
+          sudo dpkg -i xboing.deb
+          ```
+
+          macOS / Linux (Homebrew tap):
+
+          ```bash
+          brew tap jmf-pobox/xboing
+          brew install xboing
+          ```
+
+          ## Homebrew tap update (maintainer)
+
+          Until the tap-PR-open step is wired, bump the tap by hand:
+
+          - Formula `url`: `__REL_TARBALL_URL__`
+          - Formula `sha256`: `__REL_TARBALL_SHA256__`
+          EOF
+
+          # Substitute known-safe values in-place. Values are validated
+          # above (version is strict semver; SHA is 64 hex chars).
+          rel_deb_url="https://github.com/${GH_REPO}/releases/download/${REF_NAME}/${DEB_NAME}"
+          rel_tarball_url="https://github.com/${GH_REPO}/archive/refs/tags/${REF_NAME}.tar.gz"
+          sed -i \
+            -e "s|__REL_DEB_URL__|${rel_deb_url}|g" \
+            -e "s|__REL_TARBALL_URL__|${rel_tarball_url}|g" \
+            -e "s|__REL_TARBALL_SHA256__|${TARBALL_SHA256}|g" \
+            artifacts/release-notes.md
+
+      - name: Upload .deb + notes as workflow artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: release-artifacts
+          path: artifacts/
+          if-no-files-found: error
+          retention-days: 30
+
+  # -------------------------------------------------------------------------
+  # 2. Publish the GitHub Release with the .deb attached.
+  # -------------------------------------------------------------------------
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: release-artifacts
+          path: artifacts/
+
+      - name: Create GitHub Release with .deb attached
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          REF_NAME: ${{ github.ref_name }}
+          VERSION: ${{ needs.build.outputs.version }}
+          DEB_NAME: ${{ needs.build.outputs.deb_name }}
+        run: |
+          set -euo pipefail
+          gh release create "$REF_NAME" \
+            --repo "$GH_REPO" \
+            --title "xboing $VERSION" \
+            --notes-file artifacts/release-notes.md \
+            "artifacts/${DEB_NAME}"
+
+  # -------------------------------------------------------------------------
+  # 3. Smoke-install the .deb from the freshly published Release.
+  # -------------------------------------------------------------------------
+  smoke-deb:
+    needs: [build, publish]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install SDL runtime
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libsdl2-2.0-0 libsdl2-image-2.0-0 libsdl2-mixer-2.0-0 libsdl2-ttf-2.0-0
+
+      - name: Download .deb from the Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          gh release download "$REF_NAME" \
+            --repo "$GH_REPO" \
+            --pattern '*.deb'
+
+      - name: Install and verify
+        env:
+          EXPECT_VERSION: ${{ needs.build.outputs.version }}
+          DEB_NAME: ${{ needs.build.outputs.deb_name }}
+        run: |
+          set -euo pipefail
+          # Install the exact .deb the build job produced. Using the
+          # deterministic name (not a glob) avoids matching debug-symbols
+          # or a second arch if the release ever ships more than one asset.
+          # apt-get install ./file.deb resolves runtime Depends automatically.
+          sudo apt-get install -y "./$DEB_NAME"
+          out=$(/usr/games/xboing -version)
+          echo "$out"
+          # xboing -version prints "xboing X.Y.Z" possibly followed by a
+          # build/tag suffix — prefix-match on the tag-derived version.
+          echo "$out" | grep -qE "^xboing ${EXPECT_VERSION}([[:space:]]|$)"
+
+      - name: Headless smoke launch
+        env:
+          # Project convention: `dummy` is the standard headless driver for
+          # smoke runs; `offscreen` is reserved for pixel-diff tests.
+          SDL_VIDEODRIVER: dummy
+          SDL_AUDIODRIVER: dummy
+        run: |
+          set +e
+          timeout --signal=TERM 3 /usr/games/xboing
+          rc=$?
+          set -e
+          echo "xboing headless exit code: $rc"
+          # GNU timeout without --preserve-status returns 124 whenever the
+          # timeout hits (regardless of how the child was actually
+          # signaled). Anything else — including 0 — means xboing exited
+          # on its own before the timeout, which is a failure to prove
+          # init works (game_create returns success on init failure, so
+          # accepting 0 would hide a broken install).
+          [ "$rc" -eq 124 ]
+
+  # -------------------------------------------------------------------------
+  # 4. Smoke-install via Homebrew — HEAD build of the in-repo formula
+  # staged into a properly registered local tap. Modern brew rejects raw
+  # formula paths, and a bare mkdir under Library/Taps is fragile.
+  # -------------------------------------------------------------------------
+  smoke-brew:
+    needs: [build, publish]
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Install in-repo formula via a local tap
+        run: |
+          set -euo pipefail
+          # brew tap-new registers the tap properly (initializes its .git
+          # and metadata). The namespace lives under jmf-pobox so any
+          # fallback resolution lands on a URL we control.
+          brew tap-new --no-git jmf-pobox/xboing-ci
+          tap_path="$(brew --repository jmf-pobox/xboing-ci)"
+          cp packaging/homebrew/xboing.rb "$tap_path/Formula/xboing.rb"
+          brew install --HEAD jmf-pobox/xboing-ci/xboing
+
+      - name: Verify installed binary reports the tag version
+        env:
+          EXPECT_VERSION: ${{ needs.build.outputs.version }}
+        run: |
+          set -euo pipefail
+          out=$(xboing -version)
+          echo "$out"
+          echo "$out" | grep -qE "^xboing ${EXPECT_VERSION}([[:space:]]|$)"
+
+      - name: Headless smoke launch
+        env:
+          # `dummy` per project convention (see smoke-deb note above).
+          SDL_VIDEODRIVER: dummy
+          SDL_AUDIODRIVER: dummy
+        run: |
+          set +e
+          # macos-14 has neither timeout nor gtimeout by default; xboing.rb
+          # does not pull in coreutils. Prefer them if present, otherwise
+          # fall back to perl alarm which delivers SIGALRM (signal 14) to
+          # the exec'd process → shell exit 142.
+          if command -v timeout >/dev/null 2>&1; then
+            timeout --signal=TERM 3 xboing
+          elif command -v gtimeout >/dev/null 2>&1; then
+            gtimeout --signal=TERM 3 xboing
+          else
+            perl -e 'alarm 3; exec @ARGV' xboing
+          fi
+          rc=$?
+          set -e
+          echo "xboing headless exit code: $rc"
+          # 124 = GNU timeout hit (without --preserve-status)
+          # 142 = 128 + SIGALRM(14), from the perl fallback path
+          # Refusing 0 for the same reason as smoke-deb.
+          [ "$rc" -eq 124 ] || [ "$rc" -eq 142 ]
+
+  # -------------------------------------------------------------------------
+  # SLSA L1 provenance attestation for the .deb is a follow-up under
+  # xboing-qlw7: the reusable slsa-github-generator workflow needs base64
+  # sha256 subjects wired from the build job, plus a signing-key ceremony
+  # for L2. Not shipped in this PR so the core release path lands proven
+  # green first. Header comment above corrected — this workflow does not
+  # claim to include SLSA today.
