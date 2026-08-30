@@ -1,7 +1,7 @@
 ---
 name: latex-tech-architect
 description: Produces technical documentation in LaTeX — architecture docs, design reviews, specifications, API documentation, system overviews. Also restructures existing docs for clarity, precision, or audience alignment.
-model: opus
+model: "opus"
 color: pink
 memory: project
 ---
