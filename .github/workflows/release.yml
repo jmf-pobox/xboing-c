@@ -1,14 +1,14 @@
 name: Release
 
 # Phase C of the CI + distribution plan (bead xboing-qlw7).
-# Tag-triggered: build .deb, attach to GitHub Release, emit tap sha256,
-# smoke-install on both platforms, SLSA L1 provenance.
+# Tag-triggered: build .deb, publish GitHub Release with the .deb attached
+# and human-readable notes, smoke-install on both platforms.
 #
-# Prerequisites for full functionality:
-#   - Tag pushed on master matches vMAJOR.MINOR.PATCH.
-#   - debian/changelog head entry version matches the tag.
-#   - packaging/homebrew/xboing.rb is the source of truth for the tap;
-#     manual tap-bump (Phase A2 follow-up) applies the sha256 emitted below.
+# NOT (yet) included: SLSA L1 provenance attestation (deferred — see the
+# comment near the end), Homebrew tap PR-open automation (deferred until
+# a HOMEBREW_TAP_TOKEN secret is provisioned). The sha256 of the tag
+# tarball is emitted in the Release body so the tap can be bumped by hand
+# in the interim.
 
 on:
   push:
@@ -27,32 +27,64 @@ jobs:
       deb_name: ${{ steps.meta.outputs.deb_name }}
       tarball_sha256: ${{ steps.meta.outputs.tarball_sha256 }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
-      - name: Resolve release metadata
+      - name: Resolve and validate release metadata
         id: meta
+        env:
+          # GITHUB_REF_NAME is trusted (comes from the git ref itself), but
+          # any downstream use has to treat it as untrusted string input —
+          # tag names accept shell metachars. Everything below either
+          # validates it or passes it via env: (never spliced into a run: body).
+          REF_NAME: ${{ github.ref_name }}
+          GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
-          version="${GITHUB_REF_NAME#v}"
+
+          # Validate that the tag is a strict semver vMAJOR.MINOR.PATCH so
+          # the downstream stanzas can safely echo the version into shell
+          # and heredoc contexts without command-injection risk.
+          case "$REF_NAME" in
+            v[0-9]*.[0-9]*.[0-9]*) ;;
+            *)
+              echo "::error::refusing non-semver tag: $REF_NAME"
+              exit 1 ;;
+          esac
+
+          version="${REF_NAME#v}"
+          case "$version" in
+            [0-9]*.[0-9]*.[0-9]*) ;;
+            *)
+              echo "::error::stripped version is not semver: $version"
+              exit 1 ;;
+          esac
+
           deb_name="xboing_${version}-1_amd64.deb"
-          echo "version=$version"       >> "$GITHUB_OUTPUT"
-          echo "deb_name=$deb_name"     >> "$GITHUB_OUTPUT"
+
           # Fetch the GitHub-generated source tarball for the tag and hash it
           # so the tap update can pin url + sha256 without a manual round-trip.
-          url="https://github.com/${GITHUB_REPOSITORY}/archive/refs/tags/${GITHUB_REF_NAME}.tar.gz"
+          # --fail turns HTTP 4xx/5xx into a curl exit, so a 404 cannot be
+          # hashed and quietly published in the Release notes.
+          url="https://github.com/${GH_REPO}/archive/refs/tags/${REF_NAME}.tar.gz"
           echo "Fetching $url"
-          curl -sSL -o tarball.tgz "$url"
+          curl --fail -sSL -o tarball.tgz "$url"
           sha=$(shasum -a 256 tarball.tgz | awk '{print $1}')
-          echo "tarball_sha256=$sha" >> "$GITHUB_OUTPUT"
           rm -f tarball.tgz
 
+          {
+            echo "version=$version"
+            echo "deb_name=$deb_name"
+            echo "tarball_sha256=$sha"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Sanity-check debian/changelog matches the tag
+        env:
+          EXPECT_VERSION: ${{ steps.meta.outputs.version }}
         run: |
           set -euo pipefail
           head_ver=$(dpkg-parsechangelog -l debian/changelog --show-field Version | sed 's/-.*//')
-          expect="${{ steps.meta.outputs.version }}"
-          if [ "$head_ver" != "$expect" ]; then
-            echo "::error::debian/changelog head version ($head_ver) != tag ($expect)"
+          if [ "$head_ver" != "$EXPECT_VERSION" ]; then
+            echo "::error::debian/changelog head version ($head_ver) != tag ($EXPECT_VERSION)"
             exit 1
           fi
 
@@ -71,19 +103,26 @@ jobs:
         run: dpkg-buildpackage -us -uc -b
 
       - name: Stage .deb + release notes for upload
-        id: stage
+        env:
+          DEB_NAME: ${{ steps.meta.outputs.deb_name }}
+          TARBALL_SHA256: ${{ steps.meta.outputs.tarball_sha256 }}
+          REF_NAME: ${{ github.ref_name }}
+          GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
           mkdir -p artifacts
-          cp "../${{ steps.meta.outputs.deb_name }}" artifacts/
+          cp "../${DEB_NAME}" artifacts/
           # Extract the top-most changelog stanza as the Release body.
           awk '
             /^xboing \(/ { if (n++) exit; next }
             /^ -- / { if (n) exit }
             n
           ' debian/changelog > artifacts/release-notes.md
-          # Append the tap-bump hint.
-          cat >> artifacts/release-notes.md <<EOF
+
+          # Append install snippets + tap-bump hint. Use a quoted heredoc so
+          # backticks and $-prefixed shell tokens in the body do not get
+          # expanded by bash — env vars are substituted with envsubst.
+          cat >> artifacts/release-notes.md <<'EOF'
 
           ---
 
@@ -91,29 +130,38 @@ jobs:
 
           Debian / Ubuntu:
 
-          \`\`\`bash
-          curl -L -o xboing.deb https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/${{ steps.meta.outputs.deb_name }}
+          ```bash
+          curl -L -o xboing.deb __REL_DEB_URL__
           sudo dpkg -i xboing.deb
-          \`\`\`
+          ```
 
           macOS / Linux (Homebrew tap):
 
-          \`\`\`bash
+          ```bash
           brew tap jmf-pobox/xboing
           brew install xboing
-          \`\`\`
+          ```
 
-          ## Homebrew tap update
+          ## Homebrew tap update (maintainer)
 
-          For the tap maintainer (auto-generated to unblock the manual bump
-          until the tap-PR-open step is wired):
+          Until the tap-PR-open step is wired, bump the tap by hand:
 
-          - Formula \`url\`: \`https://github.com/${GITHUB_REPOSITORY}/archive/refs/tags/${GITHUB_REF_NAME}.tar.gz\`
-          - Formula \`sha256\`: \`${{ steps.meta.outputs.tarball_sha256 }}\`
+          - Formula `url`: `__REL_TARBALL_URL__`
+          - Formula `sha256`: `__REL_TARBALL_SHA256__`
           EOF
 
+          # Substitute known-safe values in-place. Values are validated
+          # above (version is strict semver; SHA is 64 hex chars).
+          rel_deb_url="https://github.com/${GH_REPO}/releases/download/${REF_NAME}/${DEB_NAME}"
+          rel_tarball_url="https://github.com/${GH_REPO}/archive/refs/tags/${REF_NAME}.tar.gz"
+          sed -i \
+            -e "s|__REL_DEB_URL__|${rel_deb_url}|g" \
+            -e "s|__REL_TARBALL_URL__|${rel_tarball_url}|g" \
+            -e "s|__REL_TARBALL_SHA256__|${TARBALL_SHA256}|g" \
+            artifacts/release-notes.md
+
       - name: Upload .deb + notes as workflow artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: release-artifacts
           path: artifacts/
@@ -129,7 +177,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: release-artifacts
           path: artifacts/
@@ -137,19 +185,23 @@ jobs:
       - name: Create GitHub Release with .deb attached
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          REF_NAME: ${{ github.ref_name }}
+          VERSION: ${{ needs.build.outputs.version }}
+          DEB_NAME: ${{ needs.build.outputs.deb_name }}
         run: |
           set -euo pipefail
-          gh release create "${GITHUB_REF_NAME}" \
-            --repo "${GITHUB_REPOSITORY}" \
-            --title "xboing ${{ needs.build.outputs.version }}" \
+          gh release create "$REF_NAME" \
+            --repo "$GH_REPO" \
+            --title "xboing $VERSION" \
             --notes-file artifacts/release-notes.md \
-            "artifacts/${{ needs.build.outputs.deb_name }}"
+            "artifacts/${DEB_NAME}"
 
   # -------------------------------------------------------------------------
   # 3. Smoke-install the .deb from the freshly published Release.
   # -------------------------------------------------------------------------
   smoke-deb:
-    needs: publish
+    needs: [build, publish]
     runs-on: ubuntu-latest
     steps:
       - name: Install SDL runtime
@@ -161,18 +213,24 @@ jobs:
       - name: Download .deb from the Release
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          REF_NAME: ${{ github.ref_name }}
         run: |
-          gh release download "${GITHUB_REF_NAME}" \
-            --repo "${GITHUB_REPOSITORY}" \
+          gh release download "$REF_NAME" \
+            --repo "$GH_REPO" \
             --pattern '*.deb'
 
       - name: Install and verify
+        env:
+          EXPECT_VERSION: ${{ needs.build.outputs.version }}
         run: |
           set -euo pipefail
           sudo dpkg -i xboing_*_amd64.deb || sudo apt-get install -f -y
           out=$(/usr/games/xboing -version)
           echo "$out"
-          echo "$out" | grep -E "^xboing ${{ needs.build.outputs.version }}$"
+          # xboing -version prints "xboing X.Y.Z" possibly followed by a
+          # build/tag suffix — prefix-match on the tag-derived version.
+          echo "$out" | grep -qE "^xboing ${EXPECT_VERSION}([[:space:]]|$)"
 
       - name: Headless smoke launch
         env:
@@ -186,23 +244,33 @@ jobs:
           [ "$rc" -eq 124 ] || [ "$rc" -eq 0 ]
 
   # -------------------------------------------------------------------------
-  # 4. Smoke-install via Homebrew — HEAD build of the in-repo formula.
+  # 4. Smoke-install via Homebrew — HEAD build of the in-repo formula
+  # staged into a synthetic local tap (modern brew rejects raw formula paths).
   # -------------------------------------------------------------------------
   smoke-brew:
-    needs: publish
+    needs: [build, publish]
     runs-on: macos-14
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
-      - name: brew install --HEAD from in-repo formula
-        run: brew install --HEAD --formula ./packaging/homebrew/xboing.rb
+      - name: Install in-repo formula via a local tap
+        run: |
+          set -euo pipefail
+          tap_path="$(brew --repository)/Library/Taps/xboing-ci/homebrew-xboing"
+          mkdir -p "$tap_path/Formula"
+          cp packaging/homebrew/xboing.rb "$tap_path/Formula/xboing.rb"
+          brew install --HEAD xboing-ci/xboing/xboing
 
-      - name: Verify
+      - name: Verify installed binary reports the tag version
+        env:
+          EXPECT_VERSION: ${{ needs.build.outputs.version }}
         run: |
           set -euo pipefail
           out=$(xboing -version)
           echo "$out"
-          echo "$out" | grep -E '^xboing [0-9]+\.[0-9]+\.[0-9]+$'
+          # Prefix-match on the version — xboing -version may print a
+          # suffix after the version string.
+          echo "$out" | grep -qE "^xboing ${EXPECT_VERSION}([[:space:]]|$)"
 
       - name: Headless smoke launch
         env:
@@ -222,8 +290,9 @@ jobs:
           [ "$rc" -eq 124 ] || [ "$rc" -eq 0 ] || [ "$rc" -eq 143 ]
 
   # -------------------------------------------------------------------------
-  # SLSA L1 provenance attestation is a follow-up: it needs the build job to
-  # emit sha256-subjects for the .deb, and the reusable generator workflow's
-  # inputs are non-trivial. Deferred to xboing-qlw7 follow-up so this Phase
-  # C ship stays focused. Tracking as a separate task once C is proven green
-  # on a rehearsal tag push.
+  # SLSA L1 provenance attestation for the .deb is a follow-up under
+  # xboing-qlw7: the reusable slsa-github-generator workflow needs base64
+  # sha256 subjects wired from the build job, plus a signing-key ceremony
+  # for L2. Not shipped in this PR so the core release path lands proven
+  # green first. Header comment above corrected — this workflow does not
+  # claim to include SLSA today.
