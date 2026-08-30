@@ -24,7 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.meta.outputs.version }}
-      deb_name: ${{ steps.meta.outputs.deb_name }}
+      deb_name: ${{ steps.debmeta.outputs.deb_name }}
       tarball_sha256: ${{ steps.meta.outputs.tarball_sha256 }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -52,8 +52,6 @@ jobs:
             exit 1
           fi
 
-          deb_name="xboing_${version}-1_amd64.deb"
-
           # Fetch the GitHub-generated source tarball for the tag and hash it
           # so the tap update can pin url + sha256 without a manual round-trip.
           # --fail turns HTTP 4xx/5xx into a curl exit, so a 404 cannot be
@@ -64,19 +62,22 @@ jobs:
           sha=$(shasum -a 256 tarball.tgz | awk '{print $1}')
           rm -f tarball.tgz
 
+          # deb_name comes from a separate step after the packaging toolchain
+          # is installed — it needs `dpkg --print-architecture` and the
+          # changelog Debian revision (from dpkg-parsechangelog), neither of
+          # which is guaranteed on the runner before apt-get.
           {
             echo "version=$version"
-            echo "deb_name=$deb_name"
             echo "tarball_sha256=$sha"
           } >> "$GITHUB_OUTPUT"
 
       - name: Install build + quality-gate toolchain
         run: |
-          # devscripts pulls in dpkg-dev (dpkg-parsechangelog) which the next
-          # step needs; clang-format + cppcheck are what `make format-check`
-          # and `make cppcheck-src` invoke. We skip `make lint` (markdown)
-          # here because the release artifact does not include markdown —
-          # docs.yml on PR CI is the gate for that.
+          # devscripts pulls in dpkg-dev (dpkg-parsechangelog, dpkg-architecture)
+          # which the next step needs; clang-format + cppcheck are what
+          # `make format-check` and `make cppcheck-src` invoke. We skip
+          # `make lint` (markdown) here because the release artifact does not
+          # include markdown — docs.yml on PR CI is the gate for that.
           sudo apt-get update
           sudo apt-get install -y \
             build-essential devscripts debhelper cmake pkg-config lintian \
@@ -84,16 +85,32 @@ jobs:
             libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev \
             libcmocka-dev
 
-      - name: Sanity-check debian/changelog matches the tag
+      - name: Derive deb_name from architecture + changelog revision
+        id: debmeta
         env:
           EXPECT_VERSION: ${{ steps.meta.outputs.version }}
         run: |
           set -euo pipefail
-          head_ver=$(dpkg-parsechangelog -l debian/changelog --show-field Version | sed 's/-.*//')
-          if [ "$head_ver" != "$EXPECT_VERSION" ]; then
-            echo "::error::debian/changelog head version ($head_ver) != tag ($EXPECT_VERSION)"
+          # dpkg-parsechangelog Version field is "UPSTREAM-REVISION"
+          # (e.g. "1.0.11-1", "1.0.11-2"). Split both halves properly instead
+          # of assuming "-1"; a maintainer-only rebuild would bump to "-2"
+          # and dpkg-buildpackage would produce a filename this workflow
+          # otherwise wouldn't know about. Arch comes from the runner —
+          # ubuntu-latest is amd64 today but this workflow would break on an
+          # ARM runner if left hardcoded.
+          raw=$(dpkg-parsechangelog -l debian/changelog --show-field Version)
+          upstream="${raw%-*}"
+          revision="${raw##*-}"
+          arch=$(dpkg --print-architecture)
+
+          if [ "$upstream" != "$EXPECT_VERSION" ]; then
+            echo "::error::debian/changelog upstream ($upstream) != tag ($EXPECT_VERSION)"
             exit 1
           fi
+
+          deb_name="xboing_${upstream}-${revision}_${arch}.deb"
+          echo "deb_name=$deb_name" >> "$GITHUB_OUTPUT"
+          echo "Derived deb_name=$deb_name"
 
       - name: Run quality gates that apply to the release artifact
         run: |
@@ -112,7 +129,7 @@ jobs:
 
       - name: Stage .deb + release notes for upload
         env:
-          DEB_NAME: ${{ steps.meta.outputs.deb_name }}
+          DEB_NAME: ${{ steps.debmeta.outputs.deb_name }}
           TARBALL_SHA256: ${{ steps.meta.outputs.tarball_sha256 }}
           REF_NAME: ${{ github.ref_name }}
           GH_REPO: ${{ github.repository }}
@@ -267,26 +284,52 @@ jobs:
           [ "$rc" -eq 124 ]
 
   # -------------------------------------------------------------------------
-  # 4. Smoke-install via Homebrew — HEAD build of the in-repo formula
-  # staged into a properly registered local tap. Modern brew rejects raw
-  # formula paths, and a bare mkdir under Library/Taps is fragile.
+  # 4. Smoke-install via Homebrew on BOTH shipping OSes.
+  # Uses the tag tarball URL + sha256 the build job computed (not --HEAD),
+  # so the smoke test exercises the exact commit this release ships — not
+  # whatever's on master when the workflow happens to run. Closes the
+  # tag/master race documented in xboing-7vkl.
   # -------------------------------------------------------------------------
   smoke-brew:
     needs: [build, publish]
-    runs-on: macos-14
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
-      - name: Install in-repo formula via a local tap
+      - name: Bootstrap Homebrew on Linux (pre-installed on macos-14)
+        if: runner.os == 'Linux'
+        run: |
+          NONINTERACTIVE=1 /bin/bash -c \
+            "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+          echo "/home/linuxbrew/.linuxbrew/bin" >> "$GITHUB_PATH"
+
+      - name: Install from a local tap pinned to the tag tarball
+        env:
+          TARBALL_SHA256: ${{ needs.build.outputs.tarball_sha256 }}
+          GH_REPO: ${{ github.repository }}
+          REF_NAME: ${{ github.ref_name }}
         run: |
           set -euo pipefail
-          # brew tap-new registers the tap properly (initializes its .git
-          # and metadata). The namespace lives under jmf-pobox so any
-          # fallback resolution lands on a URL we control.
+          # Compose a formula pinned to THIS tag's tarball + sha256 (not
+          # --HEAD). The in-repo formula only has a `head` stanza; awk
+          # rewrites it as a stable `url` + `sha256` pin so `brew install`
+          # (without --HEAD) exercises the exact tarball this release ships.
           brew tap-new --no-git jmf-pobox/xboing-ci
           tap_path="$(brew --repository jmf-pobox/xboing-ci)"
-          cp packaging/homebrew/xboing.rb "$tap_path/Formula/xboing.rb"
-          brew install --HEAD jmf-pobox/xboing-ci/xboing
+          tarball_url="https://github.com/${GH_REPO}/archive/refs/tags/${REF_NAME}.tar.gz"
+          awk -v url="$tarball_url" -v sha256="$TARBALL_SHA256" '
+            /^  head / {
+              print "  url \"" url "\""
+              print "  sha256 \"" sha256 "\""
+              next
+            }
+            { print }
+          ' packaging/homebrew/xboing.rb > "$tap_path/Formula/xboing.rb"
+          brew install jmf-pobox/xboing-ci/xboing
 
       - name: Verify installed binary reports the tag version
         env:
@@ -304,10 +347,9 @@ jobs:
           SDL_AUDIODRIVER: dummy
         run: |
           set +e
-          # macos-14 has neither timeout nor gtimeout by default; xboing.rb
-          # does not pull in coreutils. Prefer them if present, otherwise
-          # fall back to perl alarm which delivers SIGALRM (signal 14) to
-          # the exec'd process → shell exit 142.
+          # Linux always has GNU `timeout` from coreutils. macos-14 ships
+          # neither timeout nor gtimeout by default; fall back to perl
+          # alarm → SIGALRM (signal 14) → shell exit 142.
           if command -v timeout >/dev/null 2>&1; then
             timeout --signal=TERM 3 xboing
           elif command -v gtimeout >/dev/null 2>&1; then
@@ -318,8 +360,8 @@ jobs:
           rc=$?
           set -e
           echo "xboing headless exit code: $rc"
-          # 124 = GNU timeout hit (without --preserve-status)
-          # 142 = 128 + SIGALRM(14), from the perl fallback path
+          # 124 = GNU timeout hit (Linux + Homebrew coreutils path)
+          # 142 = 128 + SIGALRM(14), from the perl fallback path (macOS)
           # Refusing 0 for the same reason as smoke-deb.
           [ "$rc" -eq 124 ] || [ "$rc" -eq 142 ]
 
