@@ -36,7 +36,7 @@
 | xboing-9pl | P3 | Level editor port |
 | xboing-2yb | P3 | Distribution packaging (.desktop, AppStream, .deb) |
 
-## Today's PRs (30 merged)
+## Feb 26 PRs (30 merged)
 
 ### Game Mechanics (PRs #35-46)
 

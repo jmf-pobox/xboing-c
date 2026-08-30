@@ -1,4 +1,4 @@
-# XBoing Modernization — Full Project Summary
+# XBoing Modernization — Chronology
 
 ## Bead Progression
 
