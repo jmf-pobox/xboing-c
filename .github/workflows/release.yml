@@ -232,11 +232,14 @@ jobs:
       - name: Install and verify
         env:
           EXPECT_VERSION: ${{ needs.build.outputs.version }}
+          DEB_NAME: ${{ needs.build.outputs.deb_name }}
         run: |
           set -euo pipefail
-          # apt-get install ../deb resolves runtime Depends (fonts-liberation
-          # etc.) automatically; glob is arch-agnostic.
-          sudo apt-get install -y ./xboing_*.deb
+          # Install the exact .deb the build job produced. Using the
+          # deterministic name (not a glob) avoids matching debug-symbols
+          # or a second arch if the release ever ships more than one asset.
+          # apt-get install ./file.deb resolves runtime Depends automatically.
+          sudo apt-get install -y "./$DEB_NAME"
           out=$(/usr/games/xboing -version)
           echo "$out"
           # xboing -version prints "xboing X.Y.Z" possibly followed by a
@@ -255,11 +258,13 @@ jobs:
           rc=$?
           set -e
           echo "xboing headless exit code: $rc"
-          # 124 = timeout SIGKILLed after the 3s grace; 143 = 128 + SIGTERM.
-          # Anything else — including 0 — means xboing did not survive to
-          # be timed out (game_create returns success even on init failure,
-          # so accepting 0 would hide a broken install).
-          [ "$rc" -eq 124 ] || [ "$rc" -eq 143 ]
+          # GNU timeout without --preserve-status returns 124 whenever the
+          # timeout hits (regardless of how the child was actually
+          # signaled). Anything else — including 0 — means xboing exited
+          # on its own before the timeout, which is a failure to prove
+          # init works (game_create returns success on init failure, so
+          # accepting 0 would hide a broken install).
+          [ "$rc" -eq 124 ]
 
   # -------------------------------------------------------------------------
   # 4. Smoke-install via Homebrew — HEAD build of the in-repo formula
@@ -299,9 +304,10 @@ jobs:
           SDL_AUDIODRIVER: dummy
         run: |
           set +e
-          # macos-14 has neither timeout nor gtimeout by default; fall back
-          # to perl alarm which delivers SIGALRM (signal 14) to the exec'd
-          # process → shell exit 142.
+          # macos-14 has neither timeout nor gtimeout by default; xboing.rb
+          # does not pull in coreutils. Prefer them if present, otherwise
+          # fall back to perl alarm which delivers SIGALRM (signal 14) to
+          # the exec'd process → shell exit 142.
           if command -v timeout >/dev/null 2>&1; then
             timeout --signal=TERM 3 xboing
           elif command -v gtimeout >/dev/null 2>&1; then
@@ -312,9 +318,10 @@ jobs:
           rc=$?
           set -e
           echo "xboing headless exit code: $rc"
-          # 124 = SIGKILL; 143 = 128 + SIGTERM(15); 142 = 128 + SIGALRM(14).
+          # 124 = GNU timeout hit (without --preserve-status)
+          # 142 = 128 + SIGALRM(14), from the perl fallback path
           # Refusing 0 for the same reason as smoke-deb.
-          [ "$rc" -eq 124 ] || [ "$rc" -eq 143 ] || [ "$rc" -eq 142 ]
+          [ "$rc" -eq 124 ] || [ "$rc" -eq 142 ]
 
   # -------------------------------------------------------------------------
   # SLSA L1 provenance attestation for the .deb is a follow-up under
