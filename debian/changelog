@@ -1,3 +1,29 @@
+xboing (1.0.11-1) unstable; urgency=medium
+
+  * The DEATH_BLK skull block now winks with the original's asymmetric
+    rhythm — a short flash, then a long dark pause — instead of the even
+    on/off pulse the SDL2 port had. Cosmetic; timing verified against the
+    1996 source.
+  * Fix a sticky-paddle bug: at high warp speeds, pressing space could
+    launch two or more held balls at once. It now launches one ball per
+    press, matching the original.
+  * The E key no longer opens the level editor from live gameplay. In the
+    1996 game E is bound only in the attract loop; that behaviour is now
+    restored, and the editor stays reachable from attract.
+  * The I key now iconifies (minimizes) the window as it did in the
+    original, instead of toggling fullscreen. The fullscreen capability
+    itself is unchanged; only the key binding was wrong.
+  * The bomb sound no longer plays when the mid-play bonus spawner picks
+    dynamite. In the original that spawn is silent; the port was firing
+    the bomb-hit sound by mistake.
+  * The Delete key now works as an alias for Backspace when typing your
+    name into the high-score dialogue, matching the 1996 keymap.
+  * Restore the '=' debug skip-level cheat when the game is launched with
+    -debug. The cheat progresses to the next level (as in the original);
+    without -debug the key does nothing.
+
+ -- J Freeman <jmf@pobox.com>  Sun, 30 Aug 2026 17:00:00 -0700
+
 xboing (1.0.10-1) unstable; urgency=medium
 
   * The bonus coin blocks ($, 2x, 4x) now spin in the original's direction.
