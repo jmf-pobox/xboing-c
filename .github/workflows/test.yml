@@ -44,3 +44,122 @@ jobs:
 
       - name: Test
         run: ctest --test-dir ${{ matrix.build_dir }} --output-on-failure
+
+  # ---------------------------------------------------------------------------
+  # Shipped-install verification (punt-kit/standards/ci.md §1–§3, §5).
+  # These legs prove that the paths users actually run — the Debian .deb and
+  # the Homebrew formula — install and launch. The build+test legs above
+  # prove source-level correctness; these prove distribution.
+  # ---------------------------------------------------------------------------
+
+  install-deb:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Install .deb build toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential devscripts debhelper cmake pkg-config lintian \
+            libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev \
+            libcmocka-dev
+
+      - name: Build .deb via dpkg-buildpackage
+        run: dpkg-buildpackage -us -uc -b
+
+      - name: Install produced .deb (with runtime deps resolved)
+        run: |
+          # apt-get install ./*.deb resolves runtime Depends (fonts-liberation,
+          # SDL runtime libs) automatically — plain dpkg -i would need a
+          # second `apt-get install -f -y` pass. Glob is arch-agnostic.
+          sudo apt-get install -y ../xboing_*.deb
+
+      - name: Verify installed binary reports the release version
+        run: |
+          set -euo pipefail
+          out=$(/usr/games/xboing -version)
+          echo "$out"
+          # Match the man page / formula convention: "xboing X.Y.Z"
+          echo "$out" | grep -qE '^xboing [0-9]+\.[0-9]+\.[0-9]+'
+
+      - name: Verify installed binary passes headless smoke launch
+        env:
+          # Project convention (.claude/rules/tests.md): `dummy` is the
+          # standard headless driver for smoke/logic runs; `offscreen`
+          # is reserved for pixel-diff tests.
+          SDL_VIDEODRIVER: dummy
+          SDL_AUDIODRIVER: dummy
+        run: |
+          # Start the game headlessly and let timeout kill it after 3s so we
+          # know it ran the full startup path. The predicate below refuses
+          # exit code 0 on purpose: xboing exits 0 when game_create fails
+          # (SDL init failure, missing assets, etc.), so accepting 0 would
+          # let a broken install pass the check meant to prove init works.
+          set +e
+          timeout --signal=TERM 3 /usr/games/xboing
+          rc=$?
+          set -e
+          echo "xboing headless exit code: $rc"
+          # GNU timeout without --preserve-status returns 124 whenever the
+          # timeout hits — regardless of how the child was signaled. So the
+          # only success code is 124. Anything else (including 0) means
+          # xboing exited on its own before the timeout, which is a failure
+          # to prove init works (game_create can return success on init
+          # failure).
+          [ "$rc" -eq 124 ]
+
+  install-brew:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Install in-repo formula via a local tap (HEAD build)
+        run: |
+          # Stage the in-repo formula (packaging/homebrew/xboing.rb, the
+          # source of truth that gets copied to jmf-pobox/homebrew-xboing
+          # on release) into a proper local tap so this leg tests the PR's
+          # formula, not whatever the public tap currently holds.
+          #
+          # brew tap-new registers the tap properly (initializes .git,
+          # sets up the tap metadata) — the previous bare mkdir happened to
+          # work but was fragile.
+          set -euo pipefail
+          brew tap-new --no-git jmf-pobox/xboing-ci
+          tap_path="$(brew --repository jmf-pobox/xboing-ci)"
+          cp packaging/homebrew/xboing.rb "$tap_path/Formula/xboing.rb"
+          brew install --HEAD jmf-pobox/xboing-ci/xboing
+
+      - name: Verify installed binary reports the release version
+        run: |
+          set -euo pipefail
+          out=$(xboing -version)
+          echo "$out"
+          echo "$out" | grep -qE '^xboing [0-9]+\.[0-9]+\.[0-9]+'
+
+      - name: Verify installed binary passes headless smoke launch
+        env:
+          # `dummy` per project convention (see install-deb note above).
+          SDL_VIDEODRIVER: dummy
+          SDL_AUDIODRIVER: dummy
+        run: |
+          set +e
+          # macos-14 ships neither timeout nor gtimeout by default; xboing.rb
+          # does not pull in coreutils. Prefer timeout/gtimeout if present
+          # (rare on macOS but possible if another dep brought them in),
+          # otherwise fall back to perl alarm which delivers SIGALRM
+          # (signal 14) to the exec'd process → shell exit 142.
+          if command -v timeout >/dev/null 2>&1; then
+            timeout --signal=TERM 3 xboing
+          elif command -v gtimeout >/dev/null 2>&1; then
+            gtimeout --signal=TERM 3 xboing
+          else
+            perl -e 'alarm 3; exec @ARGV' xboing
+          fi
+          rc=$?
+          set -e
+          echo "xboing headless exit code: $rc"
+          # 124 = timeout hit (GNU timeout without --preserve-status)
+          # 142 = 128 + SIGALRM(14), from the perl fallback path
+          # Refusing 0 for the same reason as install-deb.
+          [ "$rc" -eq 124 ] || [ "$rc" -eq 142 ]
