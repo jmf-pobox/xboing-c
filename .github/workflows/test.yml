@@ -5,6 +5,8 @@ on:
     branches: [master]
   pull_request:
 
+permissions: read-all
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -18,7 +20,7 @@ jobs:
             build_dir: build-asan
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Install dependencies
         run: |
