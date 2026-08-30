@@ -4,6 +4,13 @@ on:
   push:
     branches: [master]
   pull_request:
+  # Nightly tripwire — catch drift on master from upstream package moves
+  # (SDL2 apt updates, Homebrew formula churn, base-image changes) between
+  # PR merges. Scheduled runs cannot gate PRs, so this is notify-only by
+  # construction (§7 revert-first still applies to the offending master
+  # commit if a schedule run flags it).
+  schedule:
+    - cron: '17 7 * * *'
 
 permissions: read-all
 
