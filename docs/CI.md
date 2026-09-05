@@ -83,6 +83,36 @@ determinism HEAD (`a3cb2f7`) with `debian/changelog` still at `1.0.11`.
 - Cleanup: tag deleted from origin same session; no Release created (workflow
   aborted at build stage before publish)
 
+### Rehearsal record: Linuxbrew bootstrap `pipefail` gate
+
+The `install-brew` (test.yml) and `smoke-brew` (release.yml) steps
+bootstrap Linuxbrew via `curl -fsSL <pinned> | NONINTERACTIVE=1 /bin/bash`
+under `set -o pipefail`. The pipeline shape replaced
+`bash -c "$(curl …)"`, which silently exits 0 when curl fails and
+produces an empty script (Copilot finding on PR #213).
+
+Rehearsed 2026-09-05 on both platforms CI ships to:
+
+| Host | Platform | Sad path (bogus SHA) | Happy path (`bash -n`, pinned SHA) |
+|------|----------|----------------------|-------------------------------------|
+| pembroke | Ubuntu 6.17, curl 8.x | rc=22 (HTTP error) | rc=0 |
+| keble | macOS 15 ARM64, curl (HTTP/2) | rc=56 (peer close on 404) | rc=0 |
+
+Both platforms propagate curl's non-zero exit through `pipefail` and
+fail the pipeline before bash executes. The pinned SHA
+(`7a133dcc74051ee4efc79467ed215dfedf45aea2`) fetches over TLS and
+parses as valid bash. macOS reports curl 56 rather than 22 because
+its HTTP/2 backend surfaces the 404 as a peer close — the exit code
+is different, but the propagation is identical, so the guard is
+platform-independent.
+
+The macOS host runs the rehearsal even though `install-brew (macos-14)`
+in CI skips the changed step (`if: runner.os == 'Linux'` — brew is
+pre-installed on the runner). The rehearsal covers `smoke-brew` in
+`release.yml`, which uses the same pipeline shape, and the release
+workflow only fires on `v*` tag push — the CI check on this PR
+could not have exercised it.
+
 ### Other gates in `release.yml`
 
 - **Strict-semver validation** (meta step) — implicit rehearsal: pushing
