@@ -309,8 +309,10 @@ jobs:
       - name: Bootstrap Homebrew on Linux (pre-installed on macos-14)
         if: runner.os == 'Linux'
         run: |
+          # SHA-pinned per punt-kit/standards/ci.md §9. Bump when Homebrew
+          # updates the installer (check quarterly). Current: 2026-09-04.
           NONINTERACTIVE=1 /bin/bash -c \
-            "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+            "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/7a133dcc74051ee4efc79467ed215dfedf45aea2/install.sh)"
           echo "/home/linuxbrew/.linuxbrew/bin" >> "$GITHUB_PATH"
 
       - name: Install from a local tap pinned to the tag tarball
