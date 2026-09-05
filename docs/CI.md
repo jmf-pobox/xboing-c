@@ -97,19 +97,22 @@ workflow.
 
 ## §9 — Security hardening
 
-Actions pinned by commit SHA, never floating tags:
+Actions and fetched scripts pinned by commit SHA, never floating
+tags — §9 applies to anything the runner executes, not just `uses:`
+steps:
 
 - `actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683` (v4.2.2)
 - `actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02` (v4.6.2)
 - `actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093` (v4.3.0)
 - `DavidAnson/markdownlint-cli2-action@05f32210e84442804257b2a6f20b273450ec8265` (v19.1.0)
 - `slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@f7dd8c54c2067bafc12ca7a55595d5ee9b75204a` (v2.1.0)
+- `Homebrew/install@7a133dcc74051ee4efc79467ed215dfedf45aea2` (2026-09-04) — Linuxbrew bootstrap installer, fetched via `raw.githubusercontent.com` in test.yml + release.yml
 
 Workflow-level `permissions: read-all` on all four workflows. Individual
 jobs escalate only what they need (e.g. `publish` gets `contents: write`;
 `provenance` gets `id-token: write` for Sigstore OIDC).
 
-Unpinned residual: Linuxbrew bootstrap runs `curl | bash` of
-`https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh` (the
-official installer). Documented as residual by Cursor Automation on
-PR #208; pinning to a commit SHA is a follow-up.
+The Linuxbrew bootstrap URL is pinned to a commit SHA in both
+`test.yml` and `release.yml`. Bump when Homebrew updates the installer
+— check quarterly, or when a release notes changes to the install
+script.
