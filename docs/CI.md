@@ -95,14 +95,14 @@ Rehearsed 2026-09-05 on both platforms CI ships to:
 
 | Host | Platform | Sad path (bogus SHA) | Happy path (`bash -n`, pinned SHA) |
 |------|----------|----------------------|-------------------------------------|
-| pembroke | Ubuntu 6.17, curl 8.x | rc=22 (HTTP error) | rc=0 |
-| keble | macOS 15 ARM64, curl (HTTP/2) | rc=56 (peer close on 404) | rc=0 |
+| pembroke | Ubuntu 24.04.4 LTS (kernel 6.17), curl 8.x | rc=22 (HTTP error) | rc=0 |
+| keble | macOS 26.6 ARM64 (Darwin 25.6), curl (HTTP/2) | rc=56 (peer close on 404) | rc=0 |
 
 Both platforms propagate curl's non-zero exit through `pipefail` and
 fail the pipeline before bash executes. The pinned SHA
 (`7a133dcc74051ee4efc79467ed215dfedf45aea2`) fetches over TLS and
 parses as valid bash. macOS reports curl 56 rather than 22 because
-its HTTP/2 backend surfaces the 404 as a peer close — the exit code
+its curl HTTP/2 backend surfaces the 404 as a peer close — the exit code
 is different, but the propagation is identical, so the guard is
 platform-independent.
 
