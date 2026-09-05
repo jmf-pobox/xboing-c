@@ -97,7 +97,9 @@ workflow.
 
 ## §9 — Security hardening
 
-Actions pinned by commit SHA, never floating tags:
+Actions and fetched scripts pinned by commit SHA, never floating
+tags — §9 applies to anything the runner executes, not just `uses:`
+steps:
 
 - `actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683` (v4.2.2)
 - `actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02` (v4.6.2)

@@ -311,8 +311,12 @@ jobs:
         run: |
           # SHA-pinned per punt-kit/standards/ci.md §9. Bump when Homebrew
           # updates the installer (check quarterly). Current: 2026-09-04.
-          NONINTERACTIVE=1 /bin/bash -c \
-            "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/7a133dcc74051ee4efc79467ed215dfedf45aea2/install.sh)"
+          # Pipeline + pipefail (from the runner's default shell flags) makes
+          # a curl failure fail the step immediately — with bash -c "$(curl…)"
+          # a failed curl yields an empty script and bash -c "" exits 0.
+          set -o pipefail
+          curl -fsSL https://raw.githubusercontent.com/Homebrew/install/7a133dcc74051ee4efc79467ed215dfedf45aea2/install.sh \
+            | NONINTERACTIVE=1 /bin/bash
           echo "/home/linuxbrew/.linuxbrew/bin" >> "$GITHUB_PATH"
 
       - name: Install from a local tap pinned to the tag tarball
