@@ -121,6 +121,20 @@ could not have exercised it.
 - **Formula rewrite post-condition** (smoke-brew) — grep check that the
   awk rewrite produced a `url` line. Untested; would require an
   indent-drift in `packaging/homebrew/xboing.rb` to observe.
+- **SLSA provenance** (`provenance` job) — not formally rehearsed. The
+  job only runs on a `v*` tag push, and the generator's upload step is
+  gated on `inputs.upload-assets && startsWith(github.ref, 'refs/tags/')`,
+  so there is no dry-run path — rehearsing it end-to-end would mean
+  publishing a throwaway GitHub Release to attach a real attestation to.
+  Static verification in lieu of a rehearsal: the pin
+  `f7dd8c54c2067bafc12ca7a55595d5ee9b75204a` was confirmed to resolve to
+  `slsa-github-generator` v2.1.0, and the caller's three permissions
+  (`actions: read`, `id-token: write`, `contents: write`) were confirmed
+  to be exactly the union required by the reusable workflow's inner jobs.
+  Check on the next real release: confirm a `.intoto.jsonl` asset
+  attaches to the Release alongside the `.deb`, and that the sha256
+  subject inside the attestation matches the sha256 of the shipped
+  `.deb`.
 
 Add a rehearsal record here whenever a new gate ships in a release-time
 workflow.
