@@ -138,7 +138,19 @@ could not have exercised it.
   the next real release: confirm a `.intoto.jsonl` asset
   attaches to the Release alongside the `.deb`, and that the sha256
   subject inside the attestation matches the sha256 of the shipped
-  `.deb`.
+  `.deb`. **Ordering caveat** (Copilot + Cursor, PR #215): `publish`
+  creates and publishes the GitHub Release *before* `provenance` runs.
+  The order is forced — the generator's `upload-assets: true` step
+  needs the Release to already exist to attach the `.intoto.jsonl` to.
+  So a failed `provenance` job leaves a public Release carrying the
+  `.deb` with no attestation. This is tolerable for now because it
+  fails differently than the SHA-pin bug above: that one failed
+  *silently* — workflow green, no attestation, nobody notices, which is
+  how it survived from PR #209 — while this ordering gap fails
+  *loudly*: the workflow goes red and a maintainer sees it. A loud
+  failure plus the next-release check above is an acceptable interim
+  posture. Tracked as `xboing-gqhx`: draft the Release, attach the
+  attestation, then publish.
 
 Add a rehearsal record here whenever a new gate ships in a release-time
 workflow.
