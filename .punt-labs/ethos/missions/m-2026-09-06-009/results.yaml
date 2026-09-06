@@ -1,0 +1,45 @@
+results:
+    - mission: m-2026-09-06-009
+      round: 1
+      created_at: "2026-09-06T18:47:32Z"
+      author: claude
+      verdict: pass
+      confidence: 0.99
+      files_changed: []
+      evidence:
+        - name: ethos enable installed the commit-msg hook — doctor moved Trailer hook currency from 'no Trailer hook section installed' to 'matches this ethos build (sha256:73b3300a)'
+          status: pass
+        - name: commit a1d7a04 made on branch chore/ethos-enable while mission m-2026-09-06-009 was open, with the hook installed and current
+          status: pass
+        - name: 'THE RESULT — no trailer stamped: git log -1 --format=''%(trailers)'' returns empty. No Mission:, no Delegation:'
+          status: pass
+        - name: 'root cause is the sidecar, upstream of the hook: mission create emitted ''no session in context -- active-mission sidecar not updated''; ''ethos hook commit-trailers'' exits 0 printing nothing; 133 session dirs hold only 2 active-mission sidecars (m-2026-09-02-006, m-2026-08-30-014), neither this session''s'
+          status: pass
+        - name: the hook is correct and refuses to guess — its own source says 'No resolvable session, no ethos on PATH, or no active mission means no trailer. The hook never guesses.' It also documents and fixes a prior cross-session attribution bug (ethos-pobi)
+          status: pass
+        - name: 'side effect — seal writes into tracked files: staged 8 files, commit landed 20 (+1864), sweeping in 9 missions/*/log-no-session-*.jsonl and 3 sessions/*/audit-*.jsonl. Predicted by enable''s warning that core.hooksPath sits inside the work tree'
+          status: pass
+        - name: 'side effect — deleted worktrees lost unsealed audit lines: five warnings ''active session <id> has no live audit file; if it was deleted, unsealed lines were lost'', three naming the removed .claude/worktrees/slsa-provenance-restore'
+          status: pass
+      open_questions:
+        - 'Part 2: the active-mission sidecar is not written for this session. xboing-yeuw stays open on that alone; part 3 is done and should not be redone.'
+      prose: |
+        Part 3 of xboing-yeuw is FIXED; part 2 is CONFIRMED STILL BROKEN. The
+        commit-msg trailer hook is installed and current, and it stamps nothing.
+        Proven by a real commit rather than inferred.
+
+        The chain breaks upstream of the hook, at the session sidecar. Whatever
+        should write ~/.punt-labs/ethos/sessions/<id>/active-mission on mission
+        create is not doing so for Claude Code sessions in this repo. The hook
+        correctly declines to guess a mission it cannot resolve, so no trailer
+        lands.
+
+        This is the sixth instance in this session of a control that reports
+        healthy and does not run — after SLSA provenance documented while absent,
+        a SHA-pinned generator running green and emitting nothing, make lint
+        asserting CI parity on a different linter version, an ethos doctor check
+        reporting PASS for an absent hook, and delegation.md asserting a
+        permission boundary the config does not enforce.
+
+        Reported as found. Nothing was adjusted to make the trailer appear —
+        the absence IS the finding.
