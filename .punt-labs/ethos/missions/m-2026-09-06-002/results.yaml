@@ -1,0 +1,120 @@
+results:
+    - mission: m-2026-09-06-002
+      round: 1
+      created_at: "2026-09-06T14:58:01Z"
+      author: jdc
+      verdict: pass
+      confidence: 0.95
+      files_changed:
+        - path: .github/workflows/release.yml
+          added: 21
+          removed: 2
+        - path: docs/CI.md
+          added: 34
+          removed: 7
+      evidence:
+        - name: python3 -c "import yaml; yaml.safe_load(open('.github/workflows/release.yml'))"
+          status: pass
+        - name: git diff --stat HEAD -- .github/workflows/release.yml docs/CI.md (only these two files touched)
+          status: pass
+        - name: grep -n 'uses:' .github/workflows/release.yml (checkout/upload-artifact/download-artifact unchanged and SHA-pinned; provenance line now @v2.1.0, the only ref changed)
+          status: pass
+        - name: npx --yes markdownlint-cli2 docs/CI.md (make lint unavailable on this machine, exit 127)
+          status: pass
+      prose: |
+        Fix: release.yml provenance job now references
+        generator_generic_slsa3.yml@v2.1.0 (tag), not the commit SHA
+        f7dd8c54c2067bafc12ca7a55595d5ee9b75204a. That SHA is removed from the
+        file entirely.
+
+        Inline comment added directly above the provenance job explaining: (1)
+        slsa-github-generator's README requirement, in bold, that reusable
+        builder/generator workflows MUST be referenced by tag; (2)
+        builder-fetch.sh's mechanical enforcement (exit 2 if the ref isn't
+        refs/tags/..., exit 7 if the tag isn't semver); (3) the silent-failure
+        consequence of SHA-pinning here — the job runs to completion but
+        produces no .intoto.jsonl; (4) the compensating control — builder-
+        fetch.sh downloads the builder binary and verifies ITS SLSA provenance
+        via slsa-verifier, cross-checked against the tag's resolved commit, so
+        integrity comes from the verifier rather than ref immutability. Framed
+        as not-a-bare-downgrade but explicitly not equivalent to a SHA pin
+        either (tags are mutable in principle).
+
+        docs/CI.md §9: removed the generator from the flat SHA-pinned list and
+        added a "Deliberate exception" paragraph with the same four points, so
+        a future SHA-pinning sweep reads the rationale before "fixing" this
+        back to a SHA and reintroducing the silent attestation loss.
+
+        docs/CI.md §10: the old bullet asserted, as a static-verification
+        fact, that "the pin f7dd8c54c2067bafc12ca7a55595d5ee9b75204a was
+        confirmed to resolve to v2.1.0" — no longer true, since the workflow
+        doesn't reference that SHA anymore. Replaced with a true and more
+        useful fact: a SHA pin was tried here and is affirmatively wrong
+        (builds, but produces no attestation); it was replaced by the tag ref
+        the generator requires. Kept the still-accurate permissions-
+        verification sentence unchanged.
+
+        Verification:
+        - git diff --stat HEAD confirms only release.yml and docs/CI.md
+          changed, 23 and 41 lines respectively.
+        - YAML parses (python3 yaml.safe_load).
+        - grep -n "uses:" release.yml shows exactly one changed ref (provenance,
+          now @v2.1.0); actions/checkout (both call sites), upload-artifact,
+          and download-artifact remain SHA-pinned and byte-identical. The
+          Homebrew installer pin (a curl URL, not a uses: line) was checked
+          separately and is unchanged (7a133dcc74051ee4efc79467ed215dfedf45aea2
+          at both call sites).
+        - markdownlint: `make lint` exits 127 on this machine (markdownlint-cli2
+          not on PATH, per team-lead's note). Ran `npx --yes markdownlint-cli2
+          docs/CI.md` directly: 12 issues reported, all in
+          .punt-labs/quarry/captures/session-*.md, which are gitignored/
+          untracked (confirmed via git check-ignore) and outside this
+          mission's write-set. docs/CI.md itself: zero reported issues.
+
+        Not done, per contract: no commit, no push. Working tree in
+        /home/jfreeman/Coding/xboing-c/xboing/.claude/worktrees/slsa-provenance-restore
+        has the two files modified, uncommitted, ready for leader review.
+    - mission: m-2026-09-06-002
+      round: 2
+      created_at: "2026-09-06T15:04:47Z"
+      author: jdc
+      verdict: pass
+      confidence: 0.97
+      files_changed:
+        - path: .github/workflows/release.yml
+          added: 1
+          removed: 0
+      evidence:
+        - name: 'cat -A on release.yml line 22 (reference) and line 294 (new): byte-identical separator, ''  # '' + 75 dashes, 77 chars'
+          status: pass
+        - name: 'git diff HEAD -- .github/workflows/release.yml: exactly the round-1 hunk plus one added separator line, no other change'
+          status: pass
+        - name: 'grep -n -B2 job-key pattern across all 5 jobs: build, publish, provenance, smoke-deb, smoke-brew all open+close their header comment with the 75-dash rule before the job key'
+          status: pass
+        - name: 'python3 -c "import yaml; yaml.safe_load(open(''.github/workflows/release.yml''))": parses clean'
+          status: pass
+      prose: |
+        Fix per gjm's round-1 finding: the new §9-exception comment prose had
+        consumed the closing separator rule that used to sit immediately above
+        `provenance:`. Every other job block in release.yml opens AND closes
+        its header comment with the 75-dash rule before the job key (build
+        22-25, publish 223-226, smoke-deb 305-308, smoke-brew 365-372) — the
+        provenance block was the only one missing its closing rule.
+
+        Inserted one line: `  # ` + 75 dashes, byte-identical to the reference
+        separators (confirmed with cat -A against line 22, and again against
+        the new line 294 — no drift in dash count or trailing whitespace).
+
+        Nothing else changed: prose, ref, and docs/CI.md untouched this round.
+
+        Verification:
+        - git diff HEAD -- .github/workflows/release.yml shows the round-1
+          hunk unchanged plus exactly one added line (the separator).
+        - All five job blocks (build, publish, provenance, smoke-deb,
+          smoke-brew) now consistently open and close their header comments
+          with the separator rule.
+        - YAML still parses (python3 yaml.safe_load).
+
+        Not done, per contract: no commit, no push. Working tree in
+        /home/jfreeman/Coding/xboing-c/xboing/.claude/worktrees/slsa-provenance-restore
+        has the fix applied, uncommitted, ready for leader review.

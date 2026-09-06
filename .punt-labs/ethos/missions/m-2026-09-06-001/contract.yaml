@@ -1,0 +1,69 @@
+mission_id: m-2026-09-06-001
+status: closed
+type: implement
+created_at: "2026-09-06T14:31:10Z"
+updated_at: "2026-09-06T14:46:06Z"
+closed_at: "2026-09-06T14:46:06Z"
+leader: claude
+worker: jdc
+evaluator:
+    handle: gjm
+    pinned_at: "2026-09-06T14:31:10Z"
+    hash: 7349512b3191332fef8a79f56caf962febc697b8444629912da4aa22b9b2efec
+inputs: {}
+write_set:
+    - .github/workflows/release.yml
+    - docs/CI.md
+success_criteria:
+    - release.yml build job declares output subjects_b64 wired to steps.provenance-subjects.outputs.subjects_b64
+    - release.yml build job has a 'Compute .deb sha256 subject for SLSA provenance' step, id provenance-subjects, placed immediately after 'Build .deb via dpkg-buildpackage' and before 'Stage .deb + release notes for upload'
+    - release.yml declares a provenance job with needs [build, publish], permissions actions:read + id-token:write + contents:write, uses slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml pinned to f7dd8c54c2067bafc12ca7a55595d5ee9b75204a, with base64-subjects from needs.build.outputs.subjects_b64 and upload-assets true
+    - The header comment no longer claims SLSA is 'NOT (yet) included' / deferred; it describes provenance as shipped
+    - The trailing deferral comment at the end of the file (the 'SLSA L1 provenance attestation ... is a follow-up under xboing-qlw7' block) is deleted
+    - 'Job section numbering comments are renumbered consistently: build=1, publish=2, provenance=3, smoke-deb=4, smoke-brew=5'
+    - The Linuxbrew SHA-pin + set -o pipefail block in smoke-brew is left byte-identical to master — it is NEWER than the source commit and must not be reverted
+    - The deb_name derivation guard (strict UPSTREAM-REVISION regex) is left byte-identical to master — also newer than the source commit
+    - make lint passes (markdownlint) and the YAML parses
+budget:
+    rounds: 3
+    reflection_after_each: true
+current_round: 2
+context: |
+    REGRESSION, not a new feature. PR #209 shipped this exact content but
+    merged into a stacked base branch (base=ci/release-yml-determinism,
+    head=ci/slsa-provenance) that was never merged to master. Proof:
+    `git merge-base --is-ancestor 87eaf5b master` exits 1, and
+    `git branch -a --contains 87eaf5b` returns only
+    remotes/origin/ci/release-yml-determinism. Master's PR sequence reads
+    #207, #208, #210, #211, #212 — #209 is absent.
+
+    THE SOURCE OF TRUTH FOR THE RESTORE is commit 6f55b3a (on
+    origin/ci/slsa-provenance). Read it with:
+      git show 6f55b3a -- .github/workflows/release.yml
+    and the squash 87eaf5b for the settled form. Do NOT copy the whole old
+    file over master's — the old branch PREDATES two improvements that
+    master has and the old file lacks: the Linuxbrew installer SHA-pin
+    with `set -o pipefail` (from #213), and the strict deb_name
+    UPSTREAM-REVISION guard. Cherry-pick the three SLSA hunks only.
+
+    A useful way to see exactly the delta to apply, in reverse:
+      git diff 87eaf5b master -- .github/workflows/release.yml
+    Everything that diff REMOVES is what you are putting back; everything
+    it ADDS is master's newer content you must keep.
+
+    docs/CI.md ALREADY documents this job as if it exists — §9 line 138
+    pins the generator SHA, and the permissions paragraph near line 143
+    says "`provenance` gets `id-token: write` for Sigstore OIDC". So the
+    docs become TRUE again once release.yml is restored. Do not delete
+    those lines. Only touch docs/CI.md if you find a statement that is
+    still false after your change; report it rather than inventing prose.
+
+    Note on .claude/rules/ci.md's "every CI gate needs a local make
+    equivalent": that rule cannot apply here and you should not invent a
+    make target. The attestation requires GitHub's Sigstore OIDC token and
+    an ephemeral hosted runner; there is no local equivalent by
+    construction. Add a brief comment in the provenance job saying so, so
+    the next reader does not re-litigate it.
+
+    Scope discipline: this is a restore. Do not refactor neighbouring
+    steps, do not bump other action pins, do not reformat the file.
