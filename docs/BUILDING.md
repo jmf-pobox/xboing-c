@@ -86,7 +86,7 @@ Key targets:
 | **CMocka** | Unit test framework | `apt install libcmocka-dev` |
 | **Valgrind** | Memory debugging | `apt install valgrind` |
 | **shellcheck** | Shell script linting | `apt install shellcheck` |
-| **markdownlint-cli2** | Markdown lint (`make lint`) | `npm install -g markdownlint-cli2` (falls back to `npx --yes markdownlint-cli2` if absent) |
+| **markdownlint-cli2** | Markdown lint (`make lint`) | `npm install -g markdownlint-cli2@0.17.2` (falls back to `npx --yes markdownlint-cli2@0.17.2` if absent) — pinned to match `docs.yml`'s `markdownlint-cli2-action` v19.1.0; an existing global install takes precedence and is not repinned |
 | **ImageMagick** | Screenshot capture (`import`) | `apt install imagemagick` |
 | **xdotool** | X11 keystroke injection — native X11 sessions only (`XDG_SESSION_TYPE=x11`). Under XWayland, Mutter blocks focus transfer; xdotool delivers no keys to SDL2 windows. See `docs/TESTING.md` for the savegame-fixture + `-load` alternative that avoids key injection entirely. | `apt install xdotool` |
 | **ydotool** (Wayland) | uinput-based keystroke injection — works regardless of compositor focus. Required only if you need to drive the modern SDL2 binary via keystrokes on a Wayland session. | `apt install ydotool` |
