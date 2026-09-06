@@ -1,0 +1,59 @@
+mission_id: m-2026-09-06-006
+status: closed
+type: implement
+created_at: "2026-09-06T16:30:30Z"
+updated_at: "2026-09-06T16:37:29Z"
+closed_at: "2026-09-06T16:37:29Z"
+leader: claude
+worker: jdc
+evaluator:
+    handle: gjm
+    pinned_at: "2026-09-06T16:30:30Z"
+    hash: 7349512b3191332fef8a79f56caf962febc697b8444629912da4aa22b9b2efec
+inputs: {}
+write_set:
+    - .markdownlint-cli2.jsonc
+success_criteria:
+    - The comment above the ignores list no longer claims the list mirrors .gitignore, and no longer claims CI only lints tracked files as the justification for every entry
+    - 'It accurately describes the TWO distinct reasons entries appear: (a) tracked paths we deliberately do not lint (original/ — 273 tracked files of preserved 1996 source), and (b) gitignored generated/tool-state paths CI''s checkout never contains'
+    - The existing note that .punt-labs/ethos/** is deliberately NOT ignored because it holds 11 tracked linted files is preserved — that warning is load-bearing
+    - No entry in the ignores array is added, removed or reordered — comment text only
+    - make lint still exits 0 with 102 files, 0 issues
+budget:
+    rounds: 2
+    reflection_after_each: true
+current_round: 2
+context: |
+    Copilot flagged this on PR #217 and is right. The comment I had you write
+    says the ignore list mirrors .gitignore because "CI only ever lints
+    tracked files". Measured, that justification is wrong in BOTH directions:
+
+      - node_modules appears 0 times in .gitignore, yet node_modules/** is
+        in the ignore list. So the list is not a mirror of .gitignore.
+      - original/ contains 273 TRACKED files (the preserved 1996 source) and
+        is in the ignore list. So the list also excludes tracked content that
+        CI's checkout definitely does contain.
+
+    The list is therefore not derived from .gitignore, and "CI only lints
+    tracked files" does not explain it. The comment states a principle the
+    list does not follow.
+
+    This matters more than a normal comment nit. This PR exists because a
+    quality gate's documentation did not match its behaviour, and it lands in
+    a session whose recurring finding is claims that read as true while being
+    false. Shipping a fix whose own comment misdescribes it would be the same
+    mistake at smaller scale.
+
+    THE ACCURATE FRAMING — two independent reasons, say both:
+      (a) Tracked but deliberately unlinted: original/ is the verbatim 1996
+          source, preserved as a reference and not ours to reformat.
+      (b) Gitignored build and tool-state paths that never exist in the CI
+          checkout: the build dirs, .idea, .tmp, .beads, and the three
+          .punt-labs plugin-state dirs.
+      node_modules belongs to (b) in spirit even though it is not in
+      .gitignore — it is generated and never committed. Do not overstate it
+      as gitignored; just do not claim the list is a .gitignore mirror.
+
+    Keep it short. This is a config comment, not an essay — the previous
+    version was already on the long side. Comment text only; do not touch a
+    single entry in the ignores array.

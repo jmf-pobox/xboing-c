@@ -1,0 +1,90 @@
+results:
+    - mission: m-2026-09-06-008
+      round: 1
+      created_at: "2026-09-06T16:56:57Z"
+      author: jdc
+      verdict: pass
+      confidence: 0.9
+      files_changed:
+        - path: Makefile
+          added: 4
+          removed: 1
+        - path: docs/BUILDING.md
+          added: 1
+          removed: 1
+      evidence:
+        - name: make lint (pinned npx fallback, no local markdownlint-cli2 binary)
+          status: pass
+        - name: version banner confirms markdownlint-cli2 v0.17.2 (markdownlint v0.37.4), 103 files, 0 errors, exit 0
+          status: pass
+      open_questions:
+        - 'Residual drift accepted by design: a developer with markdownlint-cli2 installed globally via the command -v branch is not pinned by this fix (guard shape was explicitly left unchanged). docs/BUILDING.md now recommends installing 0.17.2, but nothing enforces that a global install matches.'
+      prose: |
+        Pinned the Makefile lint target's npx fallback to
+        markdownlint-cli2@0.17.2, matching what docs.yml's
+        DavidAnson/markdownlint-cli2-action@05f32210e8... (v19.1.0) actually
+        bundles. Added a short comment at the pin naming the action version
+        it tracks, so a future action bump carries the pin forward instead of
+        rotting silently. docs/BUILDING.md's install row now recommends the
+        same pinned version instead of latest. The command -v guard is
+        untouched in shape -- a developer's own installed binary still wins
+        over npx.
+
+        Verified by running make lint end-to-end (not by reasoning about
+        version numbers): the version banner printed
+        "markdownlint-cli2 v0.17.2 (markdownlint v0.37.4)", linted 103
+        files, reported 0 errors, and the make target exited 0. 0.17.2 is
+        older than the 0.23.2 that unpinned npx had been fetching throughout
+        this PR, and it still passes clean on our current markdown corpus --
+        no rule-default regressions surfaced.
+
+        Explicit limitation, not glossed over: this only pins the "no local
+        binary" path. A developer with markdownlint-cli2 installed globally
+        at some other version still takes the command -v branch and is not
+        pinned by this Makefile change -- that was an explicit constraint in
+        the mission (do not change the guard's shape). No changes were made
+        to .markdownlint-cli2.jsonc.
+    - mission: m-2026-09-06-008
+      round: 2
+      created_at: "2026-09-06T17:01:11Z"
+      author: jdc
+      verdict: pass
+      confidence: 0.95
+      files_changed:
+        - path: Makefile
+          added: 4
+          removed: 1
+        - path: docs/BUILDING.md
+          added: 1
+          removed: 1
+      evidence:
+        - name: make -n lint (dry run)
+          status: pass
+        - name: make lint
+          status: pass
+      prose: |
+        Item 1: moved the three explanatory comment lines out of the tab-indented
+        lint recipe to sit unindented directly above the `lint:` target line
+        (Makefile), matching this repo's convention of unindented comments outside
+        recipes (e.g. the "# --- Quality gates ---" banner). `make -n lint` dry run
+        now shows only the if/command -v/npx/fi shell block -- no `#` lines reach
+        the shell.
+
+        Item 2: added a clause to the markdownlint-cli2 row in docs/BUILDING.md
+        noting that an existing global install takes precedence and is not
+        repinned by this row's install command.
+
+        No changes to the version pin, npx syntax, command -v guard logic, or
+        .markdownlint-cli2.jsonc.
+
+        make -n lint output:
+          if command -v markdownlint-cli2 >/dev/null 2>&1; then \
+              markdownlint-cli2; \
+          else \
+              npx --yes markdownlint-cli2@0.17.2; \
+          fi
+
+        make lint output:
+          markdownlint-cli2 v0.17.2 (markdownlint v0.37.4)
+          Linting: 103 file(s)
+          Summary: 0 error(s)

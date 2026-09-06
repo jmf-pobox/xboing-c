@@ -1,0 +1,17 @@
+reflections:
+    - mission: m-2026-09-06-007
+      round: 1
+      created_at: "2026-09-06T16:48:59Z"
+      author: gjm
+      converging: true
+      signals:
+        - 'make lint: Linting 103 files, Summary 0 issues in 0 files, exit 0 (was 102 before)'
+        - 'git diff HEAD -- .markdownlint-cli2.jsonc: exactly one array entry removed (original/**), reason (a) rewritten to cover .beads/ only, no other line touched'
+        - 'git ls-files original/ | grep -c .md$ == 1 (original/CLAUDE.md); git log --diff-filter=A shows 548d56b docs: extract TESTING.md and BUILDING.md, i.e. we wrote it -- original/** in a markdown ignore list was excluding our own doc, not 1996 source'
+        - 'Checked every remaining ignore entry with git ls-files: node_modules, build, build-asan, cmake-build-debug, obj-x86_64-linux-gnu, debian/xboing, .idea, .punt-labs/quarry, .punt-labs/vox, .punt-labs/local all return zero tracked files -- .beads/** is confirmed the ONLY tracked entry left in the array'
+        - 'Checked every remaining entry with git check-ignore -v <path>/ (trailing slash required for directory patterns to match against a non-existent path): build/, build-asan/, cmake-build-debug/, obj-x86_64-linux-gnu/, debian/xboing/, .idea/, .punt-labs/vox/, .punt-labs/quarry/, .punt-labs/local/, .tmp/ all matched a .gitignore line; node_modules/ correctly matched nothing, consistent with the comment''s own parenthetical that it is not in .gitignore'
+        - 'Copied .beads/README.md to a non-ignored path and ran markdownlint-cli2 directly against it: 4 MD032 errors at lines 36/44/49/54, exactly matching the comment''s claim'
+        - git ls-files .punt-labs/ethos | grep -c .md$ == 11, and git check-ignore -v .punt-labs/ethos/ finds no match -- guardrail note is both numerically correct and still true
+        - grep -n '273\|original/' .markdownlint-cli2.jsonc returns nothing -- no orphaned reference to the removed entry or the old file count survives
+      recommendation: stop
+      reason: 'All 5 success criteria verified by direct command against the repo, not by reading prose: original/** is gone, reason (a) covers only .beads/ (4 real MD032 violations confirmed by running markdownlint-cli2 on a copy), .beads/** is the sole tracked survivor in the array (every other entry checked individually with git ls-files), all reason-(b) entries reconfirmed gitignored, the ethos guardrail (11 files, unignored) is untouched, no orphaned 273/original references remain, and make lint is green at 103 files / 0 issues. No fifth false claim found.'
