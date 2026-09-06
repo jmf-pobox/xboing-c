@@ -1,0 +1,64 @@
+mission_id: m-2026-09-06-004
+status: closed
+type: implement
+created_at: "2026-09-06T15:17:24Z"
+updated_at: "2026-09-06T15:28:38Z"
+closed_at: "2026-09-06T15:28:38Z"
+leader: claude
+worker: jdc
+evaluator:
+    handle: gjm
+    pinned_at: "2026-09-06T15:17:24Z"
+    hash: 7349512b3191332fef8a79f56caf962febc697b8444629912da4aa22b9b2efec
+inputs: {}
+write_set:
+    - docs/CI.md
+success_criteria:
+    - 'docs/CI.md §10''s SLSA provenance bullet records the publish-before-provenance ordering: a failed attestation leaves a public Release carrying the .deb with no .intoto.jsonl'
+    - It states WHY the ordering is forced — the generator's upload-assets:true requires the Release to already exist
+    - 'It states why this is tolerable for now: the failure is LOUD (workflow goes red), unlike the SHA-pin bug which was silent and green'
+    - It cites bead xboing-gqhx as the tracked fix (draft Release, attach attestation, then publish)
+    - No other section changes; release.yml is not touched at all
+    - markdownlint clean on docs/CI.md
+budget:
+    rounds: 2
+    reflection_after_each: true
+current_round: 2
+context: |
+    Final documentation item on PR #215. Both Copilot and Cursor Bugbot
+    independently raised the same observation about the restored provenance
+    job, and neither treated it as blocking — Cursor filed it as "Residual
+    risk (not a finding)", Copilot as a suppressed "previously missed" note.
+
+    THE PROPERTY. release.yml's `publish` job creates and publishes the
+    GitHub Release BEFORE `provenance` runs. That ordering is forced: the
+    generator's `upload-assets: true` needs the Release to exist before it
+    can attach the .intoto.jsonl. So if the provenance job fails, the
+    workflow goes red but a public Release already exists, carrying the
+    .deb with no attestation.
+
+    WHY WE ARE DOCUMENTING RATHER THAN FIXING IT HERE. Be precise about
+    this, because the distinction is the whole point:
+      - The bug this PR fixes (SHA-pinned generator ref) failed SILENTLY.
+        Workflow GREEN, no attestation, nobody notices. That is why it
+        survived from PR #209.
+      - This ordering issue fails LOUDLY. Workflow RED. A maintainer sees
+        it and investigates.
+    A loud failure plus §10's existing next-release check is an acceptable
+    interim posture. The real fix (draft Release → attach attestation →
+    publish) touches smoke-deb and smoke-brew, which download assets from
+    the Release, and cannot be rehearsed without a real tag push. It needs
+    its own PR and its own rehearsal. It is filed as bead xboing-gqhx.
+
+    This is NOT a "pre-existing issue, out of scope" dodge. The fix is
+    filed, scoped, and its dependency on this PR is recorded. What must not
+    happen is that the property goes unwritten — an undocumented known gap
+    in a provenance path is exactly the failure this PR exists to correct.
+
+    WHERE IT GOES. Extend the existing SLSA provenance bullet in §10's
+    "Other gates in `release.yml`" list — the one you wrote in
+    m-2026-09-06-001 round 2. Do not create a new section. Keep the same
+    terse, factual voice as its neighbours. Do not restate the whole
+    provenance design; add the ordering caveat and the pointer to the bead.
+
+    Do not touch release.yml. No code change is wanted here.

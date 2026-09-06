@@ -1,0 +1,26 @@
+results:
+    - mission: m-2026-09-06-003
+      round: 1
+      created_at: "2026-09-06T15:09:51Z"
+      author: jdc
+      verdict: pass
+      confidence: 0.98
+      files_changed:
+        - path: .github/workflows/release.yml
+          added: 2
+          removed: 2
+      evidence:
+        - name: git diff HEAD -- .github/workflows/release.yml
+          status: pass
+        - name: grep -n "Every CI gate" .github/workflows/release.yml .claude/rules/ci.md
+          status: pass
+        - name: python3 -c "import yaml; yaml.safe_load(open('.github/workflows/release.yml'))"
+          status: pass
+      prose: |
+        Fixed the misquote in the provenance job comment (release.yml:270-271).
+        The quoted text now matches .claude/rules/ci.md:9 verbatim: "Every CI
+        gate must have a local `make` equivalent" (was: "every CI gate needs a
+        local make target"). Only those two comment lines changed — verified
+        via git diff showing a single 2-line hunk. The @v2.1.0 ref, SHA pins,
+        §9 exception block, and all five job separators are byte-identical to
+        before. YAML parses cleanly. Not committed, not pushed, per instructions.

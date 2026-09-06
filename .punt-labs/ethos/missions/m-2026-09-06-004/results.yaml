@@ -1,0 +1,70 @@
+results:
+    - mission: m-2026-09-06-004
+      round: 1
+      created_at: "2026-09-06T15:23:06Z"
+      author: jdc
+      verdict: pass
+      confidence: 0.95
+      files_changed:
+        - path: docs/CI.md
+          added: 13
+          removed: 1
+      evidence:
+        - name: 'git diff HEAD -- docs/CI.md (worktree-pinned): only the ordering caveat added to the existing SLSA provenance bullet'
+          status: pass
+        - name: 'git diff --stat HEAD (worktree-pinned): docs/CI.md | 14 +++++++++++++- , 1 file changed, 13 insertions(+), 1 deletion(-) — no other file touched, release.yml untouched'
+          status: pass
+        - name: 'npx --yes markdownlint-cli2 "docs/CI.md": 73 issues reported repo-wide, 0 attributable to docs/CI.md (grep -c "docs/CI.md:" on output -> 0); all 73 live in gitignored .punt-labs/quarry/captures/*.md; make lint unavailable on this machine (exit 127, markdownlint-cli2 not a system binary)'
+          status: pass
+        - name: 'bd show xboing-gqhx: bead exists, OPEN, describes draft-Release/attach-attestation/publish fix — citation verified before writing it'
+          status: pass
+      prose: |
+        Extended the SLSA provenance bullet in docs/CI.md's "Other gates in
+        release.yml" list with the publish-before-provenance ordering caveat
+        from PR #215 (Copilot + Cursor). States the forced ordering
+        (upload-assets: true needs the Release to exist first), the
+        consequence (public Release with .deb, no .intoto.jsonl on a failed
+        provenance job), and the reason it's tolerable now: this failure is
+        loud (workflow red) versus the SHA-pin bug's silent (workflow green)
+        failure that this PR fixes. Cites xboing-gqhx as the tracked real fix.
+
+        No other section changed, release.yml untouched, not committed, not
+        pushed per instructions.
+
+        Operational note for the leader: bare git commands in this session's
+        Bash tool (no -C/cd) resolve against a different checkout on branch
+        docs/rehearsal-linuxbrew-pipefail, not this worktree, because Bash
+        cwd resets between calls. All verification above was re-run pinned
+        with -C <worktree-path> to get truthful results. Other concurrent
+        jdc-slsa*/gjm-*-eval* missions in this same worktree should double
+        check they aren't doing the same thing.
+    - mission: m-2026-09-06-004
+      round: 2
+      created_at: "2026-09-06T15:28:23Z"
+      author: jdc
+      verdict: pass
+      confidence: 0.97
+      files_changed:
+        - path: docs/CI.md
+          added: 13
+          removed: 1
+      evidence:
+        - name: 'Fixed dangling "this PR" reference per gjm round-2 finding: "fails differently than the bug this PR fixes" -> "fails differently than the SHA-pin bug above" — one clause, no other wording changed'
+          status: pass
+        - name: 'git diff HEAD -- docs/CI.md (worktree-pinned): still exactly the one bullet extension, now with the fix applied'
+          status: pass
+        - name: 'git diff --stat HEAD (worktree-pinned): docs/CI.md | 14 +++++++++++++- , 1 file changed, 13 insertions(+), 1 deletion(-) — unchanged scope, release.yml untouched'
+          status: pass
+        - name: 'npx --yes markdownlint-cli2 "docs/CI.md": 0 issues attributable to docs/CI.md'
+          status: pass
+      prose: |
+        Round 2 fix: dropped the dangling "this PR" reference gjm flagged.
+        docs/CI.md is a permanent doc — "this PR" has no referent once
+        merged, unlike the permanent identifiers (PR #215, PR #209,
+        xboing-gqhx) already in the sentence. Rewrote to "fails differently
+        than the SHA-pin bug above" so the sentence stands on the
+        already-named SHA-pin bug instead of a self-reference. One-clause
+        edit, no other wording touched, no rewrite. Scope, evidence, and bead
+        citation from round 1 are unchanged and re-verified above.
+
+        Not committed, not pushed per instructions.

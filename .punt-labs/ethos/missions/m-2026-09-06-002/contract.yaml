@@ -1,0 +1,84 @@
+mission_id: m-2026-09-06-002
+status: closed
+type: implement
+created_at: "2026-09-06T14:55:57Z"
+updated_at: "2026-09-06T15:05:00Z"
+closed_at: "2026-09-06T15:05:00Z"
+leader: claude
+worker: jdc
+evaluator:
+    handle: gjm
+    pinned_at: "2026-09-06T14:55:57Z"
+    hash: 7349512b3191332fef8a79f56caf962febc697b8444629912da4aa22b9b2efec
+inputs: {}
+write_set:
+    - .github/workflows/release.yml
+    - docs/CI.md
+success_criteria:
+    - release.yml provenance job references the generator as generator_generic_slsa3.yml@v2.1.0 — a semantic version tag, NOT a commit SHA
+    - The inline comment explains WHY this is a deliberate, documented exception to the repo's §9 SHA-pinning rule, citing the generator's README requirement and the slsa-verifier limitation
+    - 'The comment states the compensating control: the builder binary''s own provenance is cryptographically verified by slsa-verifier against that tag inside builder-fetch.sh, so tag-referencing is not an unmitigated downgrade'
+    - docs/CI.md §9 no longer lists the generator under SHA-pinned actions with a SHA — it records the tag reference and the reason for the exception, so the doc stays true
+    - No other action pin is changed — actions/checkout, upload-artifact, download-artifact, markdownlint-cli2-action and the Homebrew installer stay SHA-pinned
+    - The §10 bullet added earlier still reads truthfully after this change — its claim about what was statically verified must be updated to match the tag reference, not the old SHA
+    - YAML parses; markdownlint clean on tracked files
+budget:
+    rounds: 3
+    reflection_after_each: true
+current_round: 2
+context: |
+    Cursor Bugbot filed a High-severity finding on PR #215 and it is CORRECT.
+    I verified it against primary sources; do not re-litigate whether to fix.
+
+    THE BUG. The provenance job currently pins the reusable workflow by
+    commit SHA:
+      uses: ...generator_generic_slsa3.yml@f7dd8c54c2067bafc12ca7a55595d5ee9b75204a
+    The slsa-github-generator README states, in bold, that its builders and
+    generators "MUST be referenced by tag in order for the slsa-verifier to
+    be able to verify the ref of the trusted builder/generator's reusable
+    workflow", and that it "needs to be referred as @vX.Y.Z". The README
+    explicitly acknowledges this contradicts GitHub's digest-pinning
+    guidance and says it is intentional, due to limits in GitHub Actions.
+
+    Corroborating source, at that same SHA:
+    .github/actions/generate-builder/builder-fetch.sh requires BUILDER_REF
+    to start with refs/tags/ (exit 2 otherwise) and then validates the tag
+    against ^v[1-9]+\.[0-9]+\.[0-9]+(-rc\.[0-9]+)?$ (exit 7 otherwise),
+    pointing the reader at the README section above.
+
+    CONSEQUENCE IF UNFIXED: the release would publish a .deb with NO
+    .intoto.jsonl attestation, while release.yml and docs/CI.md both claim
+    provenance is in place. That is the exact failure mode this whole PR
+    exists to correct — a control everyone believes is running that is not.
+    Getting this wrong twice would be worse than never having filed it.
+
+    THE FIX: change the ref to @v2.1.0.
+
+    THE TENSION YOU MUST DOCUMENT, NOT HIDE. The repo's own standard (§9 in
+    docs/CI.md, punt-kit/standards/ci.md) says actions are pinned by commit
+    SHA, never floating tags. This change deliberately violates that for one
+    action. Do not quietly make the change and leave the next reader to
+    discover the contradiction — that is how the original bug survived.
+    Write the exception down in BOTH places: an inline comment in the
+    provenance job, and docs/CI.md §9 where the generator is currently
+    listed as SHA-pinned (that line becomes false the moment you change the
+    workflow).
+
+    State the compensating control accurately: referencing by tag is not a
+    bare downgrade, because builder-fetch.sh downloads the builder binary
+    and verifies its SLSA provenance with slsa-verifier against that tag,
+    and cross-checks the tag's commit against the provenance material —
+    so the integrity guarantee is preserved by a different mechanism than
+    a SHA pin. Do not overstate it either: a tag is mutable in principle;
+    the guarantee comes from the verifier, not from the ref.
+
+    ALSO: I added a §10 bullet in the previous mission that asserts "the pin
+    f7dd8c54c2067bafc12ca7a55595d5ee9b75204a was confirmed to resolve to
+    slsa-github-generator v2.1.0" as static verification. After this change
+    that sentence describes something we no longer do. Rewrite it so it
+    remains true — the reference is now the v2.1.0 tag, and the fact worth
+    recording is that a SHA pin was tried and is affirmatively wrong here.
+    A future maintainer running a "pin everything by SHA" sweep WILL try to
+    re-pin this and reintroduce the bug; the docs must stop them.
+
+    Scope: these two files only. Do not touch anything else.
