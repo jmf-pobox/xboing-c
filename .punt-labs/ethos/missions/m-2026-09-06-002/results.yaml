@@ -72,7 +72,7 @@ results:
           mission's write-set. docs/CI.md itself: zero reported issues.
 
         Not done, per contract: no commit, no push. Working tree in
-        /home/jfreeman/Coding/xboing-c/xboing/.claude/worktrees/slsa-provenance-restore
+        .claude/worktrees/slsa-provenance-restore (repo-relative)
         has the two files modified, uncommitted, ready for leader review.
     - mission: m-2026-09-06-002
       round: 2
@@ -116,5 +116,5 @@ results:
         - YAML still parses (python3 yaml.safe_load).
 
         Not done, per contract: no commit, no push. Working tree in
-        /home/jfreeman/Coding/xboing-c/xboing/.claude/worktrees/slsa-provenance-restore
+        .claude/worktrees/slsa-provenance-restore (repo-relative)
         has the fix applied, uncommitted, ready for leader review.
