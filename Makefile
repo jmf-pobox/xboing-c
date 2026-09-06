@@ -265,8 +265,15 @@ distclean: ## Remove all build artifacts (debug, asan, debian, in-source polluti
 
 # --- Quality gates (mirror CI exactly) -------------------------------------
 
+# npx fallback pinned to match docs.yml's DavidAnson/markdownlint-cli2-action
+# @05f32210e8... (v19.1.0), which bundles markdownlint-cli2 0.17.2. Bump this
+# in lockstep whenever that action pin moves.
 lint: ## Lint markdown files (markdownlint-cli2; mirrors docs.yml).
-	markdownlint-cli2
+	if command -v markdownlint-cli2 >/dev/null 2>&1; then \
+	    markdownlint-cli2; \
+	else \
+	    npx --yes markdownlint-cli2@0.17.2; \
+	fi
 
 format: ## Apply clang-format in-place to src/*.c and include/*.h.
 	clang-format -i src/*.c include/*.h
