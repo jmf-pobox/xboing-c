@@ -1,0 +1,98 @@
+mission_id: m-2026-09-06-005
+status: closed
+type: implement
+created_at: "2026-09-06T16:19:10Z"
+updated_at: "2026-09-06T16:25:46Z"
+closed_at: "2026-09-06T16:25:46Z"
+leader: claude
+worker: jdc
+evaluator:
+    handle: gjm
+    pinned_at: "2026-09-06T16:19:10Z"
+    hash: 7349512b3191332fef8a79f56caf962febc697b8444629912da4aa22b9b2efec
+inputs: {}
+write_set:
+    - Makefile
+    - .markdownlint-cli2.jsonc
+    - docs/BUILDING.md
+success_criteria:
+    - make lint exits 0 and reports zero issues on this machine, where markdownlint-cli2 is NOT installed as a system binary
+    - The lint target uses the system markdownlint-cli2 when present and falls back to npx --yes markdownlint-cli2 only when it is absent — it must not force npx on machines that have the binary installed
+    - .markdownlint-cli2.jsonc ignores .punt-labs/quarry/**, .punt-labs/vox/** and .punt-labs/local/** — the three gitignored plugin-state dirs
+    - '.punt-labs/ethos/** is NOT ignored: it holds 11 TRACKED .md files (personalities, talents, writing-styles) that CI lints today and must keep linting'
+    - 'Also ignores the gitignored build/staging dirs that can hold generated .md and that CI never sees: cmake-build-*/**, obj-*/**, debian/xboing/**, .idea/**'
+    - docs/BUILDING.md's toolchain table gains a markdownlint-cli2 row with an install command, since its absence is why nobody installed it
+    - make check gate 3 runs to completion (you need not run the whole of make check — it builds the game and the .deb — but `make lint` invoked directly must pass)
+budget:
+    rounds: 3
+    reflection_after_each: true
+current_round: 1
+context: |
+    Bead xboing-up7m. `make lint` (Makefile:269) cannot pass on a clean
+    workstation, so `make check` — the documented local CI-parity gate —
+    cannot pass either. CI is unaffected and green because docs.yml uses
+    the pinned DavidAnson/markdownlint-cli2-action, never the local binary.
+    That asymmetry is exactly why this survived unnoticed.
+
+    TWO INDEPENDENT DEFECTS. Fix both.
+
+    1. NO BINARY, NO FALLBACK. Makefile:269 invokes bare `markdownlint-cli2`.
+       It is not on PATH here; node and npx ARE (nvm v24.11.0). Result:
+         $ make lint
+         markdownlint-cli2: No such file or directory   (exit 127)
+       Every worker and evaluator agent on PR #215 hit this independently and
+       worked around it by hand with `npx --yes markdownlint-cli2`.
+
+       Prefer the installed binary when it exists — do not unconditionally
+       route through npx, which would add a network/registry dependency for
+       developers who have it installed properly. A `command -v` guard is the
+       obvious shape. Keep it POSIX sh, since make recipes run under /bin/sh.
+
+    2. THE CONFIG LINTS FILES CI NEVER SEES. .markdownlint-cli2.jsonc globs
+       `**/*.{md,markdown}` and ignores node_modules, build, build-*, .tmp,
+       .beads, original — but not the gitignored plugin-state dirs. The
+       .punt-labs/quarry/captures/ directory holds auto-generated session
+       transcripts that fail MD007/MD032/MD010/MD047 en masse (17 issues in
+       2 files observed during PR #215; 73 repo-wide at another point, every
+       one of them in that directory).
+
+       So even WITH the binary installed, `make lint` fails locally on files
+       that do not exist in the CI checkout. Local parity is broken in both
+       directions: the gate cannot run, and when it runs it checks more than
+       CI does.
+
+    THE TRAP — READ THIS BEFORE EDITING THE CONFIG. The bead xboing-up7m
+    suggests ignoring `.punt-labs/**`. That suggestion is WRONG and I am
+    correcting it here. `git ls-files ".punt-labs/**/*.md"` returns 11
+    TRACKED files under .punt-labs/ethos/ (personalities/, talents/,
+    writing-styles/). CI lints those today and they pass. Ignoring
+    .punt-labs/** wholesale would silently stop linting 11 real files —
+    trading a loud failure for a quiet gap, which is the worse bug.
+
+    Only these three are gitignored (.gitignore:64-66):
+      .punt-labs/quarry/
+      .punt-labs/vox/
+      .punt-labs/local/
+
+    GUIDING PRINCIPLE for the ignore list: markdownlint should see what the
+    CI checkout sees. CI only ever has tracked files, so the ignores should
+    mirror .gitignore for any path that can contain .md. Beyond the three
+    above, these gitignored dirs exist on developer machines right now
+    (verified: cmake-build-debug/, obj-x86_64-linux-gnu/, debian/xboing/ all
+    present) and would be linted today if they ever gained a .md. They hold
+    none at this moment, so this part is latent, not an active break — but it
+    is the same class of bug and cheap to close: cmake-build-*/**, obj-*/**,
+    debian/xboing/**, .idea/**.
+
+    3. DOCUMENT THE TOOL. docs/BUILDING.md has a Toolchain table listing
+       gcc/clang, CMake, clang-format, clang-tidy, cppcheck, CMocka, Valgrind,
+       shellcheck, ImageMagick, xdotool, ydotool — with install commands.
+       markdownlint-cli2 is absent from it, which is a large part of why it
+       was never installed. Add a row with an install command. It is a Node
+       package, so the install command differs in kind from the apt lines
+       around it; be accurate rather than forcing it into the apt pattern.
+
+    VERIFY HONESTLY. `make lint` must actually be run and must actually exit
+    0 on this machine. Paste the real output. Do not report a gate as passing
+    that you did not execute — that failure mode is the entire subject of the
+    work that preceded this mission.

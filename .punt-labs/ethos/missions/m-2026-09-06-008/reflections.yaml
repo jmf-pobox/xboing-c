@@ -1,0 +1,27 @@
+reflections:
+    - mission: m-2026-09-06-008
+      round: 1
+      created_at: "2026-09-06T16:59:36Z"
+      author: gjm
+      converging: true
+      signals:
+        - 'Version claim verified independently: fetched package.json at the pinned SHA (DavidAnson/markdownlint-cli2-action@05f32210e8..., v19.1.0) and confirmed dependencies.markdownlint-cli2 == 0.17.2. jdc''s number is correct.'
+        - 'Pin binds: ran make lint fresh with no local markdownlint-cli2 binary; banner printed ''markdownlint-cli2 v0.17.2 (markdownlint v0.37.4)'', 103 file(s), 0 error(s), exit 0. npm view markdownlint-cli2@0.17.2 also resolves cleanly, confirming npx''s @version syntax is honored, not silently ignored.'
+        - 'Honest limit: jdc''s result open_questions and prose state plainly that the command -v branch remains unpinned by design (mission forbade touching guard shape). No overclaim found there.'
+        - 'Confirmed real defect: the 3 explanatory comment lines are TAB-indented, placing them INSIDE the lint recipe, not above the target. ''make -n lint'' proves they are passed to the shell as three separate no-op invocations (each ''# ...'' is its own recipe line, not continued with a trailing backslash). .SILENT: at Makefile:25 hides the echo, so nothing shows during a normal run, but the wasted subprocess spawns are real and the placement contradicts the repo''s own convention of unindented, un-recipe''d comments (see the ''# --- Quality gates ---'' banner at Makefile:266). This is a defect to fix, not a stylistic nice-to-have -- CLAUDE.md is explicit that convention drift gets fixed in the same PR, not deferred.'
+        - 'docs/BUILDING.md row: ''pinned to match docs.yml''s markdownlint-cli2-action v19.1.0'' is true of what the row''s own install commands produce; it is not a false claim. It does not warn a reader who already has a different markdownlint-cli2 on PATH that command -v will prefer that unpinned binary over the doc''s advice -- worth a half-sentence, not a blocker, since the mission scoped the honest-limitation requirement to the result narrative, which jdc satisfied.'
+        - Rot-risk note ('bump this in lockstep') is accurately characterized as a manual reminder with no enforcement -- nothing in CI or the Makefile will catch a future action-version bump that isn't mirrored here. jdc did not claim otherwise.
+      recommendation: continue
+      reason: 'Fix one real defect before closing: move the 3-line explanatory comment above the ''lint:'' target line, unindented, so make treats it as a makefile comment instead of three no-op recipe lines -- matches the Makefile:266 comment-banner convention. Everything else (version number, pin syntax, honest-limitation disclosure, unchanged command -v guard, unchanged .markdownlint-cli2.jsonc) checks out on independent verification, not just re-reading jdc''s claims.'
+    - mission: m-2026-09-06-008
+      round: 2
+      created_at: "2026-09-06T17:02:06Z"
+      author: gjm
+      converging: true
+      signals:
+        - 'Comment placement fixed and verified: ''make -n lint'' now prints only the if/command-v/npx block -- zero ''#'' lines reach the shell. The 3-line comment sits unindented, directly above ''lint:'', with no blank line separating it from the target, which is the Makefile''s own established idiom (same pattern at line 17-19 above DPKG_INTERMEDIATES, and 123-130 above the deb PATH-stripping logic) -- not a novel or detached placement.'
+        - 'SHA abbreviation checked byte-for-byte: docs.yml:18 pins ''DavidAnson/markdownlint-cli2-action@05f32210e84442804257b2a6f20b273450ec8265 # v19.1.0''. ''05f32210e8'' is an exact 10-char prefix of that 40-char SHA (verified programmatically) -- not mangled.'
+        - 'New docs/BUILDING.md clause ''an existing global install takes precedence and is not repinned'' matches the command -v guard''s real behavior: any markdownlint-cli2 already on PATH (npm -g, brew, distro package, whatever) is used as-is with no version check. It states a limitation, not an enforcement claim -- does not overclaim.'
+        - 'Re-ran make lint clean: ''markdownlint-cli2 v0.17.2 (markdownlint v0.37.4)'', 103 file(s), 0 error(s), exit 0. Fix still holds after the comment move.'
+      recommendation: continue
+      reason: Both round-1 findings are resolved and independently re-verified, not just re-read. No new defect found in the moved comment, the SHA abbreviation, or the new doc clause. Ready to close.

@@ -1,0 +1,168 @@
+results:
+    - mission: m-2026-09-06-005
+      round: 1
+      created_at: "2026-09-06T16:22:03Z"
+      author: jdc
+      verdict: pass
+      confidence: 0.95
+      files_changed:
+        - path: Makefile
+          added: 5
+          removed: 1
+        - path: .markdownlint-cli2.jsonc
+          added: 14
+          removed: 2
+        - path: docs/BUILDING.md
+          added: 1
+          removed: 0
+      evidence:
+        - name: git -C <worktree> ls-files ".punt-labs/**/*.md" (trap check before editing ignores)
+          status: pass
+        - name: make -C <worktree> lint (no system markdownlint-cli2 binary present)
+          status: pass
+        - name: command -v markdownlint-cli2 (confirms absent, fallback branch reasoning)
+          status: pass
+      prose: |
+        Machine state verified before editing:
+          $ command -v markdownlint-cli2 ; echo $?
+          1                                  # absent — no system binary
+          $ command -v npx ; echo $?
+          /home/jfreeman/.nvm/versions/node/v24.11.0/bin/npx
+          0                                  # present
+          $ node --version
+          v24.11.0
+
+        Trap check — ran before touching the ignores list:
+          $ git -C <worktree> ls-files ".punt-labs/**/*.md"
+          .punt-labs/ethos/personalities/carmack.md
+          .punt-labs/ethos/personalities/friendly-direct.md
+          .punt-labs/ethos/personalities/kibell.md
+          .punt-labs/ethos/personalities/lantinga.md
+          .punt-labs/ethos/personalities/myers.md
+          .punt-labs/ethos/talents/c-modernization.md
+          .punt-labs/ethos/talents/game-systems.md
+          .punt-labs/ethos/talents/legacy-c-testing.md
+          .punt-labs/ethos/talents/linux-multimedia.md
+          .punt-labs/ethos/talents/xboing-domain.md
+          .punt-labs/ethos/writing-styles/direct-with-quips.md
+        11 tracked files confirmed present. .punt-labs/ethos/** is NOT in the
+        new ignores list — only .punt-labs/quarry/**, .punt-labs/vox/**, and
+        .punt-labs/local/** were added, matching .gitignore:64-66 exactly.
+
+        Diff (all three write-set files):
+
+        diff --git a/.markdownlint-cli2.jsonc b/.markdownlint-cli2.jsonc
+        index 263ed12..a80923c 100644
+        --- a/.markdownlint-cli2.jsonc
+        +++ b/.markdownlint-cli2.jsonc
+        @@ -5,13 +5,25 @@
+           },
+           // Default glob: lint every .md / .markdown file in the repo.
+           "globs": ["**/*.{md,markdown}"],
+        -  // Skip directories whose .md files we don't own or shouldn't touch.
+        +  // Skip directories whose .md files we don't own or shouldn't touch,
+        +  // plus every gitignored path that can hold .md files the CI checkout
+        +  // never sees (mirror .gitignore — CI only ever lints tracked files).
+        +  // NOTE: .punt-labs/ethos/** is tracked and deliberately NOT ignored —
+        +  // it holds 11 real .md files (personalities/talents/writing-styles)
+        +  // that CI lints today.
+           "ignores": [
+             "node_modules/**",
+             "build/**",
+             "build-*/**",
+        +    "cmake-build-*/**",
+        +    "obj-*/**",
+             ".tmp/**",
+             ".beads/**",
+        -    "original/**"
+        +    "original/**",
+        +    "debian/xboing/**",
+        +    ".idea/**",
+        +    ".punt-labs/quarry/**",
+        +    ".punt-labs/vox/**",
+        +    ".punt-labs/local/**"
+           ]
+         }
+        diff --git a/Makefile b/Makefile
+        index c516c20..c05dc96 100644
+        --- a/Makefile
+        +++ b/Makefile
+        @@ -266,7 +266,11 @@ distclean: ## Remove all build artifacts (debug, asan, debian, in-source polluti
+         # --- Quality gates (mirror CI exactly) -------------------------------------
+
+         lint: ## Lint markdown files (markdownlint-cli2; mirrors docs.yml).
+        -	markdownlint-cli2
+        +	if command -v markdownlint-cli2 >/dev/null 2>&1; then \
+        +	    markdownlint-cli2; \
+        +	else \
+        +	    npx --yes markdownlint-cli2; \
+        +	fi
+
+         format: ## Apply clang-format in-place to src/*.c and include/*.h.
+         	clang-format -i src/*.c include/*.h
+        diff --git a/docs/BUILDING.md b/docs/BUILDING.md
+        index 08efe58..89db39d 100644
+        --- a/docs/BUILDING.md
+        +++ b/docs/BUILDING.md
+        @@ -86,6 +86,7 @@ Key targets:
+         | **CMocka** | Unit test framework | `apt install libcmocka-dev` |
+         | **Valgrind** | Memory debugging | `apt install valgrind` |
+         | **shellcheck** | Shell script linting | `apt install shellcheck` |
+        +| **markdownlint-cli2** | Markdown lint (`make lint`) | `npm install -g markdownlint-cli2` (falls back to `npx --yes markdownlint-cli2` if absent) |
+         | **ImageMagick** | Screenshot capture (`import`) | `apt install imagemagick` |
+         | **xdotool** | X11 keystroke injection — native X11 sessions only (`XDG_SESSION_TYPE=x11`). Under XWayland, Mutter blocks focus transfer; xdotool delivers no keys to SDL2 windows. See `docs/TESTING.md` for the savegame-fixture + `-load` alternative that avoids key injection entirely. | `apt install xdotool` |
+         | **ydotool** (Wayland) | uinput-based keystroke injection — works regardless of compositor focus. Required only if you need to drive the modern SDL2 binary via keystrokes on a Wayland session. | `apt install ydotool` |
+
+        make lint actual output on this machine (no system binary):
+
+          $ make -C /home/jfreeman/Coding/xboing-c/xboing/.claude/worktrees/fix-make-lint lint
+          make: Entering directory '/home/jfreeman/Coding/xboing-c/xboing/.claude/worktrees/fix-make-lint'
+          markdownlint-cli2 v0.23.2 (markdownlint v0.41.1)
+          Finding: **/*.{md,markdown} !node_modules/** !build/** !build-*/** !cmake-build-*/** !obj-*/** !.tmp/** !.beads/** !original/** !debian/xboing/** !.idea/** !.punt-labs/quarry/** !.punt-labs/vox/** !.punt-labs/local/**
+          Linting: 102 files
+          Summary: 0 issues in 0 files
+          make: Leaving directory '/home/jfreeman/Coding/xboing-c/xboing/.claude/worktrees/fix-make-lint'
+          EXIT=0
+
+        Exit status: 0. Zero issues across 102 files.
+
+        Which fallback branch executed: npx --yes markdownlint-cli2. Confirmed
+        because command -v markdownlint-cli2 returned exit 1 (absent) both
+        before and after editing, so the command -v guard fails and control
+        falls to the else clause. The tool banner (markdownlint-cli2 v0.23.2)
+        only appears after npx resolves and runs the package — the recipe
+        never invokes the bare markdownlint-cli2 command on this machine.
+
+        Sanity check of the other branch (system binary present): could not
+        install the binary in this sandbox to exercise it directly. Reasoning
+        through the code: `if command -v markdownlint-cli2 >/dev/null 2>&1;
+        then markdownlint-cli2; else npx --yes markdownlint-cli2; fi` is
+        standard POSIX sh (command -v and if/then/else/fi are POSIX, no
+        bashisms). Make recipes execute via /bin/sh by default (no SHELL
+        override in this Makefile), so the guard runs correctly regardless of
+        the developer's interactive shell. When markdownlint-cli2 is on PATH,
+        command -v prints its path and returns 0, taking the then branch and
+        invoking the system binary directly — no npx invocation, no network
+        dependency. Only when the lookup fails does control reach npx.
+
+        Success criteria checklist:
+        - make lint exits 0, zero issues, on a machine without the system
+          binary: PASS (verified above)
+        - Falls back to npx only when absent; uses system binary when present:
+          PASS by direct observation on the no-binary path; PASS by code
+          reasoning on the has-binary path (not directly exercised — no binary
+          installable in this sandbox)
+        - .markdownlint-cli2.jsonc ignores .punt-labs/quarry/**,
+          .punt-labs/vox/**, .punt-labs/local/**: PASS
+        - .punt-labs/ethos/** NOT ignored, 11 tracked files still in scope:
+          PASS (verified via git ls-files)
+        - Also ignores cmake-build-*/**, obj-*/**, debian/xboing/**,
+          .idea/**: PASS
+        - docs/BUILDING.md toolchain table gained a markdownlint-cli2 row with
+          an install command (npm, not apt, correctly called out as a
+          different install mechanism): PASS
+        - make lint invoked directly passes: PASS (real output pasted above)
+
+        Not committed, not pushed, per instructions — leader handles git.
+        Working tree: /home/jfreeman/Coding/xboing-c/xboing/.claude/worktrees/fix-make-lint
+        Branch: fix/make-lint-local-parity (base master @ 2160474)

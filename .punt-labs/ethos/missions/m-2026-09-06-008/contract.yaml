@@ -1,0 +1,73 @@
+mission_id: m-2026-09-06-008
+status: closed
+type: implement
+created_at: "2026-09-06T16:55:26Z"
+updated_at: "2026-09-06T17:02:21Z"
+closed_at: "2026-09-06T17:02:21Z"
+leader: claude
+worker: jdc
+evaluator:
+    handle: gjm
+    pinned_at: "2026-09-06T16:55:26Z"
+    hash: 7349512b3191332fef8a79f56caf962febc697b8444629912da4aa22b9b2efec
+inputs: {}
+write_set:
+    - Makefile
+    - docs/BUILDING.md
+success_criteria:
+    - 'The npx fallback in the Makefile lint target pins the version: npx --yes markdownlint-cli2@0.17.2 — matching what CI''s pinned action actually bundles'
+    - A comment at that line states the pin must track DavidAnson/markdownlint-cli2-action, and names the action version it currently matches (v19.1.0 -> markdownlint-cli2 0.17.2), so the next person knows what to bump and why
+    - docs/BUILDING.md's markdownlint-cli2 row installs the same pinned version rather than latest
+    - 'make lint passes on the pinned version: 103 files, 0 issues, exit 0 — this must be RUN, since 0.17.2 is older than the 0.23.2 npx was fetching and could behave differently on our files'
+    - The command -v guard is unchanged in shape — an installed system binary is still preferred over npx
+    - No change to .markdownlint-cli2.jsonc
+budget:
+    rounds: 2
+    reflection_after_each: true
+current_round: 2
+context: |
+    Copilot found this on PR #217 and is right. It is the fifth finding on
+    this PR and, like the original/** one, it is a real defect rather than
+    wording.
+
+    THE DEFECT — drift exists today, not hypothetically. I measured it:
+
+      CI: .github/workflows/docs.yml uses
+          DavidAnson/markdownlint-cli2-action@05f32210e84442804257b2a6f20b273450ec8265
+          (v19.1.0). Its package.json at that SHA pins
+          "markdownlint-cli2": "0.17.2".
+
+      Local: `npx --yes markdownlint-cli2` fetches latest. On this machine
+          today that resolved to 0.23.2 (markdownlint 0.41.1), as printed in
+          the version banner of every make lint run in this PR.
+
+    So local runs 0.17.2 vs CI 0.23.2 — six minor versions apart, with
+    different bundled markdownlint cores. A PR whose entire stated purpose
+    is local/CI parity currently runs a different linter locally than CI
+    does. Both happen to pass on our files right now, so nothing is failing;
+    the defect is that "parity" is asserted and not true.
+
+    This is the same shape as every other finding in this session: a claim
+    that reads true, is checkable in one command, and is wrong.
+
+    THE FIX. Pin the npx fallback to 0.17.2 so the local gate runs exactly
+    what CI runs. Pin the documented install to the same. Add a short
+    comment at the Makefile line saying the pin tracks
+    DavidAnson/markdownlint-cli2-action (currently v19.1.0 -> 0.17.2), so
+    when someone bumps the action they know to bump this too — an unexplained
+    bare version number will silently rot.
+
+    DO NOT change the command -v guard. A developer with markdownlint-cli2
+    installed system-wide still gets their binary; we are not going to force
+    npx on them. Note the honest limitation in your result rather than
+    papering over it: that path can still drift, because we cannot pin
+    someone's global install from here. Pinning the fallback closes the gap
+    for the common case (no binary installed), which is the case that
+    actually broke.
+
+    VERIFY BY RUNNING IT, not by reasoning. 0.17.2 is OLDER than the 0.23.2
+    npx has been fetching all through this PR. Older versions can differ in
+    rule defaults and in which rules exist at all, so our 103 files passing
+    on 0.23.2 does not prove they pass on 0.17.2. Run make lint and paste the
+    real output including the version banner — I want to see 0.17.2 in it.
+    If it fails, say so and stop; do not adjust the config to make it pass.

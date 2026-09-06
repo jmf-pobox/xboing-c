@@ -1,0 +1,68 @@
+results:
+    - mission: m-2026-09-06-007
+      round: 1
+      created_at: "2026-09-06T16:45:55Z"
+      author: jdc
+      verdict: pass
+      confidence: 0.98
+      files_changed:
+        - path: .markdownlint-cli2.jsonc
+          added: 6
+          removed: 8
+      evidence:
+        - name: git ls-files original/ | grep '\.md$' -> original/CLAUDE.md (only tracked .md under original/)
+          status: pass
+        - name: 'git log --diff-filter=A --oneline -- original/CLAUDE.md -> 548d56b docs: extract TESTING.md and BUILDING.md from CLAUDE.md (#126) (ours, not 1996 import)'
+          status: pass
+        - name: git check-ignore -v .beads original/ -> exit 1, no match (neither path is gitignored, confirms reason (a) 'tracked but unlinted' framing)
+          status: pass
+        - name: git diff HEAD -- .markdownlint-cli2.jsonc -> exactly one ignores[] line removed (original/**), reason (a) comment rewritten, reason (b) and .punt-labs/ethos/** NOTE untouched
+          status: pass
+        - name: make lint -> Linting 103 files (was 102), Summary 0 issues in 0 files, exit 0 (captured via redirect, not tail, to get the real make exit code)
+          status: pass
+      prose: |
+        Fix: removed "original/**" from the markdownlint-cli2 ignores array
+        and rewrote reason (a) of the comment to cover .beads/ alone, dropping
+        the now-false original/ clause and the 273-tracked-files figure.
+
+        Every claim was verified with the falsifying command before being
+        written into the comment (see evidence above):
+
+          git -C <worktree> ls-files original/ | grep '\.md$'
+            -> original/CLAUDE.md   (the only tracked .md under original/)
+
+          git -C <worktree> log --diff-filter=A --oneline -- original/CLAUDE.md
+            -> 548d56b docs: extract TESTING.md and BUILDING.md from
+               CLAUDE.md (#126)   (we wrote it; not part of the 1996 import)
+
+          git -C <worktree> ls-files original/ | wc -l
+            -> 273   (confirms the figure was accurate but now belongs
+               nowhere in the comment, since original/ is no longer cited)
+
+          git -C <worktree> check-ignore -v .beads original/ ; echo exit=$?
+            -> exit=1, no output (neither path matches any .gitignore
+               pattern -- both are "tracked but deliberately unlinted",
+               not "genuinely gitignored")
+
+          git -C <worktree> diff HEAD -- .markdownlint-cli2.jsonc
+            -> single ignores[] line removed ("original/**"); reason (a)
+               comment block edited; reason (b) and the .punt-labs/ethos/**
+               guardrail NOTE are byte-for-byte unchanged
+
+          make -C <worktree> lint  (real exit code captured via redirect)
+            -> "Linting: 103 files" / "Summary: 0 issues in 0 files" /
+               REAL_EXIT=0
+
+        All six success criteria from the contract are met:
+          - original/** removed from ignores: done
+          - reason (a) covers .beads/ only, no original/ reference: done
+          - no orphaned references to original/ or "273 tracked files": done
+          - make lint: 103 files, 0 issues, exit 0: done
+          - .punt-labs/ethos/** guardrail note intact: done (untouched)
+          - no other ignore entry added/removed/reordered: done (diff shows
+            one line removed, nothing else moved)
+
+        Not committed, not pushed, per the assignment's explicit instruction.
+        The single-file edit sits uncommitted in the worktree at
+        /home/jfreeman/Coding/xboing-c/xboing/.claude/worktrees/fix-make-lint
+        ready for the leader to commit.

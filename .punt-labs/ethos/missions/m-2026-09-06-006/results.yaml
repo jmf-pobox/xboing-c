@@ -1,0 +1,65 @@
+results:
+    - mission: m-2026-09-06-006
+      round: 1
+      created_at: "2026-09-06T16:31:45Z"
+      author: jdc
+      verdict: pass
+      confidence: 0.98
+      files_changed:
+        - path: .markdownlint-cli2.jsonc
+          added: 7
+          removed: 3
+      evidence:
+        - name: git diff HEAD -- .markdownlint-cli2.jsonc (comment lines only, ignores array untouched)
+          status: pass
+        - name: make lint (102 files, 0 issues)
+          status: pass
+      prose: |
+        Replaced the "mirrors .gitignore" justification with the accurate two-reason
+        framing: (a) tracked-but-deliberately-unlinted original/ (273 tracked files,
+        verbatim 1996 source), and (b) generated/tool-state paths the CI checkout
+        never contains (build dirs, .idea, .tmp, .beads, the three .punt-labs
+        plugin-state dirs, node_modules — noted as not actually gitignored but never
+        committed). Kept the load-bearing .punt-labs/ethos/** warning verbatim. No
+        entry in the ignores array was added, removed, or reordered.
+    - mission: m-2026-09-06-006
+      round: 2
+      created_at: "2026-09-06T16:36:57Z"
+      author: jdc
+      verdict: pass
+      confidence: 0.98
+      files_changed:
+        - path: .markdownlint-cli2.jsonc
+          added: 8
+          removed: 3
+      evidence:
+        - name: git -C <worktree> ls-files original/ | wc -l  -> 273
+          status: pass
+        - name: git -C <worktree> ls-files .beads/ | wc -l  -> 10
+          status: pass
+        - name: git -C <worktree> check-ignore -v .beads/README.md  -> exit 1 (tracked, NOT gitignored)
+          status: pass
+        - name: git -C <worktree> check-ignore -v build/foo.md build-asan/foo.md cmake-build-debug/foo.md obj-x/foo.md .tmp/foo.md debian/xboing/foo.md .idea/foo.md .punt-labs/{quarry,vox,local}/foo.md  -> all 10 probes matched, exit 0
+          status: pass
+        - name: git -C <worktree> ls-files '.punt-labs/ethos/*.md' '.punt-labs/ethos/**/*.md' | wc -l  -> 11 (unchanged NOTE, untouched by this edit)
+          status: pass
+        - name: git -C <worktree> diff HEAD -- .markdownlint-cli2.jsonc  -> comment lines only, ignores array untouched
+          status: pass
+        - name: make -C <worktree> lint  -> Linting 102 files, 0 issues, exit 0
+          status: pass
+      prose: |
+        Moved .beads/ from reason (b) to reason (a). It is tracked (10 files via
+        git ls-files) and NOT gitignored (git check-ignore exits 1 on
+        .beads/README.md) — so calling it a "generated/tool-state path CI's
+        checkout never contains" was false, same as the diagnosis for original/
+        one level down. Reason (a) now reads: original/ and .beads/ are both
+        tracked but deliberately unlinted because they are not ours to reformat
+        (.beads/README.md is bd-generated and has pre-existing MD032 violations).
+        Reason (b) now covers only genuinely gitignored paths, each individually
+        verified against .gitignore: build dirs (build/, build-asan/,
+        cmake-build-*/, obj-*/), .idea/, .tmp/, debian/xboing/, the three
+        .punt-labs plugin-state dirs, and node_modules (documented as
+        never-committed rather than gitignored, since it isn't in .gitignore).
+        The .punt-labs/ethos/** guardrail note is unchanged and re-verified (11
+        tracked .md files). The `ignores` array itself was not touched — same 13
+        entries, same order. Not committed or pushed per instructions.
