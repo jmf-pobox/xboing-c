@@ -267,8 +267,8 @@ jobs:
   # actions:read (attestation reads workflow_run metadata),
   # id-token:write (Sigstore OIDC), contents:write (upload to Release).
   #
-  # No local `make` equivalent (.claude/rules/ci.md's "every CI gate needs
-  # a local make target" does not apply here by construction): the
+  # No local `make` equivalent (.claude/rules/ci.md's "Every CI gate must
+  # have a local `make` equivalent" does not apply here by construction): the
   # attestation requires GitHub's Sigstore OIDC token and an ephemeral
   # hosted runner identity, neither of which exists outside Actions.
   #
