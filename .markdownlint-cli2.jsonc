@@ -5,13 +5,25 @@
   },
   // Default glob: lint every .md / .markdown file in the repo.
   "globs": ["**/*.{md,markdown}"],
-  // Skip directories whose .md files we don't own or shouldn't touch.
+  // Skip directories whose .md files we don't own or shouldn't touch,
+  // plus every gitignored path that can hold .md files the CI checkout
+  // never sees (mirror .gitignore — CI only ever lints tracked files).
+  // NOTE: .punt-labs/ethos/** is tracked and deliberately NOT ignored —
+  // it holds 11 real .md files (personalities/talents/writing-styles)
+  // that CI lints today.
   "ignores": [
     "node_modules/**",
     "build/**",
     "build-*/**",
+    "cmake-build-*/**",
+    "obj-*/**",
     ".tmp/**",
     ".beads/**",
-    "original/**"
+    "original/**",
+    "debian/xboing/**",
+    ".idea/**",
+    ".punt-labs/quarry/**",
+    ".punt-labs/vox/**",
+    ".punt-labs/local/**"
   ]
 }

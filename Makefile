@@ -266,7 +266,11 @@ distclean: ## Remove all build artifacts (debug, asan, debian, in-source polluti
 # --- Quality gates (mirror CI exactly) -------------------------------------
 
 lint: ## Lint markdown files (markdownlint-cli2; mirrors docs.yml).
-	markdownlint-cli2
+	if command -v markdownlint-cli2 >/dev/null 2>&1; then \
+	    markdownlint-cli2; \
+	else \
+	    npx --yes markdownlint-cli2; \
+	fi
 
 format: ## Apply clang-format in-place to src/*.c and include/*.h.
 	clang-format -i src/*.c include/*.h
