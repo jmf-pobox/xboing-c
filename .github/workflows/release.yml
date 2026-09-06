@@ -271,6 +271,26 @@ jobs:
   # a local make target" does not apply here by construction): the
   # attestation requires GitHub's Sigstore OIDC token and an ephemeral
   # hosted runner identity, neither of which exists outside Actions.
+  #
+  # DELIBERATE §9 EXCEPTION — referenced by tag, NOT by commit SHA.
+  # slsa-github-generator's README states, in bold, that its builders and
+  # generators "MUST be referenced by tag in order for the slsa-verifier
+  # to be able to verify the ref of the trusted builder/generator's
+  # reusable workflow" — a SHA-pinned `uses:` here is silently rejected.
+  # `.github/actions/generate-builder/builder-fetch.sh` in that repo
+  # enforces it mechanically: it requires the resolved ref to start with
+  # `refs/tags/` (exit 2 otherwise) and match `^v[0-9]+\.[0-9]+\.[0-9]+`
+  # (exit 7 otherwise). A commit-SHA `uses:` line here builds and runs,
+  # but produces NO .intoto.jsonl attestation — a silent loss of the
+  # provenance this whole job exists to generate (see docs/CI.md §9/§10).
+  #
+  # Compensating control: this is not a bare downgrade from SHA-pinning.
+  # builder-fetch.sh downloads the builder binary named by this tag and
+  # verifies ITS SLSA provenance with slsa-verifier, cross-checking the
+  # tag's resolved commit against the provenance material — so integrity
+  # is enforced by the verifier, not by the ref being immutable. A tag is
+  # still mutable in principle; do not treat this as equivalent to a SHA
+  # pin, only as the generator's own documented substitute for one.
   # -------------------------------------------------------------------------
   provenance:
     needs: [build, publish]
@@ -278,7 +298,7 @@ jobs:
       actions: read
       id-token: write
       contents: write
-    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@f7dd8c54c2067bafc12ca7a55595d5ee9b75204a # v2.1.0
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v2.1.0
     with:
       base64-subjects: ${{ needs.build.outputs.subjects_b64 }}
       upload-assets: true

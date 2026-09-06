@@ -126,12 +126,16 @@ could not have exercised it.
   gated on `inputs.upload-assets && startsWith(github.ref, 'refs/tags/')`,
   so there is no dry-run path — rehearsing it end-to-end would mean
   publishing a throwaway GitHub Release to attach a real attestation to.
-  Static verification in lieu of a rehearsal: the pin
-  `f7dd8c54c2067bafc12ca7a55595d5ee9b75204a` was confirmed to resolve to
-  `slsa-github-generator` v2.1.0, and the caller's three permissions
-  (`actions: read`, `id-token: write`, `contents: write`) were confirmed
-  to be exactly the union required by the reusable workflow's inner jobs.
-  Check on the next real release: confirm a `.intoto.jsonl` asset
+  Static verification in lieu of a rehearsal: the caller's three
+  permissions (`actions: read`, `id-token: write`, `contents: write`)
+  were confirmed to be exactly the union required by the reusable
+  workflow's inner jobs. A commit-SHA pin on the `uses:` line was tried
+  first and is affirmatively wrong — it was replaced with the `@v2.1.0`
+  tag reference required by the generator (see §9's documented
+  exception); a SHA pin here builds successfully but silently produces
+  no attestation, so this is not a cosmetic preference, it is the
+  difference between the job working and appearing to work. Check on
+  the next real release: confirm a `.intoto.jsonl` asset
   attaches to the Release alongside the `.deb`, and that the sha256
   subject inside the attestation matches the sha256 of the shipped
   `.deb`.
@@ -149,8 +153,31 @@ steps:
 - `actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02` (v4.6.2)
 - `actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093` (v4.3.0)
 - `DavidAnson/markdownlint-cli2-action@05f32210e84442804257b2a6f20b273450ec8265` (v19.1.0)
-- `slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@f7dd8c54c2067bafc12ca7a55595d5ee9b75204a` (v2.1.0)
 - `Homebrew/install@7a133dcc74051ee4efc79467ed215dfedf45aea2` (2026-09-04) — Linuxbrew bootstrap installer, fetched via `raw.githubusercontent.com` in test.yml + release.yml
+
+**Deliberate exception:** `slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v2.1.0`
+in `release.yml`'s `provenance` job is referenced by **tag**, not commit
+SHA. This is the one action in the repo exempted from the SHA-pinning
+rule above, and the exemption is intentional, not an oversight — do
+not "fix" it back to a SHA pin.
+
+The generator's own README requires it, in bold: reusable
+builder/generator workflows "MUST be referenced by tag" so
+`slsa-verifier` can verify the ref. `builder-fetch.sh` in that repo
+enforces this mechanically — it rejects any ref that isn't
+`refs/tags/vX.Y.Z` (exit 2 for a non-tag ref, exit 7 for a
+non-semver tag). SHA-pinning this `uses:` line does not fail loudly;
+the job runs to completion and simply produces no `.intoto.jsonl`,
+which is the exact silent-loss-of-provenance failure this job exists
+to prevent (see §10).
+
+The compensating control: `builder-fetch.sh` downloads the builder
+binary the tag points to and verifies *that binary's* SLSA provenance
+with `slsa-verifier`, cross-checking the tag's resolved commit against
+the provenance material. Integrity here comes from the verifier, not
+from the ref being immutable — a tag can move, in principle, so this
+is not equivalent to a SHA pin, only the generator's documented
+substitute for one.
 
 Workflow-level `permissions: read-all` on all four workflows. Individual
 jobs escalate only what they need (e.g. `publish` gets `contents: write`;
