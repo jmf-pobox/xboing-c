@@ -56,13 +56,14 @@ budget: { rounds: 3, reflection_after_each: true }
 | `sjl` | Sam J. Lantinga | SDL2 author. | Rendering/audio port, SDL2 abstraction, asset conversion. |
 | `gjm` | Glenford J. Myers | *Art of Software Testing*. | Tests, harness design, extracting pure functions. |
 
-`jck` is read-only (Read/Grep/Glob/WebFetch). Never `implement`/`test`.
+`jck` holds Read/Write/Edit/Grep/Glob/WebFetch (`vision-keeper.yaml`) but
+never takes `implement`/`test` — upheld by convention and review, not tools.
 
 ## Archetypes
 
-`implement` (3 rounds, any path) · `design` (2, `*.md`/`docs/**`, needs
-`context`) · `test` (2, `tests/**`) · `review` (1, `*.md`/`.tmp/**`, needs
-`inputs.files`) · `report` (1, empty OK) · `investigate` (1, empty OK).
+`implement` (3, any path) · `design` (2, `*.md`/`docs/**`, needs `context`) ·
+`test` (2, Go-only; refused here; ethos-9yfp) · `review` (1, `*.md`/`.tmp/**`,
+needs `inputs.files`) · `report` (1, empty OK) · `investigate` (1, empty OK).
 
 ## Pipelines
 
