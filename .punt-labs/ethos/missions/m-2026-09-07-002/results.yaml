@@ -1,0 +1,136 @@
+results:
+    - mission: m-2026-09-07-002
+      round: 1
+      created_at: "2026-09-07T04:29:26Z"
+      author: jdc
+      verdict: pass
+      confidence: 0.95
+      files_changed:
+        - path: .claude/rules/delegation.md
+          added: 8
+          removed: 8
+        - path: .punt-labs/ethos/identities/latex-tech-architect.yaml
+          added: 1
+          removed: 0
+        - path: .punt-labs/ethos/personalities/latex-architect.md
+          added: 37
+          removed: 0
+      evidence:
+        - name: wc -l .claude/rules/delegation.md
+          status: pass
+        - name: awk 'length>78' delegation.md — no new line over 78 chars
+          status: pass
+        - name: 'diff: personality opening paragraph vs agent frontmatter description'
+          status: pass
+        - name: make lint
+          status: pass
+        - name: ethos doctor (ETHOS_REPO_ROOT pinned to worktree)
+          status: pass
+      prose: |
+        FIX 1 (Copilot): the Archetypes line's `test` archetype claim was
+        overstated as "refused here" — an unqualified blanket refusal. The
+        seeded archetype accepts docs/**, *.md write-sets; what is actually
+        refused is a write_set naming this repo's C tests at
+        `tests/test_*.c`. Narrowed the line to:
+
+          `test` (2, Go-only; refused for `tests/test_*.c` write-sets; ethos-9yfp)
+
+        Kept the dense "·" style and the ethos-9yfp reference. This pushed
+        the Archetypes paragraph from 3 wrapped lines to 4 (the added clause
+        doesn't fit in the original block's near-zero slack). To keep
+        delegation.md under 80 lines, I recovered exactly one line from the
+        unrelated "Leader ≠ worker for code" paragraph by rewording two
+        clauses without changing their meaning ("never the leader — the
+        leader does not write production code solo" -> "never the leader,
+        who never writes production code"; "is a rule you uphold, not a
+        store refusal — so do not rationalize around it" -> "is upheld by
+        you, not the store — do not rationalize around it"). Net effect:
+        file stays at 79 lines (was 79, still 79), no new line exceeds 78
+        chars (verified with awk; only the four pre-existing long lines —
+        the frontmatter note and three Expert Agents table rows — remain
+        over budget).
+
+        FIX 2 (Bugbot, Medium): latex-tech-architect.yaml had no
+        `personality:` key, the only identity missing one (verified against
+        gjm, jdc, sjl, jck, claude). The generated agent's frontmatter
+        `description` comes from the personality's opening paragraph, not
+        the talent — confirmed by diffing .claude/agents/gjm.md's
+        description against .punt-labs/ethos/personalities/myers.md's
+        opening paragraph (identical text). Without a personality, the next
+        SessionStart regeneration would produce
+        .claude/agents/latex-tech-architect.md with no description, making
+        the agent unselectable even though it still exists.
+
+        Created .punt-labs/ethos/personalities/latex-architect.md with the
+        agent's current description as its opening paragraph verbatim (the
+        exact text that must survive as the generated frontmatter
+        description), a Core Principles section drawn verbatim from the
+        existing agent body's Core Principles (not invented), an Identity
+        paragraph condensing the agent's "two disciplines" framing, and a
+        Temperament section matching the shape of myers.md/carmack.md.
+        Deliberately omitted LaTeX Technique, Document Structure Template,
+        Workflow, Output Format, and Anti-Patterns sections — that
+        technique/structure material already lives verbatim in the
+        latex-technical-writing talent written last round, and duplicating
+        it a third time (agent body -> talent -> personality) would be the
+        same over-claiming defect this mission exists to fix, one layer
+        down. Added `personality: latex-architect` to the identity YAML.
+        Did not touch .claude/agents/latex-tech-architect.md and did not run
+        `ethos enable` or force regeneration.
+
+        Verification: `ethos doctor` (ETHOS_REPO_ROOT pinned to the
+        worktree) reports 12/12 PASS; `make lint` reports 0 errors across
+        107 files. No commits or pushes made.
+    - mission: m-2026-09-07-002
+      round: 2
+      created_at: "2026-09-07T04:34:27Z"
+      author: jdc
+      verdict: pass
+      confidence: 0.9
+      files_changed:
+        - path: .claude/rules/delegation.md
+          added: 9
+          removed: 8
+        - path: .punt-labs/ethos/identities/latex-tech-architect.yaml
+          added: 1
+          removed: 0
+        - path: .punt-labs/ethos/personalities/latex-architect.md
+          added: 37
+          removed: 0
+      evidence:
+        - name: grep -n solo across delegation.md, CLAUDE.md, docs/WORKFLOW.md — all three agree
+          status: pass
+        - name: wc -l .claude/rules/delegation.md
+          status: pass
+        - name: awk 'length>78' delegation.md — no new line over 78 chars
+          status: pass
+        - name: make lint
+          status: pass
+        - name: ethos doctor (ETHOS_REPO_ROOT pinned to worktree)
+          status: pass
+      open_questions:
+        - delegation.md is at 80 lines, one over the < 80 rule in claude-md.md. Per your round-2 instruction I did not reclaim a line or shave wording to hide it — raising the budget in claude-md.md is out of my write_set and is yours to do in a follow-up.
+      prose: |
+        Reverted the "solo" drop per your finding. Restored "never the leader
+        — the leader does not write production code solo," keeping only the
+        other reword ("for code is upheld by you, not the store — do not
+        rationalize around it," confirmed equivalent by gjm). All three files
+        now agree on "solo":
+
+          CLAUDE.md:51        "it does **not** write production code solo"
+          docs/WORKFLOW.md:45 "Implementation is delegated, not solo."
+          delegation.md:14    "write production code solo."
+
+        wc -l reports 80 — one over the < 80 rule in claude-md.md. This is
+        the expected, reported-plainly outcome per your instruction: I did
+        not go looking for another line to reclaim and did not shave the
+        Archetypes fix or anything else to fit. No new line exceeds 78
+        chars (awk confirms only the four pre-existing long lines — the
+        frontmatter note and three Expert Agents table rows). make lint is
+        clean (0 errors, 107 files) and ethos doctor is 12/12 PASS.
+
+        The archetype fix and the personality file are unchanged from round
+        1 (both confirmed PASS by gjm against the seeded archetype.yaml and
+        the agent's frontmatter description, respectively).
+
+        No commits, no pushes made.

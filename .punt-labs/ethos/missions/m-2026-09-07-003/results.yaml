@@ -1,0 +1,27 @@
+results:
+    - mission: m-2026-09-07-003
+      round: 1
+      created_at: "2026-09-07T04:35:57Z"
+      author: jdc
+      verdict: pass
+      confidence: 0.98
+      files_changed:
+        - path: .claude/rules/claude-md.md
+          added: 4
+          removed: 1
+      evidence:
+        - name: git diff HEAD -- .claude/rules/claude-md.md (raised .claude/rules/ budget from < 80 to < 100, added adherence-not-tidiness clause)
+          status: pass
+        - name: wc -l .claude/rules/claude-md.md (60) and .claude/rules/delegation.md (80) -- both inside stated budgets
+          status: pass
+        - name: make lint
+          status: pass
+        - name: ethos doctor (12/12 PASS)
+          status: pass
+      prose: |
+        Raised the .claude/rules/ line budget row from < 80 to < 100 lines
+        and added a one-line clause: budgets exist to keep rules adherent,
+        not tidy, and must never be met by trimming accuracy out of a rule.
+        Root CLAUDE.md < 200 row, sub-directory CLAUDE.md row, and
+        @-imported docs row are untouched. delegation.md (80 lines) and
+        claude-md.md (60 lines) both fit inside their budgets.
