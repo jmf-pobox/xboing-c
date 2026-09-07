@@ -56,8 +56,9 @@ budget: { rounds: 3, reflection_after_each: true }
 | `sjl` | Sam J. Lantinga | SDL2 author. | Rendering/audio port, SDL2 abstraction, asset conversion. |
 | `gjm` | Glenford J. Myers | *Art of Software Testing*. | Tests, harness design, extracting pure functions. |
 
-`jck` holds Read/Write/Edit/Grep/Glob/WebFetch (`vision-keeper.yaml`) but
-never takes `implement`/`test` — upheld by convention and review, not tools.
+`jck` holds Read/Write/Edit/Bash/Grep/Glob/WebFetch (`vision-keeper.yaml`)
+but never takes `implement`/`test` — upheld by convention and review, not
+tools.
 
 ## Archetypes
 
