@@ -1,0 +1,6 @@
+name: LaTeX Technical Architect
+handle: latex-tech-architect
+kind: agent
+personality: latex-architect
+talents:
+  - latex-technical-writing

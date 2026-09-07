@@ -52,6 +52,9 @@ If none of the above, it probably doesn't belong in any CLAUDE.md.
 | Component | Budget |
 |-----------|--------|
 | Root CLAUDE.md | < 200 lines |
-| Each .claude/rules/ file | < 80 lines |
+| Each .claude/rules/ file | < 100 lines |
 | Each sub-directory CLAUDE.md | < 40 lines |
 | `@`-imported docs | No hard limit (human docs) |
+
+These budgets exist to keep rules adherent, not tidy. Never meet one by
+trimming accuracy out of a rule — grow the budget instead.

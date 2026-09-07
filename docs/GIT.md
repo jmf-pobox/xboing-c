@@ -57,8 +57,12 @@ Format: `type(scope): description`
 (`.claude/rules/delegation.md`). Commits produced by a mission carry
 `Mission:` / `Delegation:` git trailers (stamped by the commit-msg hook) so
 `git blame → commit → trailer → contract → prompt → audit trail` is
-reconstructable. A code commit with no mission trailer means the work
-skipped the mission process — that is a defect, not a style choice.
+reconstructable. The trailer only appears on commits made after the
+commit-msg hook was installed and while a mission was bound at commit
+time — its absence there is worth a question. Its absence elsewhere means
+nothing: every commit predating the hook lacks one permanently, and
+`delegation.md`'s own archetypes don't require a mission for genuinely
+non-mission commits (a README typo, a bead sync, a revert).
 
 ## Stop and Ask
 

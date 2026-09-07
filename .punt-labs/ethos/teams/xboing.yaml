@@ -14,6 +14,8 @@ members:
     role: av-platform-engineer
   - identity: gjm
     role: test-engineer
+  - identity: latex-tech-architect
+    role: technical-writer
 collaborations:
   - from: coo
     to: maintainer
@@ -29,4 +31,7 @@ collaborations:
     type: reports_to
   - from: test-engineer
     to: vision-keeper
+    type: reports_to
+  - from: technical-writer
+    to: coo
     type: reports_to
