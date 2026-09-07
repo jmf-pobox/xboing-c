@@ -1,6 +1,6 @@
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: XBoing
-Upstream-Contact: Justin Freeman <jmf@pobox.com>
+Upstream-Contact: J Freeman <jmf@pobox.com>
 Source: https://github.com/jmf-pobox/xboing-c
 Comment:
  XBoing was originally written by Justin C. Kibell between 1993 and 1996
