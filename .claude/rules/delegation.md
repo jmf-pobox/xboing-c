@@ -10,12 +10,12 @@ Definition-of-Done gate and does NOT count as delegation. The leader
 "0 missions" for delegated work is a process failure, not a shortcut.
 
 **Leader ≠ worker for code.** For `implement`/`test` the worker MUST be a
-domain specialist (`jdc`/`gjm`/`sjl`), never the leader — the leader does
-not write production code solo. The leader MAY be the worker for the
-non-code archetypes — `design`/`report`/`review`/`investigate` — whose
-output is analysis or docs, not shipped code. The store enforces
-`worker ≠ evaluator`; `leader ≠ worker` for code is a rule you uphold, not a
-store refusal — so do not rationalize around it.
+domain specialist (`jdc`/`gjm`/`sjl`), never the leader — the leader does not
+write production code solo. The leader MAY be the worker for the non-code
+archetypes — `design`/`report`/`review`/`investigate` — whose output is
+analysis or docs, not shipped code. The store enforces `worker ≠ evaluator`;
+`leader ≠ worker` for code is upheld by you, not the store — do not
+rationalize around it.
 
 ## Mission Protocol (mandatory — no exceptions)
 
@@ -62,8 +62,9 @@ never takes `implement`/`test` — upheld by convention and review, not tools.
 ## Archetypes
 
 `implement` (3, any path) · `design` (2, `*.md`/`docs/**`, needs `context`) ·
-`test` (2, Go-only; refused here; ethos-9yfp) · `review` (1, `*.md`/`.tmp/**`,
-needs `inputs.files`) · `report` (1, empty OK) · `investigate` (1, empty OK).
+`test` (2, Go-only; refused for `tests/test_*.c` write-sets; ethos-9yfp) ·
+`review` (1, `*.md`/`.tmp/**`, needs `inputs.files`) · `report` (1, empty OK)
+· `investigate` (1, empty OK).
 
 ## Pipelines
 
