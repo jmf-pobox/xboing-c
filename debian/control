@@ -1,7 +1,7 @@
 Source: xboing
 Section: games
 Priority: optional
-Maintainer: Justin Freeman <jmf@pobox.com>
+Maintainer: J Freeman <jmf@pobox.com>
 Build-Depends: debhelper-compat (= 13),
                cmake (>= 3.16),
                pkg-config,
