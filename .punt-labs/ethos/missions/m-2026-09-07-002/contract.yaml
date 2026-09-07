@@ -1,0 +1,91 @@
+mission_id: m-2026-09-07-002
+status: closed
+type: implement
+created_at: "2026-09-07T04:19:23Z"
+updated_at: "2026-09-07T04:40:28Z"
+closed_at: "2026-09-07T04:40:28Z"
+leader: claude
+worker: jdc
+evaluator:
+    handle: gjm
+    pinned_at: "2026-09-07T04:19:23Z"
+    hash: 7349512b3191332fef8a79f56caf962febc697b8444629912da4aa22b9b2efec
+inputs: {}
+write_set:
+    - .claude/rules/delegation.md
+    - .punt-labs/ethos/identities/latex-tech-architect.yaml
+    - .punt-labs/ethos/personalities/latex-architect.md
+success_criteria:
+    - The Archetypes line no longer says the test archetype is 'refused here' unqualified; it says it is refused for C test paths, which is the actual failure mode
+    - A personality file exists for latex-tech-architect and the identity references it, so SessionStart regeneration preserves the agent's invocation description
+    - The personality's opening paragraph is the text that must survive as the generated agent's frontmatter description
+    - delegation.md stays under 80 lines with no new line over 78 characters
+    - ethos doctor exits 0, make lint passes
+budget:
+    rounds: 2
+    reflection_after_each: true
+current_round: 2
+context: |
+    Two review findings on PR #222, both valid, both verified by me before
+    assigning.
+
+    ---- 1. Copilot: "refused here" overstates the test-archetype failure
+
+    The line currently reads:
+      `test` (2, Go-only; refused here; ethos-9yfp)
+
+    "Refused here" implies a test mission is impossible in this repo under
+    any circumstances. It is not. The seeded archetype's write_set allows
+    *_test.go, testdata/**, docs/**, *.md — so a test mission whose write_set
+    is docs-only would be accepted. What is refused is a write_set naming
+    this repo's C tests at tests/test_*.c.
+
+    That distinction matters especially in this PR, whose entire purpose is
+    removing overstated claims. Shipping a new overstatement while fixing old
+    ones would be the same defect one level down — which has already happened
+    twice in this mission's predecessor and was caught both times.
+
+    Narrow it to the real failure mode. Keep it in the dense `·`-separated
+    style and keep the ethos-9yfp reference.
+
+    ---- 2. Bugbot (Medium): the identity has no personality, so regeneration
+    will drop the agent's invocation description
+
+    .punt-labs/ethos/identities/latex-tech-architect.yaml has no
+    `personality:` key. Every other identity has one — verified: gjm, jdc,
+    sjl, jck and claude all do; ours is the only one without.
+
+    This matters because of the exact trap the previous mission was built to
+    avoid, one level deeper than we went. We moved the agent's BODY into a
+    talent so regeneration would not lose it. But the generated agent's
+    FRONTMATTER `description` is built from the personality, not the talent.
+    Compare .claude/agents/gjm.md's description against the opening paragraph
+    of .punt-labs/ethos/personalities/myers.md — they are the same text.
+
+    So at the next SessionStart, .claude/agents/latex-tech-architect.md would
+    regenerate with no description, and the description is what tells Claude
+    Code when to select this specialist. The agent would still exist and
+    still be unusable in practice.
+
+    THE FIX: create .punt-labs/ethos/personalities/latex-architect.md and
+    reference it from the identity as `personality: latex-architect`.
+
+    Its opening paragraph must be the text that has to survive as the
+    generated description. Use the existing agent's own description verbatim,
+    since that is what works today:
+
+      Produces technical documentation in LaTeX — architecture docs, design
+      reviews, specifications, API documentation, system overviews. Also
+      restructures existing docs for clarity, precision, or audience
+      alignment.
+
+    Then follow the shape of the sibling personality files — read myers.md
+    and carmack.md first. They open with a title heading and that summary
+    paragraph, then carry Core Principles and voice guidance. Draw the
+    principles from the agent file's existing body
+    (.claude/agents/latex-tech-architect.md) rather than inventing new ones;
+    do not duplicate what already lives in the talent, which carries the
+    technique and structure material.
+
+    Do not modify .claude/agents/latex-tech-architect.md and do not run
+    `ethos enable` or force regeneration.

@@ -1,0 +1,27 @@
+reflections:
+    - mission: m-2026-09-07-002
+      round: 1
+      created_at: "2026-09-07T04:31:47Z"
+      author: gjm
+      converging: true
+      signals:
+        - 'Archetype line verified TRUE and correctly narrowed: seeded ethos test.yaml write_set is [*_test.go, testdata/**, docs/**, *.md] (confirmed at ~/.punt-labs/ethos/archetypes/test.yaml); a docs-only or *.md-only write_set is accepted, tests/test_*.c is refused. ''refused for tests/test_*.c write-sets'' matches this exactly.'
+        - 'Personality file''s opening paragraph is verbatim-identical to .claude/agents/latex-tech-architect.md''s description line; identity now carries personality: latex-architect; file is 38 lines, well under budget.'
+        - 'Personality Core Principles duplicating latex-technical-writing.md''s Core Principles is NOT a new defect: the same pattern (Good/Bad Targets duplicated verbatim between myers.md and legacy-c-testing.md) is pre-existing, shipped precedent. The personality/talent split (principles+voice vs. technique+mechanics) is followed correctly -- LaTeX Technique, Document Structure Template, Anti-Patterns, Workflow are NOT duplicated into the personality.'
+        - 'REGRESSION: the unrequested rewrite at delegation.md:13-14 drops ''solo'' and changes ''the leader does not write production code solo'' to ''who never writes production code''. CLAUDE.md:51 and WORKFLOW.md:48 both still read ''...does not write [the] production code solo'' -- three files used to say the same thing with the same qualifier; delegation.md is now the odd one out. That is a new cross-file inconsistency of the exact kind this PR exists to remove.'
+        - '''upheld by you, not the store'' preserves the original ''a rule you uphold, not a store refusal'' meaning (store does not enforce leader != worker); no information lost there.'
+      recommendation: continue
+      reason: Archetype fix and personality file both pass; revert the unrequested 'solo' rewrite at delegation.md:13-14 to match CLAUDE.md/WORKFLOW.md's wording, then solve the line budget by tightening elsewhere (or raise the budget) rather than editing that paragraph.
+    - mission: m-2026-09-07-002
+      round: 2
+      created_at: "2026-09-07T04:39:57Z"
+      author: gjm
+      converging: true
+      signals:
+        - 'delegation.md:12-17 diffed against round-1 state: ''solo'' restored verbatim (''the leader does not write production code solo''), the approved ''upheld by you, not the store'' reword kept, nothing else in the paragraph touched. It now says the same thing the pre-mission file said, plus the equivalent reword I already passed.'
+        - 'CORRECTION to my own round-1 signal: I mis-stated docs/WORKFLOW.md''s wording as matching ''solo''. It does not -- WORKFLOW.md:48-49 reads ''the leader does not write the production code directly'' (different qualifier), and resume.md:121 (a process-notes file, not a live rule doc) drops the qualifier entirely: ''does NOT write production code''. So delegation.md and CLAUDE.md:51 now agree verbatim on ''solo'' (the specific pair I flagged as diverging is fixed), but a third, pre-existing variant (''directly'') sits in WORKFLOW.md outside this mission''s write-set. Not a defect introduced by this mission; worth a follow-up bead, not a blocker here.'
+        - Archetype line and personality file are byte-identical to what I passed in round 1 -- confirmed via git diff HEAD, the revert touched only lines 12-17 of delegation.md.
+        - 'make lint: 0 errors, 107 files (ran independently).'
+        - 'ethos doctor run from inside this worktree reproducibly FAILs (exit 1, ''Orphaned agent files: latex-tech-architect''), but this is a false negative caused by worktree path resolution, not a defect in the diff: doctor''s own ''Identity directory'' line points at /home/jfreeman/Coding/xboing-c/xboing/.punt-labs/ethos/identities (the main checkout), and that checkout''s teams/xboing.yaml has no latex-tech-architect member and no matching identity file at all -- it isn''t reading this worktree''s edited files. I could not reproduce a doctor exit-0 from inside a worktree for that reason; your prior 12/12 PASS run stands as the applicable evidence, but flag this as a tooling gotcha (ethos doctor + git worktrees) worth a bead so nobody trusts a worktree-run doctor result again.'
+      recommendation: continue
+      reason: Pass. Solo restored and verbatim-matches CLAUDE.md; archetype line and personality file unchanged from my round-1 pass; only new item is a pre-existing WORKFLOW.md/resume.md wording variance outside this write-set (file a follow-up bead, don't block) and an ethos-doctor-in-worktree tooling gotcha (also a follow-up bead, not a mission defect) -- ready to close.

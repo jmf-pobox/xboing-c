@@ -1,0 +1,122 @@
+mission_id: m-2026-09-07-001
+status: closed
+type: implement
+created_at: "2026-09-07T03:46:19Z"
+updated_at: "2026-09-07T04:13:29Z"
+closed_at: "2026-09-07T04:13:29Z"
+leader: claude
+worker: jdc
+evaluator:
+    handle: gjm
+    pinned_at: "2026-09-07T03:46:19Z"
+    hash: 7349512b3191332fef8a79f56caf962febc697b8444629912da4aa22b9b2efec
+inputs: {}
+write_set:
+    - .claude/rules/delegation.md
+    - docs/GIT.md
+    - .punt-labs/ethos/teams/xboing.yaml
+    - .punt-labs/ethos/identities/latex-tech-architect.yaml
+    - .punt-labs/ethos/roles/technical-writer.yaml
+    - .punt-labs/ethos/talents/latex-technical-writing.md
+success_criteria:
+    - delegation.md no longer claims jck is read-only; it describes the real boundary — jck may write docs/research but never takes implement or test missions and must approve gameplay-affecting changes
+    - 'docs/GIT.md''s Mission-trailer rule is true of this repo: scoped, and distinguishing ''no mission was required'' from ''a mission was skipped''. The word ''defect'' as an unconditional verdict is gone'
+    - latex-tech-architect is a member of .punt-labs/ethos/teams/xboing.yaml with a new technical-writer role and a new identity
+    - The agent's LaTeX expertise is preserved as an ethos talent so regeneration does not lose it
+    - ethos doctor exits 0 — the Orphaned agent files FAIL clears
+    - make lint passes
+budget:
+    rounds: 3
+    reflection_after_each: true
+current_round: 3
+context: |
+    Three xboing-owned contradictions. Each is an xboing-tracked file
+    disagreeing with another xboing-tracked file or with reality. None
+    needs an ethos change — ethos renders faithfully what we tell it.
+
+    ---- 1. delegation.md:59 asserts a permission the config does not enforce
+
+    It says verbatim:
+      `jck` is read-only (Read/Grep/Glob/WebFetch). Never `implement`/`test`.
+
+    But .punt-labs/ethos/roles/vision-keeper.yaml:10-16 grants:
+      Read, Write, Edit, Grep, Glob, WebFetch
+
+    The role file is the source of truth — .claude/agents/jck.md is generated
+    from it. So the rule is false, and it is load-bearing: delegation.md has no
+    `paths:` frontmatter precisely so it loads at session start for every
+    agent. Every agent is told jck cannot write, while jck can.
+
+    FIX THE RULE, NOT THE GRANT. Bead xboing-c-xzt has asked since 2026-05-02
+    to extend jck with Write + Bash so research and design missions can
+    self-file; Write landed, Bash did not. So the config reflects the intended
+    direction and the doc is simply stale. Do NOT remove Write/Edit from the
+    role.
+
+    What must survive: jck never takes implement/test missions, and jck must
+    approve gameplay-affecting changes. Those are real constraints enforced by
+    archetype and review, not by the tool list. State them as such.
+
+    Do NOT grant Bash. That is a separate capability decision and stays open on
+    xboing-c-xzt.
+
+    ---- 2. docs/GIT.md:60-61 states a rule that flags every commit ever made
+
+      A code commit with no mission trailer means the work skipped the mission
+      process — that is a defect, not a style choice.
+
+    No commit on master carries a Mission: trailer. Checked: `git log master -30`
+    with %(trailers:only) returns zero. So the rule condemns the entire history
+    and is therefore read as noise.
+
+    It stays wrong even after the tooling is fixed (ethos-vqwn, P1 upstream):
+      - every commit predating the hook lacks a trailer, permanently
+      - genuinely non-mission commits always will — a README typo, a bead sync,
+        a revert. delegation.md's own archetypes do not require a mission for
+        those, so the rule contradicts it.
+
+    Rewrite to keep the intent and drop the unsupported verdict: a trailer is
+    expected on mission-authorized work; its absence is worth a question, not
+    an accusation. Say plainly that trailers only appear on commits made after
+    the hook was installed and while a mission is bound, so their absence on
+    older or non-mission commits means nothing.
+
+    Keep the surrounding sentences about what the trailers are for — the
+    blame → commit → trailer → contract chain is genuine and worth stating.
+
+    ---- 3. latex-tech-architect is a tracked agent on no team
+
+    .claude/agents/latex-tech-architect.md is tracked (added in 00041f8);
+    .punt-labs/ethos/teams/xboing.yaml does not list it. ethos doctor FAILs
+    with "orphaned agent files (not on any team)" and exits 1, so CLAUDE.md's
+    Session Start step 4 ("must report all PASS") is unsatisfiable.
+
+    I checked doctor's logic (internal/doctor/doctor.go): an agent file passes
+    only if its handle is a team member or a seeded checklist agent. There is
+    no exemption mechanism. So it is add-to-team or delete.
+
+    ADD IT. LaTeX is genuinely used here — four tracked files:
+    docs/ARCHITECTURE_LEGACY.tex, docs/ARCHITECTURE_MODERN.tex,
+    docs/bullet_ammo.tex, docs/specs/2026-07-04-screen-state-machine.tex.
+    No plugin provides this agent; the tracked file is the only copy, so
+    deleting it loses the capability.
+
+    THE TRAP: ethos generates .claude/agents/<handle>.md from team data at
+    SessionStart. The moment latex-tech-architect is a member, its rich
+    hand-written body ("You are a principal software architect and technical
+    writing expert...", plus its "When to invoke" guidance) will be
+    regenerated away. So move the substance into ethos's own model first:
+    create a talent carrying the LaTeX/technical-writing expertise, a
+    technical-writer role granting the tools it already has (Read, Write,
+    Edit, Bash, Grep, Glob, WebFetch), and an identity binding them. Model the
+    three new files on the existing ones — read
+    .punt-labs/ethos/talents/xboing-domain.md,
+    .punt-labs/ethos/roles/test-engineer.yaml and
+    .punt-labs/ethos/identities/gjm.yaml for the shapes.
+
+    In the team file, add it as a member and give it a reports_to
+    collaboration consistent with the others (the three specialists report to
+    vision-keeper; a technical writer reporting to coo is the natural fit
+    since its output is documentation, not gameplay).
+
+    VERIFY BY RUNNING: `ethos doctor` must exit 0. Paste the full output.

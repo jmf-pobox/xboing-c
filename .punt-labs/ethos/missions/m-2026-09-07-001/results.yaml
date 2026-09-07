@@ -1,0 +1,141 @@
+results:
+    - mission: m-2026-09-07-001
+      round: 1
+      created_at: "2026-09-07T03:51:42Z"
+      author: jdc
+      verdict: pass
+      confidence: 0.95
+      files_changed:
+        - path: .claude/rules/delegation.md
+          added: 2
+          removed: 1
+        - path: docs/GIT.md
+          added: 6
+          removed: 2
+        - path: .punt-labs/ethos/teams/xboing.yaml
+          added: 5
+          removed: 0
+        - path: .punt-labs/ethos/identities/latex-tech-architect.yaml
+          added: 5
+          removed: 0
+        - path: .punt-labs/ethos/roles/technical-writer.yaml
+          added: 16
+          removed: 0
+        - path: .punt-labs/ethos/talents/latex-technical-writing.md
+          added: 157
+          removed: 0
+      evidence:
+        - name: ETHOS_REPO_ROOT=<worktree> ethos doctor
+          status: pass
+        - name: make lint
+          status: pass
+      prose: |
+        Fix 1: delegation.md:59 rewritten. jck's tool grant now stated
+        correctly (Read/Write/Edit/Grep/Glob/WebFetch per vision-keeper.yaml,
+        no Bash added) while preserving the two real constraints: jck never
+        takes implement/test missions, and must approve gameplay-affecting
+        changes.
+
+        Fix 2: docs/GIT.md's mission-trailer paragraph rewritten. Dropped the
+        unconditional "defect" verdict. States the trailer only appears on
+        commits made after the commit-msg hook was installed and while a
+        mission was bound at commit time; absence there is worth a question,
+        absence anywhere else (pre-hook commits, genuinely non-mission
+        commits like a README typo/bead sync/revert) means nothing. Kept the
+        blame -> commit -> trailer -> contract -> audit-trail sentence intact.
+
+        Fix 3: Read .claude/agents/latex-tech-architect.md in full before
+        touching the team config. Created talents/latex-technical-writing.md
+        carrying its full substance (two disciplines, core principles, LaTeX
+        technique, document structure template, anti-patterns, workflow,
+        output format, "when to invoke" guidance) so ethos regenerating
+        .claude/agents/latex-tech-architect.md at SessionStart does not lose
+        it. Created roles/technical-writer.yaml with the agent's tools carried
+        verbatim (Read, Write, Edit, Bash, Grep, Glob, WebFetch) and
+        model: opus preserved. Created identities/latex-tech-architect.yaml
+        (handle latex-tech-architect, so the generated agent file keeps its
+        current name) binding the new talent. Added latex-tech-architect to
+        teams/xboing.yaml as a technical-writer, reporting to coo (its output
+        is documentation, not gameplay, unlike the three vision-keeper
+        reports).
+
+        Verification: `ETHOS_REPO_ROOT=<worktree-path> ethos doctor` was
+        required because ethos resolves the identity store from
+        `git rev-parse --git-common-dir`'s parent (the primary checkout),
+        not the worktree's own working copy, so plain `ethos doctor` run
+        from inside the worktree reads the main checkout's unmodified
+        master-branch config and still reports the orphaned-agent FAIL.
+        Pinning ETHOS_REPO_ROOT at the worktree confirms all 12 checks PASS,
+        exit 0.
+
+        `make lint`: markdownlint-cli2, 106 files (105 pre-existing + 1 new
+        talent .md), 0 errors.
+
+        Did not touch .claude/agents/latex-tech-architect.md, did not run
+        `ethos enable` or restart, did not grant Bash to jck, did not commit
+        or push.
+    - mission: m-2026-09-07-001
+      round: 2
+      created_at: "2026-09-07T03:57:25Z"
+      author: jdc
+      verdict: pass
+      confidence: 0.95
+      files_changed:
+        - path: .claude/rules/delegation.md
+          added: 2
+          removed: 0
+      evidence:
+        - name: awk 'length>78 {printf "%d:%d\n", NR, length}' .claude/rules/delegation.md
+          status: pass
+        - name: git diff HEAD -- .claude/rules/delegation.md (word-for-word check)
+          status: pass
+        - name: make lint
+          status: pass
+        - name: ETHOS_REPO_ROOT=<worktree> ethos doctor
+          status: pass
+      open_questions:
+        - .claude/rules/delegation.md is now 80 lines. claude-md.md's budget table says "Each .claude/rules/ file < 80 lines" (strict). 80 is not < 80. The jck sentence is 204 characters; wrapped at the repo's ~72-78 char convention it needs a minimum of 3 lines, which pushed the file from 78 to 80 lines. I did not shorten the sentence's content to force it under budget since round-1's wording was already verified word-for-word against vision-keeper.yaml by the evaluator; shrinking it risks reintroducing the inaccuracy this mission exists to fix. Flagging rather than silently trimming — team lead's call whether to shorten the sentence, raise the budget, or accept 80 as close enough.
+      prose: |
+        Rewrapped delegation.md:60 (the second half of the jck sentence,
+        previously 130 chars on one line) into two lines so no line in the
+        sentence exceeds 78 chars, matching line 59 (73 chars) and the
+        ~72-char prose-wrap convention in .claude/rules/markdown.md. Content
+        is unchanged word-for-word from round 1 -- only line breaks moved,
+        confirmed via git diff against the pre-edit content.
+
+        awk length>78 now reports only lines 3, 54, 55, 56, 57 (all
+        pre-existing, out of scope per the task) -- line 60 is gone from
+        the list.
+
+        make lint: 106 files, 0 errors.
+        ethos doctor (ETHOS_REPO_ROOT pinned to this worktree): all 12
+        checks PASS, including Orphaned agent files.
+
+        One finding not fixed, see open_questions: the file is now exactly
+        80 lines, and claude-md.md's own budget says < 80 (strict) for
+        .claude/rules/ files. This is a pre-existing tension from round 1's
+        content expansion (73-char single line -> 204-char sentence), not
+        introduced by this round's wrapping -- wrapping is what exposed it,
+        since 3 lines at ~78 chars each is the minimum needed for a 204-char
+        sentence.
+    - mission: m-2026-09-07-001
+      round: 3
+      created_at: "2026-09-07T04:11:28Z"
+      author: jdc
+      verdict: pass
+      confidence: 0.95
+      files_changed:
+        - path: .claude/rules/delegation.md
+          added: 6
+          removed: 5
+      evidence:
+        - name: wc -l .claude/rules/delegation.md (79, budget < 80)
+          status: pass
+        - name: 'awk ''length>78'' delegation.md (only pre-existing offenders: line 3, table rows 54-57)'
+          status: pass
+        - name: make lint
+          status: pass
+        - name: ETHOS_REPO_ROOT=<worktree> ethos doctor (12/12 PASS)
+          status: pass
+      prose: |
+        Three fixes now in the tree, superseding the round-2 rewrap. (1) Cut the jck sentence's duplicated "must approve gameplay-affecting changes" clause since the table row above it already states that. (2) Fixed the Archetypes `test` entry, which falsely claimed write_set `tests/**`: the seeded archetype is Go-only upstream (*_test.go/testdata/**/docs/**/*.md), so `mission create --type test` is refused for this repo's tests/test_*.c -- filed upstream as ethos-9yfp. New line reads "Go-only; refused here; ethos-9yfp". Trimmed implement's "(3 rounds, any path)" to "(3, any path)" to close the 3-line budget; gjm ruled this acceptable since implement was the only entry carrying a unit word and the unit is discoverable in the contract example 16 lines up. (3) Fixed my own round-2 wording error, caught by gjm: "enforced by archetype and review, not tools" was false (enforceRequireDelegatedWorker blocks leader==worker but does not gate identity; grep of internal/mission for jck/vision-keeper returns zero hits), and it contradicted delegation.md:16-18's correct framing two paragraphs up. Replaced with "upheld by convention and review, not tools", consistent with lines 16-18. File is 79 lines, no new lines over 78 chars.
