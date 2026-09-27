@@ -285,11 +285,11 @@ docs-gen: ## Regenerate derived LaTeX (docs/adr_table.tex from DESIGN.md, docs/m
 	scripts/gen_adr_table.sh
 	scripts/gen_metrics_tex.sh
 
-docs-pdf: docs-gen ## Regenerate derived tables then compile the three report PDFs (needs pdflatex).
-	cd docs && pdflatex -interaction=nonstopmode -halt-on-error MODERNIZATION_CASE_STUDY.tex >/dev/null && pdflatex -interaction=nonstopmode -halt-on-error MODERNIZATION_CASE_STUDY.tex >/dev/null
+docs-pdf: docs-gen ## Regenerate derived tables then compile the three report PDFs (needs pdflatex + biber).
+	cd docs && pdflatex -interaction=nonstopmode -halt-on-error MODERNIZATION_CASE_STUDY.tex >/dev/null && bibtex MODERNIZATION_CASE_STUDY >/dev/null && pdflatex -interaction=nonstopmode -halt-on-error MODERNIZATION_CASE_STUDY.tex >/dev/null && pdflatex -interaction=nonstopmode -halt-on-error MODERNIZATION_CASE_STUDY.tex >/dev/null
 	cd docs && pdflatex -interaction=nonstopmode -halt-on-error ARCHITECTURE_MODERN.tex >/dev/null && pdflatex -interaction=nonstopmode -halt-on-error ARCHITECTURE_MODERN.tex >/dev/null
 	cd docs && pdflatex -interaction=nonstopmode -halt-on-error ARCHITECTURE_LEGACY.tex >/dev/null && pdflatex -interaction=nonstopmode -halt-on-error ARCHITECTURE_LEGACY.tex >/dev/null
-	cd docs && rm -f *.aux *.log *.out *.toc *.fls *.fdb_latexmk
+	cd docs && rm -f *.aux *.log *.out *.toc *.fls *.fdb_latexmk *.bbl *.bcf *.blg *.run.xml
 	@echo "Rebuilt docs/*.pdf. Review and commit the .tex, generated tables, and PDFs together."
 
 cppcheck-src: ## Static analysis on src/ (mirrors lint.yml cppcheck (src) step).

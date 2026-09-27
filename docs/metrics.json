@@ -62,8 +62,9 @@
     "workflows": { "value": 5, "note": "ARCHITECTURE_MODERN.tex says 3; actual = 5", "files": ["test.yml", "lint.yml", "docs.yml", "release.yml", "biff-notify.yml"], "cmd": "ls .github/workflows/*.yml" }
   },
   "ethos": {
-    "closed_missions": { "value": 107, "cmd": "wc -l .punt-labs/ethos/missions.jsonl (113 lines; 107 closed entries)" },
-    "mission_type_histogram": { "implement": 100, "design": 6, "investigate": 2, "report": 1 },
+    "ledger_entries": { "value": 113, "cmd": "wc -l .punt-labs/ethos/missions.jsonl" },
+    "closed_missions": { "value": 107, "note": "of 113 ledger entries: 107 closed, 5 failed, 1 escalated", "cmd": "grep -o '\"status\":\"[a-z]*\"' .punt-labs/ethos/missions.jsonl | sort | uniq -c" },
+    "mission_type_histogram": { "_note": "all 113 ledger entries by type", "implement": 100, "design": 6, "investigate": 2, "report": 5, "cmd": "grep -o '\"type\":\"[a-z]*\"' .punt-labs/ethos/missions.jsonl | sort | uniq -c" },
     "worker_evaluator_pairs": { "jdc->jck": 39, "gjm->jdc": 27, "jdc->gjm": 23, "sjl->jdc": 9, "sjl->jck": 6, "jck->jdc": 3 }
   },
   "zspec": {
