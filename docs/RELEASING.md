@@ -58,10 +58,41 @@ human does the bump:
    does not pin the source.
 5. Commit and push directly to the tap repo. There is no PR review
    gate on the tap today.
-6. Verify: `brew update && brew install jmf-pobox/xboing/xboing` on a
-   clean machine (or `brew reinstall` on one that already has it)
-   and confirm brew reports "Pouring" a bottle, not "==> Installing
-   xboing" followed by a `cmake`/`make` build log.
+
+## MANUAL post-tap-bump verification (the only real-tap pour check)
+
+The `bottle` job in CI (see "How CI proves the bottle actually pours"
+below) never installs from the public tap — the tap has no real
+bottle sha256s until step 6 above lands them, so a check that ran
+`brew install jmf-pobox/xboing/xboing` in CI, before that commit
+exists, would either fail every release or silently fall back to a
+source build. The one and only point this repo can verify a real user
+gets a real pour from the real tap is here, after the manual bump,
+by hand:
+
+1. On a clean machine (no prior xboing install) matching a bottled
+   platform — macOS arm64, or Linux x86_64/aarch64 — run:
+
+   ```bash
+   brew update
+   brew install jmf-pobox/xboing/xboing
+   ```
+
+   (On a machine that already has it: `brew reinstall
+   jmf-pobox/xboing/xboing` instead.)
+
+2. Confirm the install log says `==> Pouring
+   xboing--<version>.<bottle-tag>.bottle.tar.gz` — not `==> Installing
+   xboing` followed by a `cmake`/`make` compile log. If it built from
+   source, the tap's `bottle do` block, `url`/`sha256` pin, or bottle
+   tag doesn't match this machine — recheck step 4 above.
+3. `xboing -version` matches the tag; the game launches.
+
+This is a manual step by design (bead xboing-157): CI cannot exercise
+the real tap before a human commits the bump, so this is not
+automatable away without either provisioning `HOMEBREW_TAP_TOKEN`
+(Phase 2a) or accepting a chicken-and-egg gap. Skipping it means the
+release ships with an *unverified* claim that installs pour.
 
 ## Phase 2a: automated tap bump (future)
 
@@ -77,6 +108,53 @@ can bootstrap for itself. Until then, Phase 2b's manual copy-paste
 is the whole mechanism, and it is intentionally low-tech: a maintainer
 reading the Release notes is a strictly stronger check than an
 unattended push into a repo with no PR review.
+
+## How CI proves the bottle actually pours
+
+The `bottle` job cannot install from the public tap (see "MANUAL
+post-tap-bump verification" above for why) — so instead of gating on
+`brew install jmf-pobox/xboing/xboing`, it builds a bottle and then
+pours *that exact local `.bottle.tar.gz`* on the same runner, which
+`FromBottleLoader` (Homebrew's formula loader) guarantees always
+pours — the bottle's own metadata is embedded in the tarball, there
+is no source fallback to load from a bare tarball path. Four checks,
+all in `.github/workflows/release.yml`'s `bottle` job unless noted:
+
+1. **Pour assertion.** The "Pour the bottle directly from the local
+   tarball" step greps the `brew install` log for `==> Pouring
+   *.bottle.tar.gz`, and cross-checks `brew info --json=v2 ... | jq
+   '.formulae[0].installed[0].poured_from_bottle'` against the
+   install receipt (`true` required) — Homebrew's own structured
+   record of the fact (`Tab#poured_from_bottle`), not a second
+   free-text grep, because the generic `==> Installing ...` header
+   fires identically for both a pour and a source build and cannot
+   discriminate between them. The same receipt check runs the other
+   direction in "Build the bottle from source" (`poured_from_bottle`
+   must be `false` there, since `--build-bottle` disables pouring).
+2. **No-toolchain proof.** "Uninstall the source build + the
+   build-only toolchain" removes `cmake` and `pkg-config` (the
+   formula's `depends_on ... => :build` deps) — deliberately keeping
+   the runtime `sdl2*` deps — and asserts via `brew list --formula`
+   that they're actually gone. "Verify the poured binary" re-checks
+   this immediately before running the binary, so the whole
+   pour-to-launch window is covered, not just the moment right after
+   uninstalling.
+3. **Arch + execute.** `packaging/homebrew/verify-bottle.sh` (called
+   from "Verify the poured binary") uses `file` on the installed
+   binary and compares against the runner's own `uname -m`, then
+   requires an exact `xboing <version>` match and a headless launch
+   that runs to a timeout (not an early exit — see the script's
+   comments for why exit 0 doesn't prove anything here).
+4. **Sequencing.** Steps 1–3 above run against the bottle this same
+   job just built on this same runner, never against the tap — the
+   tap doesn't have real bottle sha256s until a human completes the
+   Phase 2b commit. The **only** check against the real, public tap
+   is the manual step in "MANUAL post-tap-bump verification" above,
+   run by a human after that commit lands.
+
+`smoke-brew` (source build, matrix `macos-14`/`ubuntu-latest`) is
+unchanged by any of this — it is a fallback-path test, not a bottle
+test, and stays that way on purpose.
 
 ## Bottle baseline: what a bottle actually covers
 
