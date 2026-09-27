@@ -1,0 +1,76 @@
+% xboing-doc.sty — shared preamble for the XBoing LaTeX reports.
+%
+% DRY: the ARCHITECTURE_LEGACY, ARCHITECTURE_MODERN, and
+% MODERNIZATION_CASE_STUDY documents share one package set and macro
+% vocabulary here instead of each repeating ~40 lines of preamble.
+% Each document keeps only its own \title/\date/\documentclass.
+%
+% Usage (after \documentclass): \usepackage{xboing-doc}
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{xboing-doc}[2026/09/27 XBoing shared report preamble]
+
+% --- Encoding & fonts -------------------------------------------------------
+\RequirePackage[utf8]{inputenc}
+\RequirePackage[T1]{fontenc}
+\RequirePackage{lmodern}
+\RequirePackage{microtype}
+\RequirePackage[htt]{hyphenat} % allow breaking inside \texttt paths
+
+% --- Layout -----------------------------------------------------------------
+\RequirePackage[margin=2.5cm]{geometry}
+\RequirePackage{parskip}
+\RequirePackage{enumitem}
+
+% --- Tables -----------------------------------------------------------------
+\RequirePackage{booktabs}
+\RequirePackage{tabularx}
+\RequirePackage{longtable}
+\RequirePackage{array}
+
+% --- Math, graphics, code ---------------------------------------------------
+\RequirePackage{amsmath}
+\RequirePackage{tikz}
+\usetikzlibrary{arrows.meta, positioning, shapes.geometric, calc, fit, backgrounds}
+\RequirePackage{listings}
+\RequirePackage{xcolor}
+
+% --- Links (load late) ------------------------------------------------------
+\RequirePackage[colorlinks=true, linkcolor=blue!70!black, urlcolor=blue!70!black, citecolor=blue!70!black]{hyperref}
+\RequirePackage{cleveref}
+
+% --- Shared inline macros (union across all three reports) -------------------
+\newcommand{\code}[1]{\texttt{#1}}
+\newcommand{\filename}[1]{\texttt{#1}}
+\newcommand{\file}[1]{\texttt{#1}}          % legacy alias
+\newcommand{\funcname}[1]{\texttt{#1}}
+\newcommand{\func}[1]{\texttt{#1()}}        % legacy alias
+\newcommand{\modulename}[1]{\texttt{#1}}
+\newcommand{\structname}[1]{\texttt{#1}}
+\newcommand{\enumname}[1]{\texttt{#1}}
+\newcommand{\const}[1]{\texttt{#1}}         % legacy alias
+\newcommand{\missionid}[1]{\texttt{#1}}
+\newcommand{\adref}[1]{ADR-#1}
+\newcommand{\specref}[1]{(Spec~\S#1)}
+\newcommand{\legacy}{\emph{legacy}}
+\newcommand{\modern}{\emph{modern}}
+\newcommand{\xboing}{\textsc{XBoing}}
+
+% --- Listings style ---------------------------------------------------------
+\lstdefinestyle{xboingstyle}{
+    basicstyle=\ttfamily\small,
+    keywordstyle=\color{blue!70!black}\bfseries,
+    commentstyle=\color{green!50!black},
+    stringstyle=\color{red!60!black},
+    numberstyle=\tiny\color{gray},
+    numbersep=5pt,
+    frame=single,
+    breaklines=true,
+    columns=fullflexible,
+    tabsize=2,
+    showstringspaces=false,
+}
+\lstset{style=xboingstyle}
+
+% cleveref name for listings floats
+\crefname{lstlisting}{Listing}{Listings}
+\Crefname{lstlisting}{Listing}{Listings}

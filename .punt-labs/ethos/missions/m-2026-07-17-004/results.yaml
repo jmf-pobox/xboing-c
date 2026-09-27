@@ -1,0 +1,22 @@
+results:
+    - mission: m-2026-07-17-004
+      round: 1
+      created_at: "2026-07-17T02:56:08Z"
+      author: jdc
+      verdict: pass
+      confidence: 0.95
+      files_changed:
+        - path: src/block_system.c
+          added: 6
+          removed: 3
+      evidence:
+        - name: block_system_update_explosions gate == frame -> frame >= explode_next_frame (block_system.c:574 -> `if (!bp->exploding || frame < bp->explode_next_frame) continue;`). Advances at most one stage per call; no double-score.
+          status: pass
+        - name: build-debug -Wall -Wextra -Wpedantic -Werror -Wconversion -Wshadow clean
+          status: pass
+        - name: ctest --test-dir build 61/61 pass
+          status: pass
+        - name: make asan-test ASan+UBSan 61/61 pass
+          status: pass
+        - name: 'git status --porcelain: only src/block_system.c'
+          status: pass

@@ -1,0 +1,22 @@
+results:
+    - mission: m-2026-07-12-030
+      round: 1
+      created_at: "2026-07-12T21:22:27Z"
+      author: gjm
+      verdict: pass
+      confidence: 0.94
+      files_changed:
+        - path: tests/test_keybindings.c
+          added: 81
+          removed: 0
+      evidence:
+        - name: 'test_playtest_p_ends_via_live_game_input: reaches play-test, edits block (2,3), injects SDL_SCANCODE_P + calls the REAL game_input_global; asserts SDL2ST_EDIT (not SDL2ST_PAUSE), play_test_active==false, block (2,3) restored — drives the LIVE path Stage 4 missed'
+          status: pass
+        - name: 'test_real_game_p_still_pauses: setup_game, inject P + game_input_global -> SDL2ST_PAUSE (real-game pause unbroken)'
+          status: pass
+        - name: 'test_playtest_escape_ends_via_live_game_input: inject SDL_SCANCODE_ESCAPE + game_input_global -> SDL2ST_EDIT, play_test_active==false (Escape also ends properly, not abort dialogue)'
+          status: pass
+        - name: Genuine (real SDL input + game_input_global, not editor_system_key_input for the assertion); no CMakeLists change; only tests/test_keybindings.c touched; cmake zero-warning; full ctest green
+          status: pass
+        - name: 'RED->GREEN (leader, src outside worker write-set): reverting the m-2026-07-12-029 game_input.c fix fails both play-test-exit tests (4!=14 = SDL2ST_PAUSE vs SDL2ST_EDIT; Escape fails), real-game pause sibling stays green; fix restored -> all pass, no residue'
+          status: pass

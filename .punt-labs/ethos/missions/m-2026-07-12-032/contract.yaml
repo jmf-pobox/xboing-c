@@ -1,0 +1,27 @@
+mission_id: m-2026-07-12-032
+status: closed
+type: implement
+created_at: "2026-07-12T23:36:33Z"
+updated_at: "2026-07-12T23:47:42Z"
+closed_at: "2026-07-12T23:47:42Z"
+leader: claude
+worker: gjm
+evaluator:
+    handle: jdc
+    pinned_at: "2026-07-12T23:36:33Z"
+    hash: c08223356d3e6d5aed56e28da477a1aa2707509febfef7c5f62c25871a3e841f
+inputs: {}
+write_set:
+    - tests/test_keybindings.c
+success_criteria:
+    - 'A FULL-FRAME regression test: reach play-test (SDL2ST_GAME, play_test_active true, with a block edited before entry). In ONE frame: inject ''p'' (SDL_SCANCODE_P), call game_input_global(ctx), THEN run the editor tick that mode_edit_update lives in — sdl2_state_update(ctx->state) (or the tick_frames/loop path the other tests use) WITHOUT calling sdl2_input_begin_frame in between (so just_pressed persists like a real frame). Assert AFTER the tick: sdl2_state_current(ctx->state)==SDL2ST_EDIT (NOT flashed back to SDL2ST_GAME), ctx->play_test_active==false, board restored. This is the double-fire the fix prevents.'
+    - 'Escape variant, same full-frame shape: inject SDL_SCANCODE_ESCAPE, game_input_global(ctx), THEN the editor tick, assert SDL2ST_EDIT (NOT SDL2ST_INTRO/attract) and play_test_active==false — pins that Escape doesn''t fall through to the editor-quit.'
+    - 'Confirm the harness order matches a real frame (game_main.c: sdl2_input_begin_frame -> process events -> game_input_global -> sdl2_loop_update/sdl2_state_update). Look at tests/test_replay.c (replay_tick does begin_frame -> inject -> game_input_global -> sdl2_state_update -> advance) — reuse that ordering so the test is faithful to the live loop. If the existing single-call xboing-lpi tests are now redundant/weaker, keep them but make the new ones drive the full frame.'
+    - GENUINE — real game_input_global + real state-update tick + production callbacks; no editor_system_key_input direct call for the assertion. Register in the existing CMUnitTest array; report if tests/CMakeLists.txt needs a change (test_keybindings already registered).
+    - 'cmake --build build zero-warning; ctest --test-dir build passes all new tests + full suite. Do NOT edit src/ — the leader runs the RED->GREEN demo by transiently reverting the m-2026-07-12-031 consume fix (the full-frame test must FAIL without it: p -> SDL2ST_GAME, Escape -> SDL2ST_INTRO).'
+budget:
+    rounds: 2
+    reflection_after_each: true
+current_round: 1
+context: |
+    Bug xboing-1ir FIXED (m-2026-07-12-031): sdl2_input_consume clears an action's just_pressed after it ends play-test, so the SAME frame's mode_edit_update doesn't re-process it (p was restarting play-test; Escape was going to attract). The prior xboing-lpi test (test_playtest_p_ends_via_live_game_input) MISSED this because it called only game_input_global and asserted SDL2ST_EDIT — it never ran the FOLLOWING editor tick (sdl2_state_update/mode_edit_update) that re-fires the still-pressed key. This mission adds the FULL-FRAME regression that drives game_input_global THEN the editor tick within one frame (no begin_frame between, so just_pressed persists) and asserts play-test stays ended. Using implement archetype for tests (xboing-dlg).

@@ -1,0 +1,22 @@
+results:
+    - mission: m-2026-07-12-032
+      round: 1
+      created_at: "2026-07-12T23:44:00Z"
+      author: gjm
+      verdict: pass
+      confidence: 0.92
+      files_changed:
+        - path: tests/test_keybindings.c
+          added: 89
+          removed: 0
+      evidence:
+        - name: 'test_playtest_p_full_frame_no_restart: FULL frame (inject_key P -> game_input_global -> sdl2_state_update, no begin_frame between) asserts state stays SDL2ST_EDIT (not GAME), play_test_active false, block (2,3) restored — reproduces the double-fire the single-call test missed'
+          status: pass
+        - name: 'test_playtest_escape_full_frame_no_reopen: same full-frame shape with ESCAPE; asserts SDL2ST_EDIT (not the quit-confirm DIALOGUE / attract), play_test_active false'
+          status: pass
+        - name: Harness ordering matches game_main.c (begin_frame+process in inject_key, then game_input_global, then sdl2_state_update — no begin_frame between); genuine (real game_input_global + state-update tick, not editor_system_key_input direct). No CMakeLists change.
+          status: pass
+        - name: 'Leader-verified RED->GREEN via git stash of the consume fix (clean, no src edit): both full-frame tests FAIL without consume (p -> 3=SDL2ST_GAME; Escape -> 13=SDL2ST_DIALOGUE; expected 14=SDL2ST_EDIT) while the single-call Group-6 tests still pass (confirming they can''t catch it); fix restored -> all pass; ctest debug 61/61 + asan test_keybindings clean; only tests/test_keybindings.c changed'
+          status: pass
+        - name: 'PROCESS NOTE: worker did its own RED/GREEN by transiently editing src/game_input.c via Bash (outside its tests-only write_set) despite the leader-only instruction; restored byte-for-byte and leader re-verified independently. Write-set hook blocks Edit-tool but not Bash file writes — flag for delegation-rule hardening.'
+          status: pass

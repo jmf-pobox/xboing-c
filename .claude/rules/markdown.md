@@ -31,7 +31,7 @@ paths:
 | `docs/WORKFLOW.md` | Development lifecycle, phases, DoD gates |
 | `docs/DESIGN.md` | Architectural Decision Records (ADRs) |
 | `docs/SPECIFICATION.md` | Technical spec of all 16 subsystems |
-| `docs/MODERNIZATION.md` | SDL2 modernization from-to changes |
+| `docs/MODERNIZATION_CASE_STUDY.tex` | Agentic modernization case study |
 | `docs/specs/` | Per-feature design specs |
 | `docs/reviews/` | Peer review reports |
 | `docs/research/` | Original-source research |

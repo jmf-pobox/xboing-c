@@ -1,40 +1,15 @@
 % ARCHITECTURE_MODERN.tex — Architecture of the Modernized SDL2 XBoing Codebase
 %
-% Revision history at end of front matter.
 % Intended audience: contributors understanding the current architecture,
 % and researchers comparing legacy vs. modern architecture for an
 % AI-assisted modernization study.
 
 \documentclass[11pt,a4paper]{article}
 
-% --- Packages ---------------------------------------------------------------
-\usepackage[utf8]{inputenc}
-\usepackage[T1]{fontenc}
-\usepackage{microtype}
-\usepackage[margin=2.5cm]{geometry}
-\usepackage{booktabs, tabularx, longtable}
-\usepackage{tikz}
-\usetikzlibrary{arrows.meta, positioning, shapes.geometric, calc, fit, backgrounds}
-\usepackage{amsmath}
-\usepackage[colorlinks=true, linkcolor=blue!70!black, urlcolor=blue!70!black, citecolor=blue!70!black]{hyperref}
-\usepackage{cleveref}
-\usepackage{enumitem}
-\usepackage{listings}
-\usepackage{xcolor}
-\usepackage{parskip}
+% Shared preamble (packages, macros, listings style) — see docs/xboing-doc.sty
+\usepackage{xboing-doc}
 
-% --- Custom commands ---------------------------------------------------------
-\newcommand{\adref}[1]{ADR-#1}
-\newcommand{\code}[1]{\texttt{#1}}
-\newcommand{\modulename}[1]{\texttt{#1}}
-\newcommand{\filename}[1]{\texttt{#1}}
-\newcommand{\funcname}[1]{\texttt{#1}}
-\newcommand{\structname}[1]{\texttt{#1}}
-\newcommand{\enumname}[1]{\texttt{#1}}
-\newcommand{\legacy}{\emph{legacy}}
-\newcommand{\modern}{\emph{modern}}
-
-% --- Listings style ----------------------------------------------------------
+% This document also shows C source, so it keeps a C-specific listings style.
 \lstdefinestyle{cstyle}{
     language=C,
     basicstyle=\ttfamily\small,
@@ -59,24 +34,10 @@
     \large For AI-Assisted Legacy Modernization Research
 }
 \author{XBoing Modernization Project}
-\date{March 2026 — Revision 1.0}
+\date{September 2026}
 
 \begin{document}
 \maketitle
-
-% --- Revision History --------------------------------------------------------
-\begin{table}[h]
-\centering
-\caption{Revision History}
-\label{tab:revisions}
-\begin{tabularx}{\textwidth}{llX}
-\toprule
-\textbf{Rev} & \textbf{Date} & \textbf{Description} \\
-\midrule
-1.0 & 2026-03-24 & Initial architecture document covering completed modernization \\
-\bottomrule
-\end{tabularx}
-\end{table}
 
 \tableofcontents
 \newpage
@@ -87,6 +48,8 @@
 % =============================================================================
 
 XBoing is a breakout/blockout game originally written by Justin C.\ Kibell in 1993--1996 for X11 using raw Xlib, XPM pixmaps, and a fork/pipe audio architecture. The modernization replaces all platform dependencies with SDL2 while preserving the original gameplay, physics, scoring, and level format. The result is a Linux game that builds with standard SDL2 packages, follows FHS and XDG conventions, and plays identically to the original.
+
+This document describes the \emph{architecture} of the modern codebase. For the project's \emph{method} --- how the modernization was carried out with LLM agents, ethos mission contracts, and z-spec formal methods --- see the companion case study \filename{docs/MODERNIZATION\_CASE\_STUDY.tex}.
 
 \subsection{Modernization Principles}
 \label{sec:principles}
@@ -1063,7 +1026,7 @@ Not registered as ctest targets (they run indefinitely). Manually invoked: \code
 \label{sec:cicd}
 % =============================================================================
 
-Three GitHub Actions workflows. \code{test.yml} and \code{lint.yml} run on every push to \code{master} and every PR. \code{docs.yml} is path-filtered to Markdown files (\code{**/*.md}).
+Four GitHub Actions workflows. \code{test.yml} and \code{lint.yml} run on every push to \code{master} and every PR; \code{docs.yml} is path-filtered to Markdown files (\code{**/*.md}). One further workflow, \code{release.yml} (Debian package builds), is not a build or lint gate.
 
 \begin{figure}[h]
 \centering
@@ -1113,20 +1076,8 @@ Three GitHub Actions workflows. \code{test.yml} and \code{lint.yml} run on every
 \label{fig:ci-pipeline}
 \end{figure}
 
-\begin{table}[h]
-\centering
-\caption{CI workflow details}
-\label{tab:ci-workflows}
-\begin{tabularx}{\textwidth}{llX}
-\toprule
-\textbf{Workflow} & \textbf{Jobs} & \textbf{Checks} \\
-\midrule
-\code{test.yml} & 2 (matrix) & Configure, build, run all ctest targets. Fail-fast disabled. \\
-\code{lint.yml} & 2 & clang-format \code{src/*.c include/*.h}; cppcheck \code{src/} and \code{tests/} with warning, style, performance, portability. \\
-\code{docs.yml} & 1 & markdownlint on all \code{.md} files. \\
-\bottomrule
-\end{tabularx}
-\end{table}
+The per-workflow job and check breakdown is maintained in
+\filename{docs/CI.md}; it is not duplicated here to avoid drift.
 
 
 % =============================================================================
@@ -1241,60 +1192,13 @@ The modern codebase is larger in source LOC than legacy, reflecting the modular 
 \label{sec:adrs}
 % =============================================================================
 
-All ADRs are recorded in \filename{docs/DESIGN.md}. \Cref{tab:adrs} summarizes each with status and key rationale.
+All ADRs are recorded in \filename{docs/DESIGN.md}, the single source of
+truth. \Cref{tab:adrs} lists each by number and title; it is generated
+from those headers by \filename{scripts/gen\_adr\_table.sh} and must not be
+edited by hand. See \filename{docs/DESIGN.md} for the full rationale,
+status, and consequences of each decision.
 
-\begin{longtable}{lllp{7cm}}
-\caption{Architectural Decision Records} \label{tab:adrs} \\
-\toprule
-\textbf{ADR} & \textbf{Status} & \textbf{Module} & \textbf{Key Rationale} \\
-\midrule
-\endfirsthead
-\toprule
-\textbf{ADR} & \textbf{Status} & \textbf{Module} & \textbf{Key Rationale} \\
-\midrule
-\endhead
-\bottomrule
-\endfoot
-
-001 & Accepted & Build & CMake as sole build system; no Meson. Existing CI and presets carry forward. \\
-002 & Accepted & paths & XDG Base Directory resolution. Centralizes 12+ scattered callsites. Caller-provided buffers. \\
-003 & Accepted & CMake & FHS-compliant install targets. Dev mode unchanged (relative paths). \\
-004 & Accepted & sdl2\_renderer & Single window, 575$\times$720 logical resolution, 2$\times$ scale, GPU-accelerated, nearest-neighbor. \\
-005 & Accepted & sdl2\_texture & FNV-1a hash map, eager PNG loading, 256 slots, partial load tolerance. \\
-006 & Accepted & sdl2\_font & 4 Liberation Sans TTF fonts, transient textures, 2px shadow offset. \\
-007 & Accepted & sdl2\_color & Static const RGBA, X11 rgb.txt verified, 7-step gradients. No opaque context. \\
-008 & Accepted & sdl2\_cursor & Pre-created cursors, best-effort, visibility toggle for NONE. \\
-009 & Accepted & sdl2\_regions & 9 named SDL\_Rect constants replacing X11 sub-windows. No opaque context. \\
-010 & Accepted & sdl2\_audio & SDL2\_mixer, eager WAV caching, FNV-1a hash map, 16 concurrent channels. \\
-011 & Accepted & sdl2\_input & Scancode-to-action mapping, dual bindings, level+edge triggers, runtime rebindable. \\
-012 & Accepted & sdl2\_state & Function pointer dispatch, enter/update/exit hooks, dialogue push/pop. Pure C. \\
-013 & Accepted & sdl2\_loop & Fixed-timestep accumulator, microsecond precision, spiral-of-death prevention. Pure C. \\
-014 & Accepted & sdl2\_cli & Config struct pattern, exact match, status code return. Pure C. \\
-015 & Accepted & ball\_system & Callback table (7 ptrs), environment struct (12 fields), preserves known bugs. \\
-016 & Accepted & block\_system & Diagonal cross-product collision replacing X11 Regions. Adjacency filter. \\
-017 & Accepted & paddle\_system & Position, size, reverse, delta tracking. Mouse formula preserved. \\
-018 & Accepted & gun\_system & 40 bullet slots, 40 tink slots, 8 callbacks, collision priority preserved. \\
-019 & Accepted & score\_system & Reuses score\_logic, digit layout, x2-wins-over-x4 bug preserved. \\
-020 & Accepted & level\_system & Single callback, 30-char mapping, level wrapping, background cycling. \\
-021 & Accepted & special\_system & 8 specials (7 managed, 1 paddle-owned), mutual exclusion (x2/x4), saving persistence. \\
-022 & Accepted & bonus\_system & 10-state tally, score pre-commit, save trigger every 5 levels. \\
-023 & Accepted & sfx\_system & 5 effects + BorderGlow, query-based rendering, injectable random. \\
-024 & Accepted & eyedude\_system & 6 walk frames, AABB collision, 10{,}000 point bonus, injectable random. \\
-025 & Accepted & presents\_system & 14-state sequencer, unified typewriter, sound events as data. \\
-026 & Accepted & intro\_system & 2 modes (intro+instruct), static data tables, shared sparkle. \\
-027 & Accepted & demo\_system & 2 modes (demo+preview), ball trail data, level loading callback. \\
-028 & Accepted & keys\_system & 2 modes (game+editor), static key binding tables, blink timing. \\
-029 & Accepted & dialogue\_system & Modal input with 4 validation modes (text, numeric, printable, yes/no). \\
-030 & Accepted & highscore\_system & Title sparkle, row sparkle, specials timing, score display. \\
-031 & Accepted & message\_system & Single-line message bar with auto-clear delay. \\
-032 & Accepted & highscore\_io & JSON format replacing legacy binary. Hand-written parser, atomic writes. \\
-033 & Accepted & savegame\_io & JSON format replacing legacy binary. Level, score, lives, specials, grid snapshot. \\
-034 & Accepted & config\_io & Minimal TOML format. User preferences persisted at XDG data path. \\
-035 & Accepted & cppcheck & cppcheck pass across entire codebase. \\
-036 & Accepted & clang-tidy & clang-tidy pass with \filename{.clang-tidy} configuration. \\
-037 & Accepted & paths & Asset directory resolution for installed binaries. \\
-
-\end{longtable}
+\input{adr_table.tex}
 
 
 % =============================================================================

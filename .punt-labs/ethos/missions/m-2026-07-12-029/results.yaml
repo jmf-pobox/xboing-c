@@ -1,0 +1,20 @@
+results:
+    - mission: m-2026-07-12-029
+      round: 1
+      created_at: "2026-07-12T21:14:31Z"
+      author: jdc
+      verdict: pass
+      confidence: 0.93
+      files_changed:
+        - path: src/game_input.c
+          added: 12
+          removed: 4
+      evidence:
+        - name: '#include editor_system.h added (alphabetized); resolves editor_system_key_input + EDITOR_KEY_PLAYTEST'
+          status: pass
+        - name: 'SDL2I_PAUSE handler: mode==SDL2ST_GAME && ctx->play_test_active -> editor_system_key_input(ctx->editor, EDITOR_KEY_PLAYTEST) (ends play-test, original/editor.c:994-1001); real-game pause/unpause branches unchanged'
+          status: pass
+        - name: 'SDL2I_ABORT (Escape) play_test_active branch: bare sdl2_state_transition(SDL2ST_EDIT) replaced with editor_system_key_input(EDITOR_KEY_PLAYTEST) -> fires on_playtest_end (restore board, clear flag, zero score, transition to EDIT); real-game abort-confirm dialogue branch unchanged'
+          status: pass
+        - name: Both live exits now use the same play-test-end path as the original (FinishPlayTest) and the Stage 4 test — closes the test-vs-live gap; cmake zero-warning; ctest 61/61; only src/game_input.c changed
+          status: pass

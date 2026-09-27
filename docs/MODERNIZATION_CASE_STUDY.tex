@@ -1,0 +1,670 @@
+% MODERNIZATION_CASE_STUDY.tex — XBoing: A Case Study in Agentic Software Modernization
+%
+% Intended audience: engineers evaluating agentic software-engineering
+% methods for modernizing legacy code, with emphasis on the punt-labs
+% tooling used here (ethos mission contracts, z-spec formal methods).
+%
+% Figures come from docs/metrics.tex (\Metric* macros), generated from
+% docs/metrics.json — never hand-edit numbers here; edit the JSON. The ADR
+% table comes from docs/adr_table.tex, generated from docs/DESIGN.md.
+% Build everything (regenerate the derived tables + compile all report PDFs)
+% with `make docs-pdf`. Commit the .tex, the generated tables, and the PDFs
+% together.
+
+\documentclass[11pt,a4paper]{article}
+
+% Shared preamble (packages, macros, listings style) — see docs/xboing-doc.sty
+\usepackage{xboing-doc}
+
+% Project figures, generated from docs/metrics.json by
+% scripts/gen_metrics_tex.sh. Never hand-edit metrics here — edit the JSON
+% and regenerate so every figure stays in sync with its source.
+\input{metrics.tex}
+
+% Bibliography (bibtex + natbib; biber is broken on the build host).
+\usepackage[numbers,sort&compress]{natbib}
+\bibliographystyle{plainnat}
+
+% --- Title -------------------------------------------------------------------
+\title{%
+    \textbf{XBoing II: A Case Study in Agentic Software Modernization}\\[0.5em]
+    \large Reviving a 1996 X11 Game with LLM Agents, Mission Contracts,\\
+    \large and Formal Methods
+}
+\author{Claude \\ \small Anthropic \and Reviewed by Jim Freeman}
+\date{September 2026}
+
+\begin{document}
+\maketitle
+\sloppy % path-heavy technical prose; prefer loose spacing over overfull boxes
+
+\begin{abstract}
+\noindent
+XBoing II is a fast, colorful breakout arcade game Justin C.\ Kibell wrote in
+pure Xlib between 1993 and 1996 --- the name the game shows on its title
+screen, and the 2.x line recreated here. This document is a case study of
+bringing it forward to a modern SDL2 codebase --- not by rewriting it in the
+loose
+sense, but by reimplementing it from scratch under a hard constraint:
+100\% behavioral fidelity to the 1996 original, with every deviation
+limited and documented. The distinguishing feature of the project is not
+the port itself but the \emph{method}: the work was driven by LLM agents
+operating under a principal-engineer standard, coordinated through
+\emph{ethos} mission contracts (typed delegation with a worker and a
+distinct evaluator), and hardened in places with \emph{z-spec} formal
+methods (Z specifications model-checked with \code{probcli}). This report
+documents what was built, how the agentic method worked in practice, the
+two punt-labs tools that made it auditable and verifiable, and --- in
+keeping with the project's ``evidence, not nostalgia'' mandate --- where
+it was hard and what recurred.
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+% =============================================================================
+\section{Introduction}
+% =============================================================================
+
+\subsection{Motivation}
+
+This project had two aims. The first was to test how far agentic software
+engineering has come: whether LLM agents, given the right structure, can
+modernize a real, working legacy codebase to a professional standard ---
+not a toy, but software people will install and play. The second was homage.
+XBoing was an outstanding piece of work for its day, and it holds up: fast,
+colorful, and carefully tuned, hand-built by one person over weekends on a
+SPARCstation~2. Software that good deserves to keep running on current
+machines, and its author deserves to see it do so.
+
+The maintainer, who first played XBoing on an SGI Indy workstation, chose it
+precisely because it is loved and because its craft rewards close study ---
+the deeper the port went, the more deliberate the original's details proved
+to be. When the finished port reached Justin Kibell, his reaction settled the
+second aim: he built it on a fresh Linux install, played through the early
+levels, and wrote that the sounds alone brought the memories --- and a tear
+or two --- flooding back. He has since revived the game's homepage and joined
+the project. That response is the outcome the homage was for.
+
+\subsection{What was built}
+
+XBoing II version 2.4 shipped on 22 November 1996 as pure Xlib --- no Motif,
+no Xt --- with XPM pixmap graphics, \code{fork()}-and-\code{/dev/dsp} audio
+across twelve platform-specific drivers, and compile-time paths baked in with
+\code{\#define}. It then sat unmaintained for roughly two decades. (An
+earlier XBoing~1 did not survive; the surviving, canonical game is the 2.x
+line, which is what this port recreates. This document uses ``XBoing'' as the
+short form throughout.)
+
+The modernization produces a current SDL2 game (release 1.0.11) that
+installs via Homebrew and Debian packaging and plays on contemporary Linux
+and macOS. Two source trees coexist in the repository and share
+\emph{zero} lines:
+
+\begin{itemize}[nosep]
+  \item \filename{original/} --- Kibell's 1996 sources, preserved verbatim
+        as the canonical reference. Never edited; cited line-by-line
+        (\filename{original/<file>.c:<line>}) whenever behavior is
+        reproduced.
+  \item \filename{src/} + \filename{include/} --- the new SDL2
+        implementation. The shipping game.
+\end{itemize}
+
+\subsection{Reimplementation, not reinterpretation}
+
+The precise claim is worth stating carefully, because two common framings
+are both wrong. It is not a line-level port (nothing in \filename{src/} is
+transliterated from \filename{original/}), and it is not a rewrite in the
+sense of reimagining the game. It is a faithful \emph{reimplementation from
+scratch}: new code, same game. The 1996 behavior is treated as a
+specification to reproduce exactly --- level file format, scoring values,
+physics constants (\code{MAX\_BALLS=5}, the 18$\times$9 grid, paddle bounce
+trigonometry, \code{DIST\_BASE=30}), timing feel, the sixteen-mode state
+machine. All 80 original levels load and play unchanged.
+
+Fidelity is the default; deviations are limited and documented as
+Architecture Decision Records (ADRs). Two examples: save/load v2 resumes a
+ball mid-flight rather than resetting it to the paddle
+(\adref{038}); and \code{PADDLE\_VELOCITY} is a known, tracked deviation
+(paddle moves faster than the original) recorded in the gameplay-parity
+audit. ``Faithful by default, deviations only when forced and always
+documented'' is the operative rule, not a flat claim of perfection.
+
+\subsection{The architecture shift}
+
+The port replaces every platform boundary while preserving the game
+logic. \Cref{tab:fromto} summarizes the substitutions; the companion
+documents \filename{docs/ARCHITECTURE\_LEGACY.tex} and
+\filename{docs/ARCHITECTURE\_MODERN.tex} give the full architectural
+treatment.
+
+\begin{table}[h]
+\centering
+\caption{Platform substitutions (game logic preserved)}
+\label{tab:fromto}
+\begin{tabularx}{\textwidth}{llX}
+\toprule
+\textbf{Subsystem} & \textbf{Original (1996)} & \textbf{Modernized} \\
+\midrule
+Windowing   & Xlib + private colormap + GCs        & SDL2 \\
+Graphics    & XPM via libXpm                        & PNG via SDL2\_image \\
+Audio       & \code{fork()} + \code{/dev/dsp} + 12 drivers & SDL2\_mixer \\
+Sound format& \code{.au} (Sun audio)               & OGG / WAV \\
+Build       & hand-written Makefile + Imake         & CMake \\
+Paths       & compile-time \code{\#define}s          & XDG Base Directory spec \\
+Fonts       & XLFD bitmap fonts                     & bundled TTF via SDL2\_ttf \\
+Collision   & \code{XPolygonRegion} (server-side)   & pure-C point-in-triangle \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+% =============================================================================
+\section{By the numbers}
+% =============================================================================
+
+All figures are sourced from \filename{docs/metrics.json}, regenerated from
+\code{git log}, \code{bd stats}, and \code{cloc}. Line counts are reported
+as code lines (\code{cloc}, excluding comments and blanks); raw
+\code{wc -l} totals are larger.
+
+\begin{table}[h]
+\centering
+\caption{Project metrics at release \MetricVersion{} (snapshot: \code{origin/master})}
+\label{tab:metrics}
+\begin{tabularx}{\textwidth}{Xr}
+\toprule
+\textbf{Metric} & \textbf{Value} \\
+\midrule
+Active development                 & \MetricActiveDays{} days (part-time, \MetricFirstCommit{} → \MetricLastCommit{}) \\
+Merged pull requests              & \MetricMergedPRs{} \\
+Commits on \code{master}          & \MetricCommits{} \\
+Architecture Decision Records     & \MetricADRs{} \\
+Modern source (\filename{src/})   & \MetricSrcLines{} code lines / \MetricSrcFiles{} files \\
+Modern headers (\filename{include/}) & \MetricHdrLines{} code lines / \MetricHdrFiles{} files \\
+Test code (\filename{tests/})     & \MetricTestLines{} code lines / \MetricTestFiles{} files \\
+Legacy reference (\filename{original/}) & \MetricLegacyLines{} code lines / \MetricLegacyFiles{} \code{.c} files \\
+\code{cmocka} test cases          & \MetricCmockaCases{} \\
+CTest suites                      & \MetricCtestSuites{} \\
+Issues (beads) closed / total     & \MetricBeadsClosed{} / \MetricBeadsTotal{} \\
+Playable levels                   & \MetricLevels{} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Two ratios are worth calling out. The test suite is larger than the code it
+exercises: \MetricTestLines{} code lines of tests against \MetricSrcLines{} of modern source,
+a ratio of $\approx$1.1:1 (1.2:1 by raw line count). And the modern
+codebase is larger than the 1996 original it reproduces --- the safety
+apparatus (opaque contexts, injected callbacks, exhaustive tests) costs
+lines, and buys the ability to change the game without fear.
+
+For contrast, the first ``modernization complete'' milestone was recorded
+on 26 February 2026 at 64 merged PRs, 91 closed issues, and 940 tests ---
+roughly one quarter of the eventual total. The bulk of the fidelity work
+(the parity audits, the formal-methods hardening, the agentic tooling
+adoption) happened \emph{after} the code first ``worked.''
+
+% =============================================================================
+\section{Method: agentic software engineering}
+% =============================================================================
+
+\subsection{The standard}
+
+The governing instruction is that every change leaves the codebase better
+than it was found, with root causes proven by facts and tests rather than
+asserted. Crucially, the human operator does not write the production code,
+and no agent both writes a change and approves its own work. Delegation is
+structured, typed, and auditable --- which is what the \emph{ethos} tooling
+provides.
+
+The two tools this report leans on, ethos and z-spec, come from Punt Labs, an
+open-source effort whose thesis is to ground agentic software engineering in
+formal methods and disciplined process --- rigor made cheap enough, by AI, to
+apply by default. This project doubles as a test bed for that thesis; the
+tools' behavior in a real modernization, including where one of them failed
+(\S\ref{sec:review-layers}), is part of what the case study reports.
+
+\subsection{Roles}
+
+Work is organized around three roles:
+
+\begin{description}[nosep]
+  \item[Leader] (\texttt{claude}) writes the contract and reviews. It does
+        not write production code solo. For non-code work (design, reports,
+        reviews, investigations) it may act as the worker.
+  \item[Worker] a domain specialist that executes the contract within its
+        write-set --- the fixed list of files the contract permits it to change.
+  \item[Evaluator] a \emph{distinct} expert persona ($\neq$ worker,
+        $\neq$ leader) who judges the worker's result against the contract
+        before the mission may close. The evaluator is not a generic code
+        reviewer: it is a named specialist with a stake in the outcome ---
+        the tester checking a fix, the original author judging whether the
+        game still feels right --- and it can send the work back for another
+        round (\S\ref{sec:review-layers} draws the distinction from the other
+        review layers).
+\end{description}
+
+The domain specialists are modeled on the people who would actually own
+each concern (\cref{tab:personas}).
+
+\begin{table}[h]
+\centering
+\caption{Expert personas}
+\label{tab:personas}
+\begin{tabularx}{\textwidth}{llX}
+\toprule
+\textbf{Handle} & \textbf{Persona} & \textbf{Domain} \\
+\midrule
+\texttt{jck} & Justin C.\ Kibell   & Original author; game feel, physics, scoring. Approves gameplay-affecting change. \\
+\texttt{jdc} & John D.\ Carmack     & Modern C, sanitizers; primary C implementer. \\
+\texttt{sjl} & Sam J.\ Lantinga     & SDL2 author; rendering and audio port. \\
+\texttt{gjm} & Glenford J.\ Myers   & Testing; harness design, extracting pure functions. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Scale}
+
+Across the project, the tracked ledger
+\filename{.punt-labs/ethos/missions.jsonl} records 113 missions ---
+\MetricClosedMissions{} closed, the remainder failed or escalated rather than
+quietly abandoned. By archetype they are 100 \emph{implement}, 6
+\emph{design}, 5 \emph{report}, and 2 \emph{investigate}. The
+worker$\to$evaluator pairings that actually ran show the specialist model in
+practice: \texttt{jdc}$\to$\texttt{jck} (39),
+\texttt{gjm}$\to$\texttt{jdc} (27), \texttt{jdc}$\to$\texttt{gjm} (23),
+\texttt{sjl}$\to$\texttt{jdc} (9), and smaller counts. C implementation
+reviewed by the tester; the tester's harnesses reviewed by the C engineer;
+anything that touches game feel routed to the original author for approval.
+
+% =============================================================================
+\section{Tooling: ethos (mission contracts)}
+% =============================================================================
+
+\subsection{A mission is a contract, not a chat}
+
+Delegated work runs as a typed contract, not an ad-hoc agent spawn. A
+contract names the worker, names the evaluator (and records a hash of the
+evaluator's definition, so the evaluator cannot be quietly swapped), lists
+the \emph{write-set} of files the worker may change, and states
+machine-checkable success criteria. A pre-commit hook rejects any edit to a
+file outside the write-set, so a worker cannot widen its own scope.
+
+The protocol runs \code{create} $\to$ \code{result} $\to$ \code{reflect}
+$\to$ \code{advance} $\to$ \code{close}. The store refuses self-review,
+refuses to close a mission with no submitted result, and refuses to advance
+a round with no recorded reflection. None of these steps can be skipped.
+
+\subsection{A real contract}
+
+Consider a concrete case. The 1996 game has two hazards that crawl around
+the grid: roamer blocks, which look toward a random neighbor and then shuffle
+into an adjacent empty cell, and drop blocks, which fall one row at a time.
+The SDL2 port had reproduced their sprites but not their motion --- the
+blocks blinked in place and never moved, which made roughly fifteen levels
+easier than the original. Restoring the movement is not arithmetic: it means
+porting a timer-driven update that mutates the block grid while scanning it,
+and doing so without letting a block move twice in one tick.
+
+\Cref{lst:contract} is the committed contract for that fix,
+\missionid{m-2026-07-15-003}. The work went to \texttt{jdc} (the C
+engineer); the review went to \texttt{jck} (the game's original author), who
+holds the gate on anything that changes how the game plays. The success
+criteria cite the exact original source lines to match and call out the
+iteration-safety hazard by name.
+
+\begin{lstlisting}[caption={The roamer/drop movement contract (excerpt, verbatim)}, label={lst:contract}]
+mission_id: m-2026-07-15-003
+type: implement
+leader: claude
+worker: jdc
+evaluator:
+    handle: jck
+    hash: 40cbe1204f644c77e6a26757a9b855e3298be267025e806d425bfdea99054f18
+write_set:
+    - src/block_system.c
+    - include/block_system.h
+    - src/game_modes.c
+success_criteria:
+    - Restore ROAMER_BLK and DROP_BLK grid movement, missing from the port
+      (the animation step only cycles the sprite; nothing relocates the
+      block). Port original/blocks.c HandlePendingAnimations + the adjacency
+      check (CheckAdjacentBlocks, 1220-1256).
+    - Iteration safety (critical): the scan mutates the grid while iterating.
+      A block must move AT MOST ONCE per tick. State the mechanism used.
+    - Faithfulness (jck gate): on levels with roamers the blocks now wander
+      to adjacent empty cells; drop blocks descend; both stay out of the
+      bottom two rows and never spawn onto a ball.
+    - Zero warnings under -Werror; full ctest green. Only the three
+      write_set files change.
+budget: { rounds: 3, reflection_after_each: true }
+context: |
+    Audit-2 finding, jdc-confirmed: roamer blocks only blink their eyes and
+    never move; drop blocks never descend, so ~15 levels play wrong. Restore
+    the original movement handler. jck gates faithfulness; a sibling mission
+    adds the regression tests.
+\end{lstlisting}
+
+\subsection{The reflect/advance loop does real work}
+
+The evaluator is adversarial, and it sends work back. Mission
+\missionid{m-2026-07-11-011} records the full lifecycle: the evaluator
+returned \textsc{changes-requested} with three findings, forcing a second
+round before the result passed. The event log is append-only:
+
+\begin{lstlisting}[caption={Mission lifecycle events (log.jsonl)}, label={lst:lifecycle}]
+{"event":"create","actor":"claude"}
+{"event":"reflect","details":{"converging":false,"recommendation":"continue","round":1}}
+{"event":"round_advanced","details":{"from_round":1,"to_round":2}}
+{"event":"result","details":{"verdict":"pass","round":2}}
+{"event":"close","details":{"round":2,"status":"closed","verdict":"pass"}}
+\end{lstlisting}
+
+\subsection{The audit chain}
+
+Closing a mission appends a trace line to the git-tracked ledger, and
+commits carry \code{Mission:} and \code{Delegation:} trailers. The intended
+reconstruction is \code{git blame} $\to$ commit $\to$ trailer $\to$
+contract $\to$ prompt $\to$ full audit trail: every shipped line traces
+back to the contract that authorized it and the review that approved it. On
+\code{master} there are 45 \code{Mission:} trailers and 11
+\code{Delegation:} trailers.
+
+\subsection{An honest caveat}
+
+The audit mechanism failed the first time it was relied on, and the failure
+was recorded rather than hidden. When ethos was first enabled, the
+commit-message hook that should have stamped the trailers automatically
+stamped nothing: a session-binding bug meant commits made under an open
+mission carried no trailer at all. The trailers present today were added by
+hand once the bug was diagnosed and written up (PR~\#220, mission
+\missionid{m-2026-09-06-009}). This is the kind of result the case study
+exists to record. The tool meant to guarantee traceability was shown, in
+use, not to --- and that is worth more to the next team than a clean story.
+
+% =============================================================================
+\section{Three layers of review}
+\label{sec:review-layers}
+% =============================================================================
+
+Quality did not rest on the mission evaluator alone. Every change passed
+through three separate layers of review, each catching a different class of
+problem. Keeping them distinct is deliberate; conflating the mission
+evaluator with a code reviewer would lose what each is for.
+
+The design rests on two well-established results. First, structured review
+finds defects that testing alone does not: Fagan's inspection studies
+\citep{fagan1976} and Boehm and Basili's defect-reduction survey
+\citep{boehm2001} both put peer review among the most cost-effective
+defect-removal techniques known. Second, the reviewer must be
+\emph{independent} of the author. This matters sharply for LLM agents:
+Huang et al.\ \citep{huang2024} show that a model cannot reliably correct its
+own reasoning without external feedback, and that debate among copies of the
+same model does not supply the missing independence. That finding is the
+argument for the whole arrangement below --- a distinct evaluator persona,
+fixed external checklists, and third-party reviewers --- rather than asking
+one agent to check its own work.
+
+\subsection{The mission evaluator}
+
+The first layer is the evaluator inside the mission, described above. It is a
+\emph{domain expert with authority over the outcome}, not a generalist
+scanning a diff. \texttt{gjm} judges whether a fix is actually tested;
+\texttt{jck}, the original author, judges whether a gameplay change still
+matches the 1996 game. The evaluator works against the contract's success
+criteria, can force another round, and must pass before the mission closes.
+It reviews intent and correctness against a specification --- before the
+change is even committed.
+
+\subsection{Local checklist reviewers}
+
+The second layer runs after \code{make check} passes, on the committed diff,
+using three fixed-checklist agents that ethos installs: \code{code-reviewer}
+(general code quality and project-convention compliance),
+\code{silent-failure-hunter} (swallowed errors, weak error handling, unsafe
+fallbacks), and \code{invariant-completeness-reviewer} (checks that a claimed
+invariant or exhaustiveness property actually holds, rather than trusting the
+comment that asserts it). These are not personas and carry no domain
+authority; they are mechanical passes run until each returns nothing. Where
+the evaluator asks ``is this the right change, and is it proven?'', the
+checklist reviewers ask ``does this diff contain a known class of mistake?''
+
+\subsection{Remote reviewers on every pull request}
+
+The third layer is external and runs on GitHub. All \MetricMergedPRs{}
+merged pull requests went through automated reviewers --- GitHub Copilot and
+Cursor's Bugbot --- under an explicit merge gate: a pull request may not
+merge until the reviewers have reported on the latest commit, continuous
+integration is green on that commit, and every review thread is resolved.
+These reviewers see the change with fresh context and no stake in it, which
+is exactly why they catch what the author and the in-project agents, both
+close to the work, miss. The ledger correction in this project's own
+documentation branch --- where an automated reviewer flagged that a commit
+had silently reopened dozens of closed issues --- is one example of a remote
+reviewer catching what every local check passed over.
+
+Each layer is fallible on its own. Together they cover intent (the
+evaluator), known defect classes (the checklists), and a fresh outside read
+(the remote reviewers).
+
+% =============================================================================
+\section{Tooling: z-spec (formal methods)}
+% =============================================================================
+
+\subsection{Why formal methods on a breakout game}
+
+Most of XBoing is not a candidate for formal specification --- geometry and
+rendering are better served by characterization tests. But a handful of
+properties are (a) invariants the player can observe when they break, and
+(b) reachable only through specific state sequences that are easy to miss
+in hand-written tests. For those, the project used z-spec: a Z
+specification, type-checked with \code{fuzz} and model-checked with
+\code{probcli}, with each safety property proven by model-checking toward
+its \emph{negation}. A reachable state matching the negation is a
+counter-example that proves the defect; ``no counter-example, all states
+visited'' after the fix proves the guard closes it. The technique was
+applied selectively --- several ADRs explicitly record \emph{not} using it
+where the logic is deterministic and stateless.
+
+This mirrors industrial practice at a very different scale. Newcombe et
+al.\ \citep{newcombe2015} report that AWS applies model checking (in their
+case TLA+) precisely to the subtle, state-dependent design errors that resist
+testing, and finds it both feasible and cost-effective for mainstream
+engineering. A 1996 breakout game is not a distributed data store, but the
+class of bug is the same: a bad state reachable only through a particular
+sequence of events, invisible to example-based tests.
+
+\subsection{The ammo belt}
+
+The player's remaining bullets appear three times over: the true count the
+gun fires from, the row of icons drawn on the heads-up display, and the
+tally paid out on the end-of-level bonus screen. In the original these three
+always agree. The port had let them drift: the display code hid the icons
+when ammo was unlimited and clamped the count at a maximum, while the bonus
+screen still read the raw figure. The result was visible --- pick up a
+max-ammo block, finish the level, and the belt showed zero while the bonus
+paid out twenty-one.
+
+The specification \filename{docs/bullet\_ammo.tex} models all three
+quantities and states the invariant that the display must equal the true
+count. Model-checking the code as written, the property that the display and
+the bonus agree failed in 441 of 486 reachable states --- the whole region
+where the drift could occur. With the fix (draw the true count, with no
+special case for unlimited ammo and no clamp), that region collapses: the
+invariant holds in every remaining reachable state. The change is
+recorded in \adref{063} and pinned in the code by a regression test that
+fails on the old behavior and passes on the new. The formal model, the
+regression test, and the fix are three statements of one property.
+
+\subsection{The screen state machine}
+
+The specification \filename{docs/specs/2026-07-04-screen-state-machine.tex}
+models the flat mode machine and its shared resources, with three safety
+invariants (stated deliberately as observer schemas so that violating
+transitions stay reachable rather than being silently disabled):
+
+\begin{lstlisting}[caption={Screen-machine safety invariants (Z)}, label={lst:zschema}]
+SafeGame:      mode = mGame => blocksLoaded = true
+SafeHighscore: (mode = mHighscore and boardChoice = bGlobal
+                 and globalHasData = false) => personalHasData = false
+SafeAttract:   (mode in attractModes and mode /= mHighscore)
+                 => gameActive = false
+\end{lstlisting}
+
+Each invariant named a real defect. Model-checking found a reachable state
+that violated it; after the fix, an exhaustive pass found none.
+
+\begin{itemize}[nosep]
+  \item \textbf{The empty Hall of Fame.} The attract loop cycles through a
+        high-score screen. On an install with no shared global score file
+        (the common case on a personal machine), that screen came up blank
+        instead of falling back to the player's own scores.
+        \code{SafeHighscore} required the fallback; the fix (\adref{054})
+        made it hold across 138 states.
+  \item \textbf{The leaked game flag.} A single flag marks whether a game is
+        in progress, and it gates score submission. After a game ended, the
+        flag was not always cleared before the attract loop resumed, so an
+        idle demo screen could still look like live play. \code{SafeAttract}
+        forbade that; a seven-step counter-example showed exactly how the
+        flag escaped, and the fix (\adref{055}) closed it across 90 states.
+  \item \textbf{The empty board.} Pressing Space starts a game. If the level
+        file failed to load, the game started anyway --- straight into the
+        end-of-level bonus screen over an empty grid, because ``no blocks
+        left'' and ``no blocks loaded'' looked the same. \code{SafeGame}
+        required blocks to be loaded before play begins; the fix (\adref{056})
+        made it hold across 76 states.
+\end{itemize}
+
+Each fix is both a re-proven invariant and a regression test that fails on
+the old code and passes on the new.
+
+\subsection{A caveat on the artifacts}
+
+One committed artifact,
+\filename{docs/specs/2026-07-04-screen-state-machine.report.json}, is a raw
+\code{zspec test} run at a small set size that deadlocks --- it is a
+tooling snapshot, distinct from the goal-directed proofs above. The
+authoritative results are the ``all states visited'' outcomes in the
+specification's verification section and the ADRs, not that JSON.
+
+% =============================================================================
+\section{Testing and fidelity}
+% =============================================================================
+
+Because the goal was to preserve behavior, testing led the work rather than
+following it. This is the discipline Feathers \citep{feathers2004} calls
+characterization testing: before changing legacy code, write tests that
+capture what it currently does, then hold that behavior fixed as the code
+moves. The test strategy is a five-layer pyramid: (1) \code{cmocka} unit
+tests of pure logic; (2) integration tests running the game loop headless
+with the SDL dummy drivers; (3) replay/golden tests of full input sequences;
+(4) visual-fidelity tests that capture screenshots and compare them against
+the 1996 binary, including an LLM-judged comparison; and (5) parser fuzzing.
+The savegame-v2 fixture mechanism (\adref{038}) makes the deeper layers
+practical: a test can seed an arbitrary game state --- level 25, a specific
+block mid-cooldown, a ball in flight --- directly through the save/restore
+path, instead of replaying thousands of input frames to reach it.
+
+Fidelity was verified subsystem by subsystem through six parity audits ---
+audio volume, editor, gameplay logic, animation cadence, key commands, and
+sound effects --- each comparing the modern build against
+\filename{original/} and filing discrepancies as beads. Not every audit
+finding was a real bug: at least one (bonus-screen tally ``too slow'') was
+a false positive, and the pacing turned out to be an intentional
+readability trade-off. Recording the false positives is part of the
+evidence.
+
+% =============================================================================
+\section{What was hard, and what recurred}
+% =============================================================================
+
+In keeping with the project's mandate --- evidence, not nostalgia --- the
+honest retrospective matters as much as the wins.
+
+\begin{itemize}[nosep]
+  \item \textbf{Documentation drift.} The retrospective docs froze at the
+        February ``100\% complete'' milestone and did not track the large
+        body of work that landed after it; this very report is the
+        correction. The lesson: a single machine-readable metrics source
+        (\filename{docs/metrics.json}) beats prose numbers that silently
+        rot.
+  \item \textbf{The traceability tool's own bug.} The trailer-stamping
+        hook was broken the first time ethos was enabled; relying on the
+        audit mechanism in earnest is what surfaced it.
+  \item \textbf{Config contradictions.} Three project files independently
+        encoded the same facts and drifted apart, requiring a
+        reconciliation pass (PR \#222). Single-source-of-truth is a
+        recurring failure mode, not a one-off.
+  \item \textbf{Faithful-looking bugs that are not bugs.} Several
+        ``deviations'' (the ammo morph-block scoring zero, the
+        $\approx$22.5s auto-launch delay, the bonus tally pacing) were
+        verified \emph{faithful} to 1996 and deliberately kept. Fidelity
+        work is as much about resisting spurious fixes as making real ones.
+\end{itemize}
+
+% =============================================================================
+\section{Reproducibility}
+% =============================================================================
+
+Every claim here resolves to a committed artifact:
+
+\begin{itemize}[nosep]
+  \item Metrics: \filename{docs/metrics.json} (with the regenerating command per field).
+  \item Mission contracts and the audit ledger:
+        \filename{.punt-labs/ethos/missions/} and
+        \filename{.punt-labs/ethos/missions.jsonl}.
+  \item Formal specifications: \filename{docs/bullet\_ammo.tex} and
+        \filename{docs/specs/2026-07-04-screen-state-machine.tex}.
+  \item Decisions: \filename{docs/DESIGN.md} (\adref{001} through \adref{074}).
+  \item Architecture: \filename{docs/ARCHITECTURE\_LEGACY.tex} and
+        \filename{docs/ARCHITECTURE\_MODERN.tex}.
+\end{itemize}
+
+\vspace{1em}
+\noindent\textbf{Acknowledgement.} XBoing was created by Justin C.\ Kibell
+(1993--1996), hand-built over weekends on a SPARCstation~2. The 1996 sources
+are preserved verbatim in \filename{original/} under their original
+permissive license. Justin has since seen this port run, revived the game's
+homepage, and joined the project --- the game remains, first and last, his.
+
+% =============================================================================
+\bibliography{references}
+% =============================================================================
+
+\newpage
+% =============================================================================
+\appendix
+\section{Links and Resources}
+% =============================================================================
+
+\subsection*{The game}
+\begin{itemize}[nosep]
+  \item Source repository ---
+        \url{https://github.com/jmf-pobox/xboing-c}
+  \item XBoing homepage (Justin Kibell) ---
+        \url{https://www.techrescue.org/xboing}
+  \item Install (macOS/Linux) --- \code{brew install jmf-pobox/xboing/xboing}
+\end{itemize}
+
+\subsection*{Method and tooling}
+\begin{itemize}[nosep]
+  \item Punt Labs (agentic software engineering, grounded in formal
+        methods) --- \url{https://www.punt-labs.com}
+  \item Claude Code (Anthropic), the agent runtime used throughout ---
+        \url{https://www.anthropic.com}
+\end{itemize}
+
+\subsection*{Project documents (in-repository)}
+\begin{itemize}[nosep]
+  \item Modern architecture --- \filename{docs/ARCHITECTURE\_MODERN.tex}
+  \item Legacy architecture --- \filename{docs/ARCHITECTURE\_LEGACY.tex}
+  \item Architecture Decision Records --- \filename{docs/DESIGN.md}
+  \item Original-game specification --- \filename{docs/SPECIFICATION.md}
+  \item Formal specifications --- \filename{docs/bullet\_ammo.tex},
+        \filename{docs/specs/2026-07-04-screen-state-machine.tex}
+  \item Mission ledger --- \filename{.punt-labs/ethos/missions.jsonl}
+  \item Project metrics (single source of truth) ---
+        \filename{docs/metrics.json}
+\end{itemize}
+
+\end{document}

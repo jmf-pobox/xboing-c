@@ -1,0 +1,22 @@
+results:
+    - mission: m-2026-07-12-024
+      round: 2
+      created_at: "2026-07-12T19:30:54Z"
+      author: jdc
+      verdict: pass
+      confidence: 0.95
+      files_changed:
+        - path: docs/specs/2026-07-12-playtest-fidelity.md
+          added: 857
+          removed: 0
+      evidence:
+        - name: Blueprint cites original play-test contract (editor.c:587-641 SetupPlayTest/FinishPlayTest, level.c:346-357 DecExtraLife MODE_EDIT no-op, level.c:398-419 CheckGameRules + main.c:1140-1141 call-site guard) and all modern sites
+          status: pass
+        - name: 'Detection mechanism: ctx->play_test_active bool, one setter (editor_cb_on_playtest_start) + one clearer (editor_cb_on_playtest_end), cannot leak into a real game; rejects prev/saved_mode inference with justification'
+          status: pass
+        - name: 'One coherent mechanism covers all beads: hay (skip lives_left-- + game-over + level-complete->BONUS via the flag; restore editor cursor on exit); nl4+bsz share ONE root (mode_edit_enter reset reloads editor.data, live-wiping the board) fixed by the prev==SDL2ST_GAME guard split; board round-trip via in-memory savegame_system_capture/restore (undoes in-test damage like FinishPlayTest)'
+          status: pass
+        - name: 4 staged missions (flag+snapshot; game_rules guards; game_modes/game_input guard-split; tests) with per-stage write-sets and jck-approval flags; test plan drives EDIT->GAME->EDIT asserting lives/no-game-over/no-BONUS/modified/board/cursor; ADRs listed
+          status: pass
+        - name: 'jck round-2 APPROVE: BONUS guard folded into Stage 2 per the round-1 conditional; paddle-re-expand correctly the sole out-of-scope item (own bead); markdownlint clean'
+          status: pass

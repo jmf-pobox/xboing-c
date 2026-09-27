@@ -1,0 +1,85 @@
+{
+  "_comment": "Machine-consumable single source of truth for XBoing project metrics. Data only; not for human prose. Regenerate each field with its 'cmd'. Consumed mechanically: scripts/gen_metrics_tex.sh turns this into docs/metrics.tex (LaTeX \\Metric* macros) which the reports \\input, so updating this file and recompiling propagates every figure. Snapshot basis: origin/master.",
+  "generated_at": "2026-09-27",
+  "snapshot_ref": "origin/master @ 659c717",
+  "version": {
+    "value": "1.0.11",
+    "source": "CMakeLists.txt:2 project(xboing VERSION 1.0.11)",
+    "cmd": "grep -E 'project\\(xboing VERSION' CMakeLists.txt"
+  },
+  "work_span": {
+    "first_commit": "2025-11-26",
+    "last_commit": "2026-09-26",
+    "active_days": 54,
+    "_note": "active_days = distinct calendar days with at least one commit on master. This was a part-time project, so elapsed months overstate effort; active development days is the meaningful figure.",
+    "cmd": "git log origin/master --format=%as | sort -u | wc -l"
+  },
+  "git": {
+    "merged_prs": { "value": 208, "cmd": "git log origin/master --oneline | grep -cE '\\(#[0-9]+\\)'" },
+    "highest_pr_number": { "value": 228, "cmd": "git log origin/master --oneline | grep -oE '\\(#[0-9]+\\)' | grep -oE '[0-9]+' | sort -n | tail -1" },
+    "commits_on_master": { "value": 354, "cmd": "git rev-list --count origin/master" },
+    "mission_trailers": { "value": 45, "cmd": "git log origin/master --format='%H %s%n%b' | grep -c 'Mission:'" },
+    "delegation_trailers": { "value": 11, "cmd": "git log origin/master --format='%H %s%n%b' | grep -c 'Delegation:'" }
+  },
+  "source_lines": {
+    "_note": "Two conventions reported. 'wc' = raw lines (incl. comments+blank); 'cloc' = code lines only. Report should use cloc as primary and may note wc.",
+    "modern_src": {
+      "cloc_code": 19820, "wc_lines": 27480, "files": 47,
+      "cmd": "cloc --json src ; wc -l src/*.c"
+    },
+    "modern_headers": {
+      "cloc_code": 2993, "wc_lines": 7467, "files": 51,
+      "cmd": "cloc --json include ; wc -l include/*.h"
+    },
+    "tests": {
+      "cloc_code": 21742, "wc_lines": 33052, "files": 66,
+      "cmd": "cloc --json tests ; wc -l tests/*.c"
+    },
+    "legacy_src": {
+      "cloc_code": 15405, "wc_lines": 21308, "files_c": 32, "files_all": 44,
+      "cmd": "cloc --json original ; wc -l original/*.c"
+    },
+    "test_to_source_ratio_cloc": { "value": 1.10, "basis": "tests cloc 21742 / modern src cloc 19820" },
+    "test_to_source_ratio_wc": { "value": 1.20, "basis": "tests wc 33052 / modern src wc 27480" }
+  },
+  "tests": {
+    "cmocka_cases": { "value": 1337, "cmd": "per-suite grep of cmocka_unit_test* over tests/*.c summed to 1337" },
+    "ctest_suites": { "value": 51, "cmd": "grep -cE '^\\s*add_test\\(NAME' tests/CMakeLists.txt (50) + 1 xboing_add_test wrapper" }
+  },
+  "adrs": {
+    "total": { "value": 74, "cmd": "grep -oE 'ADR-[0-9]+' docs/DESIGN.md | sort -u | wc -l" },
+    "highest": { "value": 74, "cmd": "grep -oE 'ADR-[0-9]+' docs/DESIGN.md | grep -oE '[0-9]+' | sort -n | tail -1" }
+  },
+  "beads": {
+    "total": 261, "closed": 240, "open": 21, "in_progress": 0, "blocked": 1,
+    "cmd": "bd stats"
+  },
+  "content": {
+    "levels": { "value": 80, "note": "80 playable levels level01-level80.data; 3 additional non-level .data files (demo, editor, new) bring the raw file count to 83. README's '80 levels' is correct.", "cmd": "ls levels/level[0-9][0-9].data | wc -l" },
+    "png_sprites": { "value": 181, "note": "reconciles the 48-vs-188 discrepancy; count is approximate to glob", "cmd": "find . -path ./original -prune -o -name '*.png' -print | grep -iE 'image|sprite|bitmap|blocks|balls' | wc -l" },
+    "block_types": 30,
+    "grid": "18x9",
+    "workflows": { "value": 4, "note": "committed workflows in .github/workflows/", "files": ["test.yml", "lint.yml", "docs.yml", "release.yml"], "cmd": "git ls-tree --name-only origin/master .github/workflows/" }
+  },
+  "ethos": {
+    "ledger_entries": { "value": 113, "cmd": "wc -l .punt-labs/ethos/missions.jsonl" },
+    "closed_missions": { "value": 107, "note": "of 113 ledger entries: 107 closed, 5 failed, 1 escalated", "cmd": "grep -o '\"status\":\"[a-z]*\"' .punt-labs/ethos/missions.jsonl | sort | uniq -c" },
+    "mission_type_histogram": { "_note": "all 113 ledger entries by type", "implement": 100, "design": 6, "investigate": 2, "report": 5, "cmd": "grep -o '\"type\":\"[a-z]*\"' .punt-labs/ethos/missions.jsonl | sort | uniq -c" },
+    "worker_evaluator_pairs": { "jdc->jck": 39, "gjm->jdc": 27, "jdc->gjm": 23, "sjl->jdc": 9, "sjl->jck": 6, "jck->jdc": 3 }
+  },
+  "zspec": {
+    "specs": ["docs/bullet_ammo.tex", "docs/specs/2026-07-04-screen-state-machine.tex"],
+    "bullet_ammo": { "invariant": "displayedAmmo = actualAmmo", "as_coded_excluded_states": "441/486", "fixed_states_covered": "45/45", "adr": "ADR-063" },
+    "screen_state_machine": {
+      "invariants": ["SafeGame", "SafeHighscore", "SafeAttract"],
+      "fixed_state_counts": { "SafeHighscore": 138, "SafeAttract": 90, "SafeGame": 76 },
+      "adrs": ["ADR-054", "ADR-055", "ADR-056"]
+    }
+  },
+  "stale_reference_feb26": {
+    "_note": "Frozen Feb 26 2026 snapshot figures for delta comparison; do not use as current.",
+    "merged_prs": 64, "commits": 265, "adrs_in_latex_report": 37, "cmocka_cases": 940,
+    "ctest_suites": 40, "modern_src_wc": 14581, "modern_src_files": 34, "beads_closed": 91,
+    "work_span": "7 days"
+  }
+}

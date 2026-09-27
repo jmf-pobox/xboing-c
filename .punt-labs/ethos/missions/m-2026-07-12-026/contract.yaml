@@ -1,0 +1,28 @@
+mission_id: m-2026-07-12-026
+status: closed
+type: implement
+created_at: "2026-07-12T19:39:21Z"
+updated_at: "2026-07-12T19:45:09Z"
+closed_at: "2026-07-12T19:45:09Z"
+leader: claude
+worker: jdc
+evaluator:
+    handle: jck
+    pinned_at: "2026-07-12T19:39:21Z"
+    hash: 40cbe1204f644c77e6a26757a9b855e3298be267025e806d425bfdea99054f18
+inputs: {}
+write_set:
+    - src/game_rules.c
+success_criteria:
+    - 'game_rules_ball_died (src/game_rules.c, the lives_left-- + game-over path ~line 290): when ctx->play_test_active, do NOT decrement lives and do NOT transition to game-over/high-score; instead reset the ball to keep playing (per §3.2 — mirror DecExtraLife''s mode!=MODE_EDIT no-op, original/level.c:346-357). A real game (play_test_active false) is unchanged.'
+    - 'game_rules_check level-complete transition (src/game_rules.c:331-341): change to `if (!block_system_still_active(ctx->block) && !ctx->play_test_active)` so clearing the board during play-test does NOT go to SDL2ST_BONUS — the player keeps playing on an empty board (original: CheckGameRules never runs in play-test, level.c:398-419 + main.c:1140-1141). A real level clear still reaches SDL2ST_BONUS.'
+    - Both guards are `!ctx->play_test_active`, so real games are provably unaffected — verify against a real 3-life game-over sequence and a real level clear (both must behave exactly as before).
+    - Cite original/level.c:346-357 (DecExtraLife), :398-419 (CheckGameRules), original/main.c:1140-1141 (the mode==MODE_GAME call-site guard) in comments.
+    - Follow the spec §3.2 exactly (including what happens at ball loss in play-test — ball resets, keep playing). If a criterion conflicts with the spec, follow the spec and note it.
+    - cmake --build build zero-warning under -Werror -Wconversion -Wshadow; ctest --test-dir build stays 61/61; only src/game_rules.c changes.
+budget:
+    rounds: 3
+    reflection_after_each: true
+current_round: 1
+context: |
+    Play-test fidelity Stage 2 (xboing-hay), per docs/specs/2026-07-12-playtest-fidelity.md §3.2. Stage 1 (m-2026-07-12-025, closed) added ctx->play_test_active. Now guard the two real-game terminal transitions in game_rules so play-test never depletes lives, never game-overs, and never drops into the BONUS screen — mirroring the original's mode==MODE_EDIT invariant (DecExtraLife no-op level.c:349-350; CheckGameRules never called in play-test, main.c:1140-1141). Depends on Stage 1's flag; independent of Stage 3 (different file). NO game_modes/game_input changes here.

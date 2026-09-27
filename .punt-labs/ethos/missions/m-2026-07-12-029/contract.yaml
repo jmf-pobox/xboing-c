@@ -1,0 +1,28 @@
+mission_id: m-2026-07-12-029
+status: closed
+type: implement
+created_at: "2026-07-12T21:11:46Z"
+updated_at: "2026-07-12T21:17:05Z"
+closed_at: "2026-07-12T21:17:05Z"
+leader: claude
+worker: jdc
+evaluator:
+    handle: jck
+    pinned_at: "2026-07-12T21:11:46Z"
+    hash: 40cbe1204f644c77e6a26757a9b855e3298be267025e806d425bfdea99054f18
+inputs: {}
+write_set:
+    - src/game_input.c
+success_criteria:
+    - 'Add #include "editor_system.h" to src/game_input.c (for editor_system_key_input + EDITOR_KEY_PLAYTEST).'
+    - 'SDL2I_PAUSE handler (game_input.c:142-148): when mode==SDL2ST_GAME && ctx->play_test_active, call editor_system_key_input(ctx->editor, EDITOR_KEY_PLAYTEST) to END play-test (mirrors original/editor.c:994-1001 p->FinishPlayTest); do NOT transition to SDL2ST_PAUSE in that case. Real-game pause (play_test_active false) and unpause are unchanged.'
+    - 'Escape/SDL2I_ABORT handler (game_input.c:320-332): in the ctx->play_test_active branch, replace the bare sdl2_state_transition(ctx->state, SDL2ST_EDIT) with editor_system_key_input(ctx->editor, EDITOR_KEY_PLAYTEST) so Escape also fires on_playtest_end (restores the board, clears the flag, zeroes score, transitions to EDIT). Real-game Escape (abort-confirm dialogue) unchanged.'
+    - Both exits now go through the same editor play-test-end path the original uses (FinishPlayTest) and that the Stage 4 test exercises — closing the test-vs-live gap. Cite original/editor.c:994-1001 in comments.
+    - Do NOT change EDITOR_KEY_PLAYTEST handling in editor_system.c or the pause behavior for real games. Only src/game_input.c changes.
+    - cmake --build build zero-warning under -Werror -Wconversion -Wshadow; ctest --test-dir build stays 61/61; only src/game_input.c changes.
+budget:
+    rounds: 3
+    reflection_after_each: true
+current_round: 1
+context: |
+    Bug xboing-lpi (dogfound on the fix/playtest-fidelity branch, pre-PR). During play-test (SDL2ST_GAME + ctx->play_test_active), input goes to game_input.c, not the editor key handler. Two gaps vs the original: (1) 'p' (SDL2I_PAUSE, game_input.c:142) pauses instead of ending play-test — the original toggles play-test OFF with p/P in EDIT_TEST via FinishPlayTest (original/editor.c:994-1001). (2) The Escape exit (game_input.c:320-332, ctx->play_test_active branch) does a bare sdl2_state_transition(SDL2ST_EDIT) that never calls editor_cb_on_playtest_end, so the board snapshot isn't restored, play_test_active isn't cleared, and score isn't zeroed (on_playtest_end is only reachable via editor_system_key_input(EDITOR_KEY_PLAYTEST) in EDITOR_STATE_TEST, editor_system.c:1050-1054, which the live game never calls during SDL2ST_GAME). Part of the play-test batch (xboing-hay/nl4/bsz).

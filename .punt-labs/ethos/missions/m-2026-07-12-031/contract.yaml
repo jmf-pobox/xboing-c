@@ -1,0 +1,30 @@
+mission_id: m-2026-07-12-031
+status: closed
+type: implement
+created_at: "2026-07-12T23:30:45Z"
+updated_at: "2026-07-12T23:36:06Z"
+closed_at: "2026-07-12T23:36:06Z"
+leader: claude
+worker: jdc
+evaluator:
+    handle: jck
+    pinned_at: "2026-07-12T23:30:45Z"
+    hash: 40cbe1204f644c77e6a26757a9b855e3298be267025e806d425bfdea99054f18
+inputs: {}
+write_set:
+    - include/sdl2_input.h
+    - src/sdl2_input.c
+    - src/game_input.c
+success_criteria:
+    - 'Add sdl2_input_consume(sdl2_input_t *ctx, sdl2_input_action_t action) to include/sdl2_input.h (+ doc) and src/sdl2_input.c: clears that action''s just_pressed for the rest of the frame (until the next sdl2_input_begin_frame), so a later reader in the same frame sees just_pressed==false. Mirror the storage sdl2_input_just_pressed reads. NULL-safe.'
+    - In src/game_input.c, after ending play-test via 'p' (SDL2I_PAUSE branch, the editor_system_key_input(EDITOR_KEY_PLAYTEST) call added in m-2026-07-12-029), call sdl2_input_consume(ctx->input, SDL2I_PAUSE) so the same frame's mode_edit_update 'p' handler doesn't restart play-test.
+    - 'After ending play-test via Escape (SDL2I_ABORT branch), call sdl2_input_consume(ctx->input, SDL2I_ABORT) so mode_edit_update''s SDL2I_QUIT||SDL2I_ABORT editor-quit handler doesn''t fire -> no SDL2ST_INTRO (attract). Result: Escape returns to the editor, not attract.'
+    - 'Net observable behavior (matches original editor.c:994-1001 + the modern Escape-returns-to-editor affordance): ''p'' during play-test -> back to the editor and STAYS there (no flash-restart); Escape during play-test -> back to the editor (not attract). Board restored, play_test_active false.'
+    - 'Real games unaffected: consume is only called on the play-test-exit paths (guarded by ctx->play_test_active). Real-game pause (''p'') and abort (''Escape'' confirm dialogue) unchanged.'
+    - cmake --build build zero-warning under -Werror -Wconversion -Wshadow; ctest --test-dir build stays 61/61; only the 3 write-set files change.
+budget:
+    rounds: 3
+    reflection_after_each: true
+current_round: 1
+context: |
+    Bug xboing-1ir (dogfound, fix/playtest-fidelity pre-PR). game_main runs game_input_global (once/frame, game_main.c:150) THEN the editor tick (sdl2_loop_update -> mode_edit_update) in the SAME frame. sdl2_input just_pressed stays true the whole frame (cleared only at next sdl2_input_begin_frame). So when 'p'/Escape end play-test in game_input_global (-> on_playtest_end -> SDL2ST_EDIT), the same frame's mode_edit_update re-reads the still-pressed key: 'p' (SDL2I_PAUSE, game_modes.c:1588) restarts play-test (window flashes EDIT then GAME); Escape (SDL2I_QUIT||SDL2I_ABORT, game_modes.c:1563) fires the editor quit -> SDL2ST_INTRO (attract). Original processes each key once (editor.c:994-1001 p->FinishPlayTest). This is gameplay-affecting play-test behavior — jck approves.

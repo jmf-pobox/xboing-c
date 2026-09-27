@@ -1,0 +1,29 @@
+mission_id: m-2026-07-12-025
+status: closed
+type: implement
+created_at: "2026-07-12T19:31:35Z"
+updated_at: "2026-07-12T19:39:02Z"
+closed_at: "2026-07-12T19:39:02Z"
+leader: claude
+worker: jdc
+evaluator:
+    handle: jck
+    pinned_at: "2026-07-12T19:31:35Z"
+    hash: 40cbe1204f644c77e6a26757a9b855e3298be267025e806d425bfdea99054f18
+inputs: {}
+write_set:
+    - include/game_context.h
+    - src/game_callbacks.c
+success_criteria:
+    - 'include/game_context.h: add `bool play_test_active`, `savegame_data_t play_test_snapshot_info`, `savegame_level_t play_test_snapshot_level` to game_ctx_t; add `#include "savegame_io.h"` (spec verified no circular dep — savegame_io.h does not include game_context.h). Zero-initialized via the existing calloc so play_test_active defaults false.'
+    - 'src/game_callbacks.c editor_cb_on_playtest_start: set ctx->play_test_active = true and capture the board via savegame_system_capture into the snapshot fields BEFORE the SDL2ST_GAME transition, per §3.5. Follow the spec''s exact ordering.'
+    - 'src/game_callbacks.c editor_cb_on_playtest_end: restore the board via savegame_system_restore from the snapshot AND clear ctx->play_test_active = false AFTER the SDL2ST_EDIT transition returns, per §3.5; zero the score on both ends via score_system_reset to match original editor.c:603/629. Follow the spec''s ordering exactly (capture/restore timing is the crux).'
+    - Verify capture/restore against a level with COUNTER_BLK and BLACK_BLK cells (animated/cooldown state) AND a plain static block, not just an empty grid — the snapshot must round-trip block damage, counters, RANDOM flag, time bonus (the spec calls this out; jck will check it).
+    - Match the spec exactly; do not add the game_rules or mode_edit_enter guards (those are Stage 2/3). If a success criterion conflicts with the spec, follow the spec and note it.
+    - cmake --build build zero-warning under -Werror -Wconversion -Wshadow; ctest --test-dir build stays 61/61 green; only the 2 write-set files change.
+budget:
+    rounds: 3
+    reflection_after_each: true
+current_round: 1
+context: |
+    Play-test fidelity Stage 1 (of 4), per docs/specs/2026-07-12-playtest-fidelity.md §3.1, §3.5, §4. Introduces the mechanism the other stages depend on: a play-test detection flag and an in-memory board snapshot captured on play-test entry and restored on exit, mirroring the original SetupPlayTest/FinishPlayTest temp-file round-trip (original/editor.c:587-641) and score-zeroing (editor.c:603,629). Uses the existing pure savegame_system_capture/restore functions. Beads: xboing-hay/nl4/bsz. NO game_rules or game_modes changes in this stage.

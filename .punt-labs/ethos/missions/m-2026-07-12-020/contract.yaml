@@ -1,0 +1,28 @@
+mission_id: m-2026-07-12-020
+status: closed
+type: implement
+created_at: "2026-07-12T17:00:05Z"
+updated_at: "2026-07-12T17:12:36Z"
+closed_at: "2026-07-12T17:12:36Z"
+leader: claude
+worker: gjm
+evaluator:
+    handle: jdc
+    pinned_at: "2026-07-12T17:00:05Z"
+    hash: c08223356d3e6d5aed56e28da477a1aa2707509febfef7c5f62c25871a3e841f
+inputs: {}
+write_set:
+    - tests/test_integration_editor.c
+    - tests/test_editor_system.c
+success_criteria:
+    - 'GENUINE test (no mirror — drive real production paths): name survives load->edit->save. Seed level_system''s title to a known name (load a level file, or level_system_set_title on the ctx''s level), reach editor mode so the seeding fires (transition to SDL2ST_EDIT / mode_edit_enter, OR drive editor_cb_load_level), then call the REAL save (editor_cb_save_level) to a temp path, read line 1 of the written file, assert it equals the known name (e.g. "Genesis") and is NOT "Untitled". This is the exact bug: before the fix line 1 was "Untitled".'
+    - 'GENUINE test: rename propagates to level_system (no-staleness half). With the editor in a state where set-name works, drive the real rename path (finish_set_name via editor_system_dialogue_result with a NAME_INPUT pending action, or the editor ''n'' key flow), then assert level_system_get_title(ctx->level) == the new name — proving on_set_name -> level_system_set_title fired. Before the fix, level_system''s title was unchanged by a rename.'
+    - 'Optional unit assertions in test_editor_system.c: editor_system_set_level_title then editor_system_get_level_title round-trips a name; oversized name (>25 chars) truncates safely without overflow.'
+    - Register/run so ctest --test-dir build passes all new tests; report if you must touch tests/CMakeLists.txt (prefer files already registered).
+    - cmake --build build zero-warning. Do NOT edit src/ (outside write-set) — the leader will run the RED->GREEN demonstration by transiently reverting the fix.
+budget:
+    rounds: 2
+    reflection_after_each: true
+current_round: 1
+context: |
+    Bug xboing-dr1 fixed (m-2026-07-12-019): the editor no longer writes "Untitled" over the level name. editor_system.level_title is now seeded from level_system_get_title in mode_edit_enter and editor_cb_load_level; rename (finish_set_name) fires on_set_name -> editor_cb_on_set_name -> level_system_set_title so the HUD/play-test title stays in sync. New public APIs: level_system_set_title, editor_system_set_level_title, the on_set_name editor callback. Using the implement archetype for tests (seed `test` archetype has Go-only globs, xboing-dlg). Existing editor integration tests live in tests/test_integration_editor.c (setup_editor fixture, drives the real editor callbacks incl. editor_cb_save_level and editor_system_dialogue_result); editor unit tests in tests/test_editor_system.c.

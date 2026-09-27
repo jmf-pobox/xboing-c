@@ -1,0 +1,25 @@
+results:
+    - mission: m-2026-07-12-025
+      round: 1
+      created_at: "2026-07-12T19:35:21Z"
+      author: jdc
+      verdict: pass
+      confidence: 0.93
+      files_changed:
+        - path: include/game_context.h
+          added: 12
+          removed: 0
+        - path: src/game_callbacks.c
+          added: 28
+          removed: 0
+      evidence:
+        - name: 'game_context.h: #include savegame_io.h (no circular dep verified) + bool play_test_active + savegame_data_t/savegame_level_t snapshot fields on game_ctx_t; zero-init via existing calloc'
+          status: pass
+        - name: 'editor_cb_on_playtest_start: play_test_active=true, savegame_system_capture into snapshot, score_system_set(...,0), THEN SDL2ST_GAME transition — capture before the transition per §3.5'
+          status: pass
+        - name: 'editor_cb_on_playtest_end: savegame_system_restore from snapshot, score_system_set(...,0), SDL2ST_EDIT transition, THEN clear play_test_active=false (after transition returns, so Stage 3''s mode_edit_enter guard still reads true) — ordering per §3.5'
+          status: pass
+        - name: 'Justified deviation: score_system_reset does not exist; used score_system_set(ctx->score,0), the codebase idiom (game_modes.c:120, savegame_system.c:314) — identical effect, no out-of-write-set change'
+          status: pass
+        - name: Snapshot covers occupied/block_type, COUNTER_BLK counter_slide, BLACK_BLK next_frame_offset, RANDOM flag, time_bonus; original/editor.c:587-641,603,629 cited; zero-warning build; ctest 61/61; only 2 write-set files changed
+          status: pass

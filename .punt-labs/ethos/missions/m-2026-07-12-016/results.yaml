@@ -1,0 +1,25 @@
+results:
+    - mission: m-2026-07-12-016
+      round: 1
+      created_at: "2026-07-12T16:08:20Z"
+      author: sjl
+      verdict: pass
+      confidence: 0.95
+      files_changed:
+        - path: src/game_render.c
+          added: 18
+          removed: 6
+        - path: include/game_render.h
+          added: 9
+          removed: 0
+      evidence:
+        - name: Removed BOTH the unlimited early-return and the GUN_MAX_AMMO cap from game_render_ammo_belt
+          status: pass
+        - name: Extracted pure NULL-safe game_render_ammo_belt_count (gun ammo floored at 0, no unlimited check, no cap); belt uses it as loop bound; declared in include/game_render.h
+          status: pass
+        - name: Kept the <= 0 guard and the cx = 192 - (i+1)*9 layout (original/level.c:331)
+          status: pass
+        - name: Comment cites original/level.c:324-334 and original/blocks.c:1588-1593
+          status: pass
+        - name: cmake --build build zero-warning; ctest --test-dir build 61/61
+          status: pass

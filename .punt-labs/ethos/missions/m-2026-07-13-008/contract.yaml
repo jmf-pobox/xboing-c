@@ -1,0 +1,27 @@
+mission_id: m-2026-07-13-008
+status: closed
+type: implement
+created_at: "2026-07-13T01:24:47Z"
+updated_at: "2026-07-13T01:42:49Z"
+closed_at: "2026-07-13T01:42:49Z"
+leader: claude
+worker: jdc
+evaluator:
+    handle: jck
+    pinned_at: "2026-07-13T01:24:47Z"
+    hash: 40cbe1204f644c77e6a26757a9b855e3298be267025e806d425bfdea99054f18
+inputs: {}
+write_set:
+    - src/game_modes.c
+success_criteria:
+    - 'In the real-game start path (start_new_game / mode_game_enter''s real-game branch, where ctx->savegame_restored_session=false is set ~game_modes.c:107 and the real score is reset), resync the display to the real score: score_system_set_display(ctx->score, score_system_get(ctx->score)) — for a new game the real score is 0, so the display shows 0, matching SetTheScore(0L) (original/main.c:944). Confirm the real score is actually 0/reset at that point; if score_system_set already updates the display, still add the explicit set_display so the attract fake value can''t linger.'
+    - In mode_edit_enter, resync the display to the real score the same way (score_system_set_display(ctx->score, score_system_get(ctx->score))), so entering the editor from attract never shows the leftover attract flourish. Nearest citation original/editor.c:603/629 (play-test is the only editor substate that renders the score window).
+    - Do NOT change attract_random_display or the attract screens' use of the fake score (it's a legitimate attract flourish); only ensure it's overwritten on entry to GAME/EDIT. Do NOT alter the real score value — only the display resync.
+    - 'Verify: after the attract cycle (which increments attract_fake_score and set_displays it), pressing E -> editor shows score 0, and starting a game shows 0 — not the leftover fake value. Cite original/main.c:944 and original/editor.c:603,629.'
+    - cmake --build build zero-warning under -Werror -Wconversion -Wshadow; ctest --test-dir build stays 61/61; only src/game_modes.c changes.
+budget:
+    rounds: 2
+    reflection_after_each: true
+current_round: 2
+context: |
+    Bug xboing-oyt, jck-approved target. attract_random_display (game_modes.c:404) sets score_system_set_display(ctx->score, attract_fake_score++) as an attract-screen animation flourish (a modern invention, no 1996 precedent). It leaks: on entering a real game or the editor, the HUD top-left shows the leftover fake value ("2"/"3") instead of the real score. The original zeroes the score display at game start (SetTheScore(0L), original/main.c:944) and on play-test entry/exit (original/editor.c:603, :629). Fix: resync the display to the real score when entering GAME and EDIT so the attract flourish never persists into gameplay/editor.

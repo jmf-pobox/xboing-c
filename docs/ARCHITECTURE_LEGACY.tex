@@ -4,30 +4,11 @@
 
 \documentclass[11pt,a4paper]{article}
 
-% --- Encoding and typography ---
-\usepackage[utf8]{inputenc}
-\usepackage[T1]{fontenc}
-\usepackage{microtype}
-\usepackage{lmodern}
+% Shared preamble (packages, macros, listings style) — see docs/xboing-doc.sty
+\usepackage{xboing-doc}
 
-% --- Layout ---
-\usepackage[margin=2.5cm]{geometry}
-\usepackage[colorlinks=true,linkcolor=blue!60!black,citecolor=blue!60!black,urlcolor=blue!60!black]{hyperref}
-\usepackage{amsmath}
-\usepackage{cleveref}
-
-% --- Tables ---
-\usepackage{booktabs}
-\usepackage{tabularx}
-\usepackage{longtable}
-\usepackage{array}
-
-% --- Lists ---
-\usepackage{enumitem}
+% Legacy-specific list spacing and a C-source listings style.
 \setlist{nosep,leftmargin=1.5em}
-
-% --- Code ---
-\usepackage{listings}
 \lstset{
   language=C,
   basicstyle=\ttfamily\small,
@@ -46,39 +27,15 @@
   columns=flexible,
 }
 
-% --- TikZ ---
-\usepackage{tikz}
-\usetikzlibrary{arrows.meta,positioning,shapes.geometric,calc,fit,backgrounds}
-
-% --- Custom commands ---
-\newcommand{\code}[1]{\texttt{#1}}
-\newcommand{\file}[1]{\texttt{#1}}
-\newcommand{\func}[1]{\texttt{#1()}}
-\newcommand{\const}[1]{\texttt{#1}}
-\newcommand{\xboing}{\textsc{XBoing}}
-\newcommand{\specref}[1]{(Spec~\S#1)}
-
 % --- Title ---
 \title{\LARGE Architecture of the Legacy \xboing{} Codebase\\[6pt]
        \large X11 Breakout Game, 1993--1996}
 \author{Punt Labs --- XBoing Modernization Project}
-\date{May 2026 \quad\textbar\quad Revision 1.1}
+\date{May 2026}
 
 \begin{document}
 \maketitle
 
-% --- Revision History ---
-\noindent
-\begin{tabularx}{\textwidth}{llX}
-\toprule
-\textbf{Rev} & \textbf{Date} & \textbf{Description} \\
-\midrule
-1.0 & 2026-03-24 & Initial legacy architecture document \\
-1.1 & 2026-05-30 & Fact-check against \file{original/} source: corrected line counts, window dimensions, function names, constants, file inventory \\
-\bottomrule
-\end{tabularx}
-
-\vspace{1em}
 \tableofcontents
 \newpage
 

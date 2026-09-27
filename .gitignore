@@ -80,6 +80,13 @@ docs/*.aux
 docs/*.log
 docs/*.fuzz
 docs/*.toc
+docs/*.out
+docs/*.fls
+docs/*.fdb_latexmk
+docs/*.bbl
+docs/*.bcf
+docs/*.blg
+docs/*.run.xml
 
 # ethos runtime (never track) — DES-058 live zone + mission locks
 .punt-labs/**/local/**

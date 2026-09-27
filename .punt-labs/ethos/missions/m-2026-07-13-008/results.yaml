@@ -1,0 +1,39 @@
+results:
+    - mission: m-2026-07-13-008
+      round: 1
+      created_at: "2026-07-13T01:35:28Z"
+      author: jdc
+      verdict: fail
+      confidence: 0.9
+      files_changed:
+        - path: src/game_modes.c
+          added: 4
+          removed: 0
+      evidence:
+        - name: Added score_system_set_display(ctx->score, score_system_get(ctx->score)) in start_new_game and mode_edit_enter per the spec
+          status: pass
+        - name: 'KEY FINDING (jdc, honest + leader-verified): score_system is a SINGLE field (struct score_system { u_long score; } at src/score_system.c:22-24); set_display and get read/write the same field. So set_display(get()) is a NO-OP (score = score). The spec was wrong (assumed a separate display field).'
+          status: fail
+        - name: start_new_game is already fixed by the EXISTING score_system_set(ctx->score, 0) (jdc's added line is a harmless redundant no-op). mode_edit_enter's set_display(get()) is a NO-OP and does NOT clear the attract flourish -> the EDITOR LEAK IS UNFIXED.
+          status: fail
+        - name: 'CORRECTION (round 2): mode_edit_enter must use score_system_set_display(ctx->score, 0) (reset the displayed score to 0, matching original/editor.c:603/629 SetTheScore(0L)); remove or keep the redundant start_new_game line. cmake zero-warning; only src/game_modes.c changed'
+          status: fail
+    - mission: m-2026-07-13-008
+      round: 2
+      created_at: "2026-07-13T01:38:40Z"
+      author: jdc
+      verdict: pass
+      confidence: 0.95
+      files_changed:
+        - path: src/game_modes.c
+          added: 11
+          removed: 0
+      evidence:
+        - name: mode_edit_enter now calls score_system_set_display(ctx->score, 0) unconditionally at the top — resets the single score field to 0 on editor entry, clearing any leftover attract_random_display flourish (the real fix, not the round-1 no-op)
+          status: pass
+        - name: start_new_game reverted to its committed form (the redundant set_display(get()) removed — the existing score_system_set(ctx->score,0) already handles the game path)
+          status: pass
+        - name: Comment cites original/editor.c:603/629 (SetTheScore(0L) on editor/play-test entry/exit); attract_random_display + the fake-score flourish untouched
+          status: pass
+        - name: cmake --build build zero-warning; only src/game_modes.c changed; the one ctest failure (test_game_rules) is the parallel zpr change (now closed), not this
+          status: pass

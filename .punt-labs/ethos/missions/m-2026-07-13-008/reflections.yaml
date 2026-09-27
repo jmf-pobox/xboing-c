@@ -1,0 +1,11 @@
+reflections:
+    - round: 1
+      created_at: "2026-07-13T01:35:47Z"
+      author: jck
+      converging: false
+      signals:
+        - score_system is a single field (src/score_system.c:22-24); set_display and get read/write the same ctx->score. So set_display(get()) is a no-op — the spec's assumption of a separate display value was wrong (leader's error, not jdc's).
+        - start_new_game already zeroes via the existing score_system_set(ctx->score, 0); jdc's added set_display(get()) there is a harmless no-op. The EDITOR path is the live gap and jdc's set_display(get()) there is a no-op -> attract flourish still leaks into the editor.
+        - 'REQUIRED round 2: mode_edit_enter must use score_system_set_display(ctx->score, 0) — reset the displayed score to 0 (matching original/editor.c:603/629 SetTheScore(0L)), which is what jck approved. The start_new_game addition can be reverted (rely on the existing set(0)) or kept as an explicit set_display(0); either is fine.'
+      recommendation: continue
+      reason: The single-field score model makes set_display(get()) a no-op, so the editor leak is unfixed. Correct mode_edit_enter to reset the display to 0. jdc followed the (flawed) spec faithfully and surfaced the single-field reality — good catch; the spec was the problem.
