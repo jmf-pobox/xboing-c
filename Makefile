@@ -150,9 +150,13 @@ deb-lint: deb ## Build .deb + run lintian on it (Debian Policy compliance).
 # xboing.rb's `head` stanza, not a tagged release tarball), so this is for
 # local sanity-checking the formula/bottle machinery, not for producing a
 # release-quality bottle — those are built by release.yml's `bottle` job
-# against the tag tarball. Deliberately NOT part of `make check`: it needs
-# brew, mutates a local tap under $(brew --repository), and is slow.
-bottle: ## Build a local Homebrew bottle from HEAD for sanity-checking the formula (requires brew; not part of 'make check'). See docs/RELEASING.md.
+# against the tag tarball. Then uninstalls the --HEAD keg, pours the built
+# *.bottle.tar.gz fresh, and runs packaging/homebrew/verify-bottle.sh
+# against it — the same pour+verify pattern release.yml's `bottle` job
+# uses — so this actually proves the bottle runs, not just that it built.
+# Deliberately NOT part of `make check`: it needs brew, mutates a local tap
+# under $(brew --repository), and is slow.
+bottle: ## Build a local Homebrew bottle from HEAD, pour it, and run verify-bottle.sh against it (requires brew; not part of 'make check'). See docs/RELEASING.md.
 	if ! command -v brew >/dev/null 2>&1; then \
 	    echo "FAIL: brew not found on PATH — see https://brew.sh"; \
 	    exit 1; \
@@ -163,6 +167,13 @@ bottle: ## Build a local Homebrew bottle from HEAD for sanity-checking the formu
 	brew bottle --no-rebuild jmf-pobox/xboing-local-bottle/xboing
 	echo
 	echo "Built: $$(ls -1 ./*.bottle.tar.gz 2>/dev/null | tail -1)"
+	echo
+	echo "Pouring the built bottle to verify it actually runs (not just builds)..."
+	brew uninstall jmf-pobox/xboing-local-bottle/xboing
+	bottle_file="$$(ls -1 ./*.bottle.tar.gz | tail -1)"; \
+	brew install "$$bottle_file"
+	version="$$(sed -n 's/^project(xboing VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt)"; \
+	packaging/homebrew/verify-bottle.sh "$$version" xboing
 
 original-build: ## Build the legacy 1996 Xlib binary in original/ (used for visual-fidelity reference capture).
 	$(MAKE) -C original
