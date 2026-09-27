@@ -1,0 +1,23 @@
+reflections:
+    - round: 1
+      created_at: "2026-07-12T19:48:10Z"
+      author: jck
+      converging: false
+      signals:
+        - 'Guard split correct (game_modes.c:1408-1444): play-test return skips reset/init_palette/reload/title-reseed (!from_dialogue && !play_test_active false), so board+modified+level_number+level_title survive — fixes nl4+bsz.'
+        - Canvas widen independently gated !from_dialogue only (line 1421) -> re-widens on play-test return (§2.3 gotcha handled); cursor restore SDL2CUR_PLUS unconditional (1365) -> xboing-hay cursor half resolved.
+        - 'No fresh-entry regression: INTRO/E and game/E both keep play_test_active false -> full reset/reload fires; dialogue round-trip (from_dialogue true) still skips reset as before; Escape consolidation onto play_test_active provably equivalent.'
+        - 'Ordering safe by construction: sdl2_state_transition runs on_enter synchronously; editor_cb_on_playtest_end clears the flag only after the transition returns, so mode_edit_enter''s guard reads true.'
+        - 'REQUIRED (minor): comment at game_modes.c:1391-1392 cites original/editor.c:616-641 as FinishPlayTest, but FinishPlayTest is 623-645 (616 is inside SetupPlayTest; range misses unlink(tempName)/close at 643-645). Fix the citation to 623-645 — provenance precision is a project standard.'
+      recommendation: continue
+      reason: 'Stage 3 is functionally APPROVED — all six correctness/regression checks pass and it''s faithful to the original''s play-test return. One required change before close: correct the FinishPlayTest citation (616-641 -> 623-645) at game_modes.c:1391-1392.'
+    - round: 2
+      created_at: "2026-07-12T19:50:55Z"
+      author: jck
+      converging: true
+      signals:
+        - 'Required citation fix applied: game_modes.c:1392 now cites original/editor.c:623-645 (FinishPlayTest''s actual span); no 616-641 remaining.'
+        - Comment-only change, no logic touched; leader-verified build clean + ctest 61/61.
+        - All six round-1 correctness/regression checks stand (guard split, canvas re-widen, cursor restore, fresh-entry + dialogue paths unregressed, Escape consolidation).
+      recommendation: stop
+      reason: 'Stage 3 faithful and complete: play-test return preserves the restored board + modified + level_number + title, palette re-widens, cursor restores; fresh entry and dialogue round-trip unchanged. Citation precision fixed. Clear to close.'

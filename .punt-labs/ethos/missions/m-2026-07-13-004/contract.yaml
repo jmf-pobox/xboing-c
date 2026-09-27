@@ -1,0 +1,27 @@
+mission_id: m-2026-07-13-004
+status: closed
+type: implement
+created_at: "2026-07-13T00:38:56Z"
+updated_at: "2026-07-13T00:42:09Z"
+closed_at: "2026-07-13T00:42:09Z"
+leader: claude
+worker: jdc
+evaluator:
+    handle: jck
+    pinned_at: "2026-07-13T00:38:56Z"
+    hash: 40cbe1204f644c77e6a26757a9b855e3298be267025e806d425bfdea99054f18
+inputs: {}
+write_set:
+    - src/game_callbacks.c
+success_criteria:
+    - In editor_cb_on_playtest_end (src/game_callbacks.c), after the savegame_system_restore call, reset ctx->savegame_restored_session = false — the in-memory play-test snapshot round-trip is not a loaded-save session, so it must not inherit savegame_system_restore's anti-cheat flag.
+    - 'Comment: savegame_system_restore sets savegame_restored_session=true (correct for a real save-load, gates global score submission at game_modes.c:1016/:1158); the play-test board round-trip reuses that helper but is not a loaded session, so clear the flag here. Cite the read sites.'
+    - Do NOT modify savegame_system_restore (it is correct for its primary save-load use) or the capture path. Only editor_cb_on_playtest_end changes.
+    - No behavior change to real games (they reset the flag via start_new_game before any score check) — this removes an inaccurate intermediate state during the play-test->editor window and future-proofs against a real-game path that skips start_new_game.
+    - cmake --build build zero-warning under -Werror -Wconversion -Wshadow; ctest --test-dir build stays 61/61; only src/game_callbacks.c changes.
+budget:
+    rounds: 2
+    reflection_after_each: true
+current_round: 1
+context: |
+    PR #180 review (Copilot, src/game_callbacks.c:1151). editor_cb_on_playtest_end calls savegame_system_restore to round-trip the in-memory play-test board snapshot, but that helper unconditionally sets ctx->savegame_restored_session=true (savegame_system.c:311) — the anti-cheat marker that makes a session ineligible for GLOBAL high-score submission (read at game_modes.c:1016 and :1158). A play-test snapshot is NOT a loaded save, so setting that flag is inaccurate. Today it is self-corrected (start_new_game resets it at game_modes.c:107 before any score check), so there is no reachable impact — but leaving an inaccurate anti-cheat flag set is a latent trap. Fix at the call site (don't touch savegame_system_restore, which is correct for real save-loads). Part of fix/playtest-fidelity.

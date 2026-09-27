@@ -1,0 +1,29 @@
+mission_id: m-2026-07-12-022
+status: closed
+type: implement
+created_at: "2026-07-12T17:32:53Z"
+updated_at: "2026-07-12T17:38:46Z"
+closed_at: "2026-07-12T17:38:46Z"
+leader: claude
+worker: jdc
+evaluator:
+    handle: gjm
+    pinned_at: "2026-07-12T17:32:53Z"
+    hash: 7349512b3191332fef8a79f56caf962febc697b8444629912da4aa22b9b2efec
+inputs: {}
+write_set:
+    - src/gun_system.c
+    - include/gun_system.h
+    - tests/test_gun_system.c
+success_criteria:
+    - 'gun_system_set_ammo clamps count to [0, GUN_MAX_AMMO+1]: negative -> 0, > GUN_MAX_AMMO+1 -> GUN_MAX_AMMO+1. All legitimate values (4, 20, 21) pass unchanged; only out-of-range (e.g. a tampered save''s 9999) is clamped. This makes gun ammo an always-legit value, so the belt never draws > 21 and the bonus never awards > 21.'
+    - 'Update the include/gun_system.h doc comment for gun_system_set_ammo (currently ''0..GUN_MAX_AMMO, or above for unlimited'') to state the clamp: 0..GUN_MAX_AMMO+1, values above clamp to the GUN_MAX_AMMO+1 unlimited sentinel.'
+    - 'Add tests in tests/test_gun_system.c: set_ammo(9999) then gun_system_get_ammo == GUN_MAX_AMMO+1 (the DoS guard — the exact tampered-save value); set_ammo(-5) -> 0; set_ammo(GUN_MAX_AMMO+1) -> GUN_MAX_AMMO+1 unchanged (sentinel preserved); set_ammo(4) -> 4 unchanged. Reuse the existing gun fixture.'
+    - Do NOT change gun_system behavior for legit values, and do NOT alter the unlimited sentinel (GUN_MAX_AMMO+1 must still be storable so unlimited fires and the belt shows 21).
+    - cmake --build build zero-warning under -Werror -Wconversion -Wshadow; ctest --test-dir build stays green (existing set_ammo tests still pass); only the 3 write-set files change.
+budget:
+    rounds: 2
+    reflection_after_each: true
+current_round: 1
+context: |
+    PR #178 review (Cursor + Copilot, both on src/game_render.c:686): removing the ammo-belt cap (faithful belt fix) exposed a DoS. savegame validation accepts num_bullets up to SAVEGAME_MAX_BULLETS=9999 (src/savegame_system.c:88), and savegame_system_restore passes it straight to gun_system_set_ammo (savegame_system.c:338), which currently does ctx->ammo = count with NO clamp. game_render_ammo_belt then loops for(i<count) SDL_RenderCopy -> thousands of draws/frame on a crafted save; the bonus (reads gun_system_get_ammo) would also award a 9999-bullet bonus. Root fix: clamp gun ammo at the single choke point. Legit ammo range is [0, GUN_MAX_AMMO+1] (21 = the unlimited sentinel; add_ammo clamps at 20, the only >20 legit value is the 21 sentinel from MAXAMMO). Clamping there keeps the belt faithful (draws <= 21, the original's real max) and protects every consumer without touching save validation.

@@ -1,0 +1,22 @@
+results:
+    - mission: m-2026-07-13-006
+      round: 1
+      created_at: "2026-07-13T01:35:18Z"
+      author: jdc
+      verdict: pass
+      confidence: 0.95
+      files_changed:
+        - path: src/game_rules.c
+          added: 10
+          removed: 8
+      evidence:
+        - name: 'game_rules_ball_died restructured to match DeadBall: PRE-decrement game-over check `if (!play_test_active && lives_left <= 0)` before any decrement; game-over body unchanged (HIGHSCORE, game_active not cleared)'
+          status: pass
+        - name: 'Respawn tail (real + play-test): balllost, +2 ammo unless unlimited (kept, original/ball.c:1803-1805), paddle_system_set_reverse(0), paddle_system_set_size(PADDLE_SIZE_HUGE) [NEW, original/level.c:496-497], then `if (!play_test_active) lives_left--` (decrement moved into respawn, level.c:500), ball_reset_start'
+          status: pass
+        - name: 'Trace confirmed: real 3-life = 4 balls (game-over on 4th death when lives already 0); paddle HUGE every respawn (real + play-test); play-test never depletes/game-overs. Cites original/level.c:474-505,496-497, paddle.c:318-357'
+          status: pass
+        - name: cmake debug + asan zero-warning, no ASan/UBSan; only src/game_rules.c changed
+          status: pass
+        - name: 'EXPECTED test break: test_ball_died_real_game_lives_lost_game_over (test_game_rules.c:171-184) asserts the OLD 3-ball behavior (lives_left=1 -> death -> game-over). Now that death respawns (4-ball). gjm updates: lives_left=1 -> death -> respawn (SDL2ST_GAME, lives 0, paddle HUGE), THEN second death -> SDL2ST_HIGHSCORE. Production is correct; do not weaken.'
+          status: pass

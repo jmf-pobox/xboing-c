@@ -1,0 +1,12 @@
+reflections:
+    - round: 1
+      created_at: "2026-07-12T19:45:05Z"
+      author: jck
+      converging: true
+      signals:
+        - 'game_rules_ball_died: only lives_left-- + <=0 game-over->SDL2ST_HIGHSCORE gated on !play_test_active; respawn tail (sound, +2 ammo, paddle reverse reset, ball_system_reset_start) unconditional — mirrors DeadBall''s structure (original/level.c:346-357,474-505). Play-test loses no lives, ball respawns, play continues.'
+        - 'game_rules_check: `!block_system_still_active && !play_test_active` -> play-test board clear stays SDL2ST_GAME (no bonus/applause/specials-off). Matches CheckGameRules never running in play-test (main.c:1140-1141).'
+        - 'Real-game byte-for-byte unchanged: guards additive, !play_test_active true at calloc default; test_ball_died_clears_reverse still valid.'
+        - 'Non-blocking pre-existing finding filed as xboing-zpr: post-decrement game-over check gives one fewer ball than the original''s pre-decrement check (original/level.c:482-505). Predates Stage 2 (only wrapped the existing decrement+check). Correctly out of this mission''s write-set.'
+      recommendation: stop
+      reason: Stage 2 guards match the design contract and are faithful to the original's mode==MODE_EDIT invariant; real games provably unchanged. The off-by-one respawn ordering is pre-existing, out of write-set, and now tracked separately (xboing-zpr) — not a blocker for this mission's close.

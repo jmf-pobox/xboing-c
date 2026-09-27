@@ -1,0 +1,28 @@
+mission_id: m-2026-07-12-016
+status: closed
+type: implement
+created_at: "2026-07-12T16:05:18Z"
+updated_at: "2026-07-12T16:10:32Z"
+closed_at: "2026-07-12T16:10:32Z"
+leader: claude
+worker: sjl
+evaluator:
+    handle: jdc
+    pinned_at: "2026-07-12T16:05:18Z"
+    hash: c08223356d3e6d5aed56e28da477a1aa2707509febfef7c5f62c25871a3e841f
+inputs: {}
+write_set:
+    - src/game_render.c
+    - include/game_render.h
+success_criteria:
+    - Remove BOTH the `if (gun_system_get_unlimited(ctx->gun)) return;` early-return AND the `if (ammo_count > GUN_MAX_AMMO) ammo_count = GUN_MAX_AMMO;` cap from game_render_ammo_belt — removing only one still desyncs (jck).
+    - Extract a pure count seam `int game_render_ammo_belt_count(const game_ctx_t *ctx)` returning the number of bullets the belt draws (= gun_system_get_ammo floored at 0), declared in include/game_render.h; game_render_ammo_belt uses it as the loop bound. This is the seam gjm's test pins (belt count == bonus bullet_count).
+    - Keep the <= 0 guard and the bullet x/y layout (cx = 192 - (i+1)*9, matching original/level.c:331).
+    - Cite original/level.c:324-334 and original/blocks.c:1588-1593 in a comment.
+    - cmake --build build succeeds zero-warning; ctest --test-dir build stays green.
+budget:
+    rounds: 3
+    reflection_after_each: true
+current_round: 1
+context: |
+    Bug xboing-65h — ammo-belt desync. game_render_ammo_belt (src/game_render.c:672) hides the belt when unlimited (draws 0) and caps at GUN_MAX_AMMO, desyncing from the end-of-level bonus which reads the raw gun ammo (the 21 sentinel from a MAXAMMO block). jck approved the faithful fix: the belt must draw the real ammo count with NO unlimited early-return and NO cap, matching original/level.c:324-334 ReDrawBulletsLeft (which draws GetNumberBullets() unconditionally, no clamp). Formal model docs/bullet_ammo.tex pins the invariant displayed == actual == bonus.

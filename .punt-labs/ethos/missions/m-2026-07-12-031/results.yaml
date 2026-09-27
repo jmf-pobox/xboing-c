@@ -1,0 +1,26 @@
+results:
+    - mission: m-2026-07-12-031
+      round: 1
+      created_at: "2026-07-12T23:33:37Z"
+      author: jdc
+      verdict: pass
+      confidence: 0.9
+      files_changed:
+        - path: include/sdl2_input.h
+          added: 8
+          removed: 0
+        - path: src/sdl2_input.c
+          added: 9
+          removed: 0
+        - path: src/game_input.c
+          added: 8
+          removed: 0
+      evidence:
+        - name: 'sdl2_input_consume(ctx, action) added: NULL-safe + is_valid_action bounds check, sets ctx->just_pressed[action]=false (same storage sdl2_input_just_pressed reads, cleared by begin_frame). Doc comment explains the same-frame-transition rationale.'
+          status: pass
+        - name: 'game_input.c: after ending play-test via ''p'' -> sdl2_input_consume(ctx->input, SDL2I_PAUSE); after Escape -> sdl2_input_consume(ctx->input, SDL2I_ABORT). Both guarded by the play_test_active branches only.'
+          status: pass
+        - name: 'Full-frame trace: game_input_global ends play-test (->SDL2ST_EDIT) + consumes the action; sdl2_loop_update''s mode_edit_update then reads just_pressed==false -> ''p'' does NOT restart, Escape''s editor-quit does NOT fire (no SDL2ST_INTRO). Real-game pause/abort untouched (consume only on play_test_active branches).'
+          status: pass
+        - name: 'cmake --build build zero-warning under -Werror -Wconversion -Wshadow; ctest 61/61; only the 3 write-set files changed. NOTE: existing tests don''t drive the full frame — gjm''s Stage-test mission adds the full-frame regression (game_input_global + editor tick).'
+          status: pass

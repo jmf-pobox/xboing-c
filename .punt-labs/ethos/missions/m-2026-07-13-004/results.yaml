@@ -1,0 +1,20 @@
+results:
+    - mission: m-2026-07-13-004
+      round: 1
+      created_at: "2026-07-13T00:40:37Z"
+      author: jdc
+      verdict: pass
+      confidence: 0.95
+      files_changed:
+        - path: src/game_callbacks.c
+          added: 6
+          removed: 0
+      evidence:
+        - name: 'editor_cb_on_playtest_end: ctx->savegame_restored_session = false added right after savegame_system_restore (before score_system_set), clearing the anti-cheat flag the restore helper wrongly set for the in-memory play-test snapshot'
+          status: pass
+        - name: Comment explains savegame_system_restore sets the flag (correct for real save-loads, gates global submission at game_modes.c:1016/:1158), but the play-test round-trip is not a loaded session
+          status: pass
+        - name: savegame_system_restore + capture path untouched; only editor_cb_on_playtest_end changed
+          status: pass
+        - name: No real-game behavior change (start_new_game resets the flag anyway); removes the inaccurate intermediate state + future-proofs against a real-game path skipping start_new_game. cmake zero-warning; ctest 61/61; only src/game_callbacks.c changed
+          status: pass

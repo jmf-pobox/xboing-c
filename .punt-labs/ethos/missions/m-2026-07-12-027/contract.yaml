@@ -1,0 +1,29 @@
+mission_id: m-2026-07-12-027
+status: closed
+type: implement
+created_at: "2026-07-12T19:39:39Z"
+updated_at: "2026-07-12T19:51:08Z"
+closed_at: "2026-07-12T19:51:08Z"
+leader: claude
+worker: jdc
+evaluator:
+    handle: jck
+    pinned_at: "2026-07-12T19:39:39Z"
+    hash: 40cbe1204f644c77e6a26757a9b855e3298be267025e806d425bfdea99054f18
+inputs: {}
+write_set:
+    - src/game_modes.c
+    - src/game_input.c
+success_criteria:
+    - 'mode_edit_enter (src/game_modes.c) guard split per §3.4: when returning from play-test (ctx->play_test_active true, i.e. prev==SDL2ST_GAME), do NOT run editor_system_reset / the do_load_level board reload / the modified+level_number zeroing — the board was already restored by Stage 1''s editor_cb_on_playtest_end and modified must survive. A genuine fresh editor entry (from INTRO/game via E, prev != play-test) must still reset+reload editor.data exactly as before (per docs/specs/2026-07-11-editor-parity.md §3.3 point 3).'
+    - Verify the tool-palette canvas re-widens correctly after play-test (the split-guard gotcha, §2.3) — i.e. the width/logical-size setup that must still run on play-test return isn't skipped by the guard. Follow §3.4 on which parts of mode_edit_enter are gated vs always-run.
+    - 'src/game_input.c: consolidate the Escape-returns-to-editor shortcut (game_input.c:317, currently infers play-test from previous==SDL2ST_EDIT) onto ctx->play_test_active for a single source of truth, per §3.1''s consistency cleanup. Confirm behavior is identical (Escape from a play-test returns to the editor; Escape from a real game does NOT).'
+    - Optionally (§3.4) also switch mode_game_enter's prev==SDL2ST_EDIT branch to read ctx->play_test_active — only if the spec calls for it; keep it minimal.
+    - Cite original/editor.c SetupPlayTest/FinishPlayTest (587-641) and the spec §3.4 in comments. Follow the spec exactly; if a criterion conflicts, follow the spec and note it.
+    - cmake --build build zero-warning under -Werror -Wconversion -Wshadow; ctest --test-dir build stays 61/61; only src/game_modes.c and src/game_input.c change.
+budget:
+    rounds: 3
+    reflection_after_each: true
+current_round: 2
+context: |
+    Play-test fidelity Stage 3 (xboing-nl4 + xboing-bsz — one shared root cause), per docs/specs/2026-07-12-playtest-fidelity.md §3.4 and §3.1's consistency cleanup. Stage 1 (m-2026-07-12-025, closed) added ctx->play_test_active. Root cause: mode_edit_enter's reset-branch guard excludes only SDL2ST_DIALOGUE, so on return from play-test (prev==SDL2ST_GAME) it fires editor_system_reset -> state EDITOR_STATE_LEVEL -> do_load_level -> reloads editor.data, LIVE-WIPING the board and zeroing modified/level_number. Depends on Stage 1's flag; independent of Stage 2 (different files). NO game_rules changes here.

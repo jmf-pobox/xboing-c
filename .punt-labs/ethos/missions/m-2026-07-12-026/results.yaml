@@ -1,0 +1,20 @@
+results:
+    - mission: m-2026-07-12-026
+      round: 1
+      created_at: "2026-07-12T19:41:51Z"
+      author: jdc
+      verdict: pass
+      confidence: 0.94
+      files_changed:
+        - path: src/game_rules.c
+          added: 34
+          removed: 16
+      evidence:
+        - name: 'game_rules_ball_died: only the lives_left-- and the <=0 game-over -> SDL2ST_HIGHSCORE are gated on !ctx->play_test_active; the ammo/paddle-reverse/ball-reset tail runs unconditionally (mirrors DeadBall''s unguarded else, original/level.c:346-357,474-505). Play-test loss resets ball, keeps playing, no life decrement.'
+          status: pass
+        - name: 'game_rules_check level-complete: `if (!block_system_still_active(ctx->block) && !ctx->play_test_active)` -> play-test board clear stays SDL2ST_GAME (no BONUS). Cited original/level.c:398-419 + main.c:1140-1141.'
+          status: pass
+        - name: Both guards purely additive (!play_test_active is true when flag unset) -> real 3-life game-over and real level-clear->SDL2ST_BONUS byte-for-byte unchanged
+          status: pass
+        - name: cmake --build build zero-warning under -Werror -Wconversion -Wshadow; ctest 61/61; only src/game_rules.c changed
+          status: pass

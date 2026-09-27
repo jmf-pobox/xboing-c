@@ -1,0 +1,28 @@
+mission_id: m-2026-07-12-018
+status: closed
+type: implement
+created_at: "2026-07-12T16:11:45Z"
+updated_at: "2026-07-12T16:23:56Z"
+closed_at: "2026-07-12T16:23:56Z"
+leader: claude
+worker: gjm
+evaluator:
+    handle: jdc
+    pinned_at: "2026-07-12T16:11:45Z"
+    hash: c08223356d3e6d5aed56e28da477a1aa2707509febfef7c5f62c25871a3e841f
+inputs: {}
+write_set:
+    - tests/test_integration_gameplay.c
+    - tests/test_game_render_specials.c
+success_criteria:
+    - 'A GENUINE test (no mirror — call real production functions, do not duplicate their expression) pinning the cross-consumer invariant: with unlimited ammo active (MAXAMMO), game_render_ammo_belt_count(ctx) equals what the bonus feeds. Prefer driving the real MAXAMMO path and asserting game_render_ammo_belt_count(ctx) == bonus_system_get_initial_bullet_count(ctx->bonus) after the bonus captures it; if reaching bonus is heavy, at minimum assert game_render_ammo_belt_count(ctx) == gun_system_get_ammo(ctx->gun) under unlimited (=21), the exact accessor the bonus reads.'
+    - 'Seam unit assertions on game_render_ammo_belt_count: ammo 0->0, 4->4, GUN_MAX_AMMO(20)->20, and unlimited+21 sentinel->21 (NOT 0, NOT capped). The 21-under-unlimited case was 0 before the fix — the regression guard.'
+    - Register the new test(s) so ctest --test-dir build runs and passes them all on the fixed code.
+    - 'Demonstrate RED->GREEN in the mission result: temporarily reintroduce the bug in src/game_render.c (e.g. re-add `if (gun_system_get_unlimited(ctx->gun)) return;` at the top of game_render_ammo_belt_count), rebuild, run the new test -> FAILS on the unlimited/21 case; revert, rebuild -> PASSES. Report both outputs verbatim. Do NOT leave src/game_render.c modified (it is not in your write-set — only touch it transiently to prove RED, then restore it exactly).'
+    - cmake --build build zero-warning; report if you must touch tests/CMakeLists.txt for registration (I will rescope).
+budget:
+    rounds: 2
+    reflection_after_each: true
+current_round: 1
+context: |
+    Bug xboing-65h — ammo belt desynced from the bullet bonus under unlimited ammo. Using the implement archetype for a test mission because the seed `test` archetype ships Go-only globs (xboing-dlg). The fix (m-2026-07-12-016, applied) made game_render_ammo_belt draw the raw gun ammo via the new pure seam game_render_ammo_belt_count(ctx) (include/game_render.h): gun_system_get_ammo floored at 0, no unlimited check, no cap. The bonus reads the same raw count (game_modes.c:816 -> env.bullet_count; bonus_system_get_initial_bullet_count, bonus_system.c:560). Model docs/bullet_ammo.tex proves displayed == actual == bonus. Pin it against real code.

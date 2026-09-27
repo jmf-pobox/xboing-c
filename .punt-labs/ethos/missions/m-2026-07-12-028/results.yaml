@@ -1,0 +1,23 @@
+results:
+    - mission: m-2026-07-12-028
+      round: 1
+      created_at: "2026-07-12T20:10:12Z"
+      author: gjm
+      verdict: pass
+      confidence: 0.94
+      files_changed:
+        - path: tests/test_game_rules.c
+          added: 115
+          removed: 0
+        - path: tests/test_integration_editor.c
+          added: 71
+          removed: 12
+      evidence:
+        - name: 'test_game_rules.c: 4 tests driving real game_rules_ball_died/game_rules_check — playtest no-lives-lost/no-game-over (stays SDL2ST_GAME, ball reset to BALL_WAIT) + real-game decrement->SDL2ST_HIGHSCORE sibling; playtest board-clear stays SDL2ST_GAME + real-game clear->SDL2ST_BONUS sibling'
+          status: pass
+        - name: 'test_integration_editor.c: extended test_editor_playtest_transition drives the REAL EDIT->play-test->EDIT round-trip (EDITOR_KEY_PLAYTEST -> editor_cb_on_playtest_start/_end); asserts (i) edited block survives (board preserved, bsz), (ii) modified survives (nl4), (iii) level_number/level_title survive, (iv) cursor SDL2CUR_PLUS->NONE->PLUS restored + returns to SDL2ST_EDIT not HIGHSCORE (hay)'
+          status: pass
+        - name: All new tests genuine (real functions/callbacks, not mirrors); no tests/CMakeLists.txt change (both files registered); cmake zero-warning; full ctest green
+          status: pass
+        - name: 'RED->GREEN (leader, src outside worker write-set): stashing the Stage 2/3 guards fails all three (0!=1 lives; 7!=3 BONUS-vs-GAME; editor round-trip wipe), real-game siblings still pass; guards restored -> all pass, no residue'
+          status: pass

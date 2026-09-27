@@ -1,0 +1,30 @@
+mission_id: m-2026-07-13-009
+status: closed
+type: implement
+created_at: "2026-07-13T01:43:13Z"
+updated_at: "2026-07-13T01:53:40Z"
+closed_at: "2026-07-13T01:53:40Z"
+leader: claude
+worker: gjm
+evaluator:
+    handle: jdc
+    pinned_at: "2026-07-13T01:43:13Z"
+    hash: c08223356d3e6d5aed56e28da477a1aa2707509febfef7c5f62c25871a3e841f
+inputs: {}
+write_set:
+    - tests/test_game_rules.c
+    - tests/test_keybindings.c
+    - tests/test_integration_editor.c
+success_criteria:
+    - 'FIX the stale test (tests/test_game_rules.c) test_ball_died_real_game_lives_lost_game_over to the new 4-ball semantics: with lives_left=1, one game_rules_ball_died call RESPAWNS (assert sdl2_state_current==SDL2ST_GAME, lives_left==0, and paddle is PADDLE_SIZE_HUGE); a SECOND game_rules_ball_died call (now lives_left==0) transitions to SDL2ST_HIGHSCORE. Do NOT weaken — production is correct.'
+    - 'zpr regression (tests/test_game_rules.c): a full 3-life sequence — lives_left=3, call game_rules_ball_died 3 times, each RESPAWNS (SDL2ST_GAME, lives 2/1/0, paddle grows to HUGE — set paddle to a non-HUGE size before each death and assert it is HUGE after), then the 4th call -> SDL2ST_HIGHSCORE. This pins BOTH the 4-ball count AND the paddle re-expand. Also a paddle-grow-on-respawn assertion: shrink the paddle, one non-fatal death, assert paddle_system_get_size (or equivalent) == PADDLE_SIZE_HUGE. Reuse the existing test_game_rules fixture.'
+    - '3h3 regression (tests/test_keybindings.c): reach play-test (SDL2ST_GAME + play_test_active), inject SDL_SCANCODE (the Q key / SDL2I_QUIT binding — check the input table) + game_input_global(ctx) + a state-update tick (full frame like the xboing-1ir tests), assert the state stays SDL2ST_GAME (NOT SDL2ST_DIALOGUE — no quit dialogue opens) and play_test_active stays true. Sibling: Q in a REAL game (play_test_active false) DOES open the dialogue (-> SDL2ST_DIALOGUE).'
+    - 'oyt regression (tests/test_integration_editor.c or wherever an editor+score ctx is cheap): set a nonzero score display (score_system_set_display(ctx->score, 5) to mimic the attract flourish), then enter the editor / call mode_edit_enter path, assert score_system_get(ctx->score)==0 (the flourish is cleared on editor entry). GENUINE — drive the real mode_edit_enter/transition, not score_system_set_display(0) directly.'
+    - cmake --build build zero-warning; ctest --test-dir build 61/61 (all pass — the stale test now updated). Report if tests/CMakeLists.txt needs changes (prefer files already registered).
+    - Do NOT edit src/ — the leader runs RED->GREEN by transiently reverting each fix. Write the tests to PASS on the shipped code.
+budget:
+    rounds: 2
+    reflection_after_each: true
+current_round: 1
+context: |
+    Three fixes just shipped (all jck-approved), each needs test coverage + one stale test updated. Using implement archetype for tests (xboing-dlg). (1) xboing-zpr: game_rules_ball_died now matches DeadBall — 3 lives = 4 balls (pre-decrement game-over), and the paddle grows to PADDLE_SIZE_HUGE on every respawn (src/game_rules.c). (2) xboing-3h3: Q during play-test does nothing now (game_input.c gate has !ctx->play_test_active). (3) xboing-oyt: mode_edit_enter now calls score_system_set_display(ctx->score, 0) so the attract fake-score doesn't leak into the editor. The existing test_ball_died_real_game_lives_lost_game_over (tests/test_game_rules.c:171-184) FAILS because it encodes the OLD 3-ball behavior.

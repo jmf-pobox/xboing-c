@@ -1,0 +1,23 @@
+results:
+    - mission: m-2026-07-12-018
+      round: 1
+      created_at: "2026-07-12T16:20:06Z"
+      author: gjm
+      verdict: pass
+      confidence: 0.95
+      files_changed:
+        - path: tests/test_game_render_specials.c
+          added: 109
+          removed: 0
+        - path: tests/test_integration_gameplay.c
+          added: 47
+          removed: 0
+      evidence:
+        - name: '4 seam unit tests on game_render_ammo_belt_count: ammo 0->0, 4->4, 20->20, unlimited+21->21 (test_ammo_belt_count_unlimited_21 is the regression guard)'
+          status: pass
+        - name: 'Cross-consumer form (a): test_ammo_belt_matches_bonus_tally_under_unlimited drives the real MAXAMMO->empty-grid->game_rules_check->mode_bonus_enter->bonus_system_begin path, asserts game_render_ammo_belt_count(ctx) == bonus_system_get_initial_bullets(ctx->bonus) == 21 (genuine, not a mirror)'
+          status: pass
+        - name: All 5 new tests pass; ctest --test-dir build 61/61 and asan 61/61; no tests/CMakeLists.txt change (both files already registered)
+          status: pass
+        - name: 'RED->GREEN demonstrated by leader (src outside worker write-set): with the unlimited early-return reintroduced, both test_ammo_belt_count_unlimited_21 and test_ammo_belt_matches_bonus_tally_under_unlimited FAIL with 0 != 21; fix restored -> both PASS; src/game_render.c restored exactly (0 residue lines)'
+          status: pass

@@ -1,0 +1,28 @@
+mission_id: m-2026-07-12-030
+status: closed
+type: implement
+created_at: "2026-07-12T21:17:29Z"
+updated_at: "2026-07-12T21:26:04Z"
+closed_at: "2026-07-12T21:26:04Z"
+leader: claude
+worker: gjm
+evaluator:
+    handle: jdc
+    pinned_at: "2026-07-12T21:17:29Z"
+    hash: c08223356d3e6d5aed56e28da477a1aa2707509febfef7c5f62c25871a3e841f
+inputs: {}
+write_set:
+    - tests/test_keybindings.c
+    - tests/test_integration_editor.c
+success_criteria:
+    - 'A GENUINE regression test that drives the LIVE input path (not editor_system_key_input directly): reach play-test (editor -> EDITOR_KEY_PLAYTEST start -> SDL2ST_GAME with ctx->play_test_active true), then inject the ''p'' key and call game_input_global(ctx) (the once-per-frame handler where SDL2I_PAUSE lives), and assert play-test ENDED: sdl2_state_current(ctx->state)==SDL2ST_EDIT (NOT SDL2ST_PAUSE), ctx->play_test_active==false, and the pre-test board was restored (a block edited before play-test is present). Use the inject_key + game_input_global harness (docs/TESTING.md keybinding pattern; test_keybindings.c has it) with a fixture that can reach play-test.'
+    - A sibling assertion or second test that 'p' in a REAL game (play_test_active false, SDL2ST_GAME) still PAUSES (-> SDL2ST_PAUSE), so the play-test routing didn't break real-game pause. And ideally that Escape during play-test also ends it (routes through the same path).
+    - GENUINE — inject real SDL input + call the real game_input_global / production callbacks; do NOT call editor_system_key_input directly for the play-test-exit assertion (that's the path that already had coverage and missed the live bug).
+    - Register in the existing CMUnitTest arrays; report if tests/CMakeLists.txt needs a change (prefer files already registered — test_keybindings and test_integration_editor are both registered).
+    - cmake --build build zero-warning; ctest --test-dir build passes all new tests + full suite. Do NOT edit src/ — the leader runs the RED->GREEN demo by transiently reverting the m-2026-07-12-029 game_input.c fix.
+budget:
+    rounds: 2
+    reflection_after_each: true
+current_round: 1
+context: |
+    Bug xboing-lpi FIXED (m-2026-07-12-029): during play-test, 'p' and Escape now route through editor_system_key_input(EDITOR_KEY_PLAYTEST) -> on_playtest_end (restore board, clear play_test_active, zero score, transition to SDL2ST_EDIT), matching original editor.c:994-1001. The bug existed because the Stage 4 test drove editor_system_key_input DIRECTLY, missing the LIVE game_input.c 'p' path (SDL2I_PAUSE during SDL2ST_GAME). This mission adds the regression test that drives the real game_input path so the gap can't reopen. Using implement archetype for tests (seed `test` archetype has Go-only globs, xboing-dlg).

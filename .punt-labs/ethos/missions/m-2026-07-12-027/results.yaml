@@ -1,0 +1,49 @@
+results:
+    - mission: m-2026-07-12-027
+      round: 1
+      created_at: "2026-07-12T19:45:28Z"
+      author: jdc
+      verdict: pass
+      confidence: 0.92
+      files_changed:
+        - path: src/game_modes.c
+          added: 53
+          removed: 12
+        - path: src/game_input.c
+          added: 8
+          removed: 3
+      evidence:
+        - name: 'mode_edit_enter guard split: canvas widen (set_logical_width) gated on !from_dialogue ONLY (runs on play-test return too); editor_system_reset/init_palette/set_level_title gated on !from_dialogue && !ctx->play_test_active (skipped on play-test return); cursor restore (SDL2CUR_PLUS) + special_system_turn_off remain unconditional'
+          status: pass
+        - name: Play-test return keeps board (restored by Stage 1), modified, level_number, level_title; palette re-widens; cursor restores (resolves xboing-hay cursor half + nl4 + bsz)
+          status: pass
+        - name: Fresh editor entry (INTRO/E or game/E, play_test_active false, from_dialogue false) runs the full reset+reload+widen exactly as before
+          status: pass
+        - name: game_input.c Escape handler + mode_game_enter prev==SDL2ST_EDIT branch consolidated onto ctx->play_test_active (single source of truth, §3.1); Escape from play-test -> SDL2ST_EDIT, Escape from real game -> abort-confirm unchanged
+          status: pass
+        - name: cmake --build build zero-warning; ctest 61/61 (no test asserted old wipe-on-return behavior); only src/game_modes.c + src/game_input.c changed; original/editor.c:587-641 cited
+          status: pass
+    - mission: m-2026-07-12-027
+      round: 2
+      created_at: "2026-07-12T19:51:05Z"
+      author: jdc
+      verdict: pass
+      confidence: 0.95
+      files_changed:
+        - path: src/game_modes.c
+          added: 53
+          removed: 12
+        - path: src/game_input.c
+          added: 8
+          removed: 3
+      evidence:
+        - name: 'mode_edit_enter guard split (game_modes.c:1408-1444): reset/init_palette/reload/title-reseed gated on !from_dialogue && !play_test_active (skipped on play-test return); canvas widen gated !from_dialogue only (re-widens on return); cursor restore unconditional'
+          status: pass
+        - name: 'nl4+bsz fixed: play-test return preserves restored board + modified + level_number + level_title; xboing-hay cursor half resolved (cursor restore runs + Stage 2 removed the HIGHSCORE hijack)'
+          status: pass
+        - name: No fresh-entry regression (INTRO/E, game/E run full reset+reload+widen); dialogue round-trip still skips reset; Escape + mode_game_enter consolidated onto play_test_active (equivalent)
+          status: pass
+        - name: 'Round 2: FinishPlayTest citation corrected to original/editor.c:623-645 (jck round-1 required fix)'
+          status: pass
+        - name: 'Leader-verified: cmake --build build zero-warning; ctest 61/61; only src/game_modes.c + src/game_input.c changed'
+          status: pass

@@ -1,0 +1,20 @@
+results:
+    - mission: m-2026-07-13-003
+      round: 1
+      created_at: "2026-07-13T00:21:08Z"
+      author: jdc
+      verdict: pass
+      confidence: 0.93
+      files_changed:
+        - path: src/game_modes.c
+          added: 8
+          removed: 6
+      evidence:
+        - name: mode_game_enter play-test-init gated on `ctx->play_test_active && prev == SDL2ST_EDIT` — one-time setup (lives=3, paddle HUGE, ball/ammo, title) runs only on the initial editor->game entry, never on a GAME re-entry mid-play-test
+          status: pass
+        - name: 'Comment rewritten: the init is scoped to the initial EDIT->GAME entry via prev; play_test_active persists for the per-tick game_rules guards; the two are NOT equivalent for re-entry (removes the false ''provably equivalent'' claim)'
+          status: pass
+        - name: 'Initial play-test start unaffected: editor_cb_on_playtest_start sets play_test_active=true THEN transitions to SDL2ST_GAME while still in EDIT, so prev==SDL2ST_EDIT && play_test_active both hold -> init runs as before'
+          status: pass
+        - name: game_rules guards + mode_edit_enter guard-split untouched; cmake zero-warning; ctest 61/61 (play-test tests enter EDIT->GAME so still exercise the init); only src/game_modes.c changed
+          status: pass

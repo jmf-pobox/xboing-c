@@ -1,0 +1,22 @@
+reflections:
+    - round: 1
+      created_at: "2026-07-12T19:26:18Z"
+      author: jck
+      converging: false
+      signals:
+        - 'Design faithful + well-sourced on the 3 charter bugs: SetupPlayTest/FinishPlayTest round-trip, DecExtraLife MODE_EDIT no-op, play_test_active flag (one setter/one clearer, cannot leak), in-memory savegame capture/restore — all verified against original.'
+        - 'REQUIRED: fold the level-complete -> SDL2ST_BONUS guard INTO Stage 2. game_rules_check (src/game_rules.c:331-341) transitions to BONUS on cleared board with no play-test guard — the 4th manifestation of xboing-hay''s game-over hijack. Original CheckGameRules (level.c:398-419) is never called in play-test because mode stays MODE_EDIT (guarded at only call site main.c:1140-1141). Fix: add `&& !ctx->play_test_active`, same file/flag as the game_rules_ball_died guard; move the §7 bullet into Stage 2 write-set + a sibling test case; jck approval yes; no new stage/bead.'
+        - 'Paddle re-expand on respawn (original/level.c:496-497) correctly OUT: fires on every respawn in a REAL game too (no mode gate), general fidelity gap, own bead.'
+      recommendation: continue
+      reason: 'Approve after one change: the design builds ctx->play_test_active specifically to gate real-game terminal-screen transitions during play-test, then guards only one of the two (SDL2ST_HIGHSCORE/game-over) and leaves SDL2ST_BONUS unguarded — an incomplete application of its own mechanism, violating the no-partial-fixes and single-source doctrine. Fold the BONUS guard into Stage 2. Everything else stands.'
+    - round: 2
+      created_at: "2026-07-12T19:30:22Z"
+      author: jck
+      converging: true
+      signals:
+        - §2.2 addendum present citing original/level.c:398-419 (CheckGameRules) + main.c:1140-1141 (mode==MODE_GAME guard); §7 level-complete bullet moved into Stage 2.
+        - 'Stage 2 guard text exact: `if (!block_system_still_active(ctx->block) && !ctx->play_test_active)` (§3.2:465); write-set names src/game_rules.c for both ball-died and level-complete guards; jck approval yes.'
+        - '§5 test case 2 (sibling to game-over case): play-test + clear blocks -> stays SDL2ST_GAME (no BONUS); real clear still reaches SDL2ST_BONUS (regression).'
+        - Paddle-re-expand is the sole remaining §7 out-of-scope item; mechanism/stages/ADRs/citations from round 1 intact; diff additive.
+      recommendation: stop
+      reason: Revised spec satisfies the round-1 conditional and all mission success criteria. Faithful to the original's single-source (mode==MODE_EDIT) play-test invariant. Clear to close and proceed to Stage 1 implementation.

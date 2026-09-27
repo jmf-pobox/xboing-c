@@ -1,0 +1,28 @@
+mission_id: m-2026-07-12-024
+status: closed
+type: design
+created_at: "2026-07-12T19:10:22Z"
+updated_at: "2026-07-12T19:30:58Z"
+closed_at: "2026-07-12T19:30:58Z"
+leader: claude
+worker: jdc
+evaluator:
+    handle: jck
+    pinned_at: "2026-07-12T19:10:22Z"
+    hash: 40cbe1204f644c77e6a26757a9b855e3298be267025e806d425bfdea99054f18
+inputs: {}
+write_set:
+    - docs/specs/2026-07-12-playtest-fidelity.md
+success_criteria:
+    - docs/specs/2026-07-12-playtest-fidelity.md exists, markdownlint-clean, cites original/editor.c:587-641 (SetupPlayTest/FinishPlayTest), original/level.c:346-357 (DecExtraLife mode!=MODE_EDIT), and the modern sites (game_rules.c:290 lives_left--, the game-over path, mode_game_enter prev==EDIT branch, mode_edit_enter reset).
+    - 'Specifies the play-test-detection mechanism concretely: how game_rules and the ball-death/game-over path learn they are in play-test (recommend a single source of truth — e.g. a ctx bool play_test_active set on play-test entry and cleared on exit, vs relying on sdl2_state saved_mode/prev). State the exact set/clear points and why the chosen mechanism can''t leak into a real game.'
+    - 'Covers all three beads with one coherent mechanism: (hay) skip lives_left-- and the game-over transition when play-test active, mirroring DecExtraLife''s MODE_EDIT no-op; restore the editor cursor on play-test exit (gameplay hides it via SDL2CUR_NONE, game_modes.c:269-271). (nl4) mode_edit_enter must NOT zero modified/level_number when returning from play-test (prev==SDL2ST_GAME) — specify the guard. (bsz) the board must round-trip across play-test: specify the capture-before / restore-after mechanism (in-memory grid snapshot vs the savegame temp-file pattern the original uses) and where it hooks.'
+    - Breaks the work into ordered implementation stages sized for separate implement+test missions, naming the write-set files per stage (game_context/flag, game_rules guards, game_modes enter/exit wiring, editor board snapshot, cursor), and flags which stages need jck gameplay approval.
+    - 'States the test plan: how integration tests will drive play-test (transition EDIT->GAME->EDIT) and assert lives don''t deplete, no game-over at 0, modified survives, board survives, cursor restored — reusing setup_editor / the existing editor+gameplay integration fixtures.'
+    - Lists required ADR(s) for docs/DESIGN.md (play-test detection + infinite-lives/no-game-over parity; board round-trip approach).
+budget:
+    rounds: 2
+    reflection_after_each: true
+current_round: 2
+context: |
+    Bring the editor play-test mode to parity with the 1996 original — three user-reported deviations (dogfooding 1.0.5), all in the same subsystem: xboing-hay (lives deplete during play-test; game-over fires on depletion; editor cursor not restored on return), xboing-nl4 (mode_edit_enter reset zeroes the modified flag on return from play-test -> unsaved-work confirm under-fires), xboing-bsz (board edits not preserved across play-test round-trip). Modern play-test = SDL2ST_GAME entered from SDL2ST_EDIT (mode_game_enter checks prev==SDL2ST_EDIT ~game_modes.c:222); return goes back to SDL2ST_EDIT via mode_edit_enter. The original: SetupPlayTest/FinishPlayTest (original/editor.c:587-641) save the board to a temp file and reload it around play; DecExtraLife (original/level.c:346-357) is a no-op in MODE_EDIT so lives never deplete; ball-death game-over is likewise gated. Modern game_rules.c:290 does ctx->lives_left-- with NO play-test guard, and the game-over path (game_rules.c ~290-300) fires at 0. This is a design blueprint only — NO production code. jck must approve the faithfulness of the play-test-detection mechanism and the infinite-lives / no-game-over / board-round-trip behavior (gameplay-affecting).

@@ -1,0 +1,20 @@
+results:
+    - mission: m-2026-07-13-010
+      round: 1
+      created_at: "2026-07-13T02:04:28Z"
+      author: jdc
+      verdict: pass
+      confidence: 0.95
+      files_changed:
+        - path: src/game_modes.c
+          added: 13
+          removed: 9
+      evidence:
+        - name: mode_edit_enter now uses score_system_set(ctx->score, 0) instead of set_display — resets score AND the extra-life threshold (score_system.c:105), keeping the system consistent; the SetTheScore(0L) equivalent (original/editor.c:603/629, main.c:944)
+          status: pass
+        - name: Comment updated to explain set() vs set_display() (set_display is attract-mode-only and would leave life_threshold stale); attract_random_display's set_display flourish untouched
+          status: pass
+        - name: 'set(0) awards no extra life at score 0 (check_extra_life: new_threshold 0 not > previous); editor still shows 0'
+          status: pass
+        - name: cmake --build build zero-warning; ctest 61/61 (test_editor_entry_resets_score_display asserts score_system_get==0, still true); only src/game_modes.c changed
+          status: pass

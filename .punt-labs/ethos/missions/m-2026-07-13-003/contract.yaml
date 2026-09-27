@@ -1,0 +1,27 @@
+mission_id: m-2026-07-13-003
+status: closed
+type: implement
+created_at: "2026-07-13T00:19:07Z"
+updated_at: "2026-07-13T00:25:00Z"
+closed_at: "2026-07-13T00:25:00Z"
+leader: claude
+worker: jdc
+evaluator:
+    handle: jck
+    pinned_at: "2026-07-13T00:19:07Z"
+    hash: 40cbe1204f644c77e6a26757a9b855e3298be267025e806d425bfdea99054f18
+inputs: {}
+write_set:
+    - src/game_modes.c
+success_criteria:
+    - 'Gate mode_game_enter''s play-test-init branch (src/game_modes.c:222) on BOTH: `if (ctx->play_test_active && prev == SDL2ST_EDIT)` so the one-time game setup (lives_left=3, paddle HUGE, ball reset, ammo=MAX, title sticky) runs ONLY on the initial editor->play-test entry, never on a re-entry into SDL2ST_GAME during play-test.'
+    - 'Rewrite the comment (currently claims prev==SDL2ST_EDIT and play_test_active are ''provably equivalent''): explain that this one-time init is scoped to the initial EDIT->GAME entry via prev==SDL2ST_EDIT, while ctx->play_test_active persists across the session for the per-tick guards in game_rules — the two conditions are NOT equivalent for re-entry, which is exactly why both are needed here.'
+    - Verify the initial play-test entry still fully initializes (prev IS SDL2ST_EDIT on that transition, set by editor_cb_on_playtest_start before the SDL2ST_GAME transition), so no behavior change for the normal play-test start.
+    - Do NOT change the game_rules guards (they correctly use play_test_active alone — per-tick, must persist) or the mode_edit_enter guard-split. Only mode_game_enter's init-branch condition + comment.
+    - cmake --build build zero-warning under -Werror -Wconversion -Wshadow; ctest --test-dir build stays 61/61 (the play-test tests enter EDIT->GAME with prev==EDIT, so they still exercise the init); only src/game_modes.c changes.
+budget:
+    rounds: 2
+    reflection_after_each: true
+current_round: 1
+context: |
+    PR #180 review (Copilot, src/game_modes.c:222). Stage 3's optional cleanup changed mode_game_enter's play-test-init branch from `prev == SDL2ST_EDIT` to `ctx->play_test_active` alone. The in-code comment claims they are "provably equivalent" — TRUE only for the initial EDIT->GAME entry, FALSE for re-entry: play_test_active stays true the whole play-test session, so any GAME -> (dialogue or pause) -> GAME re-entry would re-run this block and reinitialize lives_left=3, paddle HUGE, balls, ammo mid-play-test. The correct scoping for a ONE-TIME entry init is prev == SDL2ST_EDIT; play_test_active is the right tool only for the persistent per-tick guards (game_rules). This is a correctness/robustness fix + a misleading-comment fix. Part of fix/playtest-fidelity.
