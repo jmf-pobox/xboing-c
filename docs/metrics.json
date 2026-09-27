@@ -10,8 +10,9 @@
   "work_span": {
     "first_commit": "2025-11-26",
     "last_commit": "2026-09-26",
-    "approx_months": 10,
-    "cmd": "git log --reverse --format=%as origin/master | head -1 ; git log -1 --format=%as origin/master"
+    "active_days": 54,
+    "_note": "active_days = distinct calendar days with at least one commit on master. This was a part-time project, so elapsed months overstate effort; active development days is the meaningful figure.",
+    "cmd": "git log origin/master --format=%as | sort -u | wc -l"
   },
   "git": {
     "merged_prs": { "value": 208, "cmd": "git log origin/master --oneline | grep -cE '\\(#[0-9]+\\)'" },

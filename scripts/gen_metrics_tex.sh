@@ -26,7 +26,7 @@ j() { jq -r "$1" "$src"; }
     printf '\\newcommand{\\MetricVersion}{%s}\n'        "$(j '.version.value')"
     printf '\\newcommand{\\MetricFirstCommit}{%s}\n'    "$(j '.work_span.first_commit')"
     printf '\\newcommand{\\MetricLastCommit}{%s}\n'     "$(j '.work_span.last_commit')"
-    printf '\\newcommand{\\MetricMonths}{%s}\n'         "$(j '.work_span.approx_months')"
+    printf '\\newcommand{\\MetricActiveDays}{%s}\n'     "$(j '.work_span.active_days')"
     printf '\\newcommand{\\MetricMergedPRs}{%s}\n'      "$(group "$(j '.git.merged_prs.value')")"
     printf '\\newcommand{\\MetricCommits}{%s}\n'        "$(group "$(j '.git.commits_on_master.value')")"
     printf '\\newcommand{\\MetricADRs}{%s}\n'           "$(group "$(j '.adrs.total.value')")"

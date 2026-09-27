@@ -28,25 +28,11 @@
     \large and Formal Methods
 }
 \author{XBoing Modernization Project}
-\date{September 2026 — Revision 1.0}
+\date{September 2026}
 
 \begin{document}
 \maketitle
 \sloppy % path-heavy technical prose; prefer loose spacing over overfull boxes
-
-% --- Revision History --------------------------------------------------------
-\begin{table}[h]
-\centering
-\caption{Revision History}
-\label{tab:revisions}
-\begin{tabularx}{\textwidth}{llX}
-\toprule
-\textbf{Rev} & \textbf{Date} & \textbf{Description} \\
-\midrule
-1.0 & 2026-09-27 & Initial comprehensive case study covering the modernization through release 1.0.11 \\
-\bottomrule
-\end{tabularx}
-\end{table}
 
 \begin{abstract}
 \noindent
@@ -160,7 +146,7 @@ as code lines (\code{cloc}, excluding comments and blanks); raw
 \toprule
 \textbf{Metric} & \textbf{Value} \\
 \midrule
-Work span                         & \MetricFirstCommit{} → \MetricLastCommit{} ($\approx$\MetricMonths{} months) \\
+Active development                 & \MetricActiveDays{} days (part-time, \MetricFirstCommit{} → \MetricLastCommit{}) \\
 Merged pull requests              & \MetricMergedPRs{} \\
 Commits on \code{master}          & \MetricCommits{} \\
 Architecture Decision Records     & \MetricADRs{} \\
@@ -438,9 +424,9 @@ honest retrospective matters as much as the wins.
 
 \begin{itemize}[nosep]
   \item \textbf{Documentation drift.} The retrospective docs froze at the
-        February ``100\% complete'' milestone and did not track the seven
-        further months of work; this very report is the correction. The
-        lesson: a single machine-readable metrics source
+        February ``100\% complete'' milestone and did not track the large
+        body of work that landed after it; this very report is the
+        correction. The lesson: a single machine-readable metrics source
         (\filename{docs/metrics.json}) beats prose numbers that silently
         rot.
   \item \textbf{The traceability tool's own bug.} The trailer-stamping
