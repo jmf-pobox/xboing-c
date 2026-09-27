@@ -506,19 +506,112 @@ jobs:
             "$TARBALL_SHA256" \
             "$tap_path/Formula/xboing.rb"
 
-      - name: Build the bottle
+      - name: Build the bottle from source (creates the keg `brew bottle` packages)
+        run: |
+          set -euo pipefail
+          # `--build-bottle` forces FormulaInstaller#pour_bottle? to return
+          # false unconditionally (formula_installer.rb: `return false if
+          # ... build_bottle? ...`), so this step cannot pour even if a
+          # bottle existed. Assert the resulting receipt agrees, using
+          # Homebrew's own structured record of the fact
+          # (Tab#poured_from_bottle, written at formula_installer.rb:1701)
+          # rather than parsing free-text ohai/oh1 log lines — the generic
+          # "==> Installing ..." header fires for both a pour and a source
+          # build, so it cannot discriminate between them.
+          brew install --build-bottle jmf-pobox/xboing-ci/xboing
+          poured="$(brew info --json=v2 jmf-pobox/xboing-ci/xboing | jq -r '.formulae[0].installed[0].poured_from_bottle')"
+          if [ "$poured" != "false" ]; then
+            echo "::error::expected a from-source build here (--build-bottle disables pouring) but the install receipt says poured_from_bottle=$poured" >&2
+            exit 1
+          fi
+
+      - name: Generate the bottle tarball + JSON from the just-built keg
         env:
           GH_REPO: ${{ github.repository }}
           REF_NAME: ${{ github.ref_name }}
         run: |
           set -euo pipefail
-          brew install --build-bottle jmf-pobox/xboing-ci/xboing
           # --root-url points the embedded download URL at where `publish`
           # (job 2) already created the Release — the bottle-notes job
           # below (needs: bottle) uploads these same files there next.
           brew bottle --json --no-rebuild \
             --root-url="https://github.com/${GH_REPO}/releases/download/${REF_NAME}" \
             jmf-pobox/xboing-ci/xboing
+
+      - name: Uninstall the source build + the build-only toolchain
+        run: |
+          set -euo pipefail
+          # Remove the keg the source build produced above — the next step
+          # pours the bottle tarball fresh, so this proves the pour (not
+          # some leftover from the from-source install) is what's tested.
+          brew uninstall jmf-pobox/xboing-ci/xboing
+          # Remove the BUILD-ONLY deps (packaging/homebrew/xboing.rb's
+          # `depends_on "cmake" => :build` / `"pkg-config" => :build`).
+          # Deliberately does NOT remove sdl2/sdl2_image/sdl2_mixer/
+          # sdl2_ttf — those are runtime depends_on lines, not build-only,
+          # and xboing legitimately needs their shared libraries at
+          # startup. If pouring + running still works with cmake and
+          # pkg-config gone, that is the no-toolchain-needed proof: a
+          # bottle install cannot be secretly falling back to a source
+          # build, because the tools a source build would need are absent.
+          brew uninstall cmake pkg-config
+
+          # Assert they're actually gone rather than trusting `uninstall`'s
+          # exit code alone — this is the NO-TOOLCHAIN PROOF's setup half;
+          # the "Verify the poured binary" step re-checks this again right
+          # before running the binary, so a dependency silently reinstalling
+          # one of these (e.g. as another formula's build dep) is caught.
+          for build_only in cmake pkg-config; do
+            if brew list --formula "$build_only" >/dev/null 2>&1; then
+              echo "::error::$build_only is still installed after 'brew uninstall' — the no-toolchain proof below would be meaningless" >&2
+              exit 1
+            fi
+          done
+
+      - name: Pour the bottle directly from the local tarball
+        run: |
+          set -euo pipefail
+          bottle_file="$(ls ./*.bottle.tar.gz)"
+          echo "Pouring: $bottle_file"
+          brew install "$bottle_file" 2>&1 | tee pour.log
+          # THE pour assertion (team-lead requirement #1): brew's own log
+          # must say it poured a bottle, not that it built from source. A
+          # test that can pass on a source-build fallback is not a bottle
+          # test — this is what makes it one.
+          if ! grep -qE '^==> Pouring .*\.bottle\.tar\.gz' pour.log; then
+            echo "::error::expected '==> Pouring ...bottle.tar.gz' in brew's install log — got a source build (or unrecognized log wording) instead:" >&2
+            cat pour.log >&2
+            exit 1
+          fi
+          # Cross-check against Homebrew's own structured receipt rather
+          # than trusting free-text log wording alone (`brew install
+          # <local .bottle.tar.gz path>` loads via Formulary's
+          # FromBottleLoader, which is architecturally guaranteed to pour —
+          # see formulary.rb `get_formula` / formula_installer.rb:1701 —
+          # but assert it explicitly so this fails loudly, not silently,
+          # if that assumption ever stops holding).
+          poured="$(brew info --json=v2 jmf-pobox/xboing-ci/xboing | jq -r '.formulae[0].installed[0].poured_from_bottle')"
+          if [ "$poured" != "true" ]; then
+            echo "::error::brew's install receipt says poured_from_bottle=$poured after installing a local bottle tarball — this should be impossible; investigate before trusting this bottle" >&2
+            exit 1
+          fi
+
+      - name: Verify the poured binary (arch, version, headless launch)
+        env:
+          EXPECT_VERSION: ${{ needs.build.outputs.version }}
+        run: |
+          set -euo pipefail
+          # NO-TOOLCHAIN PROOF, second half: re-confirm cmake/pkg-config are
+          # still absent right before running the binary, so this check
+          # covers the whole pour-to-launch window, not just the moment
+          # right after uninstalling them.
+          for build_only in cmake pkg-config; do
+            if brew list --formula "$build_only" >/dev/null 2>&1; then
+              echo "::error::$build_only reappeared before the binary ran — a bottle pour must not need the build toolchain" >&2
+              exit 1
+            fi
+          done
+          packaging/homebrew/verify-bottle.sh "$EXPECT_VERSION" xboing
 
       - name: Upload bottle tarball + JSON to the Release
         env:
