@@ -281,11 +281,11 @@ format: ## Apply clang-format in-place to src/*.c and include/*.h.
 format-check: ## Check formatting without modifying files (mirrors lint.yml clang-format job).
 	clang-format --dry-run --Werror src/*.c include/*.h
 
-docs-gen: ## Regenerate derived LaTeX (docs/adr_table.tex from DESIGN.md, docs/metrics.tex from metrics.json).
+docs-gen: ## Regenerate derived LaTeX (docs/adr_table.tex from DESIGN.md, docs/metrics.tex from metrics.json; needs jq).
 	scripts/gen_adr_table.sh
 	scripts/gen_metrics_tex.sh
 
-docs-pdf: docs-gen ## Regenerate derived tables then compile the three report PDFs (needs pdflatex + bibtex).
+docs-pdf: docs-gen ## Regenerate derived tables then compile the three report PDFs (needs jq, pdflatex + bibtex).
 	cd docs && pdflatex -interaction=nonstopmode -halt-on-error MODERNIZATION_CASE_STUDY.tex >/dev/null && bibtex MODERNIZATION_CASE_STUDY >/dev/null && pdflatex -interaction=nonstopmode -halt-on-error MODERNIZATION_CASE_STUDY.tex >/dev/null && pdflatex -interaction=nonstopmode -halt-on-error MODERNIZATION_CASE_STUDY.tex >/dev/null
 	cd docs && pdflatex -interaction=nonstopmode -halt-on-error ARCHITECTURE_MODERN.tex >/dev/null && pdflatex -interaction=nonstopmode -halt-on-error ARCHITECTURE_MODERN.tex >/dev/null
 	cd docs && pdflatex -interaction=nonstopmode -halt-on-error ARCHITECTURE_LEGACY.tex >/dev/null && pdflatex -interaction=nonstopmode -halt-on-error ARCHITECTURE_LEGACY.tex >/dev/null
