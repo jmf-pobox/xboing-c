@@ -3,6 +3,15 @@
 > Architecture and implementation changes for rewriting XBoing as a modern Linux game
 > with distro-quality packaging, while preserving the original gameplay experience.
 
+**Status: superseded forward plan.** This is the original modernization
+plan, written before implementation. It has been realized, but not always
+as predicted — the build system is CMake (not Meson), and persistence uses
+JSON/TOML (not SQLite). For what was actually built and why, see
+`docs/MODERNIZATION_CASE_STUDY.tex` (the method and outcomes),
+`docs/INTEGRATION_ROADMAP.md` (the phase-by-phase record), and
+`docs/DESIGN.md` (ADR-001 onward). This document is retained as a
+historical planning artifact.
+
 ---
 
 ## Table of Contents

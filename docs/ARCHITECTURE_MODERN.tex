@@ -59,7 +59,7 @@
     \large For AI-Assisted Legacy Modernization Research
 }
 \author{XBoing Modernization Project}
-\date{March 2026 — Revision 1.0}
+\date{September 2026 — Revision 1.1}
 
 \begin{document}
 \maketitle
@@ -74,6 +74,7 @@
 \textbf{Rev} & \textbf{Date} & \textbf{Description} \\
 \midrule
 1.0 & 2026-03-24 & Initial architecture document covering completed modernization \\
+1.1 & 2026-09-27 & Fact-check against release 1.0.11: ADR summary extended to \adref{074}; CI workflow count corrected to five; cross-reference to the modernization case study added \\
 \bottomrule
 \end{tabularx}
 \end{table}
@@ -87,6 +88,8 @@
 % =============================================================================
 
 XBoing is a breakout/blockout game originally written by Justin C.\ Kibell in 1993--1996 for X11 using raw Xlib, XPM pixmaps, and a fork/pipe audio architecture. The modernization replaces all platform dependencies with SDL2 while preserving the original gameplay, physics, scoring, and level format. The result is a Linux game that builds with standard SDL2 packages, follows FHS and XDG conventions, and plays identically to the original.
+
+This document describes the \emph{architecture} of the modern codebase. For the project's \emph{method} --- how the modernization was carried out with LLM agents, ethos mission contracts, and z-spec formal methods --- see the companion case study \filename{docs/MODERNIZATION\_CASE\_STUDY.tex}.
 
 \subsection{Modernization Principles}
 \label{sec:principles}
@@ -1063,7 +1066,7 @@ Not registered as ctest targets (they run indefinitely). Manually invoked: \code
 \label{sec:cicd}
 % =============================================================================
 
-Three GitHub Actions workflows. \code{test.yml} and \code{lint.yml} run on every push to \code{master} and every PR. \code{docs.yml} is path-filtered to Markdown files (\code{**/*.md}).
+Five GitHub Actions workflows. \code{test.yml} and \code{lint.yml} run on every push to \code{master} and every PR; \code{docs.yml} is path-filtered to Markdown files (\code{**/*.md}). Two further workflows, \code{release.yml} (Debian package builds) and \code{biff-notify.yml} (team notifications), are not build or lint gates.
 
 \begin{figure}[h]
 \centering
@@ -1293,6 +1296,43 @@ All ADRs are recorded in \filename{docs/DESIGN.md}. \Cref{tab:adrs} summarizes e
 035 & Accepted & cppcheck & cppcheck pass across entire codebase. \\
 036 & Accepted & clang-tidy & clang-tidy pass with \filename{.clang-tidy} configuration. \\
 037 & Accepted & paths & Asset directory resolution for installed binaries. \\
+038 & Accepted & savegame & Save/load v2 mid-flight ball resume; deliberate deviation from the original's reset-to-paddle. \\
+039 & Accepted & bonus & Bonus screen visual fidelity: trust the goldens, not the source. \\
+040 & Accepted & bonus & Bonus coin count synced once at mode entry, not per pickup. \\
+041 & Accepted & highscore & Multi-user global high scores via setgid-games + flock. \\
+042 & Accepted & game\_rules & \code{game\_active} is the score-submission gate, not a death sentinel. \\
+043 & Accepted & bonus & Bonus renderer reads captured env, not live \code{ctx}. \\
+044 & Accepted & game\_rules & Failed level load ends the game via HIGHSCORE, not ShutDown. \\
+045 & Accepted & ball\_system & Warp-speed velocity table; documented deviation from the 1996 formula. \\
+046 & Superseded & paths & macOS shared high-score path via \code{/Users/Shared}; superseded by \adref{047}. \\
+047 & Accepted & highscore & Machine leaderboard is Debian-only; macOS shared board dropped. \\
+048 & Proposed & highscore & Leaderboard provider interface. \\
+049 & Accepted & audio & Sound on by default; deviation from the original. \\
+050 & Accepted & bonus & Bonus interstitial predicts placement on the board the player competes on. \\
+051 & Accepted & sdl2\_cursor & Faithful editor cursors from the X11 cursor font. \\
+052 & Accepted & sdl2\_cursor & Every mode sets its cursor; plain arrow on menu/attract screens. \\
+053 & Accepted & sdl2\_input & Attract \code{space} once-per-frame; title \code{space} opens instructions. \\
+054 & Accepted & highscore & Attract high-score screen falls back to the personal board when the global board is empty. (z-spec \code{SafeHighscore}) \\
+055 & Accepted & game\_rules & \code{game\_active} cleared on entering the title, closing the game-over leak into attract. (z-spec \code{SafeAttract}) \\
+056 & Accepted & game\_rules & A failed level load refuses GAME and returns to the title. (z-spec \code{SafeGame}) \\
+057 & Accepted & editor & Editor widens the logical canvas and window in lockstep. \\
+058 & Accepted & editor & Editor erase reachable without a middle mouse button. \\
+059 & Accepted & editor & Editor async dialogue mechanism. \\
+060 & Accepted & editor & In-list palette highlight removed. \\
+061 & Accepted & editor & Digit-key and arrow-key palette selectors. \\
+062 & Accepted & editor & Editor file-error handling shows a message and continues instead of exiting. \\
+063 & Accepted & game\_render & Ammo belt draws the raw count so it can't desync from the bonus. (z-spec \filename{bullet\_ammo.tex}) \\
+064 & Accepted & level\_system & The level title is single-source across load, edit, and save. \\
+065 & Accepted & editor & Play-test detection uses a dedicated flag, not previous-mode inference. \\
+066 & Accepted & editor & Play-test board round-trip uses in-memory savegame capture/restore. \\
+067 & Accepted & ball\_system & \code{DeadBall} fidelity, play-test Q, and score-display leak. \\
+068 & Accepted & paths & Asset resolution consults the compiled install prefix. \\
+069 & Accepted & block\_system & Mid-play special-block spawner throttled like the original. \\
+070 & Accepted & block\_system & Roamer and drop blocks move; direction mapping drops a 1996 bug. \\
+071 & Accepted & sdl2\_loop & Gameplay frame$\to$tick mapping is 1:1; the $\approx$22.5\,s auto-launch is faithful, not a bug. \\
+072 & Accepted & sdl2\_cli & \code{-debug} functional; the \code{=} skip-level cheat restored. \\
+073 & Accepted & game\_rules & Using the \code{=} skip-level cheat disqualifies the session from all high-score boards. \\
+074 & Accepted & block\_system & Explosion timer uses \code{>=}; skip-level sweep moved into \modulename{block\_system}. \\
 
 \end{longtable}
 
