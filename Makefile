@@ -129,7 +129,7 @@ uninstall: ## Best-effort uninstall using install_manifest.txt.
 # isn't installed, so the configure step stops.  Take Homebrew out of PATH
 # for the package build only -- everything else still uses it.
 DEB_PATH := $(shell printf '%s' "$$PATH" | tr ':' '\n' \
-              | grep -v -i -e linuxbrew -e homebrew | paste -sd:)
+              | grep -v -i -e linuxbrew -e homebrew | paste -s -d ':' -)
 DEB_PATH := $(if $(DEB_PATH),$(DEB_PATH),/usr/local/bin:/usr/bin:/bin)
 
 deb: ## Build a Debian package via dpkg-buildpackage (.deb lands in ../).
