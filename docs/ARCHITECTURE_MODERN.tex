@@ -1026,7 +1026,7 @@ Not registered as ctest targets (they run indefinitely). Manually invoked: \code
 \label{sec:cicd}
 % =============================================================================
 
-Five GitHub Actions workflows. \code{test.yml} and \code{lint.yml} run on every push to \code{master} and every PR; \code{docs.yml} is path-filtered to Markdown files (\code{**/*.md}). Two further workflows, \code{release.yml} (Debian package builds) and \code{biff-notify.yml} (team notifications), are not build or lint gates.
+Four GitHub Actions workflows. \code{test.yml} and \code{lint.yml} run on every push to \code{master} and every PR; \code{docs.yml} is path-filtered to Markdown files (\code{**/*.md}). One further workflow, \code{release.yml} (Debian package builds), is not a build or lint gate.
 
 \begin{figure}[h]
 \centering

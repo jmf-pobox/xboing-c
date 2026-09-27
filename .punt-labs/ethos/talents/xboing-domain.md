@@ -116,6 +116,6 @@ reader can see the original code, not just trust the citation.
 - `original/` — **canonical 1996 source — read this first**
 - `docs/SPECIFICATION.md` — comprehensive technical spec of every
   subsystem
-- `docs/MODERNIZATION.md` — from-to architectural plan
+- `docs/ARCHITECTURE_MODERN.tex` — from-to architecture of the modern port
 - `levels/*.data` — canonical level designs
 - `original/docs/` — original 1996 documentation

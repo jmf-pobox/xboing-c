@@ -117,7 +117,7 @@ for short effects; OGG for music.
 ## Reference
 
 - `docs/SPECIFICATION.md` — sections 2 (graphics), 3 (audio), 15 (UI)
-- `docs/MODERNIZATION.md` — full from/to plan
+- `docs/ARCHITECTURE_MODERN.tex` — full from/to architecture of the modern port
 - `original/audio/LINUXaudio.c` — 1996 audio driver (canonical reference)
 - `original/init.c` — 1996 X11 display/window/colormap setup
 - `src/sdl2_audio.c` — modernized audio subsystem (SDL2_mixer-based)

@@ -59,7 +59,7 @@
     "png_sprites": { "value": 181, "note": "reconciles the 48-vs-188 discrepancy; count is approximate to glob", "cmd": "find . -path ./original -prune -o -name '*.png' -print | grep -iE 'image|sprite|bitmap|blocks|balls' | wc -l" },
     "block_types": 30,
     "grid": "18x9",
-    "workflows": { "value": 5, "note": "ARCHITECTURE_MODERN.tex says 3; actual = 5", "files": ["test.yml", "lint.yml", "docs.yml", "release.yml", "biff-notify.yml"], "cmd": "ls .github/workflows/*.yml" }
+    "workflows": { "value": 4, "note": "committed workflows in .github/workflows/", "files": ["test.yml", "lint.yml", "docs.yml", "release.yml"], "cmd": "git ls-tree --name-only origin/master .github/workflows/" }
   },
   "ethos": {
     "ledger_entries": { "value": 113, "cmd": "wc -l .punt-labs/ethos/missions.jsonl" },
