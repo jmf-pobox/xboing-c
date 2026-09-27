@@ -43,7 +43,7 @@ XBoing is a classic X11 breakout/blockout game (1993-1996, Justin C. Kibell) mod
 **Reference documents:**
 
 - `docs/SPECIFICATION.md` — technical spec of all 16 subsystems
-- `docs/MODERNIZATION.md` — from-to architectural changes for SDL2
+- `docs/MODERNIZATION_CASE_STUDY.tex` — agentic modernization case study (method, tooling, outcomes)
 - `docs/DESIGN.md` — append ADRs here for non-trivial decisions
 
 ## Operating Principles

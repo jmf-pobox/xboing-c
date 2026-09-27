@@ -71,9 +71,9 @@ This is an incremental modernization, not a rewrite. The 1996 Xlib sources stay 
 
 For deeper detail:
 
-- [`docs/MODERNIZATION_CASE_STUDY.tex`](docs/MODERNIZATION_CASE_STUDY.tex) — case study of the agentic modernization method (LLM agents, ethos mission contracts, z-spec formal methods). Compile with `pdflatex`.
+- [`docs/MODERNIZATION_CASE_STUDY.tex`](docs/MODERNIZATION_CASE_STUDY.tex) — case study of the agentic modernization method (LLM agents, ethos mission contracts, z-spec formal methods). Build the PDF with `make docs-pdf`.
 - [`docs/SPECIFICATION.md`](docs/SPECIFICATION.md) — full technical spec of the original game's 16 subsystems.
-- [`docs/MODERNIZATION.md`](docs/MODERNIZATION.md) — from-to architectural changes.
+- [`docs/ARCHITECTURE_MODERN.tex`](docs/ARCHITECTURE_MODERN.tex) — from-to architectural changes and the modern codebase architecture.
 - [`docs/INTEGRATION_ROADMAP.md`](docs/INTEGRATION_ROADMAP.md) — phase-by-phase port plan.
 - [`docs/DESIGN.md`](docs/DESIGN.md) — architecture decision records.
 

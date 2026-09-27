@@ -4,56 +4,22 @@
 % methods for modernizing legacy code, with emphasis on the punt-labs
 % tooling used here (ethos mission contracts, z-spec formal methods).
 %
-% Numbers in this document are sourced from docs/metrics.json (the
-% machine-readable single source of truth). Regenerate that file and
-% reconcile before editing figures here. Build: pdflatex twice (TOC/refs).
-% There is no make target or CI job for LaTeX; compile by hand and commit
-% the PDF alongside the source, matching docs/ARCHITECTURE_*.tex.
+% Figures come from docs/metrics.tex (\Metric* macros), generated from
+% docs/metrics.json — never hand-edit numbers here; edit the JSON. The ADR
+% table comes from docs/adr_table.tex, generated from docs/DESIGN.md.
+% Build everything (regenerate the derived tables + compile all report PDFs)
+% with `make docs-pdf`. Commit the .tex, the generated tables, and the PDFs
+% together.
 
 \documentclass[11pt,a4paper]{article}
 
-% --- Packages ---------------------------------------------------------------
-\usepackage[utf8]{inputenc}
-\usepackage[T1]{fontenc}
-\usepackage{microtype}
-\usepackage[margin=2.5cm]{geometry}
-\usepackage{booktabs, tabularx, longtable}
-\usepackage{tikz}
-\usetikzlibrary{arrows.meta, positioning, shapes.geometric, calc, fit, backgrounds}
-\usepackage{amsmath}
-\usepackage[colorlinks=true, linkcolor=blue!70!black, urlcolor=blue!70!black, citecolor=blue!70!black]{hyperref}
-\usepackage{cleveref}
-\usepackage{enumitem}
-\usepackage{listings}
-\usepackage{xcolor}
-\usepackage{parskip}
-\usepackage[htt]{hyphenat} % allow hyphenation/breaking inside \texttt paths
+% Shared preamble (packages, macros, listings style) — see docs/xboing-doc.sty
+\usepackage{xboing-doc}
 
-% --- Custom commands ---------------------------------------------------------
-\newcommand{\adref}[1]{ADR-#1}
-\newcommand{\code}[1]{\texttt{#1}}
-\newcommand{\modulename}[1]{\texttt{#1}}
-\newcommand{\filename}[1]{\texttt{#1}}
-\newcommand{\funcname}[1]{\texttt{#1}}
-\newcommand{\missionid}[1]{\texttt{#1}}
-
-% --- Listings style ----------------------------------------------------------
-\lstdefinestyle{plainstyle}{
-    basicstyle=\ttfamily\small,
-    keywordstyle=\color{blue!70!black}\bfseries,
-    commentstyle=\color{green!50!black},
-    stringstyle=\color{red!60!black},
-    frame=single,
-    breaklines=true,
-    columns=fullflexible,
-    tabsize=2,
-    showstringspaces=false,
-}
-\lstset{style=plainstyle}
-
-% cleveref needs an explicit name for listings float references
-\crefname{lstlisting}{Listing}{Listings}
-\Crefname{lstlisting}{Listing}{Listings}
+% Project figures, generated from docs/metrics.json by
+% scripts/gen_metrics_tex.sh. Never hand-edit metrics here — edit the JSON
+% and regenerate so every figure stays in sync with its source.
+\input{metrics.tex}
 
 % --- Title -------------------------------------------------------------------
 \title{%
@@ -188,30 +154,30 @@ as code lines (\code{cloc}, excluding comments and blanks); raw
 
 \begin{table}[h]
 \centering
-\caption{Project metrics at release 1.0.11 (snapshot: \code{origin/master})}
+\caption{Project metrics at release \MetricVersion{} (snapshot: \code{origin/master})}
 \label{tab:metrics}
 \begin{tabularx}{\textwidth}{Xr}
 \toprule
 \textbf{Metric} & \textbf{Value} \\
 \midrule
-Work span                         & 2025-11-26 → 2026-09-26 ($\approx$10 months) \\
-Merged pull requests              & 208 \\
-Commits on \code{master}          & 354 \\
-Architecture Decision Records     & 74 \\
-Modern source (\filename{src/})   & 19{,}820 code lines / 47 files \\
-Modern headers (\filename{include/}) & 2{,}993 code lines / 51 files \\
-Test code (\filename{tests/})     & 21{,}742 code lines / 66 files \\
-Legacy reference (\filename{original/}) & 15{,}405 code lines / 32 \code{.c} files \\
-\code{cmocka} test cases          & 1{,}337 \\
-CTest suites                      & 51 \\
-Issues (beads) closed / total     & 240 / 261 \\
-Playable levels                   & 80 \\
+Work span                         & \MetricFirstCommit{} → \MetricLastCommit{} ($\approx$\MetricMonths{} months) \\
+Merged pull requests              & \MetricMergedPRs{} \\
+Commits on \code{master}          & \MetricCommits{} \\
+Architecture Decision Records     & \MetricADRs{} \\
+Modern source (\filename{src/})   & \MetricSrcLines{} code lines / \MetricSrcFiles{} files \\
+Modern headers (\filename{include/}) & \MetricHdrLines{} code lines / \MetricHdrFiles{} files \\
+Test code (\filename{tests/})     & \MetricTestLines{} code lines / \MetricTestFiles{} files \\
+Legacy reference (\filename{original/}) & \MetricLegacyLines{} code lines / \MetricLegacyFiles{} \code{.c} files \\
+\code{cmocka} test cases          & \MetricCmockaCases{} \\
+CTest suites                      & \MetricCtestSuites{} \\
+Issues (beads) closed / total     & \MetricBeadsClosed{} / \MetricBeadsTotal{} \\
+Playable levels                   & \MetricLevels{} \\
 \bottomrule
 \end{tabularx}
 \end{table}
 
 Two ratios are worth calling out. The test suite is larger than the code it
-exercises: 21{,}742 code lines of tests against 19{,}820 of modern source,
+exercises: \MetricTestLines{} code lines of tests against \MetricSrcLines{} of modern source,
 a ratio of $\approx$1.1:1 (1.2:1 by raw line count). And the modern
 codebase is larger than the 1996 original it reproduces --- the safety
 apparatus (opaque contexts, injected callbacks, exhaustive tests) costs
@@ -270,7 +236,7 @@ each concern (\cref{tab:personas}).
 
 \subsection{Scale}
 
-Across the project, 107 closed missions are recorded in the tracked ledger
+Across the project, \MetricClosedMissions{} closed missions are recorded in the tracked ledger
 \filename{.punt-labs/ethos/missions.jsonl}. By archetype: 100
 \emph{implement}, 6 \emph{design}, 2 \emph{investigate}, 1 \emph{report}.
 The worker$\to$evaluator pairings that actually ran show the specialist

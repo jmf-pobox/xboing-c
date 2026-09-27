@@ -1,5 +1,5 @@
 {
-  "_comment": "Machine-consumable single source of truth for XBoing project metrics. Data only; not for human prose. Regenerate with the command in each field's 'cmd'. Consumed by docs/MODERNIZATION_CASE_STUDY.tex and other docs so figures never diverge. Snapshot basis: origin/master.",
+  "_comment": "Machine-consumable single source of truth for XBoing project metrics. Data only; not for human prose. Regenerate each field with its 'cmd'. Consumed mechanically: scripts/gen_metrics_tex.sh turns this into docs/metrics.tex (LaTeX \\Metric* macros) which the reports \\input, so updating this file and recompiling propagates every figure. Snapshot basis: origin/master.",
   "generated_at": "2026-09-27",
   "snapshot_ref": "origin/master @ 659c717",
   "version": {

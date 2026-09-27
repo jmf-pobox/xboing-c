@@ -4,30 +4,11 @@
 
 \documentclass[11pt,a4paper]{article}
 
-% --- Encoding and typography ---
-\usepackage[utf8]{inputenc}
-\usepackage[T1]{fontenc}
-\usepackage{microtype}
-\usepackage{lmodern}
+% Shared preamble (packages, macros, listings style) — see docs/xboing-doc.sty
+\usepackage{xboing-doc}
 
-% --- Layout ---
-\usepackage[margin=2.5cm]{geometry}
-\usepackage[colorlinks=true,linkcolor=blue!60!black,citecolor=blue!60!black,urlcolor=blue!60!black]{hyperref}
-\usepackage{amsmath}
-\usepackage{cleveref}
-
-% --- Tables ---
-\usepackage{booktabs}
-\usepackage{tabularx}
-\usepackage{longtable}
-\usepackage{array}
-
-% --- Lists ---
-\usepackage{enumitem}
+% Legacy-specific list spacing and a C-source listings style.
 \setlist{nosep,leftmargin=1.5em}
-
-% --- Code ---
-\usepackage{listings}
 \lstset{
   language=C,
   basicstyle=\ttfamily\small,
@@ -45,18 +26,6 @@
   belowskip=6pt,
   columns=flexible,
 }
-
-% --- TikZ ---
-\usepackage{tikz}
-\usetikzlibrary{arrows.meta,positioning,shapes.geometric,calc,fit,backgrounds}
-
-% --- Custom commands ---
-\newcommand{\code}[1]{\texttt{#1}}
-\newcommand{\file}[1]{\texttt{#1}}
-\newcommand{\func}[1]{\texttt{#1()}}
-\newcommand{\const}[1]{\texttt{#1}}
-\newcommand{\xboing}{\textsc{XBoing}}
-\newcommand{\specref}[1]{(Spec~\S#1)}
 
 % --- Title ---
 \title{\LARGE Architecture of the Legacy \xboing{} Codebase\\[6pt]
