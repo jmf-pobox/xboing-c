@@ -28,7 +28,7 @@ DPKG_INTERMEDIATES := obj-*/ debian/.debhelper debian/files debian/*.substvars \
 .PHONY: help all build configure rebuild test run \
         asan asan-build asan-test \
         clean distclean \
-        install uninstall deb deb-lint dogfood \
+        install uninstall deb deb-lint dogfood bottle \
         lint format format-check docs-gen docs-pdf \
         cppcheck cppcheck-src cppcheck-tests \
         tidy check ci \
@@ -144,6 +144,25 @@ deb: ## Build a Debian package via dpkg-buildpackage (.deb lands in ../).
 deb-lint: deb ## Build .deb + run lintian on it (Debian Policy compliance).
 	lintian ../xboing_*.deb
 	echo "lintian: clean"
+
+# Requires Homebrew (brew.sh) on PATH — macOS or Linuxbrew. Builds a bottle
+# from the CURRENT working tree's HEAD commit (via packaging/homebrew/
+# xboing.rb's `head` stanza, not a tagged release tarball), so this is for
+# local sanity-checking the formula/bottle machinery, not for producing a
+# release-quality bottle — those are built by release.yml's `bottle` job
+# against the tag tarball. Deliberately NOT part of `make check`: it needs
+# brew, mutates a local tap under $(brew --repository), and is slow.
+bottle: ## Build a local Homebrew bottle from HEAD for sanity-checking the formula (requires brew; not part of 'make check'). See docs/RELEASING.md.
+	if ! command -v brew >/dev/null 2>&1; then \
+	    echo "FAIL: brew not found on PATH — see https://brew.sh"; \
+	    exit 1; \
+	fi
+	brew tap-new --no-git jmf-pobox/xboing-local-bottle
+	cp packaging/homebrew/xboing.rb "$$(brew --repository jmf-pobox/xboing-local-bottle)/Formula/xboing.rb"
+	brew install --build-bottle --HEAD jmf-pobox/xboing-local-bottle/xboing
+	brew bottle --no-rebuild jmf-pobox/xboing-local-bottle/xboing
+	echo
+	echo "Built: $$(ls -1 ./*.bottle.tar.gz 2>/dev/null | tail -1)"
 
 original-build: ## Build the legacy 1996 Xlib binary in original/ (used for visual-fidelity reference capture).
 	$(MAKE) -C original
