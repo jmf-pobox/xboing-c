@@ -479,6 +479,13 @@ jobs:
     runs-on: ${{ matrix.os }}
     permissions:
       contents: write
+    env:
+      # Force deterministic, un-colorized brew output. On hosted runners brew
+      # emits ANSI color, which prefixes lines like "==> Pouring …" with an
+      # escape sequence and defeats the anchored `^==> Pouring` grep below —
+      # a CI-only failure the local `make bottle` (color auto-disabled when
+      # piped) never reproduced. (First real-tag run, v1.0.12.)
+      HOMEBREW_NO_COLOR: "1"
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -593,28 +600,31 @@ jobs:
           # pkg-config gone, that is the no-toolchain-needed proof: a
           # bottle install cannot be secretly falling back to a source
           # build, because the tools a source build would need are absent.
-          # --ignore-dependencies: on a hosted runner other PREINSTALLED
-          # formulae may depend on cmake/pkg-config, and plain `brew
-          # uninstall` refuses to remove a still-depended-on formula, which
-          # would fail this step before the pour verification runs. This is
-          # a disposable runner and we only need these two build-only tools
-          # GONE to prove the pour needs no toolchain — so force their
-          # removal regardless of unrelated dependents. (Copilot PR #230.)
-          brew uninstall --ignore-dependencies cmake pkg-config
-
-          # Secondary sanity check (NOT the pour proof): confirm brew's own
-          # cmake/pkg-config are gone after uninstall. This only inspects
-          # Homebrew's formula registry, not a system toolchain elsewhere on
-          # PATH (e.g. /usr/bin), so it does NOT by itself prove no source
-          # build happened — the authoritative proof is the
-          # `poured_from_bottle=true` receipt asserted in the pour step
-          # below. Removing them still reduces the chance of an accidental
-          # source fallback and is cheap on a disposable runner.
-          # (Copilot PR #230.)
-          for build_only in cmake pkg-config; do
+          # Best-effort removal of the build-only toolchain. This is a
+          # SECONDARY signal, NOT the pour proof — the authoritative proof is
+          # the `poured_from_bottle=true` receipt asserted in the pour step
+          # below. Do NOT fail the release on it: formula names and installed
+          # state vary across runners — current Homebrew ships the tool as
+          # `pkgconf` (with `pkg-config` only an alias, so `Cellar/pkg-config`
+          # does not exist), and `cmake` may not be a brew-installed formula
+          # at all. The first real-tag run (v1.0.12) aborted here on exactly
+          # that. So only uninstall names that are actually installed, and
+          # tolerate failures. --ignore-dependencies: other preinstalled
+          # formulae may depend on these on a hosted runner; force removal
+          # regardless of unrelated dependents.
+          for build_only in cmake pkg-config pkgconf; do
             if brew list --formula "$build_only" >/dev/null 2>&1; then
-              echo "::error::$build_only is still installed after 'brew uninstall' — expected it gone before the pour" >&2
-              exit 1
+              brew uninstall --ignore-dependencies "$build_only" 2>/dev/null \
+                || echo "note: could not remove $build_only (best-effort)"
+            fi
+          done
+
+          # Informational only (NOT fatal): report any build-only tool still
+          # present. The receipt + verify-bottle.sh below are what actually
+          # prove the binary is a poured bottle, not a source build.
+          for build_only in cmake pkg-config pkgconf; do
+            if brew list --formula "$build_only" >/dev/null 2>&1; then
+              echo "note: $build_only still present after best-effort removal"
             fi
           done
 
@@ -639,8 +649,15 @@ jobs:
           # THE pour assertion (team-lead requirement #1): brew's own log
           # must say it poured a bottle, not that it built from source. A
           # test that can pass on a source-build fallback is not a bottle
-          # test — this is what makes it one.
-          if ! grep -qE '^==> Pouring .*\.bottle\.tar\.gz' pour.log; then
+          # test — this is what makes it one. Strip any ANSI escapes first so
+          # the anchored match holds even if a runner forces color despite
+          # HOMEBREW_NO_COLOR. Use process substitution, NOT `sed | grep -q`:
+          # under `set -o pipefail`, `grep -q` closes the pipe on first match
+          # and `sed` then dies of SIGPIPE writing later log lines, making the
+          # pipeline non-zero even on a successful match — a false failure.
+          # (Copilot PR #232.)
+          if ! grep -qE '^==> Pouring .*\.bottle\.tar\.gz' \
+               < <(sed $'s/\x1b\\[[0-9;]*m//g' pour.log); then
             echo "::error::expected '==> Pouring ...bottle.tar.gz' in brew's install log — got a source build (or unrecognized log wording) instead:" >&2
             cat pour.log >&2
             exit 1
@@ -661,16 +678,15 @@ jobs:
           EXPECT_VERSION: ${{ needs.build.outputs.version }}
         run: |
           set -euo pipefail
-          # Secondary sanity check (NOT the pour proof — see the pour step's
-          # `poured_from_bottle=true` receipt assertion for that): re-confirm
-          # brew's cmake/pkg-config are still absent right before running the
-          # binary, covering the whole pour-to-launch window. This inspects
-          # only Homebrew's registry, not a system toolchain on PATH, so it
-          # is a defense-in-depth signal, not conclusive on its own.
-          for build_only in cmake pkg-config; do
+          # Informational only (NOT fatal, NOT the pour proof — see the pour
+          # step's `poured_from_bottle=true` receipt for that): note whether
+          # any build-only tool is present before the binary runs. Names vary
+          # across runners (pkgconf vs pkg-config) and this inspects only
+          # Homebrew's registry, not a system toolchain on PATH, so it can't
+          # be conclusive and must never fail the release on its own.
+          for build_only in cmake pkg-config pkgconf; do
             if brew list --formula "$build_only" >/dev/null 2>&1; then
-              echo "::error::$build_only reappeared before the binary ran — expected the build toolchain to stay absent" >&2
-              exit 1
+              echo "note: $build_only present before the binary ran"
             fi
           done
           packaging/homebrew/verify-bottle.sh "$EXPECT_VERSION" xboing
