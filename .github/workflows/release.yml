@@ -574,9 +574,21 @@ jobs:
       - name: Pour the bottle directly from the local tarball
         run: |
           set -euo pipefail
+          # Homebrew's Cellar keys kegs by BARE name, so an earlier keg for
+          # `xboing` can survive and get silently reused instead of poured
+          # fresh — force-remove the bare name before pouring. (Verified
+          # against Homebrew 7.x in `make bottle`; same failure mode there.)
+          brew uninstall --force xboing 2>/dev/null || true
           bottle_file="$(ls ./*.bottle.tar.gz)"
           echo "Pouring: $bottle_file"
-          brew install "$bottle_file" 2>&1 | tee pour.log
+          # HOMEBREW_DEVELOPER=1 is REQUIRED: Homebrew refuses to install a
+          # formula from a bare/relative bottle-tarball path
+          # (Formulary::FromBottleLoader short-circuits to nil) unless
+          # HOMEBREW_DEVELOPER or HOMEBREW_TESTS is set. Without it this step
+          # fails "No available formula with the name <tarball>" — verified
+          # live in `make bottle`, which uses the identical pour. Set it
+          # explicitly rather than relying on the runner's environment.
+          HOMEBREW_DEVELOPER=1 brew install "$bottle_file" 2>&1 | tee pour.log
           # THE pour assertion (team-lead requirement #1): brew's own log
           # must say it poured a bottle, not that it built from source. A
           # test that can pass on a source-build fallback is not a bottle
@@ -587,12 +599,10 @@ jobs:
             exit 1
           fi
           # Cross-check against Homebrew's own structured receipt rather
-          # than trusting free-text log wording alone (`brew install
-          # <local .bottle.tar.gz path>` loads via Formulary's
-          # FromBottleLoader, which is architecturally guaranteed to pour —
-          # see formulary.rb `get_formula` / formula_installer.rb:1701 —
-          # but assert it explicitly so this fails loudly, not silently,
-          # if that assumption ever stops holding).
+          # than trusting free-text log wording alone. `brew install
+          # <local .bottle.tar.gz path>` (with HOMEBREW_DEVELOPER set) loads
+          # via Formulary's FromBottleLoader and pours; assert it explicitly
+          # so this fails loudly, not silently, if that ever stops holding.
           poured="$(brew info --json=v2 jmf-pobox/xboing-ci/xboing | jq -r '.formulae[0].installed[0].poured_from_bottle')"
           if [ "$poured" != "true" ]; then
             echo "::error::brew's install receipt says poured_from_bottle=$poured after installing a local bottle tarball — this should be impossible; investigate before trusting this bottle" >&2
