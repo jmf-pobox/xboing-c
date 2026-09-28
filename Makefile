@@ -205,6 +205,12 @@ bottle: ## Build a Homebrew bottle from the local working tree's HEAD commit, po
 	    "$$tap_path/Formula/xboing.rb" \
 	    "$$version"
 	brew install --build-bottle jmf-pobox/xboing-local-bottle/xboing
+	# Remove any stale bottle artifacts from a prior run BEFORE bottling, so
+	# the glob below matches exactly the one this run produces — otherwise a
+	# version bump (e.g. 1.0.9 -> 1.0.11) leaves an old `*.bottle.tar.gz`
+	# that `ls | tail -1` could pick, or that makes the bare glob expand to
+	# multiple paths and break the pour. (Copilot PR #230 review.)
+	rm -f ./*.bottle.tar.gz ./*.bottle.json
 	brew bottle --no-rebuild jmf-pobox/xboing-local-bottle/xboing
 	echo
 	echo "Built: $$(ls -1 ./*.bottle.tar.gz 2>/dev/null | tail -1)"
