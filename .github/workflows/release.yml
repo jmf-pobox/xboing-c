@@ -501,6 +501,13 @@ jobs:
           # One implementation of the head->url rewrite (packaging/homebrew/
           # compose-formula.sh), shared with smoke-brew above.
           brew tap-new --no-git jmf-pobox/xboing-ci
+          # A freshly created tap's FIRST install is auto-trusted, but this
+          # job installs from this tap TWICE (the from-source build below,
+          # then the bottle pour further down) — the second install hits
+          # Homebrew's tap-trust gate ("Refusing to load formula ... from
+          # untrusted tap") without this. Verified locally (make bottle hit
+          # the identical gate on its own tap's second install).
+          brew trust --taps jmf-pobox/xboing-ci
           tap_path="$(brew --repository jmf-pobox/xboing-ci)"
           tarball_url="https://github.com/${GH_REPO}/archive/refs/tags/${REF_NAME}.tar.gz"
           packaging/homebrew/compose-formula.sh \
