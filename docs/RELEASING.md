@@ -156,6 +156,20 @@ all in `.github/workflows/release.yml`'s `bottle` job unless noted:
 unchanged by any of this — it is a fallback-path test, not a bottle
 test, and stays that way on purpose.
 
+**`packaging/homebrew/xboing.rb` (the in-repo formula) carries no
+`bottle do ... end` block, and must not.** Homebrew's `pour_bottle?`
+checks `formula.bottled?` — whether a `bottle do` tag matches the
+current platform — before it ever looks at `url`/`sha256`. A
+placeholder block with fake `sha256`/`root_url` values would make
+`brew install` on a matching platform (exactly what `smoke-brew` runs
+on `macos-14`/`ubuntu-latest`, unauthenticated, no flags) try to pour
+that fake bottle and 404 hard, with **no fallback to the source
+`url`**. Only the tap (`jmf-pobox/homebrew-xboing`, a separate repo)
+ever carries a `bottle do` block, and only after Phase 2b lands the
+real per-platform sha256s that `bottle-notes` assembled — the in-repo
+formula is source-only by design, permanently, not just until the
+first bottled release.
+
 ## Bottle baseline: what a bottle actually covers
 
 A Homebrew bottle is not portable to every machine running the same
