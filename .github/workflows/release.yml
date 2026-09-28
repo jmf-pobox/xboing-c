@@ -554,6 +554,28 @@ jobs:
           brew bottle --json --no-rebuild \
             --root-url="https://github.com/${GH_REPO}/releases/download/${REF_NAME}" \
             jmf-pobox/xboing-ci/xboing
+          # Bind the upload to EXACTLY these artifacts, captured now — before
+          # the poured binary is exercised in the verify step — and record
+          # their checksums. The upload step re-verifies the bytes and uploads
+          # by name, so a misbehaving binary that dropped or overwrote a file
+          # in the workspace cannot substitute the published asset (Cursor
+          # PR #230). A single-tag `brew bottle` writes exactly one of each.
+          shopt -s nullglob
+          tarballs=( ./*.bottle.tar.gz )
+          jsons=( ./*.bottle.json )
+          if [ "${#tarballs[@]}" -ne 1 ] || [ "${#jsons[@]}" -ne 1 ]; then
+            echo "::error::expected exactly one .bottle.tar.gz and one .bottle.json" >&2
+            printf '%s\n' ./*.bottle.* >&2
+            exit 1
+          fi
+          bottle_tarball="${tarballs[0]}"
+          bottle_json="${jsons[0]}"
+          {
+            echo "BOTTLE_TARBALL=$bottle_tarball"
+            echo "BOTTLE_JSON=$bottle_json"
+            echo "BOTTLE_TARBALL_SHA=$(shasum -a 256 "$bottle_tarball" | awk '{print $1}')"
+            echo "BOTTLE_JSON_SHA=$(shasum -a 256 "$bottle_json" | awk '{print $1}')"
+          } >> "$GITHUB_ENV"
 
       - name: Uninstall the source build + the build-only toolchain
         run: |
@@ -660,12 +682,18 @@ jobs:
           REF_NAME: ${{ github.ref_name }}
         run: |
           set -euo pipefail
+          # Re-verify the artifacts are byte-identical to what `brew bottle`
+          # wrote (before the poured binary ran) and upload them BY NAME, not
+          # a re-glob of the workspace — so nothing the binary may have
+          # touched is published. (Cursor PR #230.)
+          echo "${BOTTLE_TARBALL_SHA}  ${BOTTLE_TARBALL}" | shasum -a 256 -c -
+          echo "${BOTTLE_JSON_SHA}  ${BOTTLE_JSON}" | shasum -a 256 -c -
           # --clobber: a re-run of this job (e.g. after a flaky leg) must be
           # able to overwrite its own prior upload rather than fail the step.
           gh release upload "$REF_NAME" \
             --repo "$GH_REPO" \
             --clobber \
-            ./*.bottle.tar.gz ./*.bottle.json
+            "$BOTTLE_TARBALL" "$BOTTLE_JSON"
 
   # -------------------------------------------------------------------------
   # 7. Assemble the tap's `bottle do` block from the three per-platform JSON
@@ -739,7 +767,7 @@ jobs:
               jq -r '.[] | .bottle as $b | ($b.cellar // "") as $cellar
                 | $b.tags | to_entries[]
                 | .key as $tag | .value.sha256 as $sha
-                | ($tag | test("^[a-z0-9_]+$")) as $tag_ok
+                | ($tag | test("^(arm64_[a-z0-9]+|x86_64_linux|arm64_linux)$")) as $tag_ok
                 | ($sha | test("^[a-f0-9]{64}$")) as $sha_ok
                 | (if ($cellar | test("^:[a-z_]+$")) then "cellar: " + $cellar + ", "
                    elif ($cellar | test("^/[A-Za-z0-9/._-]+$")) then "cellar: \"" + $cellar + "\", "
