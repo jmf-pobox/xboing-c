@@ -5,7 +5,7 @@ include(GNUInstallDirs)
 # Release date shown in the man page .TH header.  A fixed ISO date (not a
 # wall-clock value) so builds stay reproducible and mandoc can parse it.
 # Bump on each release.
-set(XBOING_MAN_DATE "2026-08-30")
+set(XBOING_MAN_DATE "2026-09-28")
 
 # Export compile_commands.json for clang-tidy
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
