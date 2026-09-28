@@ -25,6 +25,16 @@ class Xboing < Formula
   license "MIT"
   head "https://github.com/jmf-pobox/xboing-c.git", branch: "master"
 
+  # Deliberately NO `bottle do ... end` block here. `formula.bottled?`
+  # (Homebrew's own pour_bottle? check) matches on tag alone, before it
+  # ever looks at url/sha256 — a placeholder block with fake shas/root_url
+  # makes brew TRY to pour a bottle that 404s, on every plain
+  # `brew install` on a matching platform (macos-14/ubuntu-latest, exactly
+  # what release.yml's smoke-brew job runs), with no source-url fallback.
+  # Only the SEPARATE tap (jmf-pobox/homebrew-xboing) carries a bottle
+  # block, and only after a human pastes the real per-platform sha256s
+  # that bottle-notes assembles from the `bottle` job's output — see
+  # docs/RELEASING.md.
   depends_on "cmake" => :build
   depends_on "pkg-config" => :build
   depends_on "sdl2"

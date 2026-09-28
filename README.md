@@ -19,6 +19,11 @@ XBoing installs with [Homebrew](https://brew.sh) on macOS and Linux:
 brew install jmf-pobox/xboing/xboing
 ```
 
+On macOS Apple Silicon and Linux (x86_64 or aarch64), this pours a
+prebuilt bottle — no compiler needed. Every other platform (e.g.
+macOS Intel) falls back to Homebrew's normal source build
+automatically.
+
 If Homebrew asks you to trust the tap, run `brew trust --formula jmf-pobox/xboing/xboing` and install again.
 
 Prefer a Debian package or a source build? See [Building](#building).

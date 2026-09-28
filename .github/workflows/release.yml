@@ -401,42 +401,16 @@ jobs:
         run: |
           set -euo pipefail
           # Compose a formula pinned to THIS tag's tarball + sha256 (not
-          # --HEAD). The in-repo formula only has a `head` stanza; awk
-          # rewrites it as a stable `url` + `sha256` pin so `brew install`
-          # (without --HEAD) exercises the exact tarball this release ships.
-          #
-          # Match `head` with flexible leading whitespace so harmless
-          # indentation edits to packaging/homebrew/xboing.rb (tabs, extra
-          # spaces, formula-reformatter) don't silently pass through with
-          # only a `head` stanza and no `url`+`sha256` — brew install
-          # (without --HEAD) would then fail with a confusing "no source"
-          # error at release time. The post-condition check below fails
-          # LOUDLY if the rewrite didn't emit url + sha256.
+          # --HEAD), via the shared script (also used by the `bottle` job
+          # below) so there is one implementation of the head->url rewrite.
           brew tap-new --no-git jmf-pobox/xboing-ci
           tap_path="$(brew --repository jmf-pobox/xboing-ci)"
           tarball_url="https://github.com/${GH_REPO}/archive/refs/tags/${REF_NAME}.tar.gz"
-          awk -v url="$tarball_url" -v sha256="$TARBALL_SHA256" '
-            /^[[:space:]]*head[[:space:]]/ {
-              # Preserve the leading indentation of the `head` line so the
-              # composed formula stays consistent with the input formula.
-              match($0, /^[[:space:]]*/)
-              indent = substr($0, 1, RLENGTH)
-              print indent "url \"" url "\""
-              print indent "sha256 \"" sha256 "\""
-              next
-            }
-            { print }
-          ' packaging/homebrew/xboing.rb > "$tap_path/Formula/xboing.rb"
-
-          # Post-condition: the awk rewrite must have replaced the `head`
-          # stanza with url + sha256, otherwise brew install --HEAD-less
-          # would fall back on an empty formula. Fail here (not at
-          # brew install) so the error is actionable.
-          if ! grep -qE '^[[:space:]]*url[[:space:]]+"'"${tarball_url//./\\.}"'"' "$tap_path/Formula/xboing.rb"; then
-            echo "::error::awk rewrite produced no url stanza — indentation in packaging/homebrew/xboing.rb may have drifted from the expected `head` line pattern"
-            cat "$tap_path/Formula/xboing.rb"
-            exit 1
-          fi
+          packaging/homebrew/compose-formula.sh \
+            packaging/homebrew/xboing.rb \
+            "$tarball_url" \
+            "$TARBALL_SHA256" \
+            "$tap_path/Formula/xboing.rb"
           brew install jmf-pobox/xboing-ci/xboing
 
       - name: Verify installed binary reports the tag version
@@ -472,3 +446,346 @@ jobs:
           # 142 = 128 + SIGALRM(14), from the perl fallback path (macOS)
           # Refusing 0 for the same reason as smoke-deb.
           [ "$rc" -eq 124 ] || [ "$rc" -eq 142 ]
+
+  # -------------------------------------------------------------------------
+  # 6. Build and publish Homebrew bottles (prebuilt binaries) for the three
+  # platforms the tap ships to. Bottling is the ONLY way `brew install
+  # jmf-pobox/xboing/xboing` avoids a from-source build — without this job
+  # the formula only ever has a `head`/`url`+`sha256` source stanza and brew
+  # always compiles.
+  #
+  # bottling requires a genuinely tagged release (not workflow_dispatch on a
+  # branch): the `build` job's strict-semver gate (~line 55) rejects any
+  # REF_NAME that is not `vMAJOR.MINOR.PATCH`, and this job pins the formula
+  # to that tag's source tarball via compose-formula.sh (the same script
+  # smoke-brew above uses) before bottling it — there is no branch ref this
+  # job could sensibly resolve to a tarball for. Exercising this path end to
+  # end therefore requires pushing a real `v*` tag; see docs/RELEASING.md.
+  #
+  # Bottle tags produced: arm64_sonoma (macos-14 runner; Homebrew's bottle
+  # tag names the OS codename, currently "sonoma" for that runner image),
+  # x86_64_linux, arm64_linux (Homebrew renamed aarch64_linux ->
+  # arm64_linux in Homebrew/brew#19188, official as of Homebrew 5.0). The
+  # bottle-notes job below reads the real tag key out of each leg's
+  # *.bottle.json rather than hardcoding it, so this comment is
+  # documentation only, not something the workflow parses.
+  # -------------------------------------------------------------------------
+  bottle:
+    needs: [build, publish]
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, ubuntu-latest, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          # Least privilege: this job's contents:write token is for the
+          # asset upload only. Don't let checkout persist it in .git/config
+          # where the Homebrew installer and `brew install` steps (which run
+          # third-party formula/installer code) would inherit it. (Cursor
+          # PR #230.) The upload step passes GH_TOKEN explicitly instead.
+          persist-credentials: false
+
+      - name: Bootstrap Homebrew on Linux (pre-installed on macos-14)
+        if: runner.os == 'Linux'
+        run: |
+          # Same SHA-pinned installer as smoke-brew above (docs/CI.md §9).
+          set -o pipefail
+          curl -fsSL https://raw.githubusercontent.com/Homebrew/install/7a133dcc74051ee4efc79467ed215dfedf45aea2/install.sh \
+            | NONINTERACTIVE=1 /bin/bash
+          echo "/home/linuxbrew/.linuxbrew/bin" >> "$GITHUB_PATH"
+
+      - name: Compose a formula pinned to the tag tarball
+        env:
+          TARBALL_SHA256: ${{ needs.build.outputs.tarball_sha256 }}
+          GH_REPO: ${{ github.repository }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          # One implementation of the head->url rewrite (packaging/homebrew/
+          # compose-formula.sh), shared with smoke-brew above.
+          brew tap-new --no-git jmf-pobox/xboing-ci
+          # A freshly created tap's FIRST install is auto-trusted, but this
+          # job installs from this tap TWICE (the from-source build below,
+          # then the bottle pour further down) — the second install hits
+          # Homebrew's tap-trust gate ("Refusing to load formula ... from
+          # untrusted tap") without this. Verified locally (make bottle hit
+          # the identical gate on its own tap's second install).
+          brew trust --taps jmf-pobox/xboing-ci
+          tap_path="$(brew --repository jmf-pobox/xboing-ci)"
+          tarball_url="https://github.com/${GH_REPO}/archive/refs/tags/${REF_NAME}.tar.gz"
+          packaging/homebrew/compose-formula.sh \
+            packaging/homebrew/xboing.rb \
+            "$tarball_url" \
+            "$TARBALL_SHA256" \
+            "$tap_path/Formula/xboing.rb"
+
+      - name: Build the bottle from source (creates the keg `brew bottle` packages)
+        run: |
+          set -euo pipefail
+          # `--build-bottle` forces FormulaInstaller#pour_bottle? to return
+          # false unconditionally (formula_installer.rb: `return false if
+          # ... build_bottle? ...`), so this step cannot pour even if a
+          # bottle existed. Assert the resulting receipt agrees, using
+          # Homebrew's own structured record of the fact
+          # (Tab#poured_from_bottle, written at formula_installer.rb:1701)
+          # rather than parsing free-text ohai/oh1 log lines — the generic
+          # "==> Installing ..." header fires for both a pour and a source
+          # build, so it cannot discriminate between them.
+          brew install --build-bottle jmf-pobox/xboing-ci/xboing
+          poured="$(brew info --json=v2 jmf-pobox/xboing-ci/xboing | jq -r '.formulae[0].installed[0].poured_from_bottle')"
+          if [ "$poured" != "false" ]; then
+            echo "::error::expected a from-source build here (--build-bottle disables pouring) but the install receipt says poured_from_bottle=$poured" >&2
+            exit 1
+          fi
+
+      - name: Generate the bottle tarball + JSON from the just-built keg
+        env:
+          GH_REPO: ${{ github.repository }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          # --root-url points the embedded download URL at where `publish`
+          # (job 2) already created the Release — the bottle-notes job
+          # below (needs: bottle) uploads these same files there next.
+          brew bottle --json --no-rebuild \
+            --root-url="https://github.com/${GH_REPO}/releases/download/${REF_NAME}" \
+            jmf-pobox/xboing-ci/xboing
+          # Bind the upload to EXACTLY these artifacts, captured now — before
+          # the poured binary is exercised in the verify step — and record
+          # their checksums. The upload step re-verifies the bytes and uploads
+          # by name, so a misbehaving binary that dropped or overwrote a file
+          # in the workspace cannot substitute the published asset (Cursor
+          # PR #230). A single-tag `brew bottle` writes exactly one of each.
+          shopt -s nullglob
+          tarballs=( ./*.bottle.tar.gz )
+          jsons=( ./*.bottle.json )
+          if [ "${#tarballs[@]}" -ne 1 ] || [ "${#jsons[@]}" -ne 1 ]; then
+            echo "::error::expected exactly one .bottle.tar.gz and one .bottle.json" >&2
+            printf '%s\n' ./*.bottle.* >&2
+            exit 1
+          fi
+          bottle_tarball="${tarballs[0]}"
+          bottle_json="${jsons[0]}"
+          {
+            echo "BOTTLE_TARBALL=$bottle_tarball"
+            echo "BOTTLE_JSON=$bottle_json"
+            echo "BOTTLE_TARBALL_SHA=$(shasum -a 256 "$bottle_tarball" | awk '{print $1}')"
+            echo "BOTTLE_JSON_SHA=$(shasum -a 256 "$bottle_json" | awk '{print $1}')"
+          } >> "$GITHUB_ENV"
+
+      - name: Uninstall the source build + the build-only toolchain
+        run: |
+          set -euo pipefail
+          # Remove the keg the source build produced above — the next step
+          # pours the bottle tarball fresh, so this proves the pour (not
+          # some leftover from the from-source install) is what's tested.
+          brew uninstall jmf-pobox/xboing-ci/xboing
+          # Remove the BUILD-ONLY deps (packaging/homebrew/xboing.rb's
+          # `depends_on "cmake" => :build` / `"pkg-config" => :build`).
+          # Deliberately does NOT remove sdl2/sdl2_image/sdl2_mixer/
+          # sdl2_ttf — those are runtime depends_on lines, not build-only,
+          # and xboing legitimately needs their shared libraries at
+          # startup. If pouring + running still works with cmake and
+          # pkg-config gone, that is the no-toolchain-needed proof: a
+          # bottle install cannot be secretly falling back to a source
+          # build, because the tools a source build would need are absent.
+          # --ignore-dependencies: on a hosted runner other PREINSTALLED
+          # formulae may depend on cmake/pkg-config, and plain `brew
+          # uninstall` refuses to remove a still-depended-on formula, which
+          # would fail this step before the pour verification runs. This is
+          # a disposable runner and we only need these two build-only tools
+          # GONE to prove the pour needs no toolchain — so force their
+          # removal regardless of unrelated dependents. (Copilot PR #230.)
+          brew uninstall --ignore-dependencies cmake pkg-config
+
+          # Secondary sanity check (NOT the pour proof): confirm brew's own
+          # cmake/pkg-config are gone after uninstall. This only inspects
+          # Homebrew's formula registry, not a system toolchain elsewhere on
+          # PATH (e.g. /usr/bin), so it does NOT by itself prove no source
+          # build happened — the authoritative proof is the
+          # `poured_from_bottle=true` receipt asserted in the pour step
+          # below. Removing them still reduces the chance of an accidental
+          # source fallback and is cheap on a disposable runner.
+          # (Copilot PR #230.)
+          for build_only in cmake pkg-config; do
+            if brew list --formula "$build_only" >/dev/null 2>&1; then
+              echo "::error::$build_only is still installed after 'brew uninstall' — expected it gone before the pour" >&2
+              exit 1
+            fi
+          done
+
+      - name: Pour the bottle directly from the local tarball
+        run: |
+          set -euo pipefail
+          # Homebrew's Cellar keys kegs by BARE name, so an earlier keg for
+          # `xboing` can survive and get silently reused instead of poured
+          # fresh — force-remove the bare name before pouring. (Verified
+          # against Homebrew 7.x in `make bottle`; same failure mode there.)
+          brew uninstall --force xboing 2>/dev/null || true
+          bottle_file="$(ls ./*.bottle.tar.gz)"
+          echo "Pouring: $bottle_file"
+          # HOMEBREW_DEVELOPER=1 is REQUIRED: Homebrew refuses to install a
+          # formula from a bare/relative bottle-tarball path
+          # (Formulary::FromBottleLoader short-circuits to nil) unless
+          # HOMEBREW_DEVELOPER or HOMEBREW_TESTS is set. Without it this step
+          # fails "No available formula with the name <tarball>" — verified
+          # live in `make bottle`, which uses the identical pour. Set it
+          # explicitly rather than relying on the runner's environment.
+          HOMEBREW_DEVELOPER=1 brew install "$bottle_file" 2>&1 | tee pour.log
+          # THE pour assertion (team-lead requirement #1): brew's own log
+          # must say it poured a bottle, not that it built from source. A
+          # test that can pass on a source-build fallback is not a bottle
+          # test — this is what makes it one.
+          if ! grep -qE '^==> Pouring .*\.bottle\.tar\.gz' pour.log; then
+            echo "::error::expected '==> Pouring ...bottle.tar.gz' in brew's install log — got a source build (or unrecognized log wording) instead:" >&2
+            cat pour.log >&2
+            exit 1
+          fi
+          # Cross-check against Homebrew's own structured receipt rather
+          # than trusting free-text log wording alone. `brew install
+          # <local .bottle.tar.gz path>` (with HOMEBREW_DEVELOPER set) loads
+          # via Formulary's FromBottleLoader and pours; assert it explicitly
+          # so this fails loudly, not silently, if that ever stops holding.
+          poured="$(brew info --json=v2 jmf-pobox/xboing-ci/xboing | jq -r '.formulae[0].installed[0].poured_from_bottle')"
+          if [ "$poured" != "true" ]; then
+            echo "::error::brew's install receipt says poured_from_bottle=$poured after installing a local bottle tarball — this should be impossible; investigate before trusting this bottle" >&2
+            exit 1
+          fi
+
+      - name: Verify the poured binary (arch, version, headless launch)
+        env:
+          EXPECT_VERSION: ${{ needs.build.outputs.version }}
+        run: |
+          set -euo pipefail
+          # Secondary sanity check (NOT the pour proof — see the pour step's
+          # `poured_from_bottle=true` receipt assertion for that): re-confirm
+          # brew's cmake/pkg-config are still absent right before running the
+          # binary, covering the whole pour-to-launch window. This inspects
+          # only Homebrew's registry, not a system toolchain on PATH, so it
+          # is a defense-in-depth signal, not conclusive on its own.
+          for build_only in cmake pkg-config; do
+            if brew list --formula "$build_only" >/dev/null 2>&1; then
+              echo "::error::$build_only reappeared before the binary ran — expected the build toolchain to stay absent" >&2
+              exit 1
+            fi
+          done
+          packaging/homebrew/verify-bottle.sh "$EXPECT_VERSION" xboing
+
+      - name: Upload bottle tarball + JSON to the Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          # Re-verify the artifacts are byte-identical to what `brew bottle`
+          # wrote (before the poured binary ran) and upload them BY NAME, not
+          # a re-glob of the workspace — so nothing the binary may have
+          # touched is published. (Cursor PR #230.)
+          echo "${BOTTLE_TARBALL_SHA}  ${BOTTLE_TARBALL}" | shasum -a 256 -c -
+          echo "${BOTTLE_JSON_SHA}  ${BOTTLE_JSON}" | shasum -a 256 -c -
+          # --clobber: a re-run of this job (e.g. after a flaky leg) must be
+          # able to overwrite its own prior upload rather than fail the step.
+          gh release upload "$REF_NAME" \
+            --repo "$GH_REPO" \
+            --clobber \
+            "$BOTTLE_TARBALL" "$BOTTLE_JSON"
+
+  # -------------------------------------------------------------------------
+  # 7. Assemble the tap's `bottle do` block from the three per-platform JSON
+  # files the `bottle` job produced, and append it to the Release notes.
+  #
+  # This is Phase 2b (MANUAL tap-bump) per bead xboing-157: a human copies
+  # the emitted block from the Release notes into Formula/xboing.rb in the
+  # SEPARATE jmf-pobox/homebrew-xboing tap repo (NOT this repo's source-only
+  # packaging/homebrew/xboing.rb) and pushes it there. This job deliberately
+  # does NOT push to the tap itself and does NOT require a HOMEBREW_TAP_TOKEN
+  # secret — see docs/RELEASING.md for the future automated (2a) path that
+  # would need one.
+  # -------------------------------------------------------------------------
+  bottle-notes:
+    needs: [build, publish, bottle]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download the per-platform bottle JSON files
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          mkdir -p bottle-json
+          gh release download "$REF_NAME" \
+            --repo "$GH_REPO" \
+            --pattern '*.bottle.json' \
+            --dir bottle-json
+
+      - name: Compose the bottle do block and append it to the Release notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          root_url="https://github.com/${GH_REPO}/releases/download/${REF_NAME}"
+
+          {
+            echo
+            echo "## Homebrew bottle (tap maintainer action required)"
+            echo
+            echo "CI built prebuilt bottles for this release. Copy the block"
+            echo "below into \`bottle do ... end\` in Formula/xboing.rb in the"
+            echo "SEPARATE tap repo (jmf-pobox/homebrew-xboing) — NOT this"
+            echo "repo's source-only packaging/homebrew/xboing.rb — replacing"
+            echo "the placeholder shas, then commit + push. See docs/RELEASING.md."
+            echo
+            echo '```ruby'
+            echo "  bottle do"
+            echo "    root_url \"${root_url}\""
+            # Each JSON is keyed by the tap-local formula full_name; read
+            # cellar from the BOTTLE object and emit one
+            # `sha256 cellar: <c>, tag: "..."` line per tag. Verified against
+            # real `brew bottle --json`: cellar lives at `.<f>.bottle.cellar`
+            # (a per-run value; e.g. "/opt/homebrew/Cellar"), NOT on each
+            # `.tags.<tag>` entry (those carry sha256/filename/tab/… but no
+            # cellar). The cellar MUST be preserved: omitting it makes
+            # Homebrew assume the build-prefix cellar, so the bottle is
+            # rejected (source-build fallback) for users on a different prefix
+            # (Copilot + Cursor PR #230). Homebrew serializes a relocatable
+            # cellar as a colon symbol string (":any", ":any_skip_relocation")
+            # and a fixed one as an absolute path ("/opt/homebrew/Cellar"), so
+            # emit the former unquoted and the latter quoted. Validate tag,
+            # digest, AND cellar before emitting: the lines go into a Ruby
+            # `bottle do` block a maintainer pastes into the tap, so a '"' or
+            # '#{...}' in any field would become code when the formula loads —
+            # fail loudly on anything unexpected.
+            for f in bottle-json/*.bottle.json; do
+              jq -r '.[] | .bottle as $b | ($b.cellar // "") as $cellar
+                | $b.tags | to_entries[]
+                | .key as $tag | .value.sha256 as $sha
+                | ($tag | test("^(arm64_[a-z0-9]+|x86_64_linux|arm64_linux)$")) as $tag_ok
+                | ($sha | test("^[a-f0-9]{64}$")) as $sha_ok
+                | (if ($cellar | test("^:[a-z_]+$")) then "cellar: " + $cellar + ", "
+                   elif ($cellar | test("^/[A-Za-z0-9/._-]+$")) then "cellar: \"" + $cellar + "\", "
+                   else null end) as $cellar_str
+                | if $tag_ok and $sha_ok and ($cellar_str != null)
+                    then "    sha256 " + $cellar_str + $tag + ": \"" + $sha + "\""
+                    else error("unsafe/missing bottle tag, sha256, or cellar: tag=" + $tag + " cellar=" + $cellar)
+                  end' "$f"
+            done
+            echo "  end"
+            echo '```'
+          } > notes-appendix.md
+
+          # Fetch the notes `publish` wrote, append the appendix, write back.
+          # gh release edit takes the WHOLE body from --notes-file, so this
+          # has to be read-modify-write, not a partial patch.
+          gh release view "$REF_NAME" --repo "$GH_REPO" --json body -q .body > notes-current.md
+          cat notes-current.md notes-appendix.md > notes-final.md
+          gh release edit "$REF_NAME" --repo "$GH_REPO" --notes-file notes-final.md

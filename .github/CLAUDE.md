@@ -7,6 +7,7 @@
 | `lint.yml` | Lint | Push to master, PRs | `clang-format` check, `cppcheck` on src/ and tests/ |
 | `test.yml` | Build & Test | Push to master, PRs | Matrix: Debug build + ctest, ASan build + ctest |
 | `docs.yml` | Docs | Push to master, PRs | `markdownlint` on all .md files |
+| `release.yml` | Release | `v*` tag push | Build .deb, publish Release, SLSA provenance, smoke-install, build + upload Homebrew bottles (`bottle`), emit tap-bump notes (`bottle-notes`) — see `docs/RELEASING.md` |
 
 ## Local Parity
 

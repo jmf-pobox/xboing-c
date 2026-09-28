@@ -28,7 +28,7 @@ DPKG_INTERMEDIATES := obj-*/ debian/.debhelper debian/files debian/*.substvars \
 .PHONY: help all build configure rebuild test run \
         asan asan-build asan-test \
         clean distclean \
-        install uninstall deb deb-lint dogfood \
+        install uninstall deb deb-lint dogfood bottle \
         lint format format-check docs-gen docs-pdf \
         cppcheck cppcheck-src cppcheck-tests \
         tidy check ci \
@@ -144,6 +144,109 @@ deb: ## Build a Debian package via dpkg-buildpackage (.deb lands in ../).
 deb-lint: deb ## Build .deb + run lintian on it (Debian Policy compliance).
 	lintian ../xboing_*.deb
 	echo "lintian: clean"
+
+# Requires Homebrew (brew.sh) on PATH — macOS or Linuxbrew. `brew bottle`
+# refuses to bottle a --HEAD-only install (Error: Formula has no stable
+# version) — a stable url+sha256 formula is mandatory, so this target
+# archives the CURRENT working tree's HEAD commit into a local tarball,
+# sha256s it, and uses packaging/homebrew/compose-formula.sh (the same
+# script release.yml's `bottle`/`smoke-brew` jobs use) to compose a stable
+# formula pinned to that local tarball via a file:// url — the same shape
+# CI uses, just pointed at a local archive instead of a GitHub tag tarball.
+# Uncommitted changes are NOT included (git archive only sees committed
+# tree state) — commit locally first if you need to bottle-test a change.
+# Then builds --build-bottle (now legal, since the formula has a stable
+# url+sha256), uninstalls, pours the built *.bottle.tar.gz fresh, asserts
+# the install receipt says poured_from_bottle=true, and runs
+# packaging/homebrew/verify-bottle.sh against it — the same pour+verify
+# pattern release.yml's `bottle` job uses — so this actually proves the
+# bottle runs, not just that it built.
+# Deliberately NOT part of `make check`: it needs brew, mutates a local tap
+# under $(brew --repository), and is slow.
+# Idempotent: removes any tap/keg left behind by a prior run before
+# rebuilding, so it can be re-run without manual cleanup. The uninstall
+# guard targets the BARE formula name (`xboing`), not the tap-qualified
+# one — Homebrew's Cellar keys kegs by bare name, so a keg from an earlier
+# run's tap incarnation survives `brew untap` and gets silently reused
+# ("already installed, it's just not linked") instead of freshly rebuilt
+# from this run's local tarball, unless the bare name is uninstalled too.
+# HOMEBREW_DEVELOPER=1 is required for the final pour step: Homebrew
+# refuses to install a formula from a bare/relative bottle-tarball path
+# (Formulary::FromBottleLoader short-circuits to nil) unless
+# HOMEBREW_DEVELOPER or HOMEBREW_TESTS is set — true by default on any
+# machine that hasn't opted in, so this sets it explicitly rather than
+# relying on the invoking shell's environment.
+# `brew trust` (Homebrew's tap-trust gate, tap-trust.md) must be granted
+# explicitly right after `tap-new` — a freshly created tap's first
+# install is auto-trusted, but a SECOND install of the same tap (as this
+# recipe's pour-verification step does, after uninstalling) is not, and
+# fails "Refusing to load formula ... from untrusted tap" without this.
+bottle: ## Build a Homebrew bottle from the local working tree's HEAD commit, pour it, and run verify-bottle.sh against it (requires brew; not part of 'make check'). See docs/RELEASING.md.
+	if ! command -v brew >/dev/null 2>&1; then \
+	    echo "FAIL: brew not found on PATH — see https://brew.sh"; \
+	    exit 1; \
+	fi
+	# Never force-remove a bare `xboing` keg this target cannot prove it
+	# owns: Homebrew keys the Cellar by the BARE name, and tap-presence is
+	# NOT proof of ownership — a crashed prior run can leave the ephemeral
+	# tap behind, after which a developer's own public-tap `xboing` would be
+	# wrongly force-removed (Cursor + Copilot PR #230). So: always drop the
+	# ephemeral tap first (a leftover one also breaks `brew tap-new` below),
+	# then REFUSE to proceed if any `xboing` keg is installed and let the
+	# developer remove it explicitly. A successful run cleans up its own keg
+	# at the end, so normal sequential re-runs start clean.
+	brew untap jmf-pobox/xboing-local-bottle 2>/dev/null || true
+	if brew list --formula xboing >/dev/null 2>&1; then \
+	    echo "FAIL: an 'xboing' formula is installed; 'make bottle' will not remove it" >&2; \
+	    echo "  (Homebrew's bare-name keg is shared, so it may be your real install)." >&2; \
+	    echo "  Run 'brew uninstall xboing' first, then re-run 'make bottle'." >&2; \
+	    exit 1; \
+	fi
+	rm -f "$(CURDIR)/.tmp/xboing-local-bottle.tar.gz"
+	mkdir -p "$(CURDIR)/.tmp"
+	git archive --format=tar.gz --prefix=xboing-local-bottle/ \
+	    -o "$(CURDIR)/.tmp/xboing-local-bottle.tar.gz" HEAD
+	tarball_sha256="$$(shasum -a 256 "$(CURDIR)/.tmp/xboing-local-bottle.tar.gz" | awk '{print $$1}')"; \
+	version="$$(sed -n 's/^project(xboing VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt)"; \
+	brew tap-new --no-git jmf-pobox/xboing-local-bottle; \
+	brew trust --taps jmf-pobox/xboing-local-bottle; \
+	tap_path="$$(brew --repository jmf-pobox/xboing-local-bottle)"; \
+	packaging/homebrew/compose-formula.sh \
+	    packaging/homebrew/xboing.rb \
+	    "file://$(CURDIR)/.tmp/xboing-local-bottle.tar.gz" \
+	    "$$tarball_sha256" \
+	    "$$tap_path/Formula/xboing.rb" \
+	    "$$version"
+	brew install --build-bottle jmf-pobox/xboing-local-bottle/xboing
+	# Remove any stale bottle artifacts from a prior run BEFORE bottling, so
+	# the glob below matches exactly the one this run produces — otherwise a
+	# version bump (e.g. 1.0.9 -> 1.0.11) leaves an old `*.bottle.tar.gz`
+	# that `ls | tail -1` could pick, or that makes the bare glob expand to
+	# multiple paths and break the pour. (Copilot PR #230 review.)
+	rm -f ./*.bottle.tar.gz ./*.bottle.json
+	brew bottle --no-rebuild jmf-pobox/xboing-local-bottle/xboing
+	echo
+	echo "Built: $$(ls -1 ./*.bottle.tar.gz 2>/dev/null | tail -1)"
+	echo
+	echo "Pouring the built bottle to verify it actually runs (not just builds)..."
+	brew uninstall jmf-pobox/xboing-local-bottle/xboing
+	bottle_file="$$(ls -1 ./*.bottle.tar.gz | tail -1)"; \
+	HOMEBREW_DEVELOPER=1 brew install "$$bottle_file"
+	poured="$$(brew info --json=v2 jmf-pobox/xboing-local-bottle/xboing | jq -r '.formulae[0].installed[0].poured_from_bottle')"; \
+	if [ "$$poured" != "true" ]; then \
+	    echo "FAIL: install receipt says poured_from_bottle=$$poured after installing a local bottle tarball" >&2; \
+	    exit 1; \
+	fi
+	version="$$(sed -n 's/^project(xboing VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt)"; \
+	packaging/homebrew/verify-bottle.sh "$$version" xboing
+	rm -f "$(CURDIR)/.tmp/xboing-local-bottle.tar.gz"
+	# Restore the machine to its prior state — this is a verification target,
+	# not an installer. The `*.bottle.tar.gz` left in the repo dir is the
+	# deliverable; the poured keg and the ephemeral tap are not, so remove
+	# both. Safe here: the start guard only lets us reach this point when the
+	# installed `xboing` is our own, so the bare-name uninstall targets it.
+	brew uninstall --force xboing 2>/dev/null || true
+	brew untap jmf-pobox/xboing-local-bottle 2>/dev/null || true
 
 original-build: ## Build the legacy 1996 Xlib binary in original/ (used for visual-fidelity reference capture).
 	$(MAKE) -C original

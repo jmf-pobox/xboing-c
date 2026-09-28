@@ -12,7 +12,7 @@ the why.
 | `.github/workflows/lint.yml` | Push to master, PRs | `clang-format` + `cppcheck` static gates |
 | `.github/workflows/test.yml` | Push to master, PRs, nightly | Build matrix + install-deb + install-brew matrix |
 | `.github/workflows/docs.yml` | `**/*.md` on master + PRs | markdownlint |
-| `.github/workflows/release.yml` | `v*` tag push | Build .deb, publish Release, SLSA provenance, smoke-install both artifacts |
+| `.github/workflows/release.yml` | `v*` tag push | Build .deb, publish Release, SLSA provenance, smoke-install both artifacts, build + upload Homebrew bottles, emit tap bump notes |
 
 ## §1 — Per-OS floor
 
@@ -151,6 +151,16 @@ could not have exercised it.
   failure plus the next-release check above is an acceptable interim
   posture. Tracked as `xboing-gqhx`: draft the Release, attach the
   attestation, then publish.
+
+- **`bottle` / `bottle-notes` jobs** (Homebrew bottling, bead xboing-157) —
+  not yet rehearsed; both require a real `v*` tag to exercise (see
+  `docs/RELEASING.md`, "Strict semver and exercising the bottle job" —
+  no `workflow_dispatch` dry-run path exists by design). Add a rehearsal
+  record here after the first tagged release these ship on: confirm the
+  three `*.bottle.tar.gz` + `*.bottle.json` assets land on the Release
+  and that `bottle-notes` appended a correct `bottle do` block (real
+  per-platform sha256s, not the formula's placeholder zeros) to the
+  Release notes.
 
 Add a rehearsal record here whenever a new gate ships in a release-time
 workflow.
