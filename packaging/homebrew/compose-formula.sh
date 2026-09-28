@@ -43,6 +43,20 @@ version="${5:-}"
 # of the Ruby string into arbitrary formula code (flagged by Cursor on
 # PR #230).
 #
+# Reject embedded newlines/carriage-returns in every interpolated value
+# FIRST. `grep` matches line-by-line, so a value like "<valid-url>\n\";
+# system('id'); url \"" would pass the single-line allowlist below on its
+# first line while smuggling a second line into the Ruby string (Cursor
+# PR #230). After this guard each value is one line, so the greps are sound.
+for _v in "$url" "$sha256" "$version"; do
+  case "$_v" in
+    *$'\n'* | *$'\r'*)
+      echo "::error::compose-formula.sh: url/sha256/version must not contain a newline" >&2
+      exit 1
+      ;;
+  esac
+done
+
 # url is ALLOWLISTED, not denylisted: a double-quoted Ruby string also
 # interpolates #{...}, #@ivar and #$global, so a denylist that misses '#'
 # lets `url "...#{system('id')}..."` run when the formula loads. Permit

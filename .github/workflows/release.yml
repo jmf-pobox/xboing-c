@@ -481,6 +481,13 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          # Least privilege: this job's contents:write token is for the
+          # asset upload only. Don't let checkout persist it in .git/config
+          # where the Homebrew installer and `brew install` steps (which run
+          # third-party formula/installer code) would inherit it. (Cursor
+          # PR #230.) The upload step passes GH_TOKEN explicitly instead.
+          persist-credentials: false
 
       - name: Bootstrap Homebrew on Linux (pre-installed on macos-14)
         if: runner.os == 'Linux'
