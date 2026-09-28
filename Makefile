@@ -186,27 +186,21 @@ bottle: ## Build a Homebrew bottle from the local working tree's HEAD commit, po
 	    echo "FAIL: brew not found on PATH — see https://brew.sh"; \
 	    exit 1; \
 	fi
-	# Clean up a prior `make bottle` run WITHOUT clobbering a real xboing
-	# install. Homebrew keys the Cellar by the BARE name, so an `xboing`
-	# from the public tap and this target's local bottle share one keg — a
-	# blind `brew uninstall --force xboing` would delete a developer's
-	# actual install (verified: on a dev box with the public tap tapped,
-	# bare `xboing` resolves ambiguously across both taps). This target
-	# always creates the ephemeral `jmf-pobox/xboing-local-bottle` tap, so
-	# its presence marks the installed keg as OUR leftover (safe to remove).
-	# If `xboing` is installed but that tap is absent, it is a foreign
-	# install we must not touch — abort and let the developer remove it.
-	# (Copilot PR #230 review.)
+	# Never force-remove a bare `xboing` keg this target cannot prove it
+	# owns: Homebrew keys the Cellar by the BARE name, and tap-presence is
+	# NOT proof of ownership — a crashed prior run can leave the ephemeral
+	# tap behind, after which a developer's own public-tap `xboing` would be
+	# wrongly force-removed (Cursor + Copilot PR #230). So: always drop the
+	# ephemeral tap first (a leftover one also breaks `brew tap-new` below),
+	# then REFUSE to proceed if any `xboing` keg is installed and let the
+	# developer remove it explicitly. A successful run cleans up its own keg
+	# at the end, so normal sequential re-runs start clean.
+	brew untap jmf-pobox/xboing-local-bottle 2>/dev/null || true
 	if brew list --formula xboing >/dev/null 2>&1; then \
-	    if brew tap 2>/dev/null | grep -qx jmf-pobox/xboing-local-bottle; then \
-	        brew uninstall --force xboing 2>/dev/null || true; \
-	        brew untap jmf-pobox/xboing-local-bottle 2>/dev/null || true; \
-	    else \
-	        echo "FAIL: an 'xboing' formula is already installed and 'make bottle' did not create it." >&2; \
-	        echo "  It shares Homebrew's bare-name keg, so this target will not remove your install." >&2; \
-	        echo "  Run 'brew uninstall xboing' first if you want to proceed." >&2; \
-	        exit 1; \
-	    fi; \
+	    echo "FAIL: an 'xboing' formula is installed; 'make bottle' will not remove it" >&2; \
+	    echo "  (Homebrew's bare-name keg is shared, so it may be your real install)." >&2; \
+	    echo "  Run 'brew uninstall xboing' first, then re-run 'make bottle'." >&2; \
+	    exit 1; \
 	fi
 	rm -f "$(CURDIR)/.tmp/xboing-local-bottle.tar.gz"
 	mkdir -p "$(CURDIR)/.tmp"

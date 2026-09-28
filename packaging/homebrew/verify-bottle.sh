@@ -66,11 +66,15 @@ if ! printf '%s' "$file_out" | grep -qE "$pattern"; then
 fi
 
 # --- Version ------------------------------------------------------------
-# Must match the tag-derived version exactly (same prefix-match convention
-# as smoke-deb/smoke-brew above in release.yml), not just "some version".
+# Must match the tag-derived version EXACTLY. Compare the version token
+# literally rather than with a regex: in a regex the dots of a version like
+# "1.0.11" are wildcards, so "xboing 1X0Y11" would wrongly pass (Copilot
+# PR #230). Pull the first whitespace-delimited token after "xboing " and
+# string-compare it.
 out="$("$resolved" -version)"
 echo "$out"
-if ! printf '%s' "$out" | grep -qE "^xboing ${expected_version}([[:space:]]|$)"; then
+got_version="$(printf '%s\n' "$out" | sed -n 's/^xboing \([^[:space:]][^[:space:]]*\).*/\1/p' | head -1)"
+if [ "$got_version" != "$expected_version" ]; then
   echo "::error::version mismatch: expected xboing ${expected_version}, got: $out" >&2
   exit 1
 fi
