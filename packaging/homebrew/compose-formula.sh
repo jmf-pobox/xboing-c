@@ -82,9 +82,13 @@ awk -v url="$url" -v sha256="$sha256" -v version="$version" '
 ' "$src" > "$out"
 
 # Post-condition: the url stanza must be present, else brew install (without
-# --HEAD) would fall back on an empty formula.
-url_re="${url//./\\.}"
-if ! grep -qE '^[[:space:]]*url[[:space:]]+"'"${url_re}"'"' "$out"; then
+# --HEAD) would fall back on an empty formula. Match as a FIXED string, not
+# a regex: the url allowlist permits `?` and `+` (both ERE operators), so
+# building a pattern from the url would misfire on a valid URL that contains
+# them (Copilot PR #230). The composed line is `<indent>url "<url>"`, so the
+# literal substring `url "<url>"` is present exactly when the stanza was
+# written.
+if ! grep -qF -- "url \"${url}\"" "$out"; then
   echo "::error::compose-formula.sh produced no url stanza — the 'head' line pattern in ${src} may have drifted" >&2
   cat "$out" >&2
   exit 1
