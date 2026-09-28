@@ -25,24 +25,16 @@ class Xboing < Formula
   license "MIT"
   head "https://github.com/jmf-pobox/xboing-c.git", branch: "master"
 
-  # Placeholder scaffold — release CI (.github/workflows/release.yml's
-  # `bottle` job) fills in the real per-platform sha256 values and root_url
-  # at release time via `brew bottle --json`, then a human copies the
-  # complete block from the Release notes into the tap repo
-  # (jmf-pobox/homebrew-xboing). The zeroed shas here keep this in-repo
-  # formula syntactically valid; they are never installed from directly —
-  # only the tap's copy (with real shas) is. See docs/RELEASING.md.
-  bottle do
-    root_url "https://github.com/jmf-pobox/xboing-c/releases/download/PLACEHOLDER"
-    # arm64_sonoma: the macos-14 CI runner (release.yml's `bottle` job) is
-    # macOS 14 "Sonoma" — Homebrew's bottle tag names the OS codename, not
-    # the runner label, so this must track whatever macOS version that
-    # runner image resolves to.
-    sha256 arm64_sonoma:  "0000000000000000000000000000000000000000000000000000000000000000"
-    sha256 x86_64_linux:  "0000000000000000000000000000000000000000000000000000000000000000"
-    sha256 aarch64_linux: "0000000000000000000000000000000000000000000000000000000000000000"
-  end
-
+  # Deliberately NO `bottle do ... end` block here. `formula.bottled?`
+  # (Homebrew's own pour_bottle? check) matches on tag alone, before it
+  # ever looks at url/sha256 — a placeholder block with fake shas/root_url
+  # makes brew TRY to pour a bottle that 404s, on every plain
+  # `brew install` on a matching platform (macos-14/ubuntu-latest, exactly
+  # what release.yml's smoke-brew job runs), with no source-url fallback.
+  # Only the SEPARATE tap (jmf-pobox/homebrew-xboing) carries a bottle
+  # block, and only after a human pastes the real per-platform sha256s
+  # that bottle-notes assembles from the `bottle` job's output — see
+  # docs/RELEASING.md.
   depends_on "cmake" => :build
   depends_on "pkg-config" => :build
   depends_on "sdl2"
