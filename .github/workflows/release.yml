@@ -577,6 +577,21 @@ jobs:
           fi
           bottle_tarball="${tarballs[0]}"
           bottle_json="${jsons[0]}"
+          # `brew bottle` writes the tarball with a DOUBLE dash
+          # (xboing--1.0.12.<tag>.bottle.tar.gz) as its local build artifact,
+          # but when pouring from root_url Homebrew fetches the canonical
+          # SINGLE-dash name (xboing-1.0.12.<tag>.bottle.tar.gz) recorded as
+          # `.bottle.tags[].filename` in the JSON. Upload under that canonical
+          # name or `brew install` 404s at the pour — v1.0.12's first cut hit
+          # exactly this. Rename the local artifact to the canonical filename.
+          canonical="$(jq -r '.[].bottle.tags | to_entries[0].value.filename' "$bottle_json")"
+          case "$canonical" in
+            ""|null) echo "::error::no canonical bottle filename in $bottle_json" >&2; exit 1 ;;
+          esac
+          if [ "$bottle_tarball" != "$canonical" ] && [ "$bottle_tarball" != "./$canonical" ]; then
+            mv "$bottle_tarball" "$canonical"
+          fi
+          bottle_tarball="$canonical"
           {
             echo "BOTTLE_TARBALL=$bottle_tarball"
             echo "BOTTLE_JSON=$bottle_json"
