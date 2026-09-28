@@ -700,11 +700,12 @@ jobs:
   # files the `bottle` job produced, and append it to the Release notes.
   #
   # This is Phase 2b (MANUAL tap-bump) per bead xboing-157: a human copies
-  # the emitted block from the Release notes into packaging/homebrew/
-  # xboing.rb in the SEPARATE jmf-pobox/homebrew-xboing tap repo and pushes
-  # it there. This job deliberately does NOT push to the tap itself and
-  # does NOT require a HOMEBREW_TAP_TOKEN secret — see docs/RELEASING.md
-  # for the future automated (2a) path that would need one.
+  # the emitted block from the Release notes into Formula/xboing.rb in the
+  # SEPARATE jmf-pobox/homebrew-xboing tap repo (NOT this repo's source-only
+  # packaging/homebrew/xboing.rb) and pushes it there. This job deliberately
+  # does NOT push to the tap itself and does NOT require a HOMEBREW_TAP_TOKEN
+  # secret — see docs/RELEASING.md for the future automated (2a) path that
+  # would need one.
   # -------------------------------------------------------------------------
   bottle-notes:
     needs: [build, publish, bottle]
@@ -739,8 +740,9 @@ jobs:
             echo "## Homebrew bottle (tap maintainer action required)"
             echo
             echo "CI built prebuilt bottles for this release. Copy the block"
-            echo "below into \`bottle do ... end\` in packaging/homebrew/xboing.rb"
-            echo "in the SEPARATE tap repo (jmf-pobox/homebrew-xboing), replacing"
+            echo "below into \`bottle do ... end\` in Formula/xboing.rb in the"
+            echo "SEPARATE tap repo (jmf-pobox/homebrew-xboing) — NOT this"
+            echo "repo's source-only packaging/homebrew/xboing.rb — replacing"
             echo "the placeholder shas, then commit + push. See docs/RELEASING.md."
             echo
             echo '```ruby'
