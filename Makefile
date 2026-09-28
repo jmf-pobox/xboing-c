@@ -151,7 +151,8 @@ deb-lint: deb ## Build .deb + run lintian on it (Debian Policy compliance).
 # local sanity-checking the formula/bottle machinery, not for producing a
 # release-quality bottle — those are built by release.yml's `bottle` job
 # against the tag tarball. Then uninstalls the --HEAD keg, pours the built
-# *.bottle.tar.gz fresh, and runs packaging/homebrew/verify-bottle.sh
+# *.bottle.tar.gz fresh, asserts the install receipt says
+# poured_from_bottle=true, and runs packaging/homebrew/verify-bottle.sh
 # against it — the same pour+verify pattern release.yml's `bottle` job
 # uses — so this actually proves the bottle runs, not just that it built.
 # Deliberately NOT part of `make check`: it needs brew, mutates a local tap
@@ -172,6 +173,11 @@ bottle: ## Build a local Homebrew bottle from HEAD, pour it, and run verify-bott
 	brew uninstall jmf-pobox/xboing-local-bottle/xboing
 	bottle_file="$$(ls -1 ./*.bottle.tar.gz | tail -1)"; \
 	brew install "$$bottle_file"
+	poured="$$(brew info --json=v2 jmf-pobox/xboing-local-bottle/xboing | jq -r '.formulae[0].installed[0].poured_from_bottle')"; \
+	if [ "$$poured" != "true" ]; then \
+	    echo "FAIL: install receipt says poured_from_bottle=$$poured after installing a local bottle tarball" >&2; \
+	    exit 1; \
+	fi
 	version="$$(sed -n 's/^project(xboing VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt)"; \
 	packaging/homebrew/verify-bottle.sh "$$version" xboing
 
