@@ -35,6 +35,29 @@ sha256="$3"
 out="$4"
 version="${5:-}"
 
+# Validate the values that get interpolated into the generated formula's
+# Ruby source before writing them. All current callers pass trusted input
+# (a GitHub tag-archive URL or a repo-local file:// path, a shasum hex
+# digest, a semver), so this changes nothing today — it stops a FUTURE
+# caller from smuggling a double-quote/`$`/backtick through url/sha256/
+# version and breaking out of the Ruby string into arbitrary formula code
+# (flagged by Cursor on PR #230). The url set forbids exactly those
+# string-breaking characters while still allowing http(s) and file URLs.
+case "$url" in
+  *['"'\`'$'\\]* | *[[:space:]]*)
+    echo "::error::compose-formula.sh: url contains characters unsafe for formula Ruby: $url" >&2
+    exit 1
+    ;;
+esac
+if ! printf '%s' "$sha256" | grep -qE '^[A-Fa-f0-9]{64}$'; then
+  echo "::error::compose-formula.sh: sha256 is not a 64-char hex digest: $sha256" >&2
+  exit 1
+fi
+if [ -n "$version" ] && ! printf '%s' "$version" | grep -qE '^[A-Za-z0-9._+~-]+$'; then
+  echo "::error::compose-formula.sh: version has characters unsafe for formula Ruby: $version" >&2
+  exit 1
+fi
+
 [ -f "$src" ] || { echo "error: source formula not found: $src" >&2; exit 1; }
 
 # Replace the `head "..."` stanza with `url` + `sha256` (+ `version` when
