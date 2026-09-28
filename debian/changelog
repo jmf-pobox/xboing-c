@@ -1,3 +1,12 @@
+xboing (1.0.12-1) unstable; urgency=medium
+
+  * Ship prebuilt Homebrew bottles for macOS (Apple Silicon) and Linux
+    (x86_64 and aarch64). `brew install jmf-pobox/xboing/xboing` now pours
+    a prebuilt binary on those platforms instead of compiling from source;
+    other platforms keep the automatic source-build fallback.
+
+ -- J Freeman <jmf@pobox.com>  Mon, 28 Sep 2026 07:05:00 -0700
+
 xboing (1.0.11-1) unstable; urgency=medium
 
   * The DEATH_BLK skull block now winks with the original's asymmetric
