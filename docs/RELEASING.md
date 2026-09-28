@@ -185,7 +185,7 @@ OS family — it is pinned to the exact combination CI built it on:
   from the tap without also re-cutting a release. There is no macOS
   Intel bottle in this scope — the tap is Apple Silicon only,
   matching the `macos-14` (arm64) runner.
-- **Linux**: `x86_64_linux` / `aarch64_linux` bottles are built on
+- **Linux**: `x86_64_linux` / `arm64_linux` bottles are built on
   `ubuntu-latest` / `ubuntu-24.04-arm` and link against that
   runner image's glibc. Homebrew's Linux bottles assume a glibc no
   older than the build machine's — a much older distro (or a
@@ -223,12 +223,17 @@ outcome there.
 
 ## Local sanity check
 
-`make bottle` builds a bottle from the current working tree's `HEAD`
-(via the formula's `head` stanza, not a tagged tarball) into a
-throwaway local tap. It requires Homebrew on `PATH` and is not part
-of `make check` — it is slow and mutates `$(brew --repository)`. Use
-it to confirm the formula and bottle machinery work before trusting
-a release run to exercise them for real:
+`make bottle` builds a bottle from **remote** `master` (via the
+formula's `head` stanza, which `brew install --HEAD` clones straight
+from `https://github.com/jmf-pobox/xboing-c.git` — not this working
+tree) into a throwaway local tap. Uncommitted or unpushed local
+changes are NOT exercised; push to master first if you need to
+bottle-test a change. It requires Homebrew on `PATH` and is not part
+of `make check` — it is slow and mutates `$(brew --repository)`. It
+is idempotent — a prior run's tap/keg is removed before rebuilding,
+so it can be re-run without manual cleanup. Use it to confirm the
+formula and bottle machinery work before trusting a release run to
+exercise them for real:
 
 ```bash
 make bottle

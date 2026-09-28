@@ -463,9 +463,12 @@ jobs:
   # end therefore requires pushing a real `v*` tag; see docs/RELEASING.md.
   #
   # Bottle tags produced: arm64_sonoma (macos-14 runner; Homebrew's bottle
-  # tag names the OS codename, currently "sonoma" for that runner image —
-  # see packaging/homebrew/xboing.rb's `bottle do` scaffold), x86_64_linux,
-  # aarch64_linux.
+  # tag names the OS codename, currently "sonoma" for that runner image),
+  # x86_64_linux, arm64_linux (Homebrew renamed aarch64_linux ->
+  # arm64_linux in Homebrew/brew#19188, official as of Homebrew 5.0). The
+  # bottle-notes job below reads the real tag key out of each leg's
+  # *.bottle.json rather than hardcoding it, so this comment is
+  # documentation only, not something the workflow parses.
   # -------------------------------------------------------------------------
   bottle:
     needs: [build, publish]
