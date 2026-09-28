@@ -564,7 +564,14 @@ jobs:
           # pkg-config gone, that is the no-toolchain-needed proof: a
           # bottle install cannot be secretly falling back to a source
           # build, because the tools a source build would need are absent.
-          brew uninstall cmake pkg-config
+          # --ignore-dependencies: on a hosted runner other PREINSTALLED
+          # formulae may depend on cmake/pkg-config, and plain `brew
+          # uninstall` refuses to remove a still-depended-on formula, which
+          # would fail this step before the pour verification runs. This is
+          # a disposable runner and we only need these two build-only tools
+          # GONE to prove the pour needs no toolchain — so force their
+          # removal regardless of unrelated dependents. (Copilot PR #230.)
+          brew uninstall --ignore-dependencies cmake pkg-config
 
           # Assert they're actually gone rather than trusting `uninstall`'s
           # exit code alone — this is the NO-TOOLCHAIN PROOF's setup half;

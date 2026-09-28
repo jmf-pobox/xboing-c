@@ -54,7 +54,11 @@ case "$arch" in
     ;;
 esac
 
-file_out="$(file "$resolved")"
+# `file -L` follows symlinks so it reports the ACTUAL binary's machine
+# type. Homebrew's <prefix>/bin/xboing is a symlink into the Cellar keg
+# (a relative symlink on Linux); without -L, `file` prints "symbolic link
+# to ..." and the arch check below never sees the ELF/Mach-O header.
+file_out="$(file -L "$resolved")"
 echo "file: $file_out"
 if ! printf '%s' "$file_out" | grep -qE "$pattern"; then
   echo "::error::binary arch mismatch: expected pattern '$pattern' (runner uname -m=$arch), file says: $file_out" >&2
