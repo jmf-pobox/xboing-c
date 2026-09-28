@@ -223,15 +223,23 @@ outcome there.
 
 ## Local sanity check
 
-`make bottle` builds a bottle from **remote** `master` (via the
-formula's `head` stanza, which `brew install --HEAD` clones straight
-from `https://github.com/jmf-pobox/xboing-c.git` — not this working
-tree) into a throwaway local tap. Uncommitted or unpushed local
-changes are NOT exercised; push to master first if you need to
-bottle-test a change. It requires Homebrew on `PATH` and is not part
-of `make check` — it is slow and mutates `$(brew --repository)`. It
-is idempotent — a prior run's tap/keg is removed before rebuilding,
-so it can be re-run without manual cleanup. Use it to confirm the
+`make bottle` builds a bottle from the **local working tree's HEAD
+commit**: it archives `HEAD` via `git archive`, sha256s the tarball,
+and uses `packaging/homebrew/compose-formula.sh` to compose a stable
+formula pinned to that local tarball via a `file://` URL — the same
+script `release.yml`'s `smoke-brew`/`bottle` jobs use, just pointed at
+a local archive instead of a GitHub tag tarball. `brew bottle`
+categorically refuses to bottle a `head`-only install (no stable
+version to bottle), so a stable `url`+`sha256` formula is mandatory —
+this is why the target doesn't just `brew install --HEAD` the
+in-repo formula directly. Uncommitted changes are NOT included
+(`git archive` only sees committed tree state) — commit locally
+first if you need to bottle-test a change. It requires Homebrew on
+`PATH` and is not part of `make check` — it is slow and mutates
+`$(brew --repository)`. It is idempotent — a prior run's tap/keg is
+removed before rebuilding (by bare formula name, since Homebrew's
+Cellar keys kegs by name regardless of which tap installed them), so
+it can be re-run without manual cleanup. Use it to confirm the
 formula and bottle machinery work before trusting a release run to
 exercise them for real:
 
