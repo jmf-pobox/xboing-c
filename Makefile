@@ -186,9 +186,28 @@ bottle: ## Build a Homebrew bottle from the local working tree's HEAD commit, po
 	    echo "FAIL: brew not found on PATH — see https://brew.sh"; \
 	    exit 1; \
 	fi
-	brew uninstall --force xboing 2>/dev/null || true
-	brew uninstall jmf-pobox/xboing-local-bottle/xboing 2>/dev/null || true
-	brew untap jmf-pobox/xboing-local-bottle 2>/dev/null || true
+	# Clean up a prior `make bottle` run WITHOUT clobbering a real xboing
+	# install. Homebrew keys the Cellar by the BARE name, so an `xboing`
+	# from the public tap and this target's local bottle share one keg — a
+	# blind `brew uninstall --force xboing` would delete a developer's
+	# actual install (verified: on a dev box with the public tap tapped,
+	# bare `xboing` resolves ambiguously across both taps). This target
+	# always creates the ephemeral `jmf-pobox/xboing-local-bottle` tap, so
+	# its presence marks the installed keg as OUR leftover (safe to remove).
+	# If `xboing` is installed but that tap is absent, it is a foreign
+	# install we must not touch — abort and let the developer remove it.
+	# (Copilot PR #230 review.)
+	if brew list --formula xboing >/dev/null 2>&1; then \
+	    if brew tap 2>/dev/null | grep -qx jmf-pobox/xboing-local-bottle; then \
+	        brew uninstall --force xboing 2>/dev/null || true; \
+	        brew untap jmf-pobox/xboing-local-bottle 2>/dev/null || true; \
+	    else \
+	        echo "FAIL: an 'xboing' formula is already installed and 'make bottle' did not create it." >&2; \
+	        echo "  It shares Homebrew's bare-name keg, so this target will not remove your install." >&2; \
+	        echo "  Run 'brew uninstall xboing' first if you want to proceed." >&2; \
+	        exit 1; \
+	    fi; \
+	fi
 	rm -f "$(CURDIR)/.tmp/xboing-local-bottle.tar.gz"
 	mkdir -p "$(CURDIR)/.tmp"
 	git archive --format=tar.gz --prefix=xboing-local-bottle/ \
@@ -227,6 +246,13 @@ bottle: ## Build a Homebrew bottle from the local working tree's HEAD commit, po
 	version="$$(sed -n 's/^project(xboing VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt)"; \
 	packaging/homebrew/verify-bottle.sh "$$version" xboing
 	rm -f "$(CURDIR)/.tmp/xboing-local-bottle.tar.gz"
+	# Restore the machine to its prior state — this is a verification target,
+	# not an installer. The `*.bottle.tar.gz` left in the repo dir is the
+	# deliverable; the poured keg and the ephemeral tap are not, so remove
+	# both. Safe here: the start guard only lets us reach this point when the
+	# installed `xboing` is our own, so the bare-name uninstall targets it.
+	brew uninstall --force xboing 2>/dev/null || true
+	brew untap jmf-pobox/xboing-local-bottle 2>/dev/null || true
 
 original-build: ## Build the legacy 1996 Xlib binary in original/ (used for visual-fidelity reference capture).
 	$(MAKE) -C original
