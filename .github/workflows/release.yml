@@ -651,8 +651,13 @@ jobs:
           # test that can pass on a source-build fallback is not a bottle
           # test — this is what makes it one. Strip any ANSI escapes first so
           # the anchored match holds even if a runner forces color despite
-          # HOMEBREW_NO_COLOR.
-          if ! sed $'s/\x1b\\[[0-9;]*m//g' pour.log | grep -qE '^==> Pouring .*\.bottle\.tar\.gz'; then
+          # HOMEBREW_NO_COLOR. Use process substitution, NOT `sed | grep -q`:
+          # under `set -o pipefail`, `grep -q` closes the pipe on first match
+          # and `sed` then dies of SIGPIPE writing later log lines, making the
+          # pipeline non-zero even on a successful match — a false failure.
+          # (Copilot PR #232.)
+          if ! grep -qE '^==> Pouring .*\.bottle\.tar\.gz' \
+               < <(sed $'s/\x1b\\[[0-9;]*m//g' pour.log); then
             echo "::error::expected '==> Pouring ...bottle.tar.gz' in brew's install log — got a source build (or unrecognized log wording) instead:" >&2
             cat pour.log >&2
             exit 1
