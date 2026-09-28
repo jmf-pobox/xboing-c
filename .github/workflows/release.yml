@@ -718,24 +718,27 @@ jobs:
             echo '```ruby'
             echo "  bottle do"
             echo "    root_url \"${root_url}\""
-            # Each JSON is keyed by the tap-local formula full_name; walk
-            # every file's bottle.tags map and emit one
-            # `sha256 cellar: <c>, tag: "..."` line per platform, regardless
-            # of which leg produced which tag. The cellar MUST be preserved:
-            # omitting it makes Homebrew assume the build-prefix cellar, so
-            # the bottle is rejected (source-build fallback) for users on a
-            # different prefix (Copilot PR #230). Homebrew serializes a
-            # relocatable cellar as a colon symbol string (":any",
-            # ":any_skip_relocation") and a fixed one as an absolute path
-            # ("/opt/homebrew/Cellar"), so emit the former unquoted and the
-            # latter quoted. Validate tag, digest, AND cellar before emitting:
-            # the lines go into a Ruby `bottle do` block a maintainer pastes
-            # into the tap, so a '"' or '#{...}' in any field would become
-            # code when the formula loads — fail loudly on anything unexpected.
-            # (Cursor + Copilot PR #230.)
+            # Each JSON is keyed by the tap-local formula full_name; read
+            # cellar from the BOTTLE object and emit one
+            # `sha256 cellar: <c>, tag: "..."` line per tag. Verified against
+            # real `brew bottle --json`: cellar lives at `.<f>.bottle.cellar`
+            # (a per-run value; e.g. "/opt/homebrew/Cellar"), NOT on each
+            # `.tags.<tag>` entry (those carry sha256/filename/tab/… but no
+            # cellar). The cellar MUST be preserved: omitting it makes
+            # Homebrew assume the build-prefix cellar, so the bottle is
+            # rejected (source-build fallback) for users on a different prefix
+            # (Copilot + Cursor PR #230). Homebrew serializes a relocatable
+            # cellar as a colon symbol string (":any", ":any_skip_relocation")
+            # and a fixed one as an absolute path ("/opt/homebrew/Cellar"), so
+            # emit the former unquoted and the latter quoted. Validate tag,
+            # digest, AND cellar before emitting: the lines go into a Ruby
+            # `bottle do` block a maintainer pastes into the tap, so a '"' or
+            # '#{...}' in any field would become code when the formula loads —
+            # fail loudly on anything unexpected.
             for f in bottle-json/*.bottle.json; do
-              jq -r '.[].bottle.tags | to_entries[]
-                | .key as $tag | .value.sha256 as $sha | (.value.cellar // "") as $cellar
+              jq -r '.[] | .bottle as $b | ($b.cellar // "") as $cellar
+                | $b.tags | to_entries[]
+                | .key as $tag | .value.sha256 as $sha
                 | ($tag | test("^[a-z0-9_]+$")) as $tag_ok
                 | ($sha | test("^[a-f0-9]{64}$")) as $sha_ok
                 | (if ($cellar | test("^:[a-z_]+$")) then "cellar: " + $cellar + ", "
