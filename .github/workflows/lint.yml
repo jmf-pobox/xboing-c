@@ -29,6 +29,10 @@ jobs:
       # runner's apt cppcheck floats with the image and silently changes
       # which style findings fire; building a fixed tag removes that drift.
       CPPCHECK_VERSION: "2.22.0"
+      # The exact commit the 2.22.0 tag points at. Git tags are mutable;
+      # verifying the resolved commit keeps the analyzer reproducible even
+      # if upstream ever re-points the tag.
+      CPPCHECK_COMMIT: "a436ca35ed1887bee789765122b65ed2d7a7e045"
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
@@ -38,6 +42,11 @@ jobs:
           sudo apt-get install -y cmake g++ make
           git clone --depth 1 --branch "${CPPCHECK_VERSION}" \
             https://github.com/danmar/cppcheck.git /tmp/cppcheck-src
+          resolved="$(git -C /tmp/cppcheck-src rev-parse HEAD)"
+          if [ "$resolved" != "$CPPCHECK_COMMIT" ]; then
+            echo "::error::cppcheck ${CPPCHECK_VERSION} resolved to $resolved, expected $CPPCHECK_COMMIT" >&2
+            exit 1
+          fi
           cmake -S /tmp/cppcheck-src -B /tmp/cppcheck-build -DCMAKE_BUILD_TYPE=Release
           cmake --build /tmp/cppcheck-build -j"$(nproc)"
           sudo cmake --install /tmp/cppcheck-build
