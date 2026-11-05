@@ -314,7 +314,7 @@ static void DoHighScores(Display *display, Window window)
             DrawShadowText(display, window, textFont, string, xl, y, green);
 
             /* Game duration in minutes and seconds */
-            snprintf(string, sizeof(string), "%ld'%ld'%ld\"", ntohl(highScores[i].gameTime) / 3600,
+            snprintf(string, sizeof(string), "%u'%u'%u\"", ntohl(highScores[i].gameTime) / 3600,
                     ntohl(highScores[i].gameTime) / 60, ntohl(highScores[i].gameTime) % 60);
 
             if (ntohl(highScores[i].score) != score)

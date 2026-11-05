@@ -173,11 +173,11 @@ static void do_letters(presents_system_t *ctx)
         ctx->sound.volume = 90;
 
         /* Advance x for next letter. */
-        int w = letter_widths[ctx->letter_index];
         /* letter_x is the position for THIS letter; advance after. */
         ctx->letter_index++;
         if (ctx->letter_index < PRESENTS_TITLE_LETTERS)
         {
+            int w = letter_widths[ctx->letter_index - 1];
             ctx->letter_x += PRESENTS_GAP + w;
         }
 
