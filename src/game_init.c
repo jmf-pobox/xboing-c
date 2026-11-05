@@ -974,7 +974,7 @@ static void vc_signal_modern(const char *mode_name, const char *substate, int se
     SDL_Delay(200);
 }
 
-static void vc_check(game_ctx_t *ctx, int pre_presents, int pre_credits, int pre_intro,
+static void vc_check(const game_ctx_t *ctx, int pre_presents, int pre_credits, int pre_intro,
                      int pre_demo, int pre_keys, int pre_highscore, int pre_bonus, int pre_edit)
 {
     static sdl2_state_mode_t prev_mode = SDL2ST_NONE;
