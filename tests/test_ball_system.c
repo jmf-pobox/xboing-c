@@ -1760,9 +1760,10 @@ typedef struct
     block_hit_result_t block_hit_return;
 } test_windowed_cb_t;
 
+// cppcheck-suppress constParameterCallback
 static int cb_check_region_windowed(int row, int col, int bx, int by, int bdx, void *ud)
 {
-    test_windowed_cb_t *bc = (test_windowed_cb_t *)ud;
+    const test_windowed_cb_t *bc = (const test_windowed_cb_t *)ud;
     (void)bx;
     (void)bdx;
     if (row == bc->hit_row && col == bc->hit_col && by >= bc->y_min && by <= bc->y_max)

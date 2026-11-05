@@ -1098,7 +1098,7 @@ static void test_editor_right_click_empty_cell_inspects_zero(void **vstate)
 
 static void test_editor_palette_click_matches_render(void **vstate)
 {
-    test_fixture_t *f = (test_fixture_t *)*vstate;
+    const test_fixture_t *f = (const test_fixture_t *)*vstate;
     const game_ctx_t *ctx = f->ctx;
 
     int count = editor_system_get_palette_count(ctx->editor);
@@ -1118,7 +1118,7 @@ static void test_editor_palette_click_matches_render(void **vstate)
 
 static void test_editor_palette_click_column_and_bounds(void **vstate)
 {
-    test_fixture_t *f = (test_fixture_t *)*vstate;
+    const test_fixture_t *f = (const test_fixture_t *)*vstate;
     const game_ctx_t *ctx = f->ctx;
 
     /* Column 1 holds indices 0..min(MAX_ROW, MAX_STATIC_BLOCKS)-1 (same
