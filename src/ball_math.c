@@ -32,6 +32,7 @@
 
 float ball_math_init(void)
 {
+    /* cppcheck-suppress suspiciousFloatingPointCast ; preserves legacy double-sqrt rounding */
     return (float)sqrt((double)MINFLOAT);
 }
 
