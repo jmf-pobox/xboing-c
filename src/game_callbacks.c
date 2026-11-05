@@ -382,6 +382,7 @@ static void ball_cb_on_event(ball_system_event_t event, int ball_index, void *ud
  * ========================================================================= */
 
 /* Check if bullet at (bx, by) hits a block. Narrows to 3x3 neighborhood. */
+// cppcheck-suppress constParameterCallback
 static int gun_cb_check_block_hit(int bx, int by, int *out_row, int *out_col, void *ud)
 {
     const game_ctx_t *ctx = ud;
@@ -459,6 +460,7 @@ static void gun_cb_on_block_hit(int row, int col, void *ud)
 }
 
 /* Check if bullet hits any active ball (AABB overlap) */
+// cppcheck-suppress constParameterCallback
 static int gun_cb_check_ball_hit(int bx, int by, void *ud)
 {
     const game_ctx_t *ctx = ud;
@@ -497,6 +499,7 @@ static void gun_cb_on_ball_hit(int ball_index, void *ud)
 /* Check if a bullet at (bx, by) hits the eyedude — AABB overlap when
  * the eyedude is in WALK state.  Reuses eyedude_system_check_collision
  * which already enforces the state guard. */
+// cppcheck-suppress constParameterCallback
 static int gun_cb_check_eyedude_hit(int bx, int by, void *ud)
 {
     const game_ctx_t *ctx = ud;
@@ -522,6 +525,7 @@ static void gun_cb_on_sound(const char *name, int volume, void *ud)
         sdl2_audio_play_at_percent(ctx->audio, name, volume);
 }
 
+// cppcheck-suppress constParameterCallback
 static int gun_cb_is_ball_waiting(void *ud)
 {
     const game_ctx_t *ctx = ud;
@@ -803,6 +807,7 @@ sfx_system_callbacks_t game_callbacks_sfx(void)
  * EyeDude system callbacks
  * ========================================================================= */
 
+// cppcheck-suppress constParameterCallback
 static int eyedude_cb_is_path_clear(void *ud)
 {
     const game_ctx_t *ctx = ud;
@@ -874,6 +879,7 @@ static void editor_cb_clear_grid(void *ud)
     block_system_clear_all(ctx->block);
 }
 
+// cppcheck-suppress constParameterCallback
 static int editor_cb_query_cell(int row, int col, editor_cell_t *cell, void *ud)
 {
     const game_ctx_t *ctx = ud;
@@ -1022,6 +1028,7 @@ static char resolve_save_char(const game_ctx_t *ctx, int row, int col)
     return block_type_to_char(effective_type, info.counter_slide);
 }
 
+// cppcheck-suppress constParameterCallback
 static int editor_cb_save_level(const char *path, void *ud)
 {
     const game_ctx_t *ctx = ud;

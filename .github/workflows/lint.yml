@@ -24,11 +24,24 @@ jobs:
 
   cppcheck:
     runs-on: ubuntu-latest
+    env:
+      # Pinned so CI and local `make check` run the same analyzer. The
+      # runner's apt cppcheck floats with the image and silently changes
+      # which style findings fire; building a fixed tag removes that drift.
+      CPPCHECK_VERSION: "2.22.0"
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
-      - name: Install cppcheck
-        run: sudo apt-get update && sudo apt-get install -y cppcheck
+      - name: Build and install cppcheck ${{ env.CPPCHECK_VERSION }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake g++ make
+          git clone --depth 1 --branch "${CPPCHECK_VERSION}" \
+            https://github.com/danmar/cppcheck.git /tmp/cppcheck-src
+          cmake -S /tmp/cppcheck-src -B /tmp/cppcheck-build -DCMAKE_BUILD_TYPE=Release
+          cmake --build /tmp/cppcheck-build -j"$(nproc)"
+          sudo cmake --install /tmp/cppcheck-build
+          cppcheck --version
 
       - name: cppcheck (src)
         run: |

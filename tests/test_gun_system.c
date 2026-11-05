@@ -76,6 +76,7 @@ static void reset_stub_state(stub_state_t *s)
  * Stub callbacks
  * ========================================================================= */
 
+// cppcheck-suppress constParameterCallback
 static int stub_check_block_hit(int bx, int by, int *out_row, int *out_col, void *ud)
 {
     (void)bx;
@@ -118,6 +119,7 @@ static void stub_on_ball_hit(int ball_index, void *ud)
     s->ball_hit_last_index = ball_index;
 }
 
+// cppcheck-suppress constParameterCallback
 static int stub_check_eyedude_hit(int bx, int by, void *ud)
 {
     (void)bx;
@@ -141,6 +143,7 @@ static void stub_on_sound(const char *name, int volume, void *ud)
     s->last_sound[sizeof(s->last_sound) - 1] = '\0';
 }
 
+// cppcheck-suppress constParameterCallback
 static int stub_is_ball_waiting(void *ud)
 {
     const stub_state_t *s = ud;

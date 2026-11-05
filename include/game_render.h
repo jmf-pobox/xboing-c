@@ -123,12 +123,16 @@ void game_render_specials_coords(int lh, const special_label_info_t *labels, int
 static inline void level_life_position(int level_area_x, int level_area_y, int i, int sprite_w,
                                        int sprite_h, int *out_x, int *out_y)
 {
-    int center_x = level_area_x + LEVEL_LIFE_ANCHOR_X - i * LEVEL_LIFE_STRIDE;
-    int center_y = level_area_y + LEVEL_LIFE_ANCHOR_Y;
     if (out_x)
+    {
+        int center_x = level_area_x + LEVEL_LIFE_ANCHOR_X - i * LEVEL_LIFE_STRIDE;
         *out_x = center_x - sprite_w / 2;
+    }
     if (out_y)
+    {
+        int center_y = level_area_y + LEVEL_LIFE_ANCHOR_Y;
         *out_y = center_y - sprite_h / 2;
+    }
 }
 
 /*

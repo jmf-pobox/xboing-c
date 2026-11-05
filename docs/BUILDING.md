@@ -82,7 +82,7 @@ Key targets:
 | **CMake** | Build system | `apt install cmake` |
 | **clang-format** | Code formatting | `apt install clang-format` |
 | **clang-tidy** | Deep semantic static analysis | `apt install clang-tidy` |
-| **cppcheck** | Syntactic static analysis | `apt install cppcheck` |
+| **cppcheck** | Syntactic static analysis — **pinned to 2.22.0** to match CI. `lint.yml` builds that exact tag because the analyzer's style findings change between versions; a stale local cppcheck makes `make check` disagree with CI. | build the `2.22.0` tag from source, or `brew install cppcheck` (apt often ships an older release) |
 | **CMocka** | Unit test framework | `apt install libcmocka-dev` |
 | **Valgrind** | Memory debugging | `apt install valgrind` |
 | **shellcheck** | Shell script linting | `apt install shellcheck` |
