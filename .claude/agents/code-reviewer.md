@@ -17,7 +17,7 @@ Three representative scenarios:
 
 ## Review Scope
 
-By default, review unstaged changes from `git diff`. The user may specify different files or scope to review.
+Review the changes actually being submitted, not just unstaged edits. Pick the scope from context: during local development include unstaged, staged, and untracked files (`git diff`, `git diff --staged`, and any new files); for a pre-PR review, diff the branch against its base (`git diff <base>...HEAD`) so commits already made are covered. The user may specify a different scope. Always state the exact scope you inspected before concluding there are no findings.
 
 ## Core Review Responsibilities
 
