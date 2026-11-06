@@ -58,13 +58,15 @@ The master ruleset (id 13438261) requires:
 - `install-brew (ubuntu-latest)`
 - `clang-format`
 - `cppcheck`
-- `Cursor Automation: Find vulnerabilities`
 
 Update this list AND the ruleset in lockstep whenever a new leg is added
 or a matrix expansion changes an existing name.
 
 `markdownlint` is not required — `docs.yml` is path-conditional, so
 requiring it would block any PR that doesn't touch `.md`.
+`Cursor Automation: Find vulnerabilities` runs on PRs as a review but is
+not a required status check — it does not fire on every PR, so requiring
+it would wedge any PR it skips.
 
 ## §10 — Gate seen failing
 
