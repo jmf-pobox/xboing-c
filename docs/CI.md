@@ -19,11 +19,11 @@ the why.
 Both shipping install paths run on both shipping OSes:
 
 - **`.deb`** — Ubuntu (`install-deb` on PRs + `smoke-deb` on release)
-- **Homebrew formula** — macOS 14 AND Linuxbrew on Ubuntu
+- **Homebrew formula** — macOS (`macos-latest`) AND Linuxbrew on Ubuntu
   (`install-brew` matrix on PRs + `smoke-brew` matrix on release)
 
 Source-level correctness runs on both OSes for the debug preset:
-`build (ubuntu-latest, debug)` + `build (macos-14, debug)`. ASan stays
+`build (ubuntu-latest, debug)` + `build (macos-latest, debug)`. ASan stays
 Ubuntu-only — clang asan on macOS catches the same memory bugs the gcc
 asan leg already covers.
 
@@ -52,9 +52,9 @@ The master ruleset (id 13438261) requires:
 
 - `build (ubuntu-latest, debug, build)`
 - `build (ubuntu-latest, asan, build-asan)`
-- `build (macos-14, debug, build)`
+- `build (macos-latest, debug, build)`
 - `install-deb`
-- `install-brew (macos-14)`
+- `install-brew (macos-latest)`
 - `install-brew (ubuntu-latest)`
 - `clang-format`
 - `cppcheck`
@@ -106,7 +106,7 @@ its curl HTTP/2 backend surfaces the 404 as a peer close — the exit code
 is different, but the propagation is identical, so the guard is
 platform-independent.
 
-The macOS host runs the rehearsal even though `install-brew (macos-14)`
+The macOS host runs the rehearsal even though `install-brew (macos-latest)`
 in CI skips the changed step (`if: runner.os == 'Linux'` — brew is
 pre-installed on the runner). The rehearsal covers `smoke-brew` in
 `release.yml`, which uses the same pipeline shape, and the release
