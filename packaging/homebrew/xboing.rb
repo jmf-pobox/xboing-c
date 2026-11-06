@@ -29,7 +29,7 @@ class Xboing < Formula
   # (Homebrew's own pour_bottle? check) matches on tag alone, before it
   # ever looks at url/sha256 — a placeholder block with fake shas/root_url
   # makes brew TRY to pour a bottle that 404s, on every plain
-  # `brew install` on a matching platform (macos-14/ubuntu-latest, exactly
+  # `brew install` on a matching platform (macos-latest/ubuntu-latest, exactly
   # what release.yml's smoke-brew job runs), with no source-url fallback.
   # Only the SEPARATE tap (jmf-pobox/homebrew-xboing) carries a bottle
   # block, and only after a human pastes the real per-platform sha256s

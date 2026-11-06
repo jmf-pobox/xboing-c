@@ -19,7 +19,7 @@ pre-release/build suffix — see "Strict semver" below) to
    tag-pinned Homebrew formula (source build) on every shipping OS,
    verify version + headless launch.
 5. `bottle` — builds a prebuilt Homebrew bottle on each of
-   `macos-14`, `ubuntu-latest`, `ubuntu-24.04-arm` and uploads the
+   `macos-latest`, `ubuntu-latest`, `ubuntu-24.04-arm` and uploads the
    `.bottle.tar.gz` + `.bottle.json` to the Release.
 6. `bottle-notes` — reads the three `.bottle.json` files back off the
    Release, assembles the tap's `bottle do ... end` block with the
@@ -152,7 +152,7 @@ all in `.github/workflows/release.yml`'s `bottle` job unless noted:
    is the manual step in "MANUAL post-tap-bump verification" above,
    run by a human after that commit lands.
 
-`smoke-brew` (source build, matrix `macos-14`/`ubuntu-latest`) is
+`smoke-brew` (source build, matrix `macos-latest`/`ubuntu-latest`) is
 unchanged by any of this — it is a fallback-path test, not a bottle
 test, and stays that way on purpose.
 
@@ -162,7 +162,7 @@ checks `formula.bottled?` — whether a `bottle do` tag matches the
 current platform — before it ever looks at `url`/`sha256`. A
 placeholder block with fake `sha256`/`root_url` values would make
 `brew install` on a matching platform (exactly what `smoke-brew` runs
-on `macos-14`/`ubuntu-latest`, unauthenticated, no flags) try to pour
+on `macos-latest`/`ubuntu-latest`, unauthenticated, no flags) try to pour
 that fake bottle and 404 hard, with **no fallback to the source
 `url`**. Only the tap (`jmf-pobox/homebrew-xboing`, a separate repo)
 ever carries a `bottle do` block, and only after Phase 2b lands the
@@ -176,15 +176,16 @@ A Homebrew bottle is not portable to every machine running the same
 OS family — it is pinned to the exact combination CI built it on:
 
 - **macOS**: the bottle tag encodes the OS *codename*
-  (`arm64_sonoma` for the `macos-14` runner, which is macOS 14
-  "Sonoma" — not "14", and not "sequoia"/macOS 15). A user on macOS
-  15 "Sequoia" installing this tap sees `brew` refuse the `sonoma`
-  bottle and fall back to a source build, because bottles do not
-  cross macOS major versions. When GitHub bumps the `macos-14`
-  runner image's OS version, `arm64_sonoma` bottles will not install
-  from the tap without also re-cutting a release. There is no macOS
-  Intel bottle in this scope — the tap is Apple Silicon only,
-  matching the `macos-14` (arm64) runner.
+  (`arm64_<codename>` — e.g. `arm64_sequoia` for macOS 15 — derived
+  from whatever version the `macos-latest` runner currently images,
+  not the numeric "15"). The tag floats with `macos-latest`: a user
+  on a different macOS major version sees `brew` refuse the bottle
+  and fall back to a source build, because bottles do not cross
+  macOS major versions. When GitHub advances `macos-latest` to a new
+  OS, the next release's bottle carries the new codename; older-tag
+  bottles will not install from the tap without re-cutting a release.
+  There is no macOS Intel bottle in this scope — the tap is Apple
+  Silicon only, matching the `macos-latest` (arm64) runner.
 - **Linux**: `x86_64_linux` / `arm64_linux` bottles are built on
   `ubuntu-latest` / `ubuntu-24.04-arm` and link against that
   runner image's glibc. Homebrew's Linux bottles assume a glibc no

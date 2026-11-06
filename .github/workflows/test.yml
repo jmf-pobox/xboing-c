@@ -50,7 +50,7 @@ jobs:
       - name: Install dependencies (macOS — Homebrew)
         if: runner.os == 'macOS'
         run: |
-          # cmake and pkg-config are usually preinstalled on macos-14 but
+          # cmake and pkg-config are usually preinstalled on the macOS runner but
           # `brew install` is idempotent, so passing them is safe. cmocka
           # and the SDL2 stack come from Homebrew.
           brew install cmake pkg-config cmocka sdl2 sdl2_image sdl2_mixer sdl2_ttf
@@ -141,7 +141,7 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
-      - name: Bootstrap Homebrew on Linux (pre-installed on macos-14)
+      - name: Bootstrap Homebrew on Linux (pre-installed on macos-latest)
         if: runner.os == 'Linux'
         run: |
           # The standard install script exits early on machines that already
