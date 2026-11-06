@@ -178,14 +178,16 @@ OS family — it is pinned to the exact combination CI built it on:
 - **macOS**: the bottle tag encodes the OS *codename*
   (`arm64_<codename>` — e.g. `arm64_sequoia` for macOS 15 — derived
   from whatever version the `macos-latest` runner currently images,
-  not the numeric "15"). The tag floats with `macos-latest`: a user
-  on a different macOS major version sees `brew` refuse the bottle
-  and fall back to a source build, because bottles do not cross
-  macOS major versions. When GitHub advances `macos-latest` to a new
-  OS, the next release's bottle carries the new codename; older-tag
-  bottles will not install from the tap without re-cutting a release.
-  There is no macOS Intel bottle in this scope — the tap is Apple
-  Silicon only, matching the `macos-latest` (arm64) runner.
+  not the numeric "15"). The tag floats with `macos-latest`.
+  Homebrew bottle compatibility is one-way: a bottle built on a
+  given macOS serves that version and *newer* hosts, but an *older*
+  host refuses it and falls back to a source build. So building on
+  `macos-latest` sets the minimum-supported floor — users on a macOS
+  older than the runner's image get no bottle. When GitHub advances
+  `macos-latest` to a new OS, the next release's bottle carries the
+  new codename and raises that floor. There is no macOS Intel bottle
+  in this scope — the tap is Apple Silicon only, matching the
+  `macos-latest` (arm64) runner.
 - **Linux**: `x86_64_linux` / `arm64_linux` bottles are built on
   `ubuntu-latest` / `ubuntu-24.04-arm` and link against that
   runner image's glibc. Homebrew's Linux bottles assume a glibc no
