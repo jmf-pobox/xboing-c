@@ -51,6 +51,7 @@
 #include <X11/Xos.h>
 #include <X11/Xutil.h>
 #include <ctype.h>
+#include <inttypes.h>
 #include <file.h>
 #include <netinet/in.h>
 #include <stddef.h>
@@ -574,8 +575,10 @@ void CommandlineHighscorePrint(void)
         if (ntohl(highScores[i].score) > 0)
         {
             /* Print out the actual record */
-            fprintf(stdout, "%d\t%ld\t  %ld\t%ld'%ld'%ld\"\t%s  %s\n", i + 1,
-                    ntohl(highScores[i].score), ntohl(highScores[i].level),
+            fprintf(stdout,
+                    "%d\t%" PRIu32 "\t  %" PRIu32 "\t"
+                    "%" PRIu32 "'%" PRIu32 "'%" PRIu32 "\"\t%s  %s\n",
+                    i + 1, ntohl(highScores[i].score), ntohl(highScores[i].level),
                     ntohl(highScores[i].gameTime) / 3600, ntohl(highScores[i].gameTime) / 60,
                     ntohl(highScores[i].gameTime) % 60, string, highScores[i].name);
         }
@@ -607,8 +610,10 @@ void CommandlineHighscorePrint(void)
         if (ntohl(highScores[i].score) > 0)
         {
             /* Print out the actual record */
-            fprintf(stdout, "%d\t%ld\t  %ld\t%ld'%ld'%ld\"\t%s  %s\n", i + 1,
-                    ntohl(highScores[i].score), ntohl(highScores[i].level),
+            fprintf(stdout,
+                    "%d\t%" PRIu32 "\t  %" PRIu32 "\t"
+                    "%" PRIu32 "'%" PRIu32 "'%" PRIu32 "\"\t%s  %s\n",
+                    i + 1, ntohl(highScores[i].score), ntohl(highScores[i].level),
                     ntohl(highScores[i].gameTime) / 3600, ntohl(highScores[i].gameTime) / 60,
                     ntohl(highScores[i].gameTime) % 60, string, highScores[i].name);
         }
