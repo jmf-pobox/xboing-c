@@ -148,7 +148,7 @@ endif()
 # SDL2 texture cache tests (bead xboing-oaa.2)
 # Links against sdl2_texture and sdl2_renderer static libraries.
 # Uses SDL_VIDEODRIVER=dummy and real PNGs from assets/images/.
-if(SDL2_FOUND AND SDL2_IMAGE_FOUND)
+if(SDL2_FOUND AND SDL2_image_FOUND)
     add_executable(test_sdl2_texture test_sdl2_texture.c)
     target_compile_options(test_sdl2_texture PRIVATE ${XBOING_STRICT_WARNINGS} -Werror ${CMOCKA_WARNING_FIXUPS})
     target_link_libraries(test_sdl2_texture PRIVATE
@@ -162,7 +162,7 @@ endif()
 # SDL2 font rendering tests (bead xboing-oaa.3)
 # Links against sdl2_font and sdl2_renderer static libraries.
 # Uses SDL_VIDEODRIVER=dummy and real TTFs from assets/fonts/.
-if(SDL2_FOUND AND SDL2_TTF_FOUND)
+if(SDL2_FOUND AND SDL2_ttf_FOUND)
     add_executable(test_sdl2_font test_sdl2_font.c)
     target_compile_options(test_sdl2_font PRIVATE ${XBOING_STRICT_WARNINGS} -Werror ${CMOCKA_WARNING_FIXUPS})
     target_link_libraries(test_sdl2_font PRIVATE
@@ -207,7 +207,7 @@ endif()
 # Links against sdl2_audio static library.
 # Uses SDL_AUDIODRIVER=dummy for headless CI testing.
 # Loads real WAV files from sounds/ directory.
-if(SDL2_FOUND AND SDL2_MIXER_FOUND)
+if(SDL2_FOUND AND SDL2_mixer_FOUND)
     add_executable(test_sdl2_audio test_sdl2_audio.c)
     target_compile_options(test_sdl2_audio PRIVATE ${XBOING_STRICT_WARNINGS} -Werror ${CMOCKA_WARNING_FIXUPS})
     target_link_libraries(test_sdl2_audio PRIVATE sdl2_audio ${CMOCKA_LIBRARIES})
@@ -488,7 +488,7 @@ endif()
 # Integration smoke test — full game_create/destroy lifecycle.
 # Links all game_*.c integration sources + all static libraries.
 # Uses SDL_VIDEODRIVER=dummy + SDL_AUDIODRIVER=dummy for headless operation.
-if(SDL2_FOUND AND SDL2_IMAGE_FOUND AND SDL2_MIXER_FOUND AND SDL2_TTF_FOUND)
+if(SDL2_FOUND AND SDL2_image_FOUND AND SDL2_mixer_FOUND AND SDL2_ttf_FOUND)
     add_executable(test_integration_smoke
         test_integration_smoke.c
         ${CMAKE_SOURCE_DIR}/src/game_callbacks.c
@@ -502,7 +502,6 @@ if(SDL2_FOUND AND SDL2_IMAGE_FOUND AND SDL2_MIXER_FOUND AND SDL2_TTF_FOUND)
     target_include_directories(test_integration_smoke PRIVATE
         ${CMAKE_SOURCE_DIR}/include
         ${CMAKE_SOURCE_DIR}/src
-        ${SDL2_INCLUDE_DIRS}
     )
     target_compile_options(test_integration_smoke PRIVATE ${XBOING_STRICT_WARNINGS} -Werror ${CMOCKA_WARNING_FIXUPS})
     target_link_libraries(test_integration_smoke PRIVATE
@@ -544,7 +543,6 @@ if(SDL2_FOUND AND SDL2_IMAGE_FOUND AND SDL2_MIXER_FOUND AND SDL2_TTF_FOUND)
     target_include_directories(test_integration_autocycle PRIVATE
         ${CMAKE_SOURCE_DIR}/include
         ${CMAKE_SOURCE_DIR}/src
-        ${SDL2_INCLUDE_DIRS}
     )
     target_compile_options(test_integration_autocycle PRIVATE ${XBOING_STRICT_WARNINGS} -Werror ${CMOCKA_WARNING_FIXUPS})
     target_link_libraries(test_integration_autocycle PRIVATE
@@ -581,7 +579,6 @@ if(SDL2_FOUND AND SDL2_IMAGE_FOUND AND SDL2_MIXER_FOUND AND SDL2_TTF_FOUND)
     target_include_directories(test_integration_modes PRIVATE
         ${CMAKE_SOURCE_DIR}/include
         ${CMAKE_SOURCE_DIR}/src
-        ${SDL2_INCLUDE_DIRS}
     )
     target_compile_options(test_integration_modes PRIVATE ${XBOING_STRICT_WARNINGS} -Werror ${CMOCKA_WARNING_FIXUPS})
     target_link_libraries(test_integration_modes PRIVATE
@@ -619,7 +616,6 @@ if(SDL2_FOUND AND SDL2_IMAGE_FOUND AND SDL2_MIXER_FOUND AND SDL2_TTF_FOUND)
         target_include_directories(${NAME} PRIVATE
             ${CMAKE_SOURCE_DIR}/include
             ${CMAKE_SOURCE_DIR}/src
-            ${SDL2_INCLUDE_DIRS}
         )
         target_compile_options(${NAME} PRIVATE ${XBOING_STRICT_WARNINGS} -Werror ${CMOCKA_WARNING_FIXUPS})
         target_link_libraries(${NAME} PRIVATE

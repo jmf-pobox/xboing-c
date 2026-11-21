@@ -12,24 +12,16 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # --- Dependencies -----------------------------------------------------------
 
-find_package(PkgConfig REQUIRED)
-
 # SDL2 libraries — required for the modernized game binary.
 # >=2.0.16 for SDL_SetWindowMouseGrab (used by the -grab option).
-pkg_check_modules(SDL2       REQUIRED sdl2>=2.0.16)
-pkg_check_modules(SDL2_IMAGE REQUIRED SDL2_image)
-pkg_check_modules(SDL2_MIXER REQUIRED SDL2_mixer)
-pkg_check_modules(SDL2_TTF   REQUIRED SDL2_ttf)
-
-# Homebrew installs SDL2 sub-libraries in per-package Cellar paths that are
-# not on the default linker search path.  Propagate LIBRARY_DIRS so that
-# bare -lSDL2_image / -lSDL2_mixer / -lSDL2_ttf flags resolve correctly.
-link_directories(
-    ${SDL2_LIBRARY_DIRS}
-    ${SDL2_IMAGE_LIBRARY_DIRS}
-    ${SDL2_MIXER_LIBRARY_DIRS}
-    ${SDL2_TTF_LIBRARY_DIRS}
-)
+# Use the CMake package configs shipped by SDL (Homebrew and Debian/Ubuntu
+# both install them).  Their imported targets carry correct include and link
+# paths, so we don't depend on pkg-config resolving every transitive
+# Requires.private (Homebrew fluid-synth -> keg-only readline broke that).
+find_package(SDL2 2.0.16 REQUIRED CONFIG)
+find_package(SDL2_image  REQUIRED CONFIG)
+find_package(SDL2_mixer  REQUIRED CONFIG)
+find_package(SDL2_ttf    REQUIRED CONFIG)
 
 # --- Compiler warning policy ------------------------------------------------
 
@@ -139,36 +131,31 @@ if(SDL2_FOUND)
     add_library(sdl2_renderer STATIC src/sdl2_renderer.c)
     target_include_directories(sdl2_renderer PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/include
-        ${SDL2_INCLUDE_DIRS}
     )
     target_compile_options(sdl2_renderer PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
-    target_link_libraries(sdl2_renderer PUBLIC ${SDL2_LIBRARIES})
+    target_link_libraries(sdl2_renderer PUBLIC SDL2::SDL2)
 endif()
 
 # --- SDL2 texture cache library (optional) ----------------------------------
 
-if(SDL2_FOUND AND SDL2_IMAGE_FOUND)
+if(SDL2_FOUND AND SDL2_image_FOUND)
     add_library(sdl2_texture STATIC src/sdl2_texture.c)
     target_include_directories(sdl2_texture PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/include
-        ${SDL2_INCLUDE_DIRS}
-        ${SDL2_IMAGE_INCLUDE_DIRS}
     )
     target_compile_options(sdl2_texture PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
-    target_link_libraries(sdl2_texture PUBLIC ${SDL2_LIBRARIES} ${SDL2_IMAGE_LIBRARIES})
+    target_link_libraries(sdl2_texture PUBLIC SDL2::SDL2 SDL2_image::SDL2_image)
 endif()
 
 # --- SDL2 font rendering library (optional) ---------------------------------
 
-if(SDL2_FOUND AND SDL2_TTF_FOUND)
+if(SDL2_FOUND AND SDL2_ttf_FOUND)
     add_library(sdl2_font STATIC src/sdl2_font.c)
     target_include_directories(sdl2_font PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/include
-        ${SDL2_INCLUDE_DIRS}
-        ${SDL2_TTF_INCLUDE_DIRS}
     )
     target_compile_options(sdl2_font PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
-    target_link_libraries(sdl2_font PUBLIC ${SDL2_LIBRARIES} ${SDL2_TTF_LIBRARIES})
+    target_link_libraries(sdl2_font PUBLIC SDL2::SDL2 SDL2_ttf::SDL2_ttf)
 endif()
 
 # --- SDL2 color system library (optional) ------------------------------------
@@ -177,10 +164,9 @@ if(SDL2_FOUND)
     add_library(sdl2_color STATIC src/sdl2_color.c)
     target_include_directories(sdl2_color PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/include
-        ${SDL2_INCLUDE_DIRS}
     )
     target_compile_options(sdl2_color PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
-    target_link_libraries(sdl2_color PUBLIC ${SDL2_LIBRARIES})
+    target_link_libraries(sdl2_color PUBLIC SDL2::SDL2)
 endif()
 
 # --- SDL2 cursor management library (optional) ------------------------------
@@ -189,10 +175,9 @@ if(SDL2_FOUND)
     add_library(sdl2_cursor STATIC src/sdl2_cursor.c)
     target_include_directories(sdl2_cursor PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/include
-        ${SDL2_INCLUDE_DIRS}
     )
     target_compile_options(sdl2_cursor PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
-    target_link_libraries(sdl2_cursor PUBLIC ${SDL2_LIBRARIES})
+    target_link_libraries(sdl2_cursor PUBLIC SDL2::SDL2)
 endif()
 
 # --- SDL2 render regions library (optional) ----------------------------------
@@ -201,23 +186,20 @@ if(SDL2_FOUND)
     add_library(sdl2_regions STATIC src/sdl2_regions.c)
     target_include_directories(sdl2_regions PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/include
-        ${SDL2_INCLUDE_DIRS}
     )
     target_compile_options(sdl2_regions PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
-    target_link_libraries(sdl2_regions PUBLIC ${SDL2_LIBRARIES})
+    target_link_libraries(sdl2_regions PUBLIC SDL2::SDL2)
 endif()
 
 # --- SDL2 audio library (optional) ------------------------------------------
 
-if(SDL2_FOUND AND SDL2_MIXER_FOUND)
+if(SDL2_FOUND AND SDL2_mixer_FOUND)
     add_library(sdl2_audio STATIC src/sdl2_audio.c)
     target_include_directories(sdl2_audio PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/include
-        ${SDL2_INCLUDE_DIRS}
-        ${SDL2_MIXER_INCLUDE_DIRS}
     )
     target_compile_options(sdl2_audio PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
-    target_link_libraries(sdl2_audio PUBLIC ${SDL2_LIBRARIES} ${SDL2_MIXER_LIBRARIES})
+    target_link_libraries(sdl2_audio PUBLIC SDL2::SDL2 SDL2_mixer::SDL2_mixer)
 endif()
 
 # --- SDL2 input mapping library (optional) -----------------------------------
@@ -226,10 +208,9 @@ if(SDL2_FOUND)
     add_library(sdl2_input STATIC src/sdl2_input.c)
     target_include_directories(sdl2_input PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/include
-        ${SDL2_INCLUDE_DIRS}
     )
     target_compile_options(sdl2_input PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
-    target_link_libraries(sdl2_input PUBLIC ${SDL2_LIBRARIES})
+    target_link_libraries(sdl2_input PUBLIC SDL2::SDL2)
 endif()
 
 # --- Game state machine library -----------------------------------------------
@@ -607,7 +588,7 @@ target_compile_options(sys_priv PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
 # The new SDL2-based game binary.  Links all pure C system libraries and SDL2
 # platform libraries.  Built only when all required SDL2 libs are available.
 
-if(SDL2_FOUND AND SDL2_IMAGE_FOUND AND SDL2_MIXER_FOUND AND SDL2_TTF_FOUND)
+if(SDL2_FOUND AND SDL2_image_FOUND AND SDL2_mixer_FOUND AND SDL2_ttf_FOUND)
     add_executable(xboing
         src/game_callbacks.c
         src/game_init.c
@@ -621,7 +602,6 @@ if(SDL2_FOUND AND SDL2_IMAGE_FOUND AND SDL2_MIXER_FOUND AND SDL2_TTF_FOUND)
     target_include_directories(xboing PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${CMAKE_CURRENT_SOURCE_DIR}/src
-        ${SDL2_INCLUDE_DIRS}
     )
     target_compile_options(xboing PRIVATE ${XBOING_STRICT_WARNINGS} -Werror)
     # Override XBOING_DATA_DIR's header default (/usr/share/xboing) so that
@@ -699,6 +679,7 @@ target_link_libraries(gen_bonus_fixtures PRIVATE savegame_io)
 
 option(BUILD_TESTING "Build unit tests" ON)
 if(BUILD_TESTING)
+    find_package(PkgConfig REQUIRED)
     pkg_check_modules(CMOCKA REQUIRED cmocka)
     enable_testing()
     add_subdirectory(tests)
@@ -709,9 +690,9 @@ endif()
 message(STATUS "")
 message(STATUS "XBoing configuration summary:")
 message(STATUS "  SDL2:       ${SDL2_VERSION}")
-message(STATUS "  SDL2_image: ${SDL2_IMAGE_VERSION}")
-message(STATUS "  SDL2_mixer: ${SDL2_MIXER_VERSION}")
-message(STATUS "  SDL2_ttf:   ${SDL2_TTF_VERSION}")
+message(STATUS "  SDL2_image: ${SDL2_image_VERSION}")
+message(STATUS "  SDL2_mixer: ${SDL2_mixer_VERSION}")
+message(STATUS "  SDL2_ttf:   ${SDL2_ttf_VERSION}")
 if(BUILD_TESTING)
     message(STATUS "  CMocka:     ${CMOCKA_VERSION}")
 else()
