@@ -576,7 +576,8 @@ void CommandlineHighscorePrint(void)
         {
             /* Print out the actual record */
             fprintf(stdout,
-                    "%d\t%ld\t  %ld\t%" PRIu32 "'%" PRIu32 "'%" PRIu32 "\"\t%s  %s\n",
+                    "%d\t%" PRIu32 "\t  %" PRIu32 "\t"
+                    "%" PRIu32 "'%" PRIu32 "'%" PRIu32 "\"\t%s  %s\n",
                     i + 1, ntohl(highScores[i].score), ntohl(highScores[i].level),
                     ntohl(highScores[i].gameTime) / 3600, ntohl(highScores[i].gameTime) / 60,
                     ntohl(highScores[i].gameTime) % 60, string, highScores[i].name);
@@ -610,7 +611,8 @@ void CommandlineHighscorePrint(void)
         {
             /* Print out the actual record */
             fprintf(stdout,
-                    "%d\t%ld\t  %ld\t%" PRIu32 "'%" PRIu32 "'%" PRIu32 "\"\t%s  %s\n",
+                    "%d\t%" PRIu32 "\t  %" PRIu32 "\t"
+                    "%" PRIu32 "'%" PRIu32 "'%" PRIu32 "\"\t%s  %s\n",
                     i + 1, ntohl(highScores[i].score), ntohl(highScores[i].level),
                     ntohl(highScores[i].gameTime) / 3600, ntohl(highScores[i].gameTime) / 60,
                     ntohl(highScores[i].gameTime) % 60, string, highScores[i].name);
