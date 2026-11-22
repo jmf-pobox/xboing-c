@@ -2,7 +2,7 @@ name: xboing
 repositories:
   - jmf-pobox/xboing-c
 members:
-  - identity: jmf-pobox
+  - identity: jfreeman
     role: maintainer
   - identity: claude
     role: coo

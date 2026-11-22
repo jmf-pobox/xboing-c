@@ -88,8 +88,6 @@ docs/*.bcf
 docs/*.blg
 docs/*.run.xml
 
-# ethos runtime (never track) — DES-058 live zone + mission locks
+# ethos runtime (never track): mission locks and any nested local zone
 .punt-labs/**/local/**
 .punt-labs/ethos/missions/**/*.lock
-# ethos: machine-local files (.local.*) — may hold secrets, never track
-.punt-labs/**/*.local.*
