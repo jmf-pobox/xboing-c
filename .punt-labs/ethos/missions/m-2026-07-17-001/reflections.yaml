@@ -1,0 +1,24 @@
+reflections:
+    - round: 1
+      created_at: "2026-07-17T01:44:56Z"
+      author: jck
+      converging: false
+      signals:
+        - 'Flag lifecycle PASS: cheated set only in the = debug-cheat block-explode branch (game_input.c:332), not the ''Stop trying to cheat!!'' no-op, not on mere -debug; reset in start_new_game (game_modes.c:108). 3 touch points only (set/reset/guard-read); no stale carryover. Play-test never reaches submit_score (game_rules gated !play_test_active).'
+        - 'Guard PASS: submit_score returns 0 when cheated before both inserts (personal ~1034, global ~1088 — only 2 sites, both in submit_score). Callers treat 0 as no-global-rank, skip boing-master prompt/sound (matches rejected-global-insert path).'
+        - 'Live scoring PASS: only high-score TABLE submission gated; in-game HUD scoring untouched.'
+        - 'ADR-073 PASS: format matches ADR-070/071/072, cites game_modes.c:1015-1074 + original/main.c:511-522, states the 1996 deviation + cheat-USE-not-debug-presence.'
+        - 'FAIL (round-2 required): ''Words of wisdom Boing Master?'' prompt (game_modes.c:1203-1206) gated on !savegame_restored_session but NOT !cheated. A cheated #1 still gets the legitimacy ceremony, then submit_score discards the answer — a UX dead-end that invites a ''why didn''t my message show'' report and cheapens the ceremony. One boolean term, matches the existing !savegame_restored_session precedent in the same if; project policy is fix-all-in-PR, no follow-up bead.'
+      recommendation: continue
+      reason: Criteria 1-4 verified correct. Gate the wisdom prompt on !ctx->cheated NOW (one-line add to game_modes.c:1203-1206) and update ADR-073 Consequences to 'resolved in round 2' rather than deferred. Not a scope creep — finishing the job the ADR itself flags.
+    - round: 2
+      created_at: "2026-07-17T01:50:34Z"
+      author: jck
+      converging: true
+      signals:
+        - Wisdom-prompt now gated on !ctx->cheated alongside !ctx->savegame_restored_session (game_modes.c:1206); only the one term added, other conditions unchanged.
+        - 'ADR-073 Consequences rewritten: prompt gated on !ctx->cheated (resolved round 2); no deferred-follow-up language remains.'
+        - Round-1 flag lifecycle (game_context.h:134, game_input.c:332 set, game_modes.c:108 reset, submit_score guard 1029) verified untouched.
+        - Build/test (zero-warning, ctest 61/61 debug+asan) on jdc report; round-2 diff is one boolean term + doc prose, low risk.
+      recommendation: stop
+      reason: 'UX dead-end closed — a cheated #1 session no longer sees the ''Words of wisdom'' ceremony whose answer submit_score would discard. Cheat now disqualifies from both boards AND skips the legitimacy prompt. Scope stayed to write_set. Approved.'

@@ -1,0 +1,16 @@
+reflections:
+    - mission: m-2026-09-06-002
+      round: 1
+      created_at: "2026-09-06T15:02:21Z"
+      author: gjm
+      converging: true
+      signals:
+        - 'compensating-control wording matches in release.yml and docs/CI.md, correctly hedged: explicitly not equivalent to a SHA pin, tag noted as mutable in principle, integrity attributed to slsa-verifier'
+        - release.yml comment, docs/CI.md §9, and docs/CI.md §10 agree on README wording, builder-fetch.sh exit codes (2/7), and the silent-no-attestation failure mode; §9/§10 cross-references resolve to the right sections
+        - '§10 permissions claim (actions:read, id-token:write, contents:write) is unchanged text and still true: git diff confirms the provenance job''s permissions: block is untouched, only the uses: ref changed'
+        - 'git diff HEAD --stat: exactly 2 files, 1 hunk in release.yml, 2 in docs/CI.md; grep -n uses: in release.yml shows only the provenance ref changed (@v2.1.0, was SHA); actions/checkout x2, upload-artifact, download-artifact, markdownlint-cli2-action, Homebrew installer pin (both call sites) all byte-identical; subjects_b64/provenance-subjects/needs wiring from round 1 untouched'
+        - 'npx --yes markdownlint-cli2 docs/CI.md: zero issues in docs/CI.md itself (17 issues reported are all in gitignored .punt-labs/quarry/captures/*.md, outside the write-set) — independently reproduced jdc''s claim'
+        - 'python3 yaml.safe_load on release.yml: parses clean'
+        - 'CONFIRMED FINDING: release.yml:293-294 — every other job block (build:22-25, publish:223-226, smoke-deb:305-308, smoke-brew:365-372) opens and closes its header comment with the 75-dash rule before the job key; provenance''s closing rule was overwritten by the new comment prose, so it now runs straight into `provenance:` with no closing separator. Confirmed via cat -A that the rule string (`  # ` + 75 dashes) matches all four other occurrences. This is the only block in the file missing it.'
+      recommendation: continue
+      reason: 'All four content-accuracy criteria pass: the security claims are accurately and symmetrically hedged (not overclaiming SHA-pin equivalence, not underclaiming into insecure), the three documentation sites (release.yml comment, CI.md section 9, CI.md section 10) are internally consistent on every specific (README wording, exit codes, failure mode, cross-references), the section 10 rewrite is true and the surviving permissions claim is verified still-true because nothing it describes changed, and exactly one ref changed with everything else in the write-set''s blast radius confirmed byte-identical. One mechanical defect remains: the closing separator comment above the provenance job key was consumed by the new comment text, making it the only job block in the file without one. This is a one-line, comment-only fix; round 2 should apply it and then close.'

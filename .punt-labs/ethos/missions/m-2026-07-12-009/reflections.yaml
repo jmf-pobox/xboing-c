@@ -1,0 +1,24 @@
+reflections:
+    - round: 1
+      created_at: "2026-07-12T02:36:49Z"
+      author: jck
+      converging: true
+      signals:
+        - 'FIX A APPROVED: game_render_playfield suppresses paddle/ball only when SDL2ST_EDIT && !EDITOR_STATE_TEST; GAME/PAUSE untouched; play-test shows them — matches RedrawEditorArea (original/editor.c:206-216) vs SetupPlayTest (:587-621)'
+        - 'FIX B DEVIATION: original ''- R -'' (DrawTheBlock case RANDOM_BLK, original/blocks.c:1700-1709) keys off the PARAMETER blockType, drawn ONCE at AddNewBlock placement (:2405-2406 uses the untouched RANDOM_BLK local), then HandlePendingAnimations recolors to concrete next tick (:1428-1444) overwriting it; all later redraws use blockP->blockType (resolved) — so ''- R -'' is a one-tick placement artifact, NEVER persistent, in gameplay OR editor grid'
+        - FIX B makes info.random (sticky, never cleared, block_system.c:455-459) draw '- R -' every frame on every random cell in SDL2ST_GAME and SDL2ST_EDIT — a permanent label that never existed; a player would notice random blocks become trivially distinguishable
+        - 'old code (case RANDOM_BLK keyed off block_type) was ALREADY faithful: palette swatch (entry->block_type==RANDOM_BLK) shows ''- R -'', live cells never match -> no persistent overlay. FIX B broke this'
+        - 'REQUIRED (round 2): revert FIX B in game_render_blocks (do not pass sticky info.random into a persistent overlay); keep FIX A; keep the palette/Active static swatch showing ''- R -'' via block_type. Also update design §2.4 addendum/stage 8 (mis-analysis) under xboing-dq5'
+        - invariant + palette usage confirmed correct; overlay exclusivity moot; nothing here is a screenshot question — pure call-graph tracing
+      recommendation: continue
+      reason: FIX A (paddle/ball suppression) faithful and approved. FIX B (RANDOM '- R -' overlay driven by the sticky random flag in game_render_blocks) is a deviation — the design §2.4 addendum mis-analyzed it. Revert FIX B for live cells; keep the palette static swatch (already faithful). Round 2.
+    - round: 2
+      created_at: "2026-07-12T02:43:26Z"
+      author: jck
+      converging: true
+      signals:
+        - FIX A faithful + sole surviving change; gameplay GAME/PAUSE unaffected (gate only true in SDL2ST_EDIT)
+        - 'FIX B reverted: original ''- R -'' is a one-tick placement redraw artifact (original/blocks.c:2405-2406) overwritten next tick (:1428-1444) and on any full redraw (:2464-2480, editor.c:206-216) — never persistent; the block_type-keyed dead-code-for-live-cells behavior is the faithful state, palette static swatch still shows it'
+        - design §2.4 addendum / stage 8 mis-analysis recorded on xboing-dq5 for spec correction
+      recommendation: stop
+      reason: 'APPROVE. FIX A (paddle/ball suppression, SDL2ST_EDIT && !EDITOR_STATE_TEST) faithful to original/editor.c:206-216 vs :587-621. FIX B fully reverted (verified by direct read): render_block_composite back to 5-arg, case RANDOM_BLK keyed off block_type, game_render_blocks passes only block_type/hit_points. Restoring the ''- R -'' to placement-artifact dead-code matches 1996; the sticky per-frame overlay would not have. Leader-verified build 61/61 both.'

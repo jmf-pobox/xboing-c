@@ -1,0 +1,24 @@
+reflections:
+    - round: 1
+      created_at: "2026-07-11T23:16:08Z"
+      author: jck
+      converging: true
+      signals:
+        - 'APPROVED: RANDOM_BLK read-time normalization matches original/file.c:562-609 (blockP->random checked at write time); §2.4 wording should say ''replicates'' not ''substitutes'' — the HandleRandomBlocks walk was never load-bearing for save, only for editor-grid display which stage 8 already covers'
+        - 'APPROVED: in-list highlight removal (no 1996 equivalent, original/editor.c:270-369); dialogue wording+TEXT_ICON fidelity (all 8 strings already in src/editor_system.c:717,759,802,833,856,860,874,905; YesNoDialogue routes through UserInputDialogueMessage TEXT_ICON per original/misc.c:376-391)'
+        - 'APPROVED independently: two-column palette geometry (col1 0-17, col2 18-24 + counter 1-5 = 30) and SDL2RGN_EDITOR_TYPE {545,650,120,35} both match original/editor.c:329-369 / stage.c:277-279'
+        - 'FINDING 1 (change): HUD gate-add is necessary but insufficient. mode_edit_enter/editor_cb_load_level must sync ctx->level_number from editor''s loaded level, refresh time_bonus_total/time_remaining from level_system_get_time_bonus, and reset specials — mirroring DoLoadLevel (original/editor.c:196-201) + LoadALevel (:869-871). Stage 7 write-set must add src/game_modes.c/src/game_callbacks.c and re-flag jck approval: yes (touches game_ctx fields shared with SDL2ST_GAME)'
+        - 'FINDING 2 (change): right-click inspect (§4.1 rec b) doesn''t survive the per-frame full redraw (game_render_score every frame at game_render.c:1199,1232) — original DisplayScore persists until next click under X11 expose. Needs a held score-display override (value+flag on ctx, consumed by game_render_score, cleared on next click). Re-flag stage 10 jck approval: yes (removes a working right-click-erase editing shortcut)'
+      recommendation: continue
+      reason: Three flagged items approved (RANDOM_BLK read-time normalization is the original's actual save mechanism per original/file.c:562-609; highlight removal correct; dialogue strings already present verbatim in editor_system.c). Two concrete faithfulness gaps require a round-2 spec revision before implementation can be funded.
+    - round: 2
+      created_at: "2026-07-11T23:28:18Z"
+      author: jck
+      converging: true
+      signals:
+        - 'Finding 1 HUD content-sync faithful: LoadALevel (original/editor.c:826-885) confirmed NOT to call TurnSpecialsOff (only DoLoadLevel :196-201); level-number clamp reproduces hardcoded 1 for scratch buffer; timer is static full bonus (SetLevelTimeBonus original/file.c:366, DecLevelTimeBonus only in gameplay level.c:393); special_system_turn_off verified idempotent (special_system.c:126-150)'
+        - 'Finding 2 score-inspect persistence faithful: original/editor.c:525-585 confirms only Button3-down touches scoreWindow (occupied->hitPoints, unoccupied->0), nothing reverts to real score — no-auto-clear overwrite-on-click design matches; game_ctx override mode-gated to EDIT'
+        - §2.4 wording corrected to 'replicates the original save-path check (original/file.c:562-609), not a deviation'; save-path signoff dropped, stage-8 display signoff retained
+        - 'Round-1 approvals stand: RANDOM_BLK read-time normalization, in-list highlight removal, dialogue wording/TEXT_ICON, two-column palette geometry, SDL2RGN_EDITOR_TYPE math'
+      recommendation: stop
+      reason: Both round-1 findings resolved faithfully, verified against original source. No blocking issues. Design approved and ready to fund the staged implement/test missions.
