@@ -88,3 +88,6 @@ docs/*.bcf
 docs/*.blg
 docs/*.run.xml
 
+# ethos runtime (never track): mission locks and any nested local zone
+.punt-labs/**/local/**
+.punt-labs/ethos/missions/**/*.lock
